@@ -150,7 +150,15 @@ namespace ShiftChange
             {
                 if (ProbeVerbose)
                 {
-                    Log.Message($"[ShiftChange] {pawn.LabelShort}: {job.def.defName} ({jobWork.defName}) — targetA has no usable cell");
+                    // Question 2, the awkward half: several job types carry
+                    // their real targets in a QUEUE rather than targetA
+                    // (hauling and harvesting both showed up this way in the
+                    // first session). Report what is actually there, so the
+                    // v1 decision can be "which target do we read" rather
+                    // than "targetA is sometimes empty".
+                    int queued = job.targetQueueA?.Count ?? 0;
+                    Log.Message($"[ShiftChange] {pawn.LabelShort}: {job.def.defName} ({jobWork.defName}) — " +
+                                $"targetA has no usable cell (targetQueueA={queued}, targetB valid={job.targetB.IsValid})");
                 }
                 return;
             }
@@ -161,7 +169,7 @@ namespace ShiftChange
 
             if (ProbeVerbose)
             {
-                LogThrottled(pawn, jobWork, room,
+                LogThrottled(pawn, jobWork, room, "seen",
                     $"[ShiftChange] seen: {pawn.LabelShort} {job.def.defName} work={jobWork.defName} " +
                     $"forced={job.playerForced} room={role?.defName ?? "none"} roomWork={roomWork?.defName ?? "none"}");
             }
@@ -177,6 +185,14 @@ namespace ShiftChange
             Building stand = FindStand(room);
             if (stand == null)
             {
+                // NOT silent. A matched room with no stand is the most
+                // informative near-miss the probe can see, and reporting the
+                // map-wide count separates "none in this room" from "none
+                // built anywhere" without a second play session.
+                LogThrottled(pawn, jobWork, room, "nostand",
+                    $"[ShiftChange] SKIP (no stand in room): {pawn.LabelShort} → {job.def.defName} " +
+                    $"work={jobWork.defName} room={role.defName} roomID={room.ID} " +
+                    $"standsOnMap={CountStandsOnMap(map)}");
                 return;
             }
 
@@ -200,10 +216,21 @@ namespace ShiftChange
                 verdict = "WOULD SWAP";
             }
 
-            LogThrottled(pawn, jobWork, room,
+            LogThrottled(pawn, jobWork, room, "verdict",
                 $"[ShiftChange] {verdict}: {pawn.LabelShort} → {job.def.defName} " +
                 $"work={jobWork.defName} room={role.defName} stand={stand.LabelShort} " +
                 $"standCell={stand.Position} pawnCell={pawn.Position} targetCell={cell}");
+        }
+
+        private static int CountStandsOnMap(Map map)
+        {
+            int total = 0;
+            List<ThingDef> defs = StandDefs;
+            for (int i = 0; i < defs.Count; i++)
+            {
+                total += map.listerThings.ThingsOfDef(defs[i]).Count;
+            }
+            return total;
         }
 
         private static Building FindStand(Room room)
@@ -222,11 +249,20 @@ namespace ShiftChange
             return null;
         }
 
-        private static void LogThrottled(Pawn pawn, WorkTypeDef work, Room room, string message)
+        /// <summary>
+        /// One line per (pawn, work type, room, <paramref name="tag"/>) per
+        /// throttle window. The tag matters: without it the verbose "seen"
+        /// line and the verdict line share a key, so turning verbosity on
+        /// silently suppresses every verdict — which is precisely the case the
+        /// probe exists to catch. Found in play 2026-08-07, first session.
+        /// </summary>
+        private static void LogThrottled(Pawn pawn, WorkTypeDef work, Room room, string tag, string message)
         {
             int key = Gen.HashCombineInt(
-                Gen.HashCombineInt(pawn.thingIDNumber, work.shortHash),
-                room?.ID ?? 0);
+                Gen.HashCombineInt(
+                    Gen.HashCombineInt(pawn.thingIDNumber, work?.shortHash ?? 0),
+                    room?.ID ?? 0),
+                tag.GetHashCode());
 
             int now = Find.TickManager.TicksGame;
             int last;
