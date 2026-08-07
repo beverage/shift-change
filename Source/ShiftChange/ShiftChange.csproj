@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shift Change's only assembly. Same shape as Fine Establishments'
+       (DEC-023): RimWorld is .NET Framework 4.7.2, game references come from
+       Krafs.Rimworld.Ref (no game-DLL copying), Harmony from Lib.Harmony.
+       Both are compile-time only — ExcludeAssets keeps their DLLs out of
+       Assemblies/, because RimWorld loads every DLL it finds there and
+       Harmony ships as its own mod (brrainz.harmony). -->
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>ShiftChange</RootNamespace>
+    <AssemblyName>ShiftChange</AssemblyName>
+    <Version>0.0.1</Version>
+
+    <!-- Straight into the mod's load path, no framework subfolder, no pdb —
+         the game cannot read one, and stack traces stay useful through
+         Harmony's own annotations. -->
+    <OutputPath>../../Assemblies/</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <DebugType>none</DebugType>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.*" ExcludeAssets="runtime" />
+    <PackageReference Include="Lib.Harmony" Version="2.*" ExcludeAssets="runtime" />
+    <!-- net472 reference assemblies, so this builds on a machine with only
+         the modern dotnet SDK (this one is a Mac; there is no Framework
+         targeting pack outside the package). -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

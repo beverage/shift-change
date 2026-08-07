@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# C# build output
+obj/
+bin/
+
+# RimWorld's texture cache. The game never writes these itself, but tools on
+# this machine do (FasterGameLoading-Continued, RimPy, RimSort) — and a .dds
+# beside a PNG makes the game ignore the PNG entirely, with no timestamp check.
+# Shift Change ships no textures today; the rule is here so it cannot start.
+*.dds

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>Shift Change</name>
+  <author>MrBeverage</author>
+  <packageId>MrBeverage.ShiftChange</packageId>
+  <supportedVersions>
+    <li>1.6</li>
+  </supportedVersions>
+  <modDependencies>
+    <li>
+      <packageId>brrainz.harmony</packageId>
+      <displayName>Harmony</displayName>
+      <steamWorkshopUrl>https://steamcommunity.com/sharedfiles/filedetails/?id=2009463077</steamWorkshopUrl>
+      <downloadUrl>https://github.com/pardeike/HarmonyRimWorld/releases/latest</downloadUrl>
+    </li>
+    <li>
+      <packageId>Ludeon.RimWorld.Odyssey</packageId>
+      <displayName>Odyssey</displayName>
+    </li>
+  </modDependencies>
+  <loadAfter>
+    <li>Ludeon.RimWorld</li>
+    <li>Ludeon.RimWorld.Odyssey</li>
+    <li>brrainz.harmony</li>
+  </loadAfter>
+  <description>Pawns change into the right clothes for the room they work in, and back out again afterwards.
+
+Assign an outfit stand to a colonist and stand it in a work room. When that colonist takes on automatic work of the room's kind — doctoring in the hospital, researching in the laboratory — they change into whatever the stand holds before they start, and change back when they leave.
+
+Deliberately narrow:
+- Automatic work only. Ordering a doctor to tend someone right now never sends them across the base to change first.
+- One stand, one owner. Their uniform is their own, and nobody walks off in someone else's clothes.
+- Never during a raid or other threat.
+
+Adds no clothing of its own. It uses the vanilla outfit stand and whatever apparel you put on it.
+
+Requires Odyssey (for the outfit stand) and Harmony.</description>
+</ModMetaData>
