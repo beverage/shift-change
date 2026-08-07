@@ -42,6 +42,21 @@ namespace ShiftChange
             }
         }
 
+        /// <summary>
+        /// Vanilla's label is always "Set owner" — the base comp never reports
+        /// who owns the thing, anywhere. Beds only appear to, because
+        /// <c>Building_Bed.GetInspectString</c> writes the owner itself. On a
+        /// stand that leaves ownership invisible outside the assign dialog, so
+        /// name it on the button.
+        /// </summary>
+        protected override string GetAssignmentGizmoLabel()
+        {
+            List<Pawn> assigned = AssignedPawnsForReading;
+            return assigned.Count > 0
+                ? "ShiftChange.OwnerGizmoLabel".Translate(assigned[0].LabelShort)
+                : base.GetAssignmentGizmoLabel();
+        }
+
         protected override string GetAssignmentGizmoDesc()
         {
             WorkTypeDef work = parent.TryGetComp<CompShiftStand>()?.WorkType;

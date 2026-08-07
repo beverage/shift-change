@@ -163,8 +163,18 @@ namespace ShiftChange
                 return false;
             }
 
-            WorkTypeDef work = job.workGiverDef?.workType;
+            WorkGiverDef giver = job.workGiverDef;
+            WorkTypeDef work = giver?.workType;
             if (work == null || !target.IsValid)
+            {
+                return false;
+            }
+
+            // Emergency work givers exist precisely because something cannot
+            // wait — DoctorTendEmergency is the obvious one. A pawn bleeding
+            // out should not be kept waiting while the doctor scrubs in, and
+            // the flag is a cleaner signal than guessing from the job def.
+            if (giver.emergency)
             {
                 return false;
             }

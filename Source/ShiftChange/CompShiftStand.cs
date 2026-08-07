@@ -196,7 +196,12 @@ namespace ShiftChange
             {
                 return line + "\n" + "ShiftChange.InspectUnassigned".Translate();
             }
-            return line + (OnShift ? "\n" + "ShiftChange.InspectOnShift".Translate(owner.LabelShort) : "");
+            // Say the owner's name here too, not only on the gizmo: the base
+            // comp reports it nowhere, and a stand that looks unassigned is
+            // indistinguishable from one that simply never fires.
+            return line + "\n" + (OnShift
+                ? "ShiftChange.InspectOnShift".Translate(owner.LabelShort)
+                : "ShiftChange.InspectOwner".Translate(owner.LabelShort));
         }
 
         public override IEnumerable<Gizmo> CompGetGizmosExtra()

@@ -3,7 +3,9 @@
 
   <ShiftChange.InspectWork>Work uniform for: {0}</ShiftChange.InspectWork>
   <ShiftChange.InspectUnassigned>No owner assigned — behaves as an ordinary outfit stand.</ShiftChange.InspectUnassigned>
+  <ShiftChange.InspectOwner>Owner: {0}</ShiftChange.InspectOwner>
   <ShiftChange.InspectOnShift>{0} is wearing this outfit.</ShiftChange.InspectOnShift>
+  <ShiftChange.OwnerGizmoLabel>Owner: {0}</ShiftChange.OwnerGizmoLabel>
 
   <ShiftChange.SetWorkTypeLabel>Set work type</ShiftChange.SetWorkTypeLabel>
   <ShiftChange.SetWorkTypeDesc>This stand dresses its owner for: {0} ({1}).\n\nThe owner changes into it before starting automatic work of that kind in this room, and changes back when they leave.</ShiftChange.SetWorkTypeDesc>
