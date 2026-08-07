@@ -118,7 +118,6 @@ namespace ShiftChange
                 {
                     if (!toStore.Contains(item))
                     {
-                        WarnIfRequired(item);
                         toStore.Add(item);
                     }
                 }
@@ -150,28 +149,18 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>
-        /// A royal title or ideology role can REQUIRE a garment, and nothing in
-        /// vanilla stops a stand swap removing it — the optimizer only scores
-        /// requirements (×25/×10) and the vanilla driver checks the much
-        /// narrower <c>IsLocked</c>. Principal's call (2026-08-07) is that the
-        /// penalty is not worth blocking the feature over, so this warns once
-        /// rather than refusing.
-        /// </summary>
-        private void WarnIfRequired(Apparel apparel)
-        {
-            foreach (ApparelRequirementWithSource requirement in pawn.apparel.AllRequirements)
-            {
-                if (requirement.requirement.RequiredForPawn(pawn, apparel.def))
-                {
-                    Log.WarningOnce(
-                        $"[ShiftChange] {pawn.LabelShort} is swapping out of {apparel.LabelCap}, which a title or "
-                        + "role requires. The uniform wins; expect the usual unmet-requirement penalty while on shift.",
-                        Gen.HashCombineInt(pawn.thingIDNumber, apparel.def.shortHash));
-                    return;
-                }
-            }
-        }
+        // Royal titles and ideology roles can REQUIRE a garment, and nothing in
+        // vanilla stops a stand swap removing it — JobGiver_OptimizeApparel
+        // only scores requirements (×25/×10) and vanilla's own stand driver
+        // checks the much narrower IsLocked. We deliberately do not guard it
+        // (principal's call, 2026-08-07). Blocking could only ever mean
+        // refusing the uniform, since the guard's lever is "don't remove the
+        // robe" — so a titled pawn would silently never change, which is worse
+        // than the mood hit. Nor do we warn: assigning this pawn to this stand
+        // and stocking it are deliberate player acts, and vanilla already
+        // surfaces the consequence where a player would look for it, via
+        // ThoughtWorker_RoyalTitleApparelRequirementNotMet and
+        // Thought_IdeoRoleApparelRequirementNotMet.
 
         protected override IEnumerable<Toil> MakeNewToils()
         {
