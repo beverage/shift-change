@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+
+  <ShiftChange.InspectWork>Work uniform for: {0}</ShiftChange.InspectWork>
+  <ShiftChange.InspectUnassigned>No owner assigned — behaves as an ordinary outfit stand.</ShiftChange.InspectUnassigned>
+  <ShiftChange.InspectOnShift>{0} is wearing this outfit.</ShiftChange.InspectOnShift>
+
+  <ShiftChange.SetWorkTypeLabel>Set work type</ShiftChange.SetWorkTypeLabel>
+  <ShiftChange.SetWorkTypeDesc>This stand dresses its owner for: {0} ({1}).\n\nThe owner changes into it before starting automatic work of that kind in this room, and changes back when they leave.</ShiftChange.SetWorkTypeDesc>
+  <ShiftChange.WorkTypeAuto>Automatic (from the room)</ShiftChange.WorkTypeAuto>
+  <ShiftChange.FromRoom>from the room</ShiftChange.FromRoom>
+  <ShiftChange.Manual>set manually</ShiftChange.Manual>
+  <ShiftChange.None>nothing</ShiftChange.None>
+
+  <ShiftChange.AssignDesc>Choose who changes into this outfit before {0} in this room.</ShiftChange.AssignDesc>
+  <ShiftChange.AssignDescNoWork>Choose who owns this stand. It has no work type yet — either put it in a room with a role, or set one manually.</ShiftChange.AssignDescNoWork>
+
+</LanguageData>

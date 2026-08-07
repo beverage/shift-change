@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <!-- The swap itself, in both directions. Not player-startable: it is only
+       ever inserted ahead of a work job by Patch_JobInterception. -->
+  <JobDef>
+    <defName>ShiftChange_SwapAtStand</defName>
+    <driverClass>ShiftChange.JobDriver_SwapAtStand</driverClass>
+    <reportString>changing clothes at TargetA.</reportString>
+    <casualInterruptible>false</casualInterruptible>
+  </JobDef>
+
+</Defs>

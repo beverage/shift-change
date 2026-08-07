@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Root element is <Patch>, singular. <Patches> silently discards every
+     operation in the file. -->
+<Patch>
+
+  <!-- Ownership and a work type for the VANILLA outfit stand, rather than a
+       stand of our own. A new ThingDef would need either new art — which is
+       exactly what this mod exists not to ship — or a copy of the vanilla
+       texture, giving the player two identical-looking buildings in the
+       architect menu. Adding to the vanilla def also means existing stands in
+       existing saves gain the gizmo on load, with nothing to rebuild.
+
+       An unassigned stand is untouched by all of this and behaves exactly as
+       it does in vanilla.
+
+       PatchOperationConditional so the whole thing is a no-op without Odyssey
+       (the stand is Odyssey content) instead of logging a failed xpath. The
+       def carries no <comps> node at all, so this Add creates one. -->
+  <Operation Class="PatchOperationConditional">
+    <xpath>/Defs/ThingDef[defName="Building_OutfitStand"]</xpath>
+    <match Class="PatchOperationAdd">
+      <xpath>/Defs/ThingDef[defName="Building_OutfitStand"]</xpath>
+      <value>
+        <comps>
+          <li Class="ShiftChange.CompProperties_ShiftStand" />
+          <li Class="CompProperties_AssignableToPawn">
+            <compClass>ShiftChange.CompAssignableToPawn_ShiftStand</compClass>
+            <drawAssignmentOverlay>true</drawAssignmentOverlay>
+            <drawUnownedAssignmentOverlay>false</drawUnownedAssignmentOverlay>
+          </li>
+        </comps>
+      </value>
+    </match>
+  </Operation>
+
+</Patch>
