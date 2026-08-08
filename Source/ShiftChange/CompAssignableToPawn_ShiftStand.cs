@@ -129,8 +129,8 @@ namespace ShiftChange
         // ledger. Since pooling landed, an unassigned stand is still perfectly
         // usable, so a pawn who is mid-shift keeps their claim and can still
         // change back — the stand simply returns to the pool afterwards.
-        // Reaping a ledger whose borrower is *gone* is Patch_Ownership's job,
-        // and it has to be, because a pool borrower was never assigned here at
-        // all.
+        // Reaping a ledger whose borrower is *gone* is Patch_UnclaimStands'
+        // job, and it has to be, because a pool borrower was never assigned
+        // here at all.
     }
 }

@@ -7,7 +7,8 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// Unassigns a pawn's stand when they stop being the colony's problem.
+    /// When vanilla unclaims everything a lost pawn owned, unclaim their
+    /// stands too — assigned AND borrowed.
     ///
     /// This has to exist because <c>Pawn_Ownership.UnclaimAll()</c> clears a
     /// HARDCODED list — bed, grave, throne, deathrest casket
@@ -19,16 +20,16 @@ namespace ShiftChange
     /// (<c>:2565</c>), <c>PreTraded</c> (<c>:2599</c>) and <c>PreKidnapped</c>
     /// (<c>:2645</c>) — exactly the set players already expect from beds.
     ///
-    /// It also reaps the pawn's BORROWED stands, which is a separate job since
-    /// pooling landed: a pawn who borrowed an unassigned stand was never
-    /// assigned to anything, so unassignment alone would miss them entirely and
-    /// their clothes would hold a pool stand hostage forever. Their garments
-    /// stay in the stand as ordinary contents, and vanilla's
+    /// The borrowed half is a separate job since pooling landed: a pawn who
+    /// borrowed an unassigned stand was never assigned to anything, so
+    /// unassignment alone would miss them entirely and their clothes would
+    /// hold a pool stand hostage forever. Their garments stay in the stand as
+    /// ordinary contents, and vanilla's
     /// <c>TryDropThingsToMakeRoomForThingOfDef</c> evicts whatever conflicts the
     /// first time someone else claims it. No reclaim logic of our own.
     /// </summary>
     [HarmonyPatch(typeof(Pawn_Ownership), nameof(Pawn_Ownership.UnclaimAll))]
-    public static class Patch_Ownership
+    public static class Patch_UnclaimStands
     {
         // ReSharper disable once InconsistentNaming — Harmony field injection.
         public static void Postfix(Pawn ___pawn)
