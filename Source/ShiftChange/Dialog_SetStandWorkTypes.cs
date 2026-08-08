@@ -13,6 +13,16 @@ namespace ShiftChange
     /// (which is Crafting work). A float menu of single choices could not say
     /// that (principal, 2026-08-08).
     ///
+    /// Sized to the MODLIST, not to vanilla (same day): heavily modded games
+    /// carry 40+ work types, so the window derives its column count from the
+    /// list length and its height from the resulting rows, clamped to the
+    /// screen — the scrollbar appears only when the clamp bites. Checkboxes
+    /// sit at a FIXED x just after the widest label: a straight, scannable
+    /// line per column, close enough to its own labels that a box cannot read
+    /// as belonging to the next column (the failure mode of far-right
+    /// alignment). Box-before-label would be clearer still, but vanilla never
+    /// does it, so neither do we.
+    ///
     /// Three states, kept canonical by <see cref="CompShiftStand.ToggleWork"/>:
     /// automatic (empty override — the room's defaults apply, and follow the
     /// room if its role changes), a custom set, or excluded. The checkboxes
@@ -22,15 +32,22 @@ namespace ShiftChange
     public class Dialog_SetStandWorkTypes : Window
     {
         private const float RowHeight = 26f;
+        private const float CheckboxSize = 24f;
+        private const float LabelGap = 10f;
+        private const float MaxLabelWidth = 260f;
+        private const float ColumnGutter = 36f;
+        private const float ScrollbarAllowance = 20f;
+        private const float HeaderAllowance = 160f;
+        private const float MinWindowWidth = 420f;
 
-        /// <summary>
-        /// Two columns halve the height — most modlists fit without
-        /// scrolling — and the alphabetical order fills DOWN each column
-        /// then across, like a directory.
-        /// </summary>
-        private const int Columns = 2;
+        /// <summary>Rows a column aims for before the dialog grows another column.</summary>
+        private const int TargetRows = 14;
 
         private readonly CompShiftStand comp;
+        private readonly List<WorkTypeDef> works;
+        private readonly float cellWidth;
+        private readonly int columns;
+        private readonly int rowsPerColumn;
         private Vector2 scroll;
 
         private static string LabelOf(WorkTypeDef w)
@@ -45,9 +62,52 @@ namespace ShiftChange
             doCloseButton = true;
             absorbInputAroundWindow = true;
             closeOnClickedOutside = true;
+
+            // Alphabetical by the label actually shown — scanning for a known
+            // name beats work-tab priority order once the list is long.
+            // Invisible types (Patient, BasicWorker) are noise.
+            works = DefDatabase<WorkTypeDef>.AllDefsListForReading
+                .Where(w => w.visible)
+                .OrderBy(LabelOf)
+                .ToList();
+
+            // The checkbox column sits just past the widest label, so measure
+            // them all once. Capped so one modded novel of a label cannot
+            // stretch every column; the draw side truncates to match.
+            GameFont previousFont = Text.Font;
+            Text.Font = GameFont.Small;
+            float widestLabel = 0f;
+            for (int i = 0; i < works.Count; i++)
+            {
+                widestLabel = Mathf.Max(widestLabel, Text.CalcSize(LabelOf(works[i])).x);
+            }
+            Text.Font = previousFont;
+            cellWidth = Mathf.Min(widestLabel + LabelGap, MaxLabelWidth) + CheckboxSize;
+
+            // Enough columns to keep each near TargetRows, clamped to what the
+            // screen can hold side by side.
+            int wanted = Mathf.Max(1, Mathf.CeilToInt(works.Count / (float)TargetRows));
+            float usableWidth = UI.screenWidth * 0.9f - Margin * 2f - ScrollbarAllowance;
+            int fitting = Mathf.Max(1, Mathf.FloorToInt((usableWidth + ColumnGutter) / (cellWidth + ColumnGutter)));
+            columns = Mathf.Clamp(wanted, 1, fitting);
+            rowsPerColumn = Mathf.Max(1, Mathf.CeilToInt(works.Count / (float)columns));
         }
 
-        public override Vector2 InitialSize => new Vector2(520f, 500f);
+        public override Vector2 InitialSize
+        {
+            get
+            {
+                float width = Margin * 2f + columns * cellWidth
+                    + (columns - 1) * ColumnGutter + ScrollbarAllowance;
+                width = Mathf.Clamp(width, MinWindowWidth, UI.screenWidth * 0.9f);
+
+                float height = Margin * 2f + HeaderAllowance
+                    + rowsPerColumn * RowHeight + CloseButSize.y + 10f;
+                height = Mathf.Min(height, UI.screenHeight * 0.85f);
+
+                return new Vector2(width, height);
+            }
+        }
 
         public override void DoWindowContents(Rect inRect)
         {
@@ -85,33 +145,28 @@ namespace ShiftChange
             listing.Label("ShiftChange.WorkTypesExplainer".Translate());
             listing.Gap(4f);
 
-            // Alphabetical by the label actually shown — scanning for a known
-            // name beats work-tab priority order once the list is long
-            // (principal, 2026-08-08). Invisible types (Patient, BasicWorker)
-            // are noise.
-            List<WorkTypeDef> works = DefDatabase<WorkTypeDef>.AllDefsListForReading
-                .Where(w => w.visible)
-                .OrderBy(LabelOf)
-                .ToList();
-
-            int rowsPerColumn = Mathf.Max(1, Mathf.CeilToInt(works.Count / (float)Columns));
             Rect outRect = listing.GetRect(content.height - listing.CurHeight);
-            Rect viewRect = new Rect(0f, 0f, outRect.width - 16f, rowsPerColumn * RowHeight);
-            float columnWidth = viewRect.width / Columns;
+            Rect viewRect = new Rect(0f, 0f,
+                columns * cellWidth + (columns - 1) * ColumnGutter,
+                rowsPerColumn * RowHeight);
+            float labelWidth = cellWidth - CheckboxSize;
+
             Widgets.BeginScrollView(outRect, ref scroll, viewRect);
             for (int i = 0; i < works.Count; i++)
             {
                 WorkTypeDef work = works[i];
                 Rect cell = new Rect(
-                    i / rowsPerColumn * columnWidth,
+                    i / rowsPerColumn * (cellWidth + ColumnGutter),
                     i % rowsPerColumn * RowHeight,
-                    columnWidth - 12f,
+                    cellWidth,
                     RowHeight - 2f);
                 bool on = comp.HandlesWork(work);
                 bool was = on;
-                // Checkbox hugs its label rather than the column's far edge,
-                // so column one's boxes cannot read as column two's.
-                Widgets.CheckboxLabeled(cell, LabelOf(work), ref on, placeCheckboxNearText: true);
+                // Default placement puts the box at the cell's right edge —
+                // which, with the cell sized to the widest label, is a fixed
+                // aligned column just past the text, and the gutter beyond it
+                // is dead space no box can wander into.
+                Widgets.CheckboxLabeled(cell, LabelOf(work).Truncate(labelWidth - 4f), ref on);
                 if (on != was)
                 {
                     comp.ToggleWork(work);
