@@ -154,6 +154,7 @@ namespace ShiftChange
             // room for one outfit, so the outgoing set must leave before the
             // incoming set can be deposited later in the same pass.
             List<Apparel> stored = new List<Apparel>();
+            List<Apparel> storedForced = new List<Apparel>();
             foreach (Apparel apparel in toStore)
             {
                 if (apparel != null && pawn.apparel.WornApparel.Contains(apparel))
@@ -161,6 +162,14 @@ namespace ShiftChange
                     if (undressing)
                     {
                         pawn.outfits?.forcedHandler?.SetForced(apparel, forced: false);
+                    }
+                    else if (pawn.outfits != null && pawn.outfits.forcedHandler.IsForced(apparel))
+                    {
+                        // Capture BEFORE Remove: Notify_ApparelRemoved clears
+                        // the forced flag on every removal
+                        // (Pawn_ApparelTracker.cs:784-790), so this is the last
+                        // moment the fact exists anywhere.
+                        storedForced.Add(apparel);
                     }
                     pawn.apparel.Remove(apparel);
                     stored.Add(apparel);
@@ -184,6 +193,15 @@ namespace ShiftChange
                     // Forced, or JobGiver_OptimizeApparel undoes this at once.
                     pawn.outfits?.forcedHandler?.SetForced(apparel, forced: true);
                 }
+                else if (comp.WasForcedWhenStored(apparel))
+                {
+                    // Restore what check-in destroyed: this garment was
+                    // force-worn before the shift, so it comes back force-worn
+                    // — otherwise the player's explicit choice is silently
+                    // downgraded to policy-managed and the optimizer swaps it
+                    // away. Must run before NotifyUndressed clears the ledger.
+                    pawn.outfits?.forcedHandler?.SetForced(apparel, forced: true);
+                }
                 issued.Add(apparel);
             }
 
@@ -201,7 +219,7 @@ namespace ShiftChange
             }
             else
             {
-                comp.NotifyDressed(pawn, stored, issued);
+                comp.NotifyDressed(pawn, stored, issued, storedForced);
             }
         }
     }

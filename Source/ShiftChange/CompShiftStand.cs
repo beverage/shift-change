@@ -37,6 +37,15 @@ namespace ShiftChange
         private List<Apparel> issuedUniform = new List<Apparel>();
 
         /// <summary>
+        /// The subset of <see cref="storedOwnerApparel"/> that was FORCE-WORN
+        /// when it was checked in. Vanilla clears the forced flag on every
+        /// removal (<c>Pawn_ApparelTracker.Notify_ApparelRemoved:784-790</c>),
+        /// so without this record a force-worn duster comes back from a shift
+        /// as ordinary policy-managed clothing and the optimizer swaps it away.
+        /// </summary>
+        private List<Apparel> storedForcedApparel = new List<Apparel>();
+
+        /// <summary>
         /// Who currently has this stand's uniform on. This — not the assigned
         /// owner — is the truth for the return trip, because an unassigned
         /// stand is a POOL stand that anyone capable may borrow.
@@ -186,6 +195,7 @@ namespace ShiftChange
                 // deal with whatever is inside.
                 storedOwnerApparel.Clear();
                 issuedUniform.Clear();
+                storedForcedApparel.Clear();
             }
         }
 
@@ -203,6 +213,7 @@ namespace ShiftChange
             base.PostExposeData();
             Scribe_Collections.Look(ref storedOwnerApparel, "storedOwnerApparel", LookMode.Reference);
             Scribe_Collections.Look(ref issuedUniform, "issuedUniform", LookMode.Reference);
+            Scribe_Collections.Look(ref storedForcedApparel, "storedForcedApparel", LookMode.Reference);
             Scribe_References.Look(ref borrower, "borrower");
             Scribe_Defs.Look(ref workTypeOverride, "workTypeOverride");
             Scribe_Values.Look(ref excluded, "excluded", defaultValue: false);
@@ -216,8 +227,10 @@ namespace ShiftChange
                 // container.
                 storedOwnerApparel = storedOwnerApparel ?? new List<Apparel>();
                 issuedUniform = issuedUniform ?? new List<Apparel>();
+                storedForcedApparel = storedForcedApparel ?? new List<Apparel>();
                 storedOwnerApparel.RemoveAll(a => a == null);
                 issuedUniform.RemoveAll(a => a == null);
+                storedForcedApparel.RemoveAll(a => a == null);
             }
         }
 
@@ -225,12 +238,17 @@ namespace ShiftChange
         /// Records a completed dressing: <paramref name="stored"/> went into
         /// the stand, <paramref name="issued"/> came out onto the pawn.
         /// </summary>
-        public void NotifyDressed(Pawn pawn, List<Apparel> stored, List<Apparel> issued)
+        public void NotifyDressed(Pawn pawn, List<Apparel> stored, List<Apparel> issued, List<Apparel> storedForced)
         {
             storedOwnerApparel.Clear();
             storedOwnerApparel.AddRange(stored);
             issuedUniform.Clear();
             issuedUniform.AddRange(issued);
+            storedForcedApparel.Clear();
+            if (storedForced != null)
+            {
+                storedForcedApparel.AddRange(storedForced);
+            }
             if (issuedUniform.Count > 0)
             {
                 borrower = pawn;
@@ -248,8 +266,19 @@ namespace ShiftChange
         {
             storedOwnerApparel.Clear();
             issuedUniform.Clear();
+            storedForcedApparel.Clear();
             borrower = null;
             OnShiftStands.Remove(pawn);
+        }
+
+        /// <summary>
+        /// Whether this garment was force-worn at check-in, and should have the
+        /// flag restored when it comes back on. Consult BEFORE
+        /// <see cref="NotifyUndressed"/> clears the ledger.
+        /// </summary>
+        public bool WasForcedWhenStored(Apparel apparel)
+        {
+            return storedForcedApparel.Contains(apparel);
         }
 
         public List<Apparel> StoredOwnerApparelForReading => storedOwnerApparel;
@@ -271,6 +300,7 @@ namespace ShiftChange
             }
             storedOwnerApparel.Clear();
             issuedUniform.Clear();
+            storedForcedApparel.Clear();
             borrower = null;
         }
 
