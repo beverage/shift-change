@@ -43,6 +43,16 @@ namespace ShiftChange
         /// <summary>Rows a column aims for before the dialog grows another column.</summary>
         internal const int TargetRows = 14;
 
+        /// <summary>
+        /// Mirror of <c>Verse.Window.Margin</c>'s default (18f,
+        /// <c>Window.cs:104</c>), NOT a read of it: Margin is a protected base
+        /// member, and hot-swapped bodies live on a twin type that the
+        /// protected-access rule does not recognise as a subclass — reading it
+        /// post-swap throws MethodAccessException (found in play 2026-08-08).
+        /// We never override Margin, so the default is exact.
+        /// </summary>
+        internal const float WindowMargin = 18f;
+
         internal readonly CompShiftStand comp;
         internal readonly List<WorkTypeDef> works;
         internal readonly float cellWidth;
@@ -87,7 +97,7 @@ namespace ShiftChange
             // Enough columns to keep each near TargetRows, clamped to what the
             // screen can hold side by side.
             int wanted = Mathf.Max(1, Mathf.CeilToInt(works.Count / (float)TargetRows));
-            float usableWidth = UI.screenWidth * 0.9f - Margin * 2f - ScrollbarAllowance;
+            float usableWidth = UI.screenWidth * 0.9f - WindowMargin * 2f - ScrollbarAllowance;
             int fitting = Mathf.Max(1, Mathf.FloorToInt((usableWidth + ColumnGutter) / (cellWidth + ColumnGutter)));
             columns = Mathf.Clamp(wanted, 1, fitting);
             rowsPerColumn = Mathf.Max(1, Mathf.CeilToInt(works.Count / (float)columns));
@@ -97,11 +107,11 @@ namespace ShiftChange
         {
             get
             {
-                float width = Margin * 2f + columns * cellWidth
+                float width = WindowMargin * 2f + columns * cellWidth
                     + (columns - 1) * ColumnGutter + ScrollbarAllowance;
                 width = Mathf.Clamp(width, MinWindowWidth, UI.screenWidth * 0.9f);
 
-                float height = Margin * 2f + HeaderAllowance
+                float height = WindowMargin * 2f + HeaderAllowance
                     + rowsPerColumn * RowHeight + CloseButSize.y + 10f;
                 height = Mathf.Min(height, UI.screenHeight * 0.85f);
 

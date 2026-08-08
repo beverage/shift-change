@@ -107,9 +107,13 @@ namespace ShiftChange
             }
             // With pooling off an unassigned stand is not "shared", it is
             // simply unowned — vanilla's own "Set owner" says that best.
+            // Inlined rather than base.GetAssignmentGizmoLabel(): the base is
+            // PROTECTED (CompAssignableToPawn.cs:154-156), and hot-swapped
+            // bodies on the twin type cannot pass the protected-access check
+            // — the same failure Window.Margin produced (2026-08-08).
             return ShiftChangeMod.PoolingEnabled
                 ? "ShiftChange.PoolGizmoLabel".Translate()
-                : base.GetAssignmentGizmoLabel();
+                : "CommandThingSetOwnerLabel".Translate();
         }
 
         protected override string GetAssignmentGizmoDesc()
