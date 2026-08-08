@@ -210,7 +210,19 @@ namespace ShiftChange
                 // Vanilla's own eviction: anything already in the stand that
                 // cannot be worn together with this gets dropped near it.
                 stand.TryDropThingsToMakeRoomForThingOfDef(apparel.def);
-                stand.AddApparel(apparel);
+                if (!stand.AddApparel(apparel))
+                {
+                    // The garment is detached from the pawn and refused by the
+                    // stand — held by nothing. Drop it on the floor, where it
+                    // survives; doing nothing here would delete it from the
+                    // world. (Vanilla's driver takes the same gamble
+                    // unchecked; a mod relaxing the stand's storage
+                    // invariants would lose items through it.)
+                    if (!GenPlace.TryPlaceThing(apparel, stand.Position, stand.Map, ThingPlaceMode.Near))
+                    {
+                        Log.Error("[ShiftChange] could not store or place " + apparel.LabelCap + " — it may be lost.");
+                    }
+                }
             }
 
             if (undressing)

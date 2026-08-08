@@ -156,8 +156,15 @@ namespace ShiftChange
             }
         }
 
+        /// <summary>Called by SessionGuard when the loaded game changes.</summary>
+        internal static void ResetSessionState()
+        {
+            OnShiftStands.Clear();
+        }
+
         public static CompShiftStand OnShiftStandFor(Pawn pawn)
         {
+            SessionGuard.Ensure();
             CompShiftStand comp;
             if (!OnShiftStands.TryGetValue(pawn, out comp))
             {
@@ -178,6 +185,7 @@ namespace ShiftChange
         public override void PostSpawnSetup(bool respawningAfterLoad)
         {
             base.PostSpawnSetup(respawningAfterLoad);
+            SessionGuard.Ensure();
 
             // Rebuild from the BORROWER, not the assigned owner. Inferring it
             // from ownership was only ever right by coincidence — reassign a

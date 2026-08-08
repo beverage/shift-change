@@ -53,6 +53,28 @@ namespace ShiftChange
                 }
 
                 bool canTake = true;
+
+                // Against candidates already accepted this pass, not only the
+                // worn list. The stand's one-outfit invariant normally makes
+                // two conflicting garments impossible to stock — but that
+                // invariant lives in Building_OutfitStand's own code
+                // (HasRoomForApparelOfDef), not here, and if a storage mod
+                // relaxes it, Wear() would silently drop the earlier garment
+                // on the floor. Checked first because it needs no
+                // displacement bookkeeping to roll back.
+                for (int k = 0; k < toWear.Count; k++)
+                {
+                    if (!ApparelUtility.CanWearTogether(candidate.def, toWear[k].def, pawn.RaceProps.body))
+                    {
+                        canTake = false;
+                        break;
+                    }
+                }
+                if (!canTake)
+                {
+                    continue;
+                }
+
                 int storeCountBefore = toStore.Count;
                 for (int j = 0; j < worn.Count; j++)
                 {

@@ -53,6 +53,18 @@ namespace ShiftChange
 
         private static readonly Dictionary<int, int> LastBlockedTick = new Dictionary<int, int>();
 
+        /// <summary>
+        /// Called by SessionGuard when the loaded game changes. This map is
+        /// keyed by thingIDNumber and stamped with TicksGame — both restart
+        /// per save, so stale entries are not merely leaked but WRONG: an
+        /// old entry can sit in the future and block a same-ID pawn from
+        /// swapping until the new game's clock catches up.
+        /// </summary>
+        internal static void ResetSessionState()
+        {
+            LastBlockedTick.Clear();
+        }
+
         private static List<ThingDef> standDefs;
 
         private static List<ThingDef> StandDefs
@@ -97,6 +109,7 @@ namespace ShiftChange
         /// <returns>true if a swap job was started in place of the incoming one.</returns>
         private static bool TryInsertSwap(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker)
         {
+            SessionGuard.Ensure();
             if (job == null || pawn == null || Current.ProgramState != ProgramState.Playing)
             {
                 return false;
@@ -132,6 +145,20 @@ namespace ShiftChange
                 return false;
             }
 
+            // Never divert a direct order or an emergency response — in
+            // EITHER direction. A right-click order means "now", and
+            // emergency work givers (DoctorTendEmergency) exist precisely
+            // because something cannot wait: a pawn bleeding out must not
+            // wait while the doctor changes out of scrubs. The uniform rides
+            // along instead, and the return happens on the next ordinary
+            // automatic job. This must sit ABOVE the return-trip block —
+            // it originally gated only the dressing path, which meant an
+            // emergency in another room was delayed by an undress detour.
+            if (job.playerForced || job.workGiverDef?.emergency == true)
+            {
+                return false;
+            }
+
             int now = Find.TickManager.TicksGame;
             int blocked;
             if (LastBlockedTick.TryGetValue(pawn.thingIDNumber, out blocked)
@@ -158,23 +185,8 @@ namespace ShiftChange
                 return Insert(pawn, tracker, onShift, job, tag, "return");
             }
 
-            if (job.playerForced)
-            {
-                return false;
-            }
-
-            WorkGiverDef giver = job.workGiverDef;
-            WorkTypeDef work = giver?.workType;
+            WorkTypeDef work = job.workGiverDef?.workType;
             if (work == null || !target.IsValid)
-            {
-                return false;
-            }
-
-            // Emergency work givers exist precisely because something cannot
-            // wait — DoctorTendEmergency is the obvious one. A pawn bleeding
-            // out should not be kept waiting while the doctor scrubs in, and
-            // the flag is a cleaner signal than guessing from the job def.
-            if (giver.emergency)
             {
                 return false;
             }
@@ -215,13 +227,18 @@ namespace ShiftChange
 
             Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, stand.parent);
 
+            // Start the swap BEFORE enqueueing the displaced job. Vanilla's
+            // own pattern (Pawn_JobTracker.cs:338-347) enqueues first, but it
+            // runs inside StartJob where nothing can fail between the two
+            // calls. Out here, if StartJob threw after the enqueue, the
+            // prefix's fail-open catch would let the original StartJob
+            // proceed while the same Job object also sat in the queue — one
+            // job, two places, and the tracker chokes on it. StartJob never
+            // consults the queue, so enqueueing after is equivalent on
+            // success and strictly safer on failure.
             inserting = true;
             try
             {
-                // Vanilla's pattern at Pawn_JobTracker.cs:338-347 — the job we
-                // displaced goes to the front of the queue, so it resumes the
-                // moment the pawn has finished changing.
-                tracker.jobQueue.EnqueueFirst(originalJob, tag);
                 tracker.StartJob(swap, JobCondition.None, null, resumeCurJobAfterwards: false,
                     cancelBusyStances: true, null, JobTag.ChangingApparel);
             }
@@ -229,6 +246,8 @@ namespace ShiftChange
             {
                 inserting = false;
             }
+            // The displaced job resumes the moment the pawn finishes changing.
+            tracker.jobQueue.EnqueueFirst(originalJob, tag);
 
             if (Verbose)
             {
