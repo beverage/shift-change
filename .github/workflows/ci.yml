@@ -1,0 +1,121 @@
+# CI stage 1 — build, lint, and the invariants this codebase actually broke
+# once each. Zero secrets; arms itself the first time the repo is pushed to
+# GitHub. Tag a commit v* to additionally get a packaged mod zip on a GitHub
+# Release (Workshop publishing is deliberately NOT here — see the release
+# plan in the constellation's BL-049).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xmllint
+        run: sudo apt-get update && sudo apt-get install -y libxml2-utils
+
+      - name: XML well-formedness
+        run: find About Defs Patches Languages -name '*.xml' -print0 | xargs -0 xmllint --noout
+
+      # ModContentPack.LoadPatches silently discards EVERY operation in a
+      # patch file whose root element is not exactly <Patch> — well-formedness
+      # passes, one log line at runtime is the only symptom. Costs a restart
+      # to notice in game; costs nothing here.
+      - name: Patch files use the singular <Patch> root
+        run: |
+          bad=0
+          for f in Patches/*.xml; do
+            root=$(xmllint --xpath 'name(/*)' "$f")
+            if [ "$root" != "Patch" ]; then
+              echo "::error file=$f::root element is <$root> — must be <Patch>, or every operation in the file is silently discarded"
+              bad=1
+            fi
+          done
+          exit $bad
+
+      # The hot-reload rig (see CLAUDE.md) makes two language features
+      # runtime hazards: a `private` member and an auto-property both compile
+      # clean and then throw FieldAccessException the first time a hot-swapped
+      # body touches them. These greps turn the invisible rules into build
+      # failures. Declaration-shaped patterns only, so comments that mention
+      # the word "private" stay legal.
+      - name: Hot-reload invariants (internal-by-default, no auto-properties)
+        run: |
+          bad=0
+          if grep -rEn '^[[:space:]]*private[[:space:]]' Source/; then
+            echo "::error::private member declared — this codebase is internal-by-default (hot-swapped bodies are cross-assembly; see CLAUDE.md)"
+            bad=1
+          fi
+          if grep -rEn '\{[[:space:]]*get[[:space:]]*;' Source/; then
+            echo "::error::auto-property declared — its backing field is private beyond reach of the IVT grants (see CLAUDE.md)"
+            bad=1
+          fi
+          exit $bad
+
+      # A Debug build is instrumented and references EditCompileReload by
+      # name; the Release build references nothing of it. The committed dll
+      # must be the Release one — this catches the "forgot to rebuild before
+      # staging" mistake mechanically.
+      - name: Committed dll is a clean Release build
+        run: |
+          count=$(ls Assemblies/*.dll | wc -l)
+          if [ "$count" != "1" ]; then
+            echo "::error::Assemblies/ must hold exactly ShiftChange.dll (found $count dlls)"
+            exit 1
+          fi
+          if ls Assemblies/*.dll_orig 2>/dev/null; then
+            echo "::error::a .dll_orig is committed — Debug artifact, sweep with a Release build"
+            exit 1
+          fi
+          if grep -q EditCompileReload Assemblies/ShiftChange.dll; then
+            echo "::error::committed ShiftChange.dll references EditCompileReload — an instrumented Debug build was committed; rebuild with -c Release"
+            exit 1
+          fi
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build (Release)
+        run: dotnet build Source/ShiftChange/ShiftChange.csproj -c Release
+
+      - name: Assemblies swept after Release build
+        run: |
+          ls -la Assemblies/
+          test "$(ls Assemblies/ | wc -l)" = "1"
+
+  release:
+    needs: checks
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build (Release)
+        run: dotnet build Source/ShiftChange/ShiftChange.csproj -c Release
+
+      # The zip is the mod folder a player drops into Mods/ — game-loaded
+      # content plus the human documents, no Source/, no CI, no dev tooling.
+      - name: Assemble mod folder
+        run: |
+          mkdir -p dist/ShiftChange
+          cp -R About Assemblies Defs Patches Languages docs LICENSE README.md dist/ShiftChange/
+          cd dist && zip -r "ShiftChange-${GITHUB_REF_NAME}.zip" ShiftChange
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/ShiftChange-*.zip --title "$GITHUB_REF_NAME" --generate-notes
