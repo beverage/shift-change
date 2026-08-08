@@ -29,7 +29,7 @@ namespace ShiftChange
     /// </summary>
     internal static class EcrWatchdog
     {
-        private const int PollMs = 500;
+        internal const int PollMs = 500;
 
         public static void Start()
         {
@@ -59,7 +59,7 @@ namespace ShiftChange
             EcrLog.Message("watchdog armed on " + path);
         }
 
-        private static void Poll(string path, MethodInfo process)
+        internal static void Poll(string path, MethodInfo process)
         {
             DateTime known = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : default;
             DateTime pending = default;

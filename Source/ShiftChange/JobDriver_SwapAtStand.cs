@@ -22,14 +22,14 @@ namespace ShiftChange
     /// </summary>
     public class JobDriver_SwapAtStand : JobDriver
     {
-        private int duration;
-        private bool undressing;
-        private List<Apparel> toWear = new List<Apparel>();
-        private List<Apparel> toStore = new List<Apparel>();
+        internal int duration;
+        internal bool undressing;
+        internal List<Apparel> toWear = new List<Apparel>();
+        internal List<Apparel> toStore = new List<Apparel>();
 
-        private Building_OutfitStand Stand => job.targetA.Thing as Building_OutfitStand;
+        internal Building_OutfitStand Stand => job.targetA.Thing as Building_OutfitStand;
 
-        private CompShiftStand Comp => Stand?.TryGetComp<CompShiftStand>();
+        internal CompShiftStand Comp => Stand?.TryGetComp<CompShiftStand>();
 
         public override void ExposeData()
         {
@@ -84,13 +84,13 @@ namespace ShiftChange
         /// the stand selector so the two can never disagree about what counts
         /// as wearable.
         /// </summary>
-        private void PlanDress(CompShiftStand comp)
+        internal void PlanDress(CompShiftStand comp)
         {
             SwapPlan.BuildDress(pawn, Stand, toWear, toStore);
         }
 
         /// <summary>Going off shift: uniform back in the stand, own clothes on.</summary>
-        private void PlanUndress(CompShiftStand comp)
+        internal void PlanUndress(CompShiftStand comp)
         {
             foreach (Apparel apparel in comp.IssuedUniformForReading)
             {
@@ -141,7 +141,7 @@ namespace ShiftChange
             yield return transfer;
         }
 
-        private void DoTransfer()
+        internal void DoTransfer()
         {
             Building_OutfitStand stand = Stand;
             CompShiftStand comp = Comp;

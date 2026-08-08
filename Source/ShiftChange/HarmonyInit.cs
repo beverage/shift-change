@@ -40,7 +40,7 @@ namespace ShiftChange
 #if DEBUG
         // ECR invokes any static parameterless method with this name after a
         // reload — the heartbeat that a swap actually landed.
-        private static void OnEditCompileReload()
+        internal static void OnEditCompileReload()
         {
             Log.Message("[ShiftChange] hot reload applied");
         }

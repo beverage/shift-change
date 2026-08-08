@@ -49,9 +49,9 @@ namespace ShiftChange
         [TweakValue("ShiftChange", 0f, 5000f)]
         public static int RetryCooldownTicks = 600;
 
-        private static bool inserting;
+        internal static bool inserting;
 
-        private static readonly Dictionary<int, int> LastBlockedTick = new Dictionary<int, int>();
+        internal static readonly Dictionary<int, int> LastBlockedTick = new Dictionary<int, int>();
 
         /// <summary>
         /// Called by SessionGuard when the loaded game changes. This map is
@@ -102,7 +102,7 @@ namespace ShiftChange
             }
         }
 
-        private static void TryDressMidJob(CompShiftStand stand, Pawn except)
+        internal static void TryDressMidJob(CompShiftStand stand, Pawn except)
         {
             Thing parent = stand?.parent;
             if (parent == null || !parent.Spawned || stand.OnShift)
@@ -182,9 +182,9 @@ namespace ShiftChange
             }
         }
 
-        private static List<ThingDef> standDefs;
+        internal static List<ThingDef> standDefs;
 
-        private static List<ThingDef> StandDefs
+        internal static List<ThingDef> StandDefs
         {
             get
             {
@@ -224,7 +224,7 @@ namespace ShiftChange
         }
 
         /// <returns>true if a swap job was started in place of the incoming one.</returns>
-        private static bool TryInsertSwap(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker)
+        internal static bool TryInsertSwap(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker)
         {
             SessionGuard.Ensure();
             if (job == null || pawn == null || Current.ProgramState != ProgramState.Playing)
@@ -328,7 +328,7 @@ namespace ShiftChange
             return Insert(pawn, tracker, stand, job, tag, "dress");
         }
 
-        private static bool Insert(Pawn pawn, Pawn_JobTracker tracker, CompShiftStand stand,
+        internal static bool Insert(Pawn pawn, Pawn_JobTracker tracker, CompShiftStand stand,
                                    Job originalJob, JobTag? tag, string direction)
         {
             if (!pawn.CanReserveAndReach(stand.parent, PathEndMode.InteractionCell, Danger.Deadly))
@@ -411,7 +411,7 @@ namespace ShiftChange
         /// No free stand simply means no swap. Never queue for one: this is a
         /// nicety and must not become a bottleneck on the work itself.
         /// </summary>
-        private static CompShiftStand FindAvailableStand(Room room, Pawn pawn, WorkTypeDef work)
+        internal static CompShiftStand FindAvailableStand(Room room, Pawn pawn, WorkTypeDef work)
         {
             CompShiftStand best = null;
             bool bestIsPersonal = false;
@@ -460,7 +460,7 @@ namespace ShiftChange
         /// it empty — verified in the spike — so fall back to the queue rather
         /// than treating those as "no location".
         /// </summary>
-        private static IntVec3 TargetCell(Job job, Map map)
+        internal static IntVec3 TargetCell(Job job, Map map)
         {
             IntVec3 cell = job.targetA.HasThing ? job.targetA.Thing.PositionHeld : job.targetA.Cell;
             if (cell.IsValid && cell.InBounds(map))

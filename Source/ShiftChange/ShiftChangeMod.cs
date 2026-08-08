@@ -24,7 +24,7 @@ namespace ShiftChange
 
     public class ShiftChangeMod : Mod
     {
-        public static ShiftChangeSettings Settings { get; private set; }
+        public static ShiftChangeSettings Settings { get; internal set; }
 
         /// <summary>
         /// The single read point for the toggle. Null-tolerant so comp code

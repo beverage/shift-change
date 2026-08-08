@@ -31,26 +31,26 @@ namespace ShiftChange
     /// </summary>
     public class Dialog_SetStandWorkTypes : Window
     {
-        private const float RowHeight = 26f;
-        private const float CheckboxSize = 24f;
-        private const float LabelGap = 10f;
-        private const float MaxLabelWidth = 260f;
-        private const float ColumnGutter = 36f;
-        private const float ScrollbarAllowance = 20f;
-        private const float HeaderAllowance = 160f;
-        private const float MinWindowWidth = 420f;
+        internal const float RowHeight = 26f;
+        internal const float CheckboxSize = 24f;
+        internal const float LabelGap = 10f;
+        internal const float MaxLabelWidth = 260f;
+        internal const float ColumnGutter = 36f;
+        internal const float ScrollbarAllowance = 20f;
+        internal const float HeaderAllowance = 160f;
+        internal const float MinWindowWidth = 420f;
 
         /// <summary>Rows a column aims for before the dialog grows another column.</summary>
-        private const int TargetRows = 14;
+        internal const int TargetRows = 14;
 
-        private readonly CompShiftStand comp;
-        private readonly List<WorkTypeDef> works;
-        private readonly float cellWidth;
-        private readonly int columns;
-        private readonly int rowsPerColumn;
-        private Vector2 scroll;
+        internal readonly CompShiftStand comp;
+        internal readonly List<WorkTypeDef> works;
+        internal readonly float cellWidth;
+        internal readonly int columns;
+        internal readonly int rowsPerColumn;
+        internal Vector2 scroll;
 
-        private static string LabelOf(WorkTypeDef w)
+        internal static string LabelOf(WorkTypeDef w)
         {
             return (w.gerundLabel ?? w.labelShort ?? w.defName).CapitalizeFirst();
         }

@@ -18,8 +18,8 @@ namespace ShiftChange
     /// </summary>
     internal static class SwapPlan
     {
-        private static readonly List<Apparel> ScratchWear = new List<Apparel>();
-        private static readonly List<Apparel> ScratchStore = new List<Apparel>();
+        internal static readonly List<Apparel> ScratchWear = new List<Apparel>();
+        internal static readonly List<Apparel> ScratchStore = new List<Apparel>();
 
         /// <summary>
         /// Fills <paramref name="toWear"/> with what the pawn would take off the

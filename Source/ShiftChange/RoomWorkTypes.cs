@@ -29,10 +29,10 @@ namespace ShiftChange
     /// </summary>
     public static class RoomWorkTypes
     {
-        private static readonly List<WorkTypeDef> None = new List<WorkTypeDef>();
+        internal static readonly List<WorkTypeDef> None = new List<WorkTypeDef>();
 
         /// <summary>role defName → work type defNames.</summary>
-        private static readonly Dictionary<string, string[]> Defaults =
+        internal static readonly Dictionary<string, string[]> Defaults =
             new Dictionary<string, string[]>
             {
                 { "Hospital",   new[] { "Doctor" } },
@@ -42,9 +42,9 @@ namespace ShiftChange
                 { "Barn",       new[] { "Handling", "Doctor" } },
             };
 
-        private static Dictionary<RoomRoleDef, List<WorkTypeDef>> resolved;
+        internal static Dictionary<RoomRoleDef, List<WorkTypeDef>> resolved;
 
-        private static Dictionary<RoomRoleDef, List<WorkTypeDef>> Resolved
+        internal static Dictionary<RoomRoleDef, List<WorkTypeDef>> Resolved
         {
             get
             {

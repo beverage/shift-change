@@ -31,10 +31,10 @@ namespace ShiftChange
     public class CompShiftStand : ThingComp
     {
         /// <summary>The owner's own clothes, currently parked in the stand.</summary>
-        private List<Apparel> storedOwnerApparel = new List<Apparel>();
+        internal List<Apparel> storedOwnerApparel = new List<Apparel>();
 
         /// <summary>The stand's clothes, currently worn by the owner.</summary>
-        private List<Apparel> issuedUniform = new List<Apparel>();
+        internal List<Apparel> issuedUniform = new List<Apparel>();
 
         /// <summary>
         /// The subset of <see cref="storedOwnerApparel"/> that was FORCE-WORN
@@ -43,33 +43,33 @@ namespace ShiftChange
         /// so without this record a force-worn duster comes back from a shift
         /// as ordinary policy-managed clothing and the optimizer swaps it away.
         /// </summary>
-        private List<Apparel> storedForcedApparel = new List<Apparel>();
+        internal List<Apparel> storedForcedApparel = new List<Apparel>();
 
         /// <summary>
         /// Who currently has this stand's uniform on. This — not the assigned
         /// owner — is the truth for the return trip, because an unassigned
         /// stand is a POOL stand that anyone capable may borrow.
         /// </summary>
-        private Pawn borrower;
+        internal Pawn borrower;
 
         /// <summary>
         /// Player override — a SET, because rooms host families of work
         /// (principal, 2026-08-08). Empty means "infer from the room's role".
         /// </summary>
-        private List<WorkTypeDef> workTypeOverrides = new List<WorkTypeDef>();
+        internal List<WorkTypeDef> workTypeOverrides = new List<WorkTypeDef>();
 
         /// <summary>
         /// Pre-set-redesign saves scribed a single "workTypeOverride" def.
         /// Loaded once and folded into <see cref="workTypeOverrides"/>.
         /// </summary>
-        private WorkTypeDef workTypeOverrideLegacy;
+        internal WorkTypeDef workTypeOverrideLegacy;
 
         /// <summary>
         /// Opt-out. A decorative or storage stand standing in a roled room would
         /// otherwise join that room's pool, which is a surprise nobody asked
         /// for.
         /// </summary>
-        private bool excluded;
+        internal bool excluded;
 
         /// <summary>
         /// Stands that currently have a uniform out on a pawn, so the return
@@ -77,7 +77,7 @@ namespace ShiftChange
         /// rebuilt on load, since <see cref="PostSpawnSetup"/> runs for every
         /// comp on both paths.
         /// </summary>
-        private static readonly Dictionary<Pawn, CompShiftStand> OnShiftStands =
+        internal static readonly Dictionary<Pawn, CompShiftStand> OnShiftStands =
             new Dictionary<Pawn, CompShiftStand>();
 
         public Building_OutfitStand Stand => parent as Building_OutfitStand;
@@ -146,7 +146,7 @@ namespace ShiftChange
             }
         }
 
-        private static readonly List<WorkTypeDef> NoWork = new List<WorkTypeDef>();
+        internal static readonly List<WorkTypeDef> NoWork = new List<WorkTypeDef>();
 
         /// <summary>
         /// The work types this stand dresses for: empty when the player

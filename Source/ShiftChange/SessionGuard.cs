@@ -26,7 +26,7 @@ namespace ShiftChange
     /// </summary>
     internal static class SessionGuard
     {
-        private static Game current;
+        internal static Game current;
 
         public static void Ensure()
         {
