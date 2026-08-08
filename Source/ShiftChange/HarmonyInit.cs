@@ -39,10 +39,20 @@ namespace ShiftChange
 
 #if DEBUG
         // ECR invokes any static parameterless method with this name after a
-        // reload — the heartbeat that a swap actually landed.
+        // reload — the heartbeat that a swap actually landed. It is also the
+        // QUARANTINE: ECR redirects EVERY method, not just changed ones, and
+        // a twin body cannot call an abstract base's implicit (protected)
+        // constructor — so any post-reload instantiation of our JobDriver
+        // detonates inside vanilla's StartJob and wedges the pawn's tracker
+        // (2026-08-08, in play). From the first reload onward this session is
+        // a UI lab, not a colony: all gameplay interception goes dark, and
+        // behaviour testing happens on a clean Release restart, as the
+        // discipline always said — now enforced by code instead of memory.
         internal static void OnEditCompileReload()
         {
-            Log.Message("[ShiftChange] hot reload applied");
+            Patch_JobInterception.Enabled = false;
+            Patch_JobInterception.DressMidJob = false;
+            Log.Warning("[ShiftChange] hot reload applied — gameplay interception disabled for this session (UI-lab mode); restart on a Release build for behaviour testing");
         }
 #endif
     }

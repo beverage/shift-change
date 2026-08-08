@@ -383,6 +383,32 @@ namespace ShiftChange
                 tracker.StartJob(swap, JobCondition.None, null, resumeCurJobAfterwards: false,
                     cancelBusyStances: true, null, JobTag.ChangingApparel);
             }
+            catch (Exception e)
+            {
+                // A throw from inside StartJob — another mod's prefix, or
+                // (2026-08-08, in play) a hot-reload twin failing JobDriver's
+                // protected base ctor — unwinds AFTER vanilla has ended the
+                // pawn's current job and set curJob but BEFORE curDriver
+                // exists. Left alone, that tracker NREs every tick forever.
+                // Disable ourselves, release both jobs' claims, and hand the
+                // pawn to vanilla's own error recovery. Return true so the
+                // original StartJob body does not run on top of the corrupt
+                // state — the original job is deliberately NOT enqueued.
+                Enabled = false;
+                Log.Error("[ShiftChange] swap StartJob threw — disabling and recovering "
+                          + pawn.LabelShort + ": " + e);
+                pawn.ClearReservationsForJob(swap);
+                pawn.ClearReservationsForJob(originalJob);
+                try
+                {
+                    JobUtility.TryStartErrorRecoverJob(pawn, "[ShiftChange] recovering from failed swap start");
+                }
+                catch (Exception recovery)
+                {
+                    Log.Error("[ShiftChange] recovery also failed for " + pawn.LabelShort + ": " + recovery);
+                }
+                return true;
+            }
             finally
             {
                 inserting = false;
