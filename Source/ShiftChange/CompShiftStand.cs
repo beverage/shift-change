@@ -95,14 +95,20 @@ namespace ShiftChange
         public bool IsPool => AssignedOwner == null;
 
         /// <summary>
-        /// Unassigned means pool: any pawn may take it. Assigned means
-        /// reserved, and nobody else gets a look in — that is what keeps a
-        /// surgeon's tailored kit off a passing hauler.
+        /// Unassigned means pool: any pawn may take it — unless the player
+        /// turned pooling off in mod settings, in which case an unassigned
+        /// stand is inert and only explicit assignment participates. Assigned
+        /// means reserved, and nobody else gets a look in — that is what
+        /// keeps a surgeon's tailored kit off a passing hauler.
         /// </summary>
         public bool CanBeClaimedBy(Pawn pawn)
         {
             Pawn owner = AssignedOwner;
-            return owner == null || owner == pawn;
+            if (owner != null)
+            {
+                return owner == pawn;
+            }
+            return ShiftChangeMod.PoolingEnabled;
         }
 
         /// <summary>
@@ -355,7 +361,11 @@ namespace ShiftChange
             Pawn owner = AssignedOwner;
             line += "\n" + (owner != null
                 ? "ShiftChange.InspectOwner".Translate(owner.LabelShort)
-                : "ShiftChange.InspectPool".Translate());
+                : (ShiftChangeMod.PoolingEnabled
+                    ? "ShiftChange.InspectPool".Translate()
+                    // Keep the UI honest: with pooling off, "shared" would be
+                    // a lie the player debugs for an evening.
+                    : "ShiftChange.InspectPoolDisabled".Translate()));
 
             if (OnShift && borrower != null)
             {
@@ -387,7 +397,10 @@ namespace ShiftChange
                 defaultDesc = "ShiftChange.SetWorkTypeDesc".Translate(
                     current?.gerundLabel ?? current?.defName ?? "ShiftChange.None".Translate().RawText,
                     source),
-                icon = TexCommand.ForbidOff,
+                // The pencil, not ForbidOff — a forbid glyph on a
+                // configuration gizmo reads as "this stand is disabled".
+                // Zero-art rule: icons come from vanilla's atlas only.
+                icon = TexButton.Rename,
                 action = OpenWorkTypeMenu,
             };
         }

@@ -81,17 +81,27 @@ namespace ShiftChange
         protected override string GetAssignmentGizmoLabel()
         {
             List<Pawn> assigned = AssignedPawnsForReading;
-            return assigned.Count > 0
-                ? "ShiftChange.OwnerGizmoLabel".Translate(assigned[0].LabelShort)
-                : "ShiftChange.PoolGizmoLabel".Translate();
+            if (assigned.Count > 0)
+            {
+                return "ShiftChange.OwnerGizmoLabel".Translate(assigned[0].LabelShort);
+            }
+            // With pooling off an unassigned stand is not "shared", it is
+            // simply unowned — vanilla's own "Set owner" says that best.
+            return ShiftChangeMod.PoolingEnabled
+                ? "ShiftChange.PoolGizmoLabel".Translate()
+                : base.GetAssignmentGizmoLabel();
         }
 
         protected override string GetAssignmentGizmoDesc()
         {
             WorkTypeDef work = parent.TryGetComp<CompShiftStand>()?.WorkType;
-            return work == null
-                ? "ShiftChange.AssignDescNoWork".Translate()
-                : "ShiftChange.AssignDesc".Translate(work.gerundLabel ?? work.defName);
+            if (work == null)
+            {
+                return "ShiftChange.AssignDescNoWork".Translate();
+            }
+            return ShiftChangeMod.PoolingEnabled
+                ? "ShiftChange.AssignDesc".Translate(work.gerundLabel ?? work.defName)
+                : "ShiftChange.AssignDescNoPool".Translate(work.gerundLabel ?? work.defName);
         }
 
         // Note what is deliberately NOT here: unassigning does not abandon the

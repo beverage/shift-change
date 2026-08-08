@@ -4,6 +4,7 @@
   <ShiftChange.InspectWork>Work uniform for: {0}</ShiftChange.InspectWork>
   <ShiftChange.InspectOwner>Owner: {0}</ShiftChange.InspectOwner>
   <ShiftChange.InspectPool>Shared — any capable colonist may use it.</ShiftChange.InspectPool>
+  <ShiftChange.InspectPoolDisabled>Unassigned — shared use is turned off in mod settings.</ShiftChange.InspectPoolDisabled>
   <ShiftChange.InspectOnShift>{0} is wearing this outfit.</ShiftChange.InspectOnShift>
   <ShiftChange.InspectEmpty>Empty — put an outfit on it.</ShiftChange.InspectEmpty>
   <ShiftChange.InspectExcluded>Not used for shift changes.</ShiftChange.InspectExcluded>
@@ -21,6 +22,10 @@
   <ShiftChange.None>nothing</ShiftChange.None>
 
   <ShiftChange.AssignDesc>Reserve this stand for one colonist.\n\nLeave it unassigned and it is shared: any colonist about to do {0} in this room may use whichever stand is free. A kitchen therefore needs one stand per cook working at once, not one per cook.</ShiftChange.AssignDesc>
+  <ShiftChange.AssignDescNoPool>Reserve this stand for one colonist.\n\nShared use of unassigned stands is turned off in mod settings, so only an assigned owner will change at this stand for {0}.</ShiftChange.AssignDescNoPool>
   <ShiftChange.AssignDescNoWork>Reserve this stand for one colonist. It has no work type yet — either put it in a room with a role, or set one manually.</ShiftChange.AssignDescNoWork>
+
+  <ShiftChange.SettingPoolUnassigned>Unassigned stands are shared</ShiftChange.SettingPoolUnassigned>
+  <ShiftChange.SettingPoolUnassignedDesc>When on, an outfit stand with no assigned owner, standing in a work room, may be used by any colonist capable of that room's work.\n\nWhen off, only stands explicitly assigned to a colonist ever dress anyone — every unassigned stand behaves exactly like vanilla furniture.</ShiftChange.SettingPoolUnassignedDesc>
 
 </LanguageData>
