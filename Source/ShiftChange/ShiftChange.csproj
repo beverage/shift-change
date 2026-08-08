@@ -29,12 +29,47 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.*" ExcludeAssets="runtime" />
     <PackageReference Include="Lib.Harmony" Version="2.*" ExcludeAssets="runtime" />
     <!-- net472 reference assemblies, so this builds on a machine with only
          the modern dotnet SDK (this one is a Mac; there is no Framework
          targeting pack outside the package). -->
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Game references, two modes, one committed file (same pattern as Fine
+       Establishments). RELEASE always compiles against Krafs.Rimworld.Ref, so
+       the shipping dll is built from identical references on every machine and
+       in CI. A DEBUG build (including the editor's design-time build) upgrades
+       itself to the REAL game assemblies when a standard Steam install exists
+       below — identical public surface, but go-to-definition then decompiles
+       genuine engine code with bodies. Non-standard install: set
+       RimWorldManaged (env var or -p:). Opt out: DisableLocalGameRefs=true.
+       The Odyssey outfit-stand code needs no extra reference — DLC types ship
+       inside Assembly-CSharp. -->
+  <PropertyGroup>
+    <RimWorldManaged Condition="'$(RimWorldManaged)' == '' AND Exists('$(HOME)/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app/Contents/Resources/Data/Managed')">$(HOME)/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app/Contents/Resources/Data/Managed</RimWorldManaged>
+    <RimWorldManaged Condition="'$(RimWorldManaged)' == '' AND Exists('C:\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed')">C:\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed</RimWorldManaged>
+    <RimWorldManaged Condition="'$(RimWorldManaged)' == '' AND Exists('$(HOME)/.steam/steam/steamapps/common/RimWorld/RimWorldLinux_Data/Managed')">$(HOME)/.steam/steam/steamapps/common/RimWorld/RimWorldLinux_Data/Managed</RimWorldManaged>
+    <LocalGameRefs Condition="'$(Configuration)' == 'Debug' AND '$(RimWorldManaged)' != '' AND '$(DisableLocalGameRefs)' != 'true'">true</LocalGameRefs>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(LocalGameRefs)' != 'true'">
+    <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.*" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(LocalGameRefs)' == 'true'">
+    <!-- Private=false is this group's ExcludeAssets: compile-time only. The
+         Debug-only CopyLocalLockFileAssemblies below moves NuGet assets (the
+         ECR runtime), never these direct references. -->
+    <Reference Include="$(RimWorldManaged)/Assembly-CSharp.dll">
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="$(RimWorldManaged)/UnityEngine.dll">
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="$(RimWorldManaged)/UnityEngine.*.dll">
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <!-- Hot reload (ECR, Zetrith's EditCompileReload) — DEV ONLY. Debug builds
