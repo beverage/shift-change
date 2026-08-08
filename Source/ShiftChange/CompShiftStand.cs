@@ -52,8 +52,17 @@ namespace ShiftChange
         /// </summary>
         private Pawn borrower;
 
-        /// <summary>Player override; null means "infer from the room's role".</summary>
-        private WorkTypeDef workTypeOverride;
+        /// <summary>
+        /// Player override — a SET, because rooms host families of work
+        /// (principal, 2026-08-08). Empty means "infer from the room's role".
+        /// </summary>
+        private List<WorkTypeDef> workTypeOverrides = new List<WorkTypeDef>();
+
+        /// <summary>
+        /// Pre-set-redesign saves scribed a single "workTypeOverride" def.
+        /// Loaded once and folded into <see cref="workTypeOverrides"/>.
+        /// </summary>
+        private WorkTypeDef workTypeOverrideLegacy;
 
         /// <summary>
         /// Opt-out. A decorative or storage stand standing in a roled room would
@@ -137,29 +146,97 @@ namespace ShiftChange
             }
         }
 
+        private static readonly List<WorkTypeDef> NoWork = new List<WorkTypeDef>();
+
         /// <summary>
-        /// The work type this stand dresses for: null when the player excluded
-        /// it, otherwise the explicit override, otherwise the enclosing room's
-        /// role. Null means inert — an ordinary vanilla outfit stand.
+        /// The work types this stand dresses for: empty when the player
+        /// excluded it, otherwise the explicit override set, otherwise the
+        /// enclosing room's role defaults. Empty means inert — an ordinary
+        /// vanilla outfit stand. Never null; treat as read-only.
         /// </summary>
-        public WorkTypeDef WorkType
+        public List<WorkTypeDef> WorkTypes
         {
             get
             {
                 if (excluded)
                 {
-                    return null;
+                    return NoWork;
                 }
-                if (workTypeOverride != null)
+                if (workTypeOverrides != null && workTypeOverrides.Count > 0)
                 {
-                    return workTypeOverride;
+                    return workTypeOverrides;
                 }
                 if (!parent.Spawned)
                 {
-                    return null;
+                    return NoWork;
                 }
                 return RoomWorkTypes.ForRole(parent.GetRoom()?.Role);
             }
+        }
+
+        public bool HandlesWork(WorkTypeDef work)
+        {
+            return work != null && WorkTypes.Contains(work);
+        }
+
+        public bool IsExcluded => excluded;
+
+        public bool IsAutomatic => !excluded && (workTypeOverrides == null || workTypeOverrides.Count == 0);
+
+        public void SetAutomatic()
+        {
+            excluded = false;
+            workTypeOverrides?.Clear();
+        }
+
+        public void SetExcluded()
+        {
+            excluded = true;
+            workTypeOverrides?.Clear();
+        }
+
+        /// <summary>
+        /// Flips one work type in the effective set, entering custom mode from
+        /// wherever the stand currently is: toggling while automatic seeds the
+        /// custom set from the room's defaults first, toggling while excluded
+        /// starts a fresh set, and emptying the custom set collapses back to
+        /// excluded so the three states stay canonical.
+        /// </summary>
+        public void ToggleWork(WorkTypeDef work)
+        {
+            if (work == null)
+            {
+                return;
+            }
+            List<WorkTypeDef> effective = new List<WorkTypeDef>(WorkTypes);
+            excluded = false;
+            workTypeOverrides = workTypeOverrides ?? new List<WorkTypeDef>();
+            workTypeOverrides.Clear();
+            workTypeOverrides.AddRange(effective);
+            if (!workTypeOverrides.Remove(work))
+            {
+                workTypeOverrides.Add(work);
+            }
+            if (workTypeOverrides.Count == 0)
+            {
+                SetExcluded();
+            }
+        }
+
+        /// <summary>Display helper: "doctoring, researching" etc.</summary>
+        public string WorkTypesLabel()
+        {
+            List<WorkTypeDef> works = WorkTypes;
+            if (works.Count == 0)
+            {
+                return "ShiftChange.None".Translate();
+            }
+            List<string> labels = new List<string>(works.Count);
+            for (int i = 0; i < works.Count; i++)
+            {
+                labels.Add(works[i].gerundLabel ?? works[i].labelShort ?? works[i].defName);
+            }
+            return labels.ToCommaList();
         }
 
         /// <summary>Called by SessionGuard when the loaded game changes.</summary>
@@ -229,7 +306,13 @@ namespace ShiftChange
             Scribe_Collections.Look(ref issuedUniform, "issuedUniform", LookMode.Reference);
             Scribe_Collections.Look(ref storedForcedApparel, "storedForcedApparel", LookMode.Reference);
             Scribe_References.Look(ref borrower, "borrower");
-            Scribe_Defs.Look(ref workTypeOverride, "workTypeOverride");
+            Scribe_Collections.Look(ref workTypeOverrides, "workTypeOverrides", LookMode.Def);
+            if (Scribe.mode == LoadSaveMode.LoadingVars)
+            {
+                // Read-only: saves from before the set redesign carried a
+                // single def under this name. Folded into the list below.
+                Scribe_Defs.Look(ref workTypeOverrideLegacy, "workTypeOverride");
+            }
             Scribe_Values.Look(ref excluded, "excluded", defaultValue: false);
 
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
@@ -245,6 +328,13 @@ namespace ShiftChange
                 storedOwnerApparel.RemoveAll(a => a == null);
                 issuedUniform.RemoveAll(a => a == null);
                 storedForcedApparel.RemoveAll(a => a == null);
+                workTypeOverrides = workTypeOverrides ?? new List<WorkTypeDef>();
+                workTypeOverrides.RemoveAll(w => w == null);
+                if (workTypeOverrides.Count == 0 && workTypeOverrideLegacy != null)
+                {
+                    workTypeOverrides.Add(workTypeOverrideLegacy);
+                }
+                workTypeOverrideLegacy = null;
             }
         }
 
@@ -347,13 +437,12 @@ namespace ShiftChange
             {
                 return "ShiftChange.InspectExcluded".Translate();
             }
-            WorkTypeDef work = WorkType;
-            if (work == null)
+            if (WorkTypes.Count == 0)
             {
                 return null;
             }
 
-            string line = "ShiftChange.InspectWork".Translate(work.gerundLabel ?? work.labelShort ?? work.defName);
+            string line = "ShiftChange.InspectWork".Translate(WorkTypesLabel());
 
             // Say who owns or holds it here as well as on the gizmo: the base
             // comp reports ownership nowhere, and a stand that looks unassigned
@@ -385,62 +474,21 @@ namespace ShiftChange
                 yield break;
             }
 
-            WorkTypeDef current = WorkType;
             string source = excluded
                 ? "ShiftChange.Excluded".Translate().RawText
-                : workTypeOverride == null
+                : IsAutomatic
                     ? "ShiftChange.FromRoom".Translate().RawText
                     : "ShiftChange.Manual".Translate().RawText;
             yield return new Command_Action
             {
                 defaultLabel = "ShiftChange.SetWorkTypeLabel".Translate(),
-                defaultDesc = "ShiftChange.SetWorkTypeDesc".Translate(
-                    current?.gerundLabel ?? current?.defName ?? "ShiftChange.None".Translate().RawText,
-                    source),
+                defaultDesc = "ShiftChange.SetWorkTypeDesc".Translate(WorkTypesLabel(), source),
                 // The pencil, not ForbidOff — a forbid glyph on a
                 // configuration gizmo reads as "this stand is disabled".
                 // Zero-art rule: icons come from vanilla's atlas only.
                 icon = TexButton.Rename,
-                action = OpenWorkTypeMenu,
+                action = () => Find.WindowStack.Add(new Dialog_SetStandWorkTypes(this)),
             };
-        }
-
-        private void OpenWorkTypeMenu()
-        {
-            List<FloatMenuOption> options = new List<FloatMenuOption>
-            {
-                new FloatMenuOption("ShiftChange.WorkTypeAuto".Translate(), () =>
-                {
-                    workTypeOverride = null;
-                    excluded = false;
-                }),
-                // The opt-out. Without it, any unassigned stand standing in a
-                // roled room silently joins that room's pool — including one
-                // the player keeps for decoration or storage.
-                new FloatMenuOption("ShiftChange.WorkTypeNone".Translate(), () =>
-                {
-                    workTypeOverride = null;
-                    excluded = true;
-                }),
-            };
-
-            // Only work types a colonist can actually be assigned — the
-            // never-assignable ones (Patient, PatientBedRest) would be noise.
-            foreach (WorkTypeDef work in DefDatabase<WorkTypeDef>.AllDefsListForReading
-                         .Where(w => w.visible)
-                         .OrderBy(w => w.labelShort ?? w.defName))
-            {
-                WorkTypeDef local = work;
-                options.Add(new FloatMenuOption(
-                    local.gerundLabel?.CapitalizeFirst() ?? local.defName,
-                    () =>
-                    {
-                        workTypeOverride = local;
-                        excluded = false;
-                    }));
-            }
-
-            Find.WindowStack.Add(new FloatMenu(options));
         }
     }
 }

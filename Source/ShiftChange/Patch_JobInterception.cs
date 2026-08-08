@@ -282,7 +282,7 @@ namespace ShiftChange
                 foreach (Thing thing in room.ContainedThings(defs[i]))
                 {
                     CompShiftStand comp = thing.TryGetComp<CompShiftStand>();
-                    if (comp == null || comp.OnShift || comp.WorkType != work
+                    if (comp == null || comp.OnShift || !comp.HandlesWork(work)
                         || !comp.CanBeClaimedBy(pawn))
                     {
                         continue;

@@ -31,15 +31,17 @@ namespace ShiftChange
                 }
 
                 IEnumerable<Pawn> colonists = parent.Map.mapPawns.FreeColonists;
-                WorkTypeDef work = parent.TryGetComp<CompShiftStand>()?.WorkType;
-                if (work == null)
+                List<WorkTypeDef> works = parent.TryGetComp<CompShiftStand>()?.WorkTypes;
+                if (works == null || works.Count == 0)
                 {
-                    // No work type resolved (roleless room, no override). Let
+                    // No work types resolved (roleless room, no override). Let
                     // the player assign anyway — they may be setting the owner
                     // before setting the room up.
                     return colonists;
                 }
-                return colonists.Where(p => !p.WorkTypeIsDisabled(work));
+                // Capable of ANY of the set — a workshop stand covering
+                // crafting and tailoring is assignable to a pure tailor.
+                return colonists.Where(p => works.Any(w => !p.WorkTypeIsDisabled(w)));
             }
         }
 
@@ -94,14 +96,15 @@ namespace ShiftChange
 
         protected override string GetAssignmentGizmoDesc()
         {
-            WorkTypeDef work = parent.TryGetComp<CompShiftStand>()?.WorkType;
-            if (work == null)
+            CompShiftStand comp = parent.TryGetComp<CompShiftStand>();
+            if (comp == null || comp.WorkTypes.Count == 0)
             {
                 return "ShiftChange.AssignDescNoWork".Translate();
             }
+            string works = comp.WorkTypesLabel();
             return ShiftChangeMod.PoolingEnabled
-                ? "ShiftChange.AssignDesc".Translate(work.gerundLabel ?? work.defName)
-                : "ShiftChange.AssignDescNoPool".Translate(work.gerundLabel ?? work.defName);
+                ? "ShiftChange.AssignDesc".Translate(works)
+                : "ShiftChange.AssignDescNoPool".Translate(works);
         }
 
         // Note what is deliberately NOT here: unassigning does not abandon the

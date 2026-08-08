@@ -12,8 +12,10 @@
   <ShiftChange.OwnerGizmoLabel>Owner: {0}</ShiftChange.OwnerGizmoLabel>
   <ShiftChange.PoolGizmoLabel>Shared (set owner)</ShiftChange.PoolGizmoLabel>
 
-  <ShiftChange.SetWorkTypeLabel>Set work type</ShiftChange.SetWorkTypeLabel>
-  <ShiftChange.SetWorkTypeDesc>This stand dresses for: {0} ({1}).\n\nWhoever uses it changes into the outfit before starting automatic work of that kind in this room, and changes back when they leave.</ShiftChange.SetWorkTypeDesc>
+  <ShiftChange.SetWorkTypeLabel>Set work types</ShiftChange.SetWorkTypeLabel>
+  <ShiftChange.SetWorkTypeDesc>This stand dresses for: {0} ({1}).\n\nWhoever uses it changes into the outfit before starting automatic work of those kinds in this room, and changes back when they leave.</ShiftChange.SetWorkTypeDesc>
+  <ShiftChange.WorkTypesTitle>Work types</ShiftChange.WorkTypesTitle>
+  <ShiftChange.WorkTypesExplainer>Ticked kinds of work, done in this room, trigger a change into this stand's outfit:</ShiftChange.WorkTypesExplainer>
   <ShiftChange.WorkTypeAuto>Automatic (from the room)</ShiftChange.WorkTypeAuto>
   <ShiftChange.WorkTypeNone>Not used for shift changes</ShiftChange.WorkTypeNone>
   <ShiftChange.FromRoom>from the room</ShiftChange.FromRoom>
