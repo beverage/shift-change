@@ -65,6 +65,123 @@ namespace ShiftChange
             LastBlockedTick.Clear();
         }
 
+        /// <summary>Toggle for the mid-job catch-up below.</summary>
+        [TweakValue("ShiftChange")]
+        public static bool DressMidJob = true;
+
+        /// <summary>
+        /// A stand just returned to availability. If a colonist is ALREADY
+        /// working bare in its room — because they took the job while every
+        /// stand was checked out — interrupt them to change now, resuming the
+        /// job afterwards (found in play, 2026-08-08: two benches, two pawns,
+        /// two stands; the second pawn starts seconds before a stand frees).
+        ///
+        /// The interrupt is vanilla's own detour shape (the vomit pattern):
+        /// StartJob with resumeCurJobAfterwards suspends the current job when
+        /// its def allows (Pawn_JobTracker.cs:293-296) and resumes it from
+        /// the queue. Gated on suspendable AND casualInterruptible — both
+        /// default true (JobDef.cs:24-26) and both are false on TendPatient,
+        /// so bills and research are caught up while a doctor mid-treatment
+        /// is never yanked away from a patient to fetch scrubs.
+        /// </summary>
+        public static void Notify_StandFreed(CompShiftStand stand, Pawn except)
+        {
+            if (!Enabled || !DressMidJob)
+            {
+                return;
+            }
+            try
+            {
+                TryDressMidJob(stand, except);
+            }
+            catch (Exception e)
+            {
+                // Called from inside another pawn's job cleanup — breaking
+                // THAT would turn a convenience into a job-system fault.
+                Log.Error("[ShiftChange] stand-freed catch-up threw: " + e);
+            }
+        }
+
+        private static void TryDressMidJob(CompShiftStand stand, Pawn except)
+        {
+            Thing parent = stand?.parent;
+            if (parent == null || !parent.Spawned || stand.OnShift)
+            {
+                return;
+            }
+            Map map = parent.Map;
+            if (map == null || map.dangerWatcher.DangerRating != StoryDanger.None)
+            {
+                return;
+            }
+            Room room = parent.GetRoom();
+            if (room == null)
+            {
+                return;
+            }
+
+            Pawn best = null;
+            int bestDistance = int.MaxValue;
+            List<Pawn> colonists = map.mapPawns.FreeColonistsSpawned;
+            for (int i = 0; i < colonists.Count; i++)
+            {
+                Pawn pawn = colonists[i];
+                if (pawn == except || !pawn.RaceProps.Humanlike
+                    || pawn.Drafted || pawn.Downed || pawn.InMentalState)
+                {
+                    continue;
+                }
+                if (CompShiftStand.OnShiftStandFor(pawn) != null)
+                {
+                    continue;
+                }
+                Job job = pawn.CurJob;
+                if (job == null || job.def == ShiftChangeDefOf.ShiftChange_SwapAtStand
+                    || job.playerForced
+                    || !job.def.suspendable || !job.def.casualInterruptible)
+                {
+                    continue;
+                }
+                WorkGiverDef giver = job.workGiverDef;
+                if (giver?.workType == null || giver.emergency || !stand.HandlesWork(giver.workType))
+                {
+                    continue;
+                }
+                IntVec3 target = TargetCell(job, map);
+                if (!target.IsValid || target.GetRoom(map) != room)
+                {
+                    continue;
+                }
+                if (!stand.CanBeClaimedBy(pawn) || !SwapPlan.WouldDress(pawn, stand.Stand))
+                {
+                    continue;
+                }
+                if (!pawn.CanReserveAndReach(parent, PathEndMode.InteractionCell, Danger.Deadly))
+                {
+                    continue;
+                }
+                int distance = pawn.Position.DistanceToSquared(parent.Position);
+                if (distance < bestDistance)
+                {
+                    best = pawn;
+                    bestDistance = distance;
+                }
+            }
+
+            if (best == null)
+            {
+                return;
+            }
+
+            Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, parent);
+            best.jobs.StartJob(swap, JobCondition.InterruptForced, null,
+                resumeCurJobAfterwards: true, cancelBusyStances: true, null, JobTag.ChangingApparel);
+            if (Verbose)
+            {
+                Log.Message($"[ShiftChange] catch-up: {best.LabelShort} interrupted to dress at {parent.LabelShort}");
+            }
+        }
+
         private static List<ThingDef> standDefs;
 
         private static List<ThingDef> StandDefs

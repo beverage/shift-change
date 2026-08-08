@@ -373,6 +373,10 @@ namespace ShiftChange
             storedForcedApparel.Clear();
             borrower = null;
             OnShiftStands.Remove(pawn);
+            // The stand just returned to the pool. Someone may have started
+            // working bare in this room while every stand was out — catch
+            // them up now rather than at their next job.
+            Patch_JobInterception.Notify_StandFreed(this, pawn);
         }
 
         /// <summary>
@@ -406,6 +410,11 @@ namespace ShiftChange
             issuedUniform.Clear();
             storedForcedApparel.Clear();
             borrower = null;
+            // Freed by abandonment rather than a return trip, but freed all
+            // the same. Excluding the former borrower matters here: an owner
+            // unassigned mid-shift is still WEARING the untracked uniform and
+            // must not be the one interrupted to claim it again.
+            Patch_JobInterception.Notify_StandFreed(this, formerBorrower);
         }
 
         /// <summary>Every stand on every map that this pawn has out on loan.</summary>
