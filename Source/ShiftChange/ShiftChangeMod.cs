@@ -24,7 +24,15 @@ namespace ShiftChange
 
     public class ShiftChangeMod : Mod
     {
-        public static ShiftChangeSettings Settings { get; internal set; }
+        // Explicit backing field, NOT an auto-property: the compiler names an
+        // auto-property's backing field <Settings>k__BackingField and makes it
+        // PRIVATE with no syntax to widen it — unreachable through the IVT
+        // grants, so a hot-swapped getter throws FieldAccessException (found
+        // in play 2026-08-08, the one member the internal sweep couldn't
+        // touch). Auto-properties are banned in this codebase for that reason.
+        internal static ShiftChangeSettings settings;
+
+        public static ShiftChangeSettings Settings => settings;
 
         /// <summary>
         /// The single read point for the toggle. Null-tolerant so comp code
@@ -34,7 +42,7 @@ namespace ShiftChange
 
         public ShiftChangeMod(ModContentPack content) : base(content)
         {
-            Settings = GetSettings<ShiftChangeSettings>();
+            settings = GetSettings<ShiftChangeSettings>();
         }
 
         public override string SettingsCategory()
