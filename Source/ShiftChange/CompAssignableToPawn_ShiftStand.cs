@@ -52,6 +52,24 @@ namespace ShiftChange
         /// stand that leaves ownership invisible outside the assign dialog, so
         /// name it on the button.
         /// </summary>
+        public override IEnumerable<Gizmo> CompGetGizmosExtra()
+        {
+            foreach (Gizmo gizmo in base.CompGetGizmosExtra())
+            {
+                // The base comp hardcodes Misc4 (N) on the assignment gizmo
+                // (CompAssignableToPawn.cs:176) — harmless on beds and
+                // thrones, but the outfit stand is a STORAGE building, and N
+                // is copy-settings there (StorageSettingsClipboard.cs:40).
+                // House rule (principal, 2026-08-08): on anything with
+                // copyable settings, never bind over N, J, F or O.
+                if (gizmo is Command command)
+                {
+                    command.hotKey = null;
+                }
+                yield return gizmo;
+            }
+        }
+
         /// <summary>
         /// Names the pawn floating over the stand at closest zoom, so a room of
         /// pool stands can be read at a glance instead of clicked through.
