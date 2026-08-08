@@ -1,3 +1,6 @@
+#if DEBUG
+using EditCompileReload;
+#endif
 using HarmonyLib;
 using Verse;
 
@@ -22,6 +25,23 @@ namespace ShiftChange
         static HarmonyInit()
         {
             new Harmony("MrBeverage.ShiftChange").PatchAll();
+#if DEBUG
+            // ECR hot reload is compiled into Debug builds only — see the
+            // dev-loop section of CLAUDE.md. Route its logging into the dev
+            // log so a swap landing (or failing) is visible, not an act of
+            // faith.
+            EcrLog.messageCallback = s => Log.Message("[ShiftChange/ECR] " + s);
+            EcrLog.errorCallback = s => Log.Error("[ShiftChange/ECR] " + s);
+#endif
         }
+
+#if DEBUG
+        // ECR invokes any static parameterless method with this name after a
+        // reload — the heartbeat that a swap actually landed.
+        private static void OnEditCompileReload()
+        {
+            Log.Message("[ShiftChange] hot reload applied");
+        }
+#endif
     }
 }

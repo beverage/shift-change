@@ -10,3 +10,9 @@ bin/
 # beside a PNG makes the game ignore the PNG entirely, with no timestamp check.
 # Shift Change ships no textures today; the rule is here so it cannot start.
 *.dds
+
+# Hot-reload dev artifacts (ECR). Debug builds drop the reloader runtime, its
+# dependencies and an instrumented-original copy beside our dll; the Release
+# build sweeps them. Only our own assembly is ever tracked.
+Assemblies/*
+!Assemblies/ShiftChange.dll

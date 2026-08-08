@@ -37,4 +37,34 @@
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
 
+  <!-- Hot reload (ECR, Zetrith's EditCompileReload) — DEV ONLY. Debug builds
+       instrument the assembly and watch for recompiles, so a layout tweak
+       shows in the running game without a restart; Release never references
+       any of it. The library must sit beside our dll at runtime, hence the
+       Debug-only copy override (the global default is false because
+       Assemblies/ must ship only our dll — Krafs/Harmony stay excluded
+       regardless). -->
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <PackageReference Include="EditCompileReload" Version="1.0.2" />
+    <PackageReference Include="EditCompileReload.CompilerPlugin" Version="1.0.2" PrivateAssets="all" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <!-- The Release build is the choke point that sweeps dev artifacts out of
+       the mod's load path — same philosophy as the FE texture generator
+       deleting stale .dds at the write site. Hygiene by construction, not by
+       memory: whatever a Debug session dropped in (the ECR runtime, its
+       dependencies, the instrumented-original copy), a Release build removes,
+       leaving exactly the one dll the mod ships. -->
+  <Target Name="CleanDevArtifacts" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <ItemGroup>
+      <DevJunk Include="$(OutputPath)*.dll" Exclude="$(OutputPath)$(AssemblyName).dll" />
+      <DevJunk Include="$(OutputPath)*.dll_orig" />
+      <DevJunk Include="$(OutputPath)*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(DevJunk)" />
+  </Target>
+
 </Project>
