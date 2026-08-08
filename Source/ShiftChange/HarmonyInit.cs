@@ -52,6 +52,7 @@ namespace ShiftChange
         {
             Patch_JobInterception.Enabled = false;
             Patch_JobInterception.DressMidJob = false;
+            Patch_ModeBadge.GameplayDark = true;
             Log.Warning("[ShiftChange] hot reload applied — gameplay interception disabled for this session (UI-lab mode); restart on a Release build for behaviour testing");
         }
 #endif
