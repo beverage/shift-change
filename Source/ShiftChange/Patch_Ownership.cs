@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using HarmonyLib;
 using RimWorld;
 using Verse;
@@ -18,11 +19,13 @@ namespace ShiftChange
     /// (<c>:2565</c>), <c>PreTraded</c> (<c>:2599</c>) and <c>PreKidnapped</c>
     /// (<c>:2645</c>) — exactly the set players already expect from beds.
     ///
-    /// The unassign drops the checkout ledger too (see
-    /// <c>CompAssignableToPawn_ShiftStand.TryUnassignPawn</c>): a dead owner's
-    /// clothes stay in the stand as ordinary contents, and vanilla's
-    /// <c>TryDropThingsToMakeRoomForThingOfDef</c> evicts whatever conflicts
-    /// the first time a new owner swaps. No reclaim logic of our own.
+    /// It also reaps the pawn's BORROWED stands, which is a separate job since
+    /// pooling landed: a pawn who borrowed an unassigned stand was never
+    /// assigned to anything, so unassignment alone would miss them entirely and
+    /// their clothes would hold a pool stand hostage forever. Their garments
+    /// stay in the stand as ordinary contents, and vanilla's
+    /// <c>TryDropThingsToMakeRoomForThingOfDef</c> evicts whatever conflicts the
+    /// first time someone else claims it. No reclaim logic of our own.
     /// </summary>
     [HarmonyPatch(typeof(Pawn_Ownership), nameof(Pawn_Ownership.UnclaimAll))]
     public static class Patch_Ownership
@@ -37,6 +40,13 @@ namespace ShiftChange
 
             try
             {
+                // Free anything they had on loan first — this covers pool
+                // stands, which no assignment would ever have named.
+                foreach (CompShiftStand borrowed in CompShiftStand.StandsBorrowedBy(___pawn).ToList())
+                {
+                    borrowed.AbandonLedger(___pawn);
+                }
+
                 ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
                 if (standDef == null)
                 {

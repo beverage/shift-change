@@ -54,7 +54,7 @@ namespace ShiftChange
             List<Pawn> assigned = AssignedPawnsForReading;
             return assigned.Count > 0
                 ? "ShiftChange.OwnerGizmoLabel".Translate(assigned[0].LabelShort)
-                : base.GetAssignmentGizmoLabel();
+                : "ShiftChange.PoolGizmoLabel".Translate();
         }
 
         protected override string GetAssignmentGizmoDesc()
@@ -65,21 +65,12 @@ namespace ShiftChange
                 : "ShiftChange.AssignDesc".Translate(work.gerundLabel ?? work.defName);
         }
 
-        public override void TryUnassignPawn(Pawn pawn, bool sort = true, bool uninstall = false)
-        {
-            // The owner is being removed while their clothes may still be
-            // checked out. Forget the ledger rather than strand it: the
-            // garments stay in the stand as ordinary contents and vanilla's
-            // TryDropThingsToMakeRoomForThingOfDef evicts whatever conflicts
-            // when the next owner first swaps.
-            parent.TryGetComp<CompShiftStand>()?.AbandonLedger(pawn);
-            base.TryUnassignPawn(pawn, sort, uninstall);
-        }
-
-        public override void ForceRemovePawn(Pawn pawn)
-        {
-            parent.TryGetComp<CompShiftStand>()?.AbandonLedger(pawn);
-            base.ForceRemovePawn(pawn);
-        }
+        // Note what is deliberately NOT here: unassigning does not abandon the
+        // ledger. Since pooling landed, an unassigned stand is still perfectly
+        // usable, so a pawn who is mid-shift keeps their claim and can still
+        // change back — the stand simply returns to the pool afterwards.
+        // Reaping a ledger whose borrower is *gone* is Patch_Ownership's job,
+        // and it has to be, because a pool borrower was never assigned here at
+        // all.
     }
 }

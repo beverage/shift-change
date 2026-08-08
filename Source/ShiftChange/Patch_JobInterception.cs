@@ -185,12 +185,12 @@ namespace ShiftChange
                 return false;
             }
 
-            CompShiftStand stand = FindOwnedStand(room, pawn, work);
+            CompShiftStand stand = FindAvailableStand(room, pawn, work);
             if (stand == null)
             {
                 if (Verbose)
                 {
-                    Log.Message($"[ShiftChange] no owned {work.defName} stand in {room.Role?.defName ?? "unroled"} " +
+                    Log.Message($"[ShiftChange] no free {work.defName} stand in {room.Role?.defName ?? "unroled"} " +
                                 $"room for {pawn.LabelShort} ({job.def.defName})");
                 }
                 return false;
@@ -238,21 +238,51 @@ namespace ShiftChange
             return true;
         }
 
-        private static CompShiftStand FindOwnedStand(Room room, Pawn pawn, WorkTypeDef work)
+        /// <summary>
+        /// The stand this pawn should use, or null if there isn't one.
+        ///
+        /// An unassigned stand is a POOL stand: any capable pawn may claim it,
+        /// so a kitchen needs one stand per CONCURRENT cook rather than one per
+        /// cook who might ever cook. A stand assigned to this pawn always wins
+        /// over a pool stand — a personal kit is personal — and among equals
+        /// the nearest is taken, or two cooks walk past a closer one to reach
+        /// the same far one.
+        ///
+        /// No free stand simply means no swap. Never queue for one: this is a
+        /// nicety and must not become a bottleneck on the work itself.
+        /// </summary>
+        private static CompShiftStand FindAvailableStand(Room room, Pawn pawn, WorkTypeDef work)
         {
+            CompShiftStand best = null;
+            bool bestIsPersonal = false;
+            int bestDistance = int.MaxValue;
+
             List<ThingDef> defs = StandDefs;
             for (int i = 0; i < defs.Count; i++)
             {
                 foreach (Thing thing in room.ContainedThings(defs[i]))
                 {
                     CompShiftStand comp = thing.TryGetComp<CompShiftStand>();
-                    if (comp != null && !comp.OnShift && comp.Owner == pawn && comp.WorkType == work)
+                    if (comp == null || comp.OnShift || comp.WorkType != work
+                        || !comp.CanBeClaimedBy(pawn) || !comp.HasWearable)
                     {
-                        return comp;
+                        continue;
+                    }
+
+                    bool personal = comp.AssignedOwner == pawn;
+                    int distance = pawn.Position.DistanceToSquared(thing.Position);
+
+                    if (best == null
+                        || (personal && !bestIsPersonal)
+                        || (personal == bestIsPersonal && distance < bestDistance))
+                    {
+                        best = comp;
+                        bestIsPersonal = personal;
+                        bestDistance = distance;
                     }
                 }
             }
-            return null;
+            return best;
         }
 
         /// <summary>

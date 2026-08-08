@@ -2,19 +2,25 @@
 <LanguageData>
 
   <ShiftChange.InspectWork>Work uniform for: {0}</ShiftChange.InspectWork>
-  <ShiftChange.InspectUnassigned>No owner assigned — behaves as an ordinary outfit stand.</ShiftChange.InspectUnassigned>
   <ShiftChange.InspectOwner>Owner: {0}</ShiftChange.InspectOwner>
+  <ShiftChange.InspectPool>Shared — any capable colonist may use it.</ShiftChange.InspectPool>
   <ShiftChange.InspectOnShift>{0} is wearing this outfit.</ShiftChange.InspectOnShift>
+  <ShiftChange.InspectEmpty>Empty — put an outfit on it.</ShiftChange.InspectEmpty>
+  <ShiftChange.InspectExcluded>Not used for shift changes.</ShiftChange.InspectExcluded>
+
   <ShiftChange.OwnerGizmoLabel>Owner: {0}</ShiftChange.OwnerGizmoLabel>
+  <ShiftChange.PoolGizmoLabel>Shared (set owner)</ShiftChange.PoolGizmoLabel>
 
   <ShiftChange.SetWorkTypeLabel>Set work type</ShiftChange.SetWorkTypeLabel>
-  <ShiftChange.SetWorkTypeDesc>This stand dresses its owner for: {0} ({1}).\n\nThe owner changes into it before starting automatic work of that kind in this room, and changes back when they leave.</ShiftChange.SetWorkTypeDesc>
+  <ShiftChange.SetWorkTypeDesc>This stand dresses for: {0} ({1}).\n\nWhoever uses it changes into the outfit before starting automatic work of that kind in this room, and changes back when they leave.</ShiftChange.SetWorkTypeDesc>
   <ShiftChange.WorkTypeAuto>Automatic (from the room)</ShiftChange.WorkTypeAuto>
+  <ShiftChange.WorkTypeNone>Not used for shift changes</ShiftChange.WorkTypeNone>
   <ShiftChange.FromRoom>from the room</ShiftChange.FromRoom>
   <ShiftChange.Manual>set manually</ShiftChange.Manual>
+  <ShiftChange.Excluded>excluded</ShiftChange.Excluded>
   <ShiftChange.None>nothing</ShiftChange.None>
 
-  <ShiftChange.AssignDesc>Choose who changes into this outfit before {0} in this room.</ShiftChange.AssignDesc>
-  <ShiftChange.AssignDescNoWork>Choose who owns this stand. It has no work type yet — either put it in a room with a role, or set one manually.</ShiftChange.AssignDescNoWork>
+  <ShiftChange.AssignDesc>Reserve this stand for one colonist.\n\nLeave it unassigned and it is shared: any colonist about to do {0} in this room may use whichever stand is free. A kitchen therefore needs one stand per cook working at once, not one per cook.</ShiftChange.AssignDesc>
+  <ShiftChange.AssignDescNoWork>Reserve this stand for one colonist. It has no work type yet — either put it in a room with a role, or set one manually.</ShiftChange.AssignDescNoWork>
 
 </LanguageData>
