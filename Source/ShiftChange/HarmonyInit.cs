@@ -29,9 +29,11 @@ namespace ShiftChange
             // ECR hot reload is compiled into Debug builds only — see the
             // dev-loop section of CLAUDE.md. Route its logging into the dev
             // log so a swap landing (or failing) is visible, not an act of
-            // faith.
+            // faith. The watchdog replaces ECR's FileSystemWatcher trigger,
+            // which never fires under Unity's Mono on macOS.
             EcrLog.messageCallback = s => Log.Message("[ShiftChange/ECR] " + s);
             EcrLog.errorCallback = s => Log.Error("[ShiftChange/ECR] " + s);
+            EcrWatchdog.Start();
 #endif
         }
 
