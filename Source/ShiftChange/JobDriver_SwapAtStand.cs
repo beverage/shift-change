@@ -78,54 +78,15 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>Going on shift: stand's clothes on, own clothes into the stand.</summary>
+        /// <summary>
+        /// Going on shift: stand's clothes on, own clothes into the stand. The
+        /// decision of what moves lives in <see cref="SwapPlan"/>, shared with
+        /// the stand selector so the two can never disagree about what counts
+        /// as wearable.
+        /// </summary>
         private void PlanDress(CompShiftStand comp)
         {
-            List<Apparel> worn = pawn.apparel.WornApparel;
-            foreach (Thing thing in Stand.HeldItems)
-            {
-                Apparel candidate = thing as Apparel;
-                if (candidate == null
-                    || !candidate.PawnCanWear(pawn)
-                    || !ApparelUtility.HasPartsToWear(pawn, candidate.def)
-                    || (CompBiocodable.IsBiocoded(candidate) && !CompBiocodable.IsBiocodedFor(candidate, pawn)))
-                {
-                    continue;
-                }
-
-                bool canTake = true;
-                List<Apparel> displaced = new List<Apparel>();
-                foreach (Apparel wornItem in worn)
-                {
-                    if (ApparelUtility.CanWearTogether(candidate.def, wornItem.def, pawn.RaceProps.body))
-                    {
-                        continue;
-                    }
-                    // Vanilla's own gate, and the only one it applies.
-                    if (pawn.apparel.IsLocked(wornItem))
-                    {
-                        canTake = false;
-                        break;
-                    }
-                    displaced.Add(wornItem);
-                }
-
-                if (!canTake)
-                {
-                    continue;
-                }
-                foreach (Apparel item in displaced)
-                {
-                    if (!toStore.Contains(item))
-                    {
-                        toStore.Add(item);
-                    }
-                }
-                if (!toWear.Contains(candidate))
-                {
-                    toWear.Add(candidate);
-                }
-            }
+            SwapPlan.BuildDress(pawn, Stand, toWear, toStore);
         }
 
         /// <summary>Going off shift: uniform back in the stand, own clothes on.</summary>

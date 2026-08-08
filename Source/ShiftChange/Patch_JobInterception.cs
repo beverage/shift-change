@@ -264,7 +264,16 @@ namespace ShiftChange
                 {
                     CompShiftStand comp = thing.TryGetComp<CompShiftStand>();
                     if (comp == null || comp.OnShift || comp.WorkType != work
-                        || !comp.CanBeClaimedBy(pawn) || !comp.HasWearable)
+                        || !comp.CanBeClaimedBy(pawn))
+                    {
+                        continue;
+                    }
+                    // Ask the same question the driver will ask on arrival, not
+                    // a looser one. "Holds some apparel" is not the same as
+                    // "holds something THIS pawn can put on", and the gap sent
+                    // pawns on wasted trips that looked like swapping at an
+                    // empty rack.
+                    if (!SwapPlan.WouldDress(pawn, comp.Stand))
                     {
                         continue;
                     }
