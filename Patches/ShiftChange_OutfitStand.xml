@@ -25,6 +25,11 @@
           <li Class="ShiftChange.CompProperties_ShiftStand" />
           <li Class="CompProperties_AssignableToPawn">
             <compClass>ShiftChange.CompAssignableToPawn_ShiftStand</compClass>
+            <!-- The overlay is how a room of pool stands is read at a glance:
+                 our comp draws the current BORROWER's name when one is out,
+                 and falls back to the base's owner name otherwise. Unowned
+                 stays off so a shelf of idle stands is not a wall of
+                 "Unowned". -->
             <drawAssignmentOverlay>true</drawAssignmentOverlay>
             <drawUnownedAssignmentOverlay>false</drawUnownedAssignmentOverlay>
           </li>

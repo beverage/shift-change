@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using RimWorld;
+using UnityEngine;
 using Verse;
 
 namespace ShiftChange
@@ -49,6 +50,34 @@ namespace ShiftChange
         /// stand that leaves ownership invisible outside the assign dialog, so
         /// name it on the button.
         /// </summary>
+        /// <summary>
+        /// Names the pawn floating over the stand at closest zoom, so a room of
+        /// pool stands can be read at a glance instead of clicked through.
+        ///
+        /// The base draws the assigned owner (<c>CompAssignableToPawn.cs:62-81</c>),
+        /// which says nothing about a pool stand — the interesting fact there is
+        /// who currently has it out. A forbidden-style X was the other option and
+        /// is rejected: `OverlayTypes.Forbidden` means *forbidden* in RimWorld's
+        /// vocabulary, so it would report the wrong thing, and it cannot say
+        /// whose stand it is.
+        /// </summary>
+        public override void DrawGUIOverlay()
+        {
+            CompShiftStand shift = parent.TryGetComp<CompShiftStand>();
+            Pawn borrower = shift?.Borrower;
+            if (borrower == null || !shift.OnShift)
+            {
+                base.DrawGUIOverlay();
+                return;
+            }
+
+            if (Find.CameraDriver.CurrentZoom != CameraZoomRange.Closest || !PlayerCanSeeAssignments)
+            {
+                return;
+            }
+            GenMapUI.DrawThingLabel(parent, borrower.LabelShort, GenMapUI.DefaultThingLabelColor);
+        }
+
         protected override string GetAssignmentGizmoLabel()
         {
             List<Pawn> assigned = AssignedPawnsForReading;
