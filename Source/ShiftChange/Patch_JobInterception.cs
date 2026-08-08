@@ -342,6 +342,30 @@ namespace ShiftChange
                 return false;
             }
 
+            // Reserve the deferred job's targets NOW — this is vanilla
+            // parity, not an extra. Vanilla reserves at StartJob
+            // (TryMakePreToilReservations), and its own opportunistic
+            // deferral reserves FIRST, then enqueues the job and starts the
+            // other one (Pawn_JobTracker.cs:331-347; ClearDriver never
+            // releases). Our prefix skips the original StartJob entirely, so
+            // without this the patient or bench sits unreserved for the
+            // whole walk-and-change and any other pawn can take it — found
+            // in play 2026-08-08 as a distant doctor dressing for a patient
+            // a nearer doctor had already tended, then changing straight
+            // back. Safe to hold while queued: every queue-clearing path
+            // releases via QueuedJob.Cleanup → ClearReservationsForJob
+            // (QueuedJob.cs:26), and the queued start re-reserves its own
+            // claims idempotently.
+            JobDriver reservationDriver = originalJob.MakeDriver(pawn);
+            if (!reservationDriver.TryMakePreToilReservations(errorOnFailed: false))
+            {
+                // Lost the race for the target within this very tick. Do not
+                // detour for a job that can no longer run — drop any partial
+                // claims and let vanilla start and fail it the ordinary way.
+                pawn.ClearReservationsForJob(originalJob);
+                return false;
+            }
+
             Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, stand.parent);
 
             // Start the swap BEFORE enqueueing the displaced job. Vanilla's
