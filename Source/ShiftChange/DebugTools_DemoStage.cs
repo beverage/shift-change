@@ -13,7 +13,8 @@ namespace ShiftChange
     /// kitchen and dining directly connected — roofed, lit, colour-coded
     /// carpet per work room (red/green/blue), stands stocked with Vanilla
     /// Apparel Expanded work gear when that mod is loaded (tinted vanilla
-    /// clothes otherwise), three specialists, a surgery patient, an active
+    /// clothes otherwise), three specialists in plain tunics, a surgery
+    /// patient, an active
     /// research project, one bulk kitchen bill and exactly one batch of
     /// ingredients.
     ///
@@ -221,7 +222,7 @@ namespace ShiftChange
         internal static void BuildKitchen(Map map, CellRect interior, Building_OutfitStand stand)
         {
             Carpet(map, interior, "CarpetBlue");
-            SpawnTorch(map, new IntVec3(interior.maxX, 0, interior.maxZ));
+            SpawnTorch(map, new IntVec3(interior.maxX, 0, interior.minZ));
 
             // South wall, facing north into the room (the kitchen's door is
             // on its NORTH wall, so the stand meets the chef at the door and
@@ -251,7 +252,7 @@ namespace ShiftChange
             {
                 Thing stack = ThingMaker.MakeThing(potatoes);
                 stack.stackCount = 40;
-                GenPlace.TryPlaceThing(stack, new IntVec3(interior.maxX, 0, interior.minZ), map, ThingPlaceMode.Near);
+                GenPlace.TryPlaceThing(stack, new IntVec3(interior.maxX, 0, interior.minZ + 1), map, ThingPlaceMode.Near);
             }
 
             Stock(stand,
@@ -293,9 +294,11 @@ namespace ShiftChange
             ThingDef chairDef = DefDatabase<ThingDef>.GetNamedSilentFail("DiningChair");
             if (chairDef != null)
             {
+                // West side seats one chair only: the kitchen↔dining door
+                // opens into (minX, minZ + 2), and a chair there blocks it.
                 Spawn(map, chairDef, ThingDefOf.WoodLog, new IntVec3(interior.minX, 0, interior.minZ + 1), Rot4.East);
-                Spawn(map, chairDef, ThingDefOf.WoodLog, new IntVec3(interior.minX, 0, interior.minZ + 2), Rot4.East);
                 Spawn(map, chairDef, ThingDefOf.WoodLog, new IntVec3(interior.minX + 3, 0, interior.minZ + 1), Rot4.West);
+                Spawn(map, chairDef, ThingDefOf.WoodLog, new IntVec3(interior.minX + 3, 0, interior.minZ + 2), Rot4.West);
             }
         }
 
@@ -314,18 +317,7 @@ namespace ShiftChange
                 {
                     continue;
                 }
-                // Cloth for anything stuffable, default sprite always — the
-                // uniforms should read identically take after take. The
-                // explicit SetColor matters: CompColorable.Initialize rolls
-                // the def's colorGenerator (random clothing colours — the
-                // pink chef's uniform), so "default" has to be imposed.
-                ThingDef stuff = def.MadeFromStuff ? ThingDefOf.Cloth : null;
-                Apparel garment = (Apparel)ThingMaker.MakeThing(def, stuff);
-                garment.SetStyleDef(null);
-                garment.overrideGraphicIndex = 0;
-                garment.TryGetComp<CompColorable>()?.SetColor(
-                    stuff != null ? stuff.stuffProps.color : Color.white);
-                stand.AddApparel(garment);
+                stand.AddApparel(MakeGarment(def, null));
                 stockedAny = true;
             }
             if (stockedAny)
@@ -339,11 +331,51 @@ namespace ShiftChange
                 {
                     continue;
                 }
-                Apparel apparel = (Apparel)ThingMaker.MakeThing(def, ThingDefOf.Cloth);
-                apparel.SetStyleDef(null);
-                apparel.overrideGraphicIndex = 0;
-                apparel.TryGetComp<CompColorable>()?.SetColor(fallbackTint);
-                stand.AddApparel(apparel);
+                stand.AddApparel(MakeGarment(def, fallbackTint));
+            }
+        }
+
+        /// <summary>
+        /// Cloth for anything stuffable, default sprite always — staged
+        /// garments should read identically take after take. The explicit
+        /// SetColor matters: CompColorable.Initialize rolls the def's
+        /// colorGenerator (random clothing colours — the pink chef's
+        /// uniform), so "default" has to be imposed.
+        /// </summary>
+        internal static Apparel MakeGarment(ThingDef def, Color? tint)
+        {
+            ThingDef stuff = def.MadeFromStuff ? ThingDefOf.Cloth : null;
+            Apparel garment = (Apparel)ThingMaker.MakeThing(def, stuff);
+            garment.SetStyleDef(null);
+            garment.overrideGraphicIndex = 0;
+            garment.TryGetComp<CompColorable>()?.SetColor(
+                tint ?? (stuff != null ? stuff.stuffProps.color : Color.white));
+            return garment;
+        }
+
+        /// <summary>
+        /// Strips generated apparel and dresses the pawn in one cloth tunic.
+        /// PawnGenerator rolls random colonist clothing, which both muddies
+        /// the take (a chef can spawn already wearing a toque in whatever
+        /// fabric rolled) and pads the change-in with one removal delay per
+        /// displaced garment — shirt plus pants cost 3.5s on top of the
+        /// uniform. A tunic is a single OnSkin torso piece: the lab coat
+        /// (Shell layer) goes straight over it, so the researcher changes in
+        /// 1.0s, while scrubs and chef's whites displace exactly this one
+        /// 1.5s garment (doctor 3.3s, chef 4.8s).
+        /// </summary>
+        internal static void DressInTunic(Pawn pawn)
+        {
+            if (pawn.apparel == null)
+            {
+                return;
+            }
+            pawn.apparel.DestroyAll();
+            ThingDef tunic = DefDatabase<ThingDef>.GetNamedSilentFail("VAE_Apparel_Tunic")
+                ?? DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_TribalA");
+            if (tunic != null)
+            {
+                pawn.apparel.Wear(MakeGarment(tunic, null));
             }
         }
 
@@ -378,7 +410,8 @@ namespace ShiftChange
                     continue;
                 }
                 WorkTypeDef specialty = DefDatabase<WorkTypeDef>.GetNamedSilentFail(staff[i].workDefName);
-                Pawn pawn = AveragePawn(staff[i].gender, staff[i].nick);
+                Pawn pawn = AveragePawn(staff[i].gender, staff[i].nick, specialty);
+                DressInTunic(pawn);
                 GenSpawn.Spawn(pawn, cell, map);
                 pawn.workSettings.EnableAndInitialize();
                 foreach (WorkTypeDef work in DefDatabase<WorkTypeDef>.AllDefsListForReading)
@@ -451,12 +484,20 @@ namespace ShiftChange
         /// body, natural hair, no beard, no tattoos, NO TRAITS (a randomly
         /// rolled Nudist or Pyromaniac hijacks a take), and a role nickname
         /// so the on-screen label reads Doc / Lab / Chef / Patient.
+        ///
+        /// Traits are cleared, but BACKSTORIES are rolled and kept — and a
+        /// backstory can disable a work type outright. A chef whose roll
+        /// disabled Cooking gets priority 0 in everything (SpawnStaff zeroes
+        /// all non-specialty work) and wanders the set for the whole take
+        /// (found in play, 2026-08-08). So reroll until the specialty is
+        /// enabled; relations are off so the discards leave nothing behind.
         /// </summary>
-        internal static Pawn AveragePawn(Gender gender, string nick)
+        internal static Pawn AveragePawn(Gender gender, string nick, WorkTypeDef mustBeCapableOf = null)
         {
             PawnGenerationRequest request = new PawnGenerationRequest(
                 PawnKindDefOf.Colonist, Faction.OfPlayer,
                 forceGenerateNewPawn: true,
+                canGeneratePawnRelations: false,
                 fixedBiologicalAge: 30f, fixedChronologicalAge: 30f,
                 fixedGender: gender);
             XenotypeDef baseliner = DefDatabase<XenotypeDef>.GetNamedSilentFail("Baseliner");
@@ -465,6 +506,13 @@ namespace ShiftChange
                 request.ForcedXenotype = baseliner;
             }
             Pawn pawn = PawnGenerator.GeneratePawn(request);
+            for (int tries = 0;
+                 mustBeCapableOf != null && pawn.WorkTypeIsDisabled(mustBeCapableOf) && tries < 30;
+                 tries++)
+            {
+                pawn.Destroy();
+                pawn = PawnGenerator.GeneratePawn(request);
+            }
 
             pawn.Name = new NameTriple(gender == Gender.Female ? "Jane" : "John", nick, "Doe");
             pawn.story.traits.allTraits.Clear();
