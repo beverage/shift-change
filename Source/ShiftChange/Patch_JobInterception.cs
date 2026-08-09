@@ -292,7 +292,33 @@ namespace ShiftChange
             if (onShift != null)
             {
                 Room standRoom = onShift.parent.GetRoom();
-                if (!target.IsValid || standRoom == null || target.GetRoom(map) == standRoom)
+                if (standRoom == null)
+                {
+                    return false;
+                }
+                // Eating cannot use the room test below, because an ingest
+                // job's targetA is the FOOD, while the place the eating
+                // happens — the dining chair — is chosen DURING the job by
+                // Toils_Ingest.CarryIngestibleToChewSpot
+                // (JobDriver_Ingest.cs:165, Toils_Ingest.cs:115) and is not
+                // knowable here. The food's cell misreads the break in both
+                // directions: a packed lunch reads as the pawn's own
+                // position, and a colony's meal stock usually sits in or
+                // near the kitchen, so a cook's meal reads as "in the room"
+                // — and they then carry it across the base to a chair in
+                // uniform, the exact walk this mod exists to prevent.
+                // Policy (principal, 2026-08-08): food already on the pawn
+                // means eat as-is; anything else is a sit-down break —
+                // change out first, wherever the meal happens to be stored.
+                if (IsIngestJob(job))
+                {
+                    if (FoodSourceIsOnPawn(job, pawn))
+                    {
+                        return false;
+                    }
+                    return Insert(pawn, tracker, onShift, job, tag, "return");
+                }
+                if (!target.IsValid || target.GetRoom(map) == standRoom)
                 {
                     // Still working in the room, or the job's location is
                     // unreadable (queue-based jobs — hauling, harvesting).
@@ -422,6 +448,36 @@ namespace ShiftChange
                             $"(deferring {originalJob.def.defName})");
             }
             return true;
+        }
+
+        /// <summary>
+        /// An ingest-family job — meals, drinks, drugs; anything driven by
+        /// <see cref="JobDriver_Ingest"/> or a subclass. By driver class, not
+        /// JobDefOf.Ingest, so modded ingest defs are covered too.
+        /// </summary>
+        internal static bool IsIngestJob(Job job)
+        {
+            Type driver = job.def?.driverClass;
+            return driver != null && typeof(JobDriver_Ingest).IsAssignableFrom(driver);
+        }
+
+        /// <summary>
+        /// The job's food source is already on the pawn — in inventory (the
+        /// same test the driver itself uses for eatingFromInventory,
+        /// JobDriver_Ingest.cs:86) or in their hands.
+        /// </summary>
+        internal static bool FoodSourceIsOnPawn(Job job, Pawn pawn)
+        {
+            Thing food = job.targetA.Thing;
+            if (food == null)
+            {
+                return false;
+            }
+            if (pawn.inventory != null && pawn.inventory.Contains(food))
+            {
+                return true;
+            }
+            return pawn.carryTracker?.CarriedThing == food;
         }
 
         /// <summary>
