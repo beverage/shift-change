@@ -54,6 +54,76 @@ namespace ShiftChange
         internal static readonly Dictionary<int, int> LastBlockedTick = new Dictionary<int, int>();
 
         /// <summary>
+        /// Pawn → the stand they were changed back at by the change-back
+        /// button (<see cref="Patch_ChangeBackGizmo"/>): the ROOM-EXIT LATCH.
+        /// While it holds, that pawn will not dress again in that stand's
+        /// room; it drops the moment they are seen starting a job anywhere
+        /// else, and drafting drops it outright.
+        ///
+        /// It is positional rather than a countdown because the thing that
+        /// must not cycle is the CHANGING, not the work (principal,
+        /// 2026-08-09): counting jobs either spends the block on an
+        /// unrelated errand — leaving the next room job free to re-dress
+        /// them a second after the player pulled them out — or holds it
+        /// through a long trip that plainly should have ended it. "Have they
+        /// left the room yet" is the question the player is actually asking,
+        /// and it answers itself from position.
+        ///
+        /// The STAND is stored, not the Room, so the room is re-derived live
+        /// on both sides of every comparison and a rebuilt wall cannot leave
+        /// a stale Room object behind. Keyed by Pawn reference rather than
+        /// thingIDNumber on purpose: an object reference cannot collide
+        /// across a save load the way a recycled ID can, so a stale entry is
+        /// inert rather than wrong. SessionGuard still clears it so old-game
+        /// pawns don't leak.
+        /// </summary>
+        internal static readonly Dictionary<Pawn, Thing> ChangedBackAt = new Dictionary<Pawn, Thing>();
+
+        /// <summary>
+        /// Drops the latch as soon as the pawn is starting a job while
+        /// standing outside the room they were changed out of. Called at the
+        /// top of every interception, so it samples at every job boundary
+        /// for every pawn — no tick hook needed. (A doorway is its own Room,
+        /// <c>Room.IsDoorway</c>, so a pawn caught mid-door reads as "left":
+        /// a hair early, and they are in fact leaving.)
+        /// </summary>
+        internal static void UpdateChangeBackLatch(Pawn pawn)
+        {
+            Thing stand;
+            if (!ChangedBackAt.TryGetValue(pawn, out stand))
+            {
+                return;
+            }
+            if (stand == null || !stand.Spawned)
+            {
+                ChangedBackAt.Remove(pawn);
+                return;
+            }
+            Room standRoom = stand.GetRoom();
+            if (standRoom == null || pawn.GetRoom() != standRoom)
+            {
+                ChangedBackAt.Remove(pawn);
+            }
+        }
+
+        /// <summary>
+        /// Would dressing in <paramref name="room"/> right now be the very
+        /// re-dress the player just cancelled? Scoped to the latched room on
+        /// purpose: a latched pawn who takes a job in a DIFFERENT room is
+        /// leaving, and the uniform waiting for them there is a different
+        /// uniform — blocking that would strand the feature at one room.
+        /// </summary>
+        internal static bool IsLatchedIn(Pawn pawn, Room room)
+        {
+            Thing stand;
+            if (!ChangedBackAt.TryGetValue(pawn, out stand) || stand == null || !stand.Spawned)
+            {
+                return false;
+            }
+            return stand.GetRoom() == room;
+        }
+
+        /// <summary>
         /// Called by SessionGuard when the loaded game changes. This map is
         /// keyed by thingIDNumber and stamped with TicksGame — both restart
         /// per save, so stale entries are not merely leaked but WRONG: an
@@ -63,6 +133,7 @@ namespace ShiftChange
         internal static void ResetSessionState()
         {
             LastBlockedTick.Clear();
+            ChangedBackAt.Clear();
         }
 
         /// <summary>Toggle for the mid-job catch-up below.</summary>
@@ -153,6 +224,13 @@ namespace ShiftChange
                     continue;
                 }
                 if (!stand.CanBeClaimedBy(pawn) || !SwapPlan.WouldDress(pawn, stand.Stand))
+                {
+                    continue;
+                }
+                // The second dress path, and it needs the same latch: without
+                // it, a stand returning to the pool re-dresses the very pawn
+                // the player just pulled out of this room.
+                if (IsLatchedIn(pawn, room))
                 {
                     continue;
                 }
@@ -252,6 +330,13 @@ namespace ShiftChange
                 return false;
             }
 
+            // Sampled here, above every other gate, so the latch is tested at
+            // EVERY job boundary — including jobs that return below (danger,
+            // player-forced, cooldown). Leaving the room is what ends it, and
+            // the pawn must not have to take a dressable job to be noticed
+            // leaving.
+            UpdateChangeBackLatch(pawn);
+
             // No changing while the map is under threat. Vanilla has no
             // precedent to copy here: JobGiver_OptimizeApparel carries no
             // danger check at all, because think-tree position does the work
@@ -340,6 +425,19 @@ namespace ShiftChange
                 return false;
             }
 
+            // The change-back latch: they were pulled out of this very room
+            // and have not left it since, so dressing again here is the cycle
+            // the player just stopped.
+            if (IsLatchedIn(pawn, room))
+            {
+                if (Verbose)
+                {
+                    Log.Message($"[ShiftChange] {pawn.LabelShort} stays changed out — " +
+                                "not left the room since the change-back order");
+                }
+                return false;
+            }
+
             CompShiftStand stand = FindAvailableStand(room, pawn, work);
             if (stand == null)
             {
@@ -382,8 +480,31 @@ namespace ShiftChange
             // releases via QueuedJob.Cleanup → ClearReservationsForJob
             // (QueuedJob.cs:26), and the queued start re-reserves its own
             // claims idempotently.
+            // The dry-run must reproduce vanilla's calling context: StartJob
+            // assigns curJob BEFORE calling TryMakePreToilReservations, and
+            // drivers rely on it — vanilla's JobDriver_SocialRelax reserves
+            // its seat against pawn.CurJob, not its own job field
+            // (JobDriver_SocialRelax.cs:30), and FE's served social driver
+            // mirrors it. With curJob unset, that reserve sees a null job and
+            // returns false (ReservationManager.cs:306-309, one "without a
+            // valid job" warning per attempt), so the divert silently
+            // degraded to ride-along — found in play 2026-08-09 as a crafter
+            // drinking at the bar in uniform. MakeDriver sets the driver's
+            // own job field (Job.cs:606), which is why only CurJob-reading
+            // drivers ever noticed the difference.
             JobDriver reservationDriver = originalJob.MakeDriver(pawn);
-            if (!reservationDriver.TryMakePreToilReservations(errorOnFailed: false))
+            Job prevCurJob = tracker.curJob;
+            bool reserved;
+            try
+            {
+                tracker.curJob = originalJob;
+                reserved = reservationDriver.TryMakePreToilReservations(errorOnFailed: false);
+            }
+            finally
+            {
+                tracker.curJob = prevCurJob;
+            }
+            if (!reserved)
             {
                 // Lost the race for the target within this very tick. Do not
                 // detour for a job that can no longer run — drop any partial

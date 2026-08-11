@@ -27,6 +27,11 @@
   <ShiftChange.AssignDescNoPool>Reserve this stand for one colonist.\n\nShared use of unassigned stands is turned off in mod settings, so only an assigned owner will change at this stand for {0}.</ShiftChange.AssignDescNoPool>
   <ShiftChange.AssignDescNoWork>Reserve this stand for one colonist. It has no work type yet — either put it in a room with a role, or set one manually.</ShiftChange.AssignDescNoWork>
 
+  <ShiftChange.ChangeBackLabel>Change back</ShiftChange.ChangeBackLabel>
+  <ShiftChange.ChangeBackDesc>Cancel this colonist's orders and send them to {STAND} to change out of their work outfit.\n\nUse this when a raid or emergency starts: they will not change back on their own while the map is under threat.\n\nThey keep working in this room in their own clothes, and will not put the outfit back on until they have left the room and returned. Drafting them clears that straight away.</ShiftChange.ChangeBackDesc>
+  <ShiftChange.ChangeBackUnreachable>Cannot reach {STAND}.</ShiftChange.ChangeBackUnreachable>
+  <ShiftChange.ChangeBackUnavailable>This colonist cannot change right now.</ShiftChange.ChangeBackUnavailable>
+
   <ShiftChange.SettingPoolUnassigned>Unassigned stands are shared</ShiftChange.SettingPoolUnassigned>
   <ShiftChange.SettingPoolUnassignedDesc>When on, an outfit stand with no assigned owner, standing in a work room, may be used by any colonist capable of that room's work.\n\nWhen off, only stands explicitly assigned to a colonist ever dress anyone — every unassigned stand behaves exactly like vanilla furniture.</ShiftChange.SettingPoolUnassignedDesc>
 

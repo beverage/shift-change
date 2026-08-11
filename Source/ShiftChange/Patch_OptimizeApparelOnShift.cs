@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using HarmonyLib;
 using RimWorld;
 using Verse;
@@ -53,6 +54,56 @@ namespace ShiftChange
             }
             __result = null;
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Second layer, at EXECUTION: the giver pause above stops new recolor
+    /// jobs being issued, but a RecolorApparel job that already exists still
+    /// runs — curJob and the job queue are scribed into the save, so a job
+    /// issued in a pre-pause session resumes after load and dyes the uniform
+    /// anyway (a stand's toque came back favourite-colour green, 2026-08-09).
+    /// The driver never re-checks its apparel queue: it dyes whatever the
+    /// job names, wherever it now sits (JobDriver_RecolorApparel.cs:74) —
+    /// including garments a swap has since parked in a stand.
+    ///
+    /// Failing TryMakePreToilReservations is the clean kill: vanilla treats
+    /// a failed reservation at job start as routine (races do it constantly)
+    /// and the think tree simply picks another job. Blocked when the pawn is
+    /// on shift (worn apparel is the uniform) or when any queued garment is
+    /// parked in an outfit stand (the post-undress legacy case). Off shift,
+    /// on their own clothes, recoloring runs untouched.
+    /// </summary>
+    [HarmonyPatch(typeof(JobDriver_RecolorApparel), nameof(JobDriver_RecolorApparel.TryMakePreToilReservations))]
+    public static class Patch_RecolorExecutionGuard
+    {
+        // ReSharper disable once InconsistentNaming — Harmony injection.
+        public static bool Prefix(JobDriver_RecolorApparel __instance, ref bool __result)
+        {
+            if (!Patch_JobInterception.Enabled)
+            {
+                return true;
+            }
+            SessionGuard.Ensure();
+            Pawn pawn = __instance.pawn;
+            if (pawn != null && CompShiftStand.OnShiftStandFor(pawn) != null)
+            {
+                __result = false;
+                return false;
+            }
+            List<LocalTargetInfo> queue = __instance.job?.GetTargetQueue(TargetIndex.B);
+            if (queue != null)
+            {
+                for (int i = 0; i < queue.Count; i++)
+                {
+                    if (queue[i].Thing?.ParentHolder is Building_OutfitStand)
+                    {
+                        __result = false;
+                        return false;
+                    }
+                }
+            }
+            return true;
         }
     }
 }
