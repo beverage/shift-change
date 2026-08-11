@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using HarmonyLib;
 using RimWorld;
@@ -40,16 +41,35 @@ namespace ShiftChange
     [HarmonyPatch(typeof(JobGiver_OptimizeApparel), "TryGiveJob")]
     public static class Patch_OptimizeApparelOnShift
     {
+        // Deliberately NOT gated on Patch_JobInterception.Enabled. That flag is
+        // the interception's kill switch and latches false on any throw inside
+        // the nested StartJob — including a throw from a NEIGHBOUR mod's patch.
+        // Tying this pause to it meant an unrelated mod's exception re-opened
+        // the recolor path on pawns still standing in their uniforms, which is
+        // verbatim the 2026-08-09 bug this patch exists to prevent, and the
+        // only unrecoverable consequence of self-disabling. A pawn who is on
+        // shift needs protecting whether or not interception is still running;
+        // the ledger is the correct condition, and it is the one asked below.
         // ReSharper disable once InconsistentNaming — Harmony result injection.
         public static bool Prefix(Pawn pawn, ref Job __result)
         {
-            if (!Patch_JobInterception.Enabled || pawn == null)
+            if (pawn == null)
             {
                 return true;
             }
-            SessionGuard.Ensure();
-            if (CompShiftStand.OnShiftStandFor(pawn) == null)
+            try
             {
+                SessionGuard.Ensure();
+                if (CompShiftStand.OnShiftStandFor(pawn) == null)
+                {
+                    return true;
+                }
+            }
+            catch (Exception e)
+            {
+                // This giver is consulted on every think cycle, so a throw
+                // here recurs forever rather than once. Fail open.
+                Log.Error("[ShiftChange] optimizer pause threw, letting vanilla run: " + e);
                 return true;
             }
             __result = null;
@@ -77,31 +97,38 @@ namespace ShiftChange
     [HarmonyPatch(typeof(JobDriver_RecolorApparel), nameof(JobDriver_RecolorApparel.TryMakePreToilReservations))]
     public static class Patch_RecolorExecutionGuard
     {
+        // Not gated on Patch_JobInterception.Enabled either, and for the same
+        // reason as the giver pause above — this is the layer that catches
+        // recolor jobs scribed into the save before the pause existed, so it
+        // has to survive the interception switching itself off.
         // ReSharper disable once InconsistentNaming — Harmony injection.
         public static bool Prefix(JobDriver_RecolorApparel __instance, ref bool __result)
         {
-            if (!Patch_JobInterception.Enabled)
+            try
             {
-                return true;
-            }
-            SessionGuard.Ensure();
-            Pawn pawn = __instance.pawn;
-            if (pawn != null && CompShiftStand.OnShiftStandFor(pawn) != null)
-            {
-                __result = false;
-                return false;
-            }
-            List<LocalTargetInfo> queue = __instance.job?.GetTargetQueue(TargetIndex.B);
-            if (queue != null)
-            {
-                for (int i = 0; i < queue.Count; i++)
+                SessionGuard.Ensure();
+                Pawn pawn = __instance.pawn;
+                if (pawn != null && CompShiftStand.OnShiftStandFor(pawn) != null)
                 {
-                    if (queue[i].Thing?.ParentHolder is Building_OutfitStand)
+                    __result = false;
+                    return false;
+                }
+                List<LocalTargetInfo> queue = __instance.job?.GetTargetQueue(TargetIndex.B);
+                if (queue != null)
+                {
+                    for (int i = 0; i < queue.Count; i++)
                     {
-                        __result = false;
-                        return false;
+                        if (queue[i].Thing?.ParentHolder is Building_OutfitStand)
+                        {
+                            __result = false;
+                            return false;
+                        }
                     }
                 }
+            }
+            catch (Exception e)
+            {
+                Log.Error("[ShiftChange] recolor guard threw, letting vanilla run: " + e);
             }
             return true;
         }

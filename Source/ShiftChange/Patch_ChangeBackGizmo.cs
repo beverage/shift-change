@@ -60,8 +60,13 @@ namespace ShiftChange
                 yield return gizmo;
             }
 
-            if (!Patch_JobInterception.Enabled || __instance == null
-                || !__instance.IsColonistPlayerControlled)
+            // Deliberately NOT gated on Patch_JobInterception.Enabled. That
+            // flag latching false is precisely the moment this button matters
+            // most: automatic return trips have stopped, so without it every
+            // pawn currently in uniform is stranded there with no route back
+            // at all. The kill switch exists to stop the mod ACTING on its
+            // own; it must not also remove the player's manual remedy.
+            if (__instance == null || !__instance.IsColonistPlayerControlled)
             {
                 yield break;
             }

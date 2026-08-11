@@ -276,7 +276,27 @@ namespace ShiftChange
             // pointed at the wrong pawn.
             if (borrower != null && OnShift)
             {
-                OnShiftStands[borrower] = this;
+                CompShiftStand incumbent;
+                if (OnShiftStands.TryGetValue(borrower, out incumbent)
+                    && incumbent != null && incumbent != this && incumbent.OnShift
+                    && incumbent.borrower == borrower)
+                {
+                    // Two stands both claiming the same borrower, and only one
+                    // can be their return trip. The incumbent keeps them; this
+                    // ledger is the stale copy (a stand reinstalled from a box
+                    // it was minified into mid-shift, carrying a checkout that
+                    // has since moved on), so drop it rather than silently
+                    // stealing the registry entry and stranding the uniform
+                    // the other stand is still holding clothes for.
+                    storedOwnerApparel.Clear();
+                    issuedUniform.Clear();
+                    storedForcedApparel.Clear();
+                    borrower = null;
+                }
+                else
+                {
+                    OnShiftStands[borrower] = this;
+                }
             }
             else if (borrower == null && OnShift)
             {
@@ -293,10 +313,50 @@ namespace ShiftChange
         public override void PostDeSpawn(Map map, DestroyMode mode = DestroyMode.Vanish)
         {
             base.PostDeSpawn(map, mode);
-            if (borrower != null)
+            // Deconstructed, burnt down, or minified into a box — either way
+            // the stand is out of the borrower's reach and the ledger cannot
+            // be honoured. Dropping the registry entry alone was not enough:
+            // it left the uniform FORCE-WORN, and forced is what makes the
+            // uniform stick. See ReleaseBorrower for why that is a trap with
+            // no way out.
+            ReleaseBorrower();
+        }
+
+        /// <summary>
+        /// Hand the uniform to whoever is wearing it and free the stand.
+        ///
+        /// Clearing the ledger without clearing the forced flags pins the
+        /// borrower into the uniform permanently, because every route back out
+        /// keys off the ledger — the automatic return trip, the Change back
+        /// button, and the optimizer pause all look the pawn up in
+        /// <see cref="OnShiftStands"/> — while vanilla's own
+        /// <c>JobGiver_OptimizeApparel</c> skips force-worn apparel by design.
+        /// Remove the ledger and all four close at once, leaving the Assign
+        /// tab's "Clear forced apparel" as the only remedy: lossy, and nobody
+        /// finds it. So the flags come off first, and the garments stay on the
+        /// pawn as ordinary policy-managed clothing that vanilla will replace
+        /// in its own time.
+        /// </summary>
+        internal void ReleaseBorrower()
+        {
+            Pawn holder = borrower;
+            if (holder != null)
             {
-                OnShiftStands.Remove(borrower);
+                for (int i = 0; i < issuedUniform.Count; i++)
+                {
+                    Apparel apparel = issuedUniform[i];
+                    if (apparel != null && holder.apparel != null
+                        && holder.apparel.WornApparel.Contains(apparel))
+                    {
+                        holder.outfits?.forcedHandler?.SetForced(apparel, forced: false);
+                    }
+                }
+                OnShiftStands.Remove(holder);
             }
+            storedOwnerApparel.Clear();
+            issuedUniform.Clear();
+            storedForcedApparel.Clear();
+            borrower = null;
         }
 
         public override void PostExposeData()

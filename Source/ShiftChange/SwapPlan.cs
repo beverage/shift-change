@@ -22,6 +22,29 @@ namespace ShiftChange
         internal static readonly List<Apparel> ScratchStore = new List<Apparel>();
 
         /// <summary>
+        /// Every gate vanilla's own <c>Wear</c> applies, asked BEFORE anything
+        /// is committed.
+        ///
+        /// <c>Pawn_ApparelTracker.Wear</c> is void and bails on each of these —
+        /// no body parts, biocoded to someone else, <c>PawnCanWear</c> false —
+        /// but it calls <c>newApparel.DeSpawnOrDeselect()</c> first
+        /// (<c>Pawn_ApparelTracker.cs:434-450</c>). So a garment that fails one
+        /// of them is ALREADY detached when the check fires: taken out of the
+        /// stand, never put on the pawn, held by nothing, gone from the world
+        /// with a single dev-log warning. Asking in advance is what stops that;
+        /// the driver verifies the outcome afterwards regardless, because the
+        /// pawn can lose a body part during the walk.
+        /// </summary>
+        public static bool CanWear(Pawn pawn, Apparel apparel)
+        {
+            return apparel != null
+                   && pawn?.apparel != null
+                   && apparel.PawnCanWear(pawn)
+                   && ApparelUtility.HasPartsToWear(pawn, apparel.def)
+                   && !(CompBiocodable.IsBiocoded(apparel) && !CompBiocodable.IsBiocodedFor(apparel, pawn));
+        }
+
+        /// <summary>
         /// Fills <paramref name="toWear"/> with what the pawn would take off the
         /// stand and <paramref name="toStore"/> with what they would take off
         /// themselves to make room.
@@ -44,10 +67,7 @@ namespace ShiftChange
             for (int i = 0; i < held.Count; i++)
             {
                 Apparel candidate = held[i] as Apparel;
-                if (candidate == null
-                    || !candidate.PawnCanWear(pawn)
-                    || !ApparelUtility.HasPartsToWear(pawn, candidate.def)
-                    || (CompBiocodable.IsBiocoded(candidate) && !CompBiocodable.IsBiocodedFor(candidate, pawn)))
+                if (!CanWear(pawn, candidate))
                 {
                     continue;
                 }

@@ -33,6 +33,22 @@ namespace ShiftChange
     [HarmonyPatch(typeof(Pawn_JobTracker), nameof(Pawn_JobTracker.StartJob))]
     public static class Patch_JobInterception
     {
+        /// <summary>
+        /// The INTERCEPTION kill switch, and nothing more. Read by
+        /// <see cref="Prefix"/> and <see cref="Notify_StandFreed"/> only.
+        ///
+        /// It latches false whenever anything throws inside the nested
+        /// <c>StartJob</c> — which includes a throw from another mod's patch,
+        /// so it is not a reliable signal that WE are broken. The on-shift
+        /// protections (the optimizer pause, the recolor execution guard) and
+        /// the Change back button therefore do NOT consult it: a pawn standing
+        /// in a uniform still needs their uniform protected and still needs a
+        /// way out of it, and gating those here meant a neighbour's exception
+        /// re-opened the dye path on staged kit while simultaneously removing
+        /// the player's only manual remedy. Those three key off the ledger
+        /// instead. Keep it that way when adding hooks: ask "does this ACT on
+        /// its own, or protect something already in progress?"
+        /// </summary>
         [TweakValue("ShiftChange")]
         public static bool Enabled = true;
 
@@ -637,6 +653,22 @@ namespace ShiftChange
                     // pawns on wasted trips that looked like swapping at an
                     // empty rack.
                     if (!SwapPlan.WouldDress(pawn, comp.Stand))
+                    {
+                        continue;
+                    }
+                    // Reservation is part of "available", not a formality to
+                    // check after choosing. OnShift only becomes true when a
+                    // swap COMPLETES, so a stand someone is currently walking
+                    // to still reads as free here — it would win the distance
+                    // tiebreak, fail to reserve back in Insert, and put the
+                    // pawn on cooldown instead of falling through to the stand
+                    // next to it that was genuinely free. On a burst arrival —
+                    // the exact concurrency pooling exists to serve — that
+                    // degraded pooling to roughly one dress per completed
+                    // swap however many stands the room had. Asked last of the
+                    // four gates because it is much the most expensive, and
+                    // it is the same call TryDressMidJob already makes.
+                    if (!pawn.CanReserveAndReach(thing, PathEndMode.InteractionCell, Danger.Deadly))
                     {
                         continue;
                     }

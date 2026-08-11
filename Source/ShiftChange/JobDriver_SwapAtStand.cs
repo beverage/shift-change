@@ -103,7 +103,13 @@ namespace ShiftChange
             }
             foreach (Apparel apparel in comp.StoredOwnerApparelForReading)
             {
-                if (apparel != null && apparel.ParentHolder == Stand && apparel.PawnCanWear(pawn))
+                // SwapPlan.CanWear, not a local predicate: this asked only
+                // PawnCanWear and so admitted garments vanilla's Wear() then
+                // refused for want of a body part or a biocode — after the
+                // stand had already let go of them. Wearability lives in
+                // SwapPlan and nowhere else (SwapPlan.cs:17); this line was
+                // the one place that had quietly grown a second opinion.
+                if (apparel != null && apparel.ParentHolder == Stand && SwapPlan.CanWear(pawn, apparel))
                 {
                     toWear.Add(apparel);
                 }
@@ -126,8 +132,12 @@ namespace ShiftChange
         protected override IEnumerable<Toil> MakeNewToils()
         {
             this.FailOnBurningImmobile(TargetIndex.A);
-            yield return Toils_Goto.GotoThing(TargetIndex.A, PathEndMode.InteractionCell)
-                .FailOnDespawnedNullOrForbidden(TargetIndex.A);
+            // Driver-level, not toil-level. Scoped to the Goto alone, a stand
+            // deconstructed or burnt down during the WAIT toil left the job
+            // running to its transfer, which then posted the pawn's clothes
+            // into a container that had already dumped its contents.
+            this.FailOnDespawnedNullOrForbidden(TargetIndex.A);
+            yield return Toils_Goto.GotoThing(TargetIndex.A, PathEndMode.InteractionCell);
 
             Toil wait = ToilMaker.MakeToil("ShiftChangeSwapDelay");
             wait.WithProgressBarToilDelay(TargetIndex.A);
@@ -145,8 +155,27 @@ namespace ShiftChange
         {
             Building_OutfitStand stand = Stand;
             CompShiftStand comp = Comp;
-            if (stand == null || comp == null)
+            if (stand == null || comp == null || !stand.Spawned || stand.Destroyed
+                || pawn?.apparel == null || pawn.Dead)
             {
+                // The stand or the pawn stopped existing between the last toil
+                // and this finish action. Nothing has moved yet, so there is
+                // nothing to unwind — and posting clothes into a despawned
+                // container would lose them.
+                return;
+            }
+
+            // RE-VALIDATE BEFORE ANYTHING COMES OFF. The plan was built back in
+            // Notify_Starting and the walk is long enough for the world to
+            // change under it: the uniform hauled away, a garment burnt, the
+            // pawn's jaw lost to a raider on the way. Stripping first and only
+            // then discovering the incoming set is empty is what left a naked
+            // colonist standing at a stand that now advertised their own
+            // civvies as the room's uniform.
+            toWear.RemoveAll(a => a == null || a.ParentHolder != stand || !SwapPlan.CanWear(pawn, a));
+            if (toWear.Count == 0)
+            {
+                NothingToWear(comp);
                 return;
             }
 
@@ -188,6 +217,19 @@ namespace ShiftChange
                     continue;
                 }
                 pawn.apparel.Wear(apparel);
+                // Wear() returns nothing and can decline silently: it calls
+                // DeSpawnOrDeselect() and only THEN checks body parts,
+                // biocoding and PawnCanWear (Pawn_ApparelTracker.cs:434-450),
+                // logging a warning and returning on each. By that point the
+                // stand has already let go, so an unchecked call deletes a
+                // colonist's clothing from the world. SwapPlan.CanWear asked
+                // all three above, but the pawn can lose a body part during
+                // the walk — so the outcome is the only thing worth trusting.
+                if (!pawn.apparel.WornApparel.Contains(apparel))
+                {
+                    PutBack(stand, apparel);
+                    continue;
+                }
                 if (!undressing)
                 {
                     // Forced, or JobGiver_OptimizeApparel undoes this at once.
@@ -210,19 +252,7 @@ namespace ShiftChange
                 // Vanilla's own eviction: anything already in the stand that
                 // cannot be worn together with this gets dropped near it.
                 stand.TryDropThingsToMakeRoomForThingOfDef(apparel.def);
-                if (!stand.AddApparel(apparel))
-                {
-                    // The garment is detached from the pawn and refused by the
-                    // stand — held by nothing. Drop it on the floor, where it
-                    // survives; doing nothing here would delete it from the
-                    // world. (Vanilla's driver takes the same gamble
-                    // unchecked; a mod relaxing the stand's storage
-                    // invariants would lose items through it.)
-                    if (!GenPlace.TryPlaceThing(apparel, stand.Position, stand.Map, ThingPlaceMode.Near))
-                    {
-                        Log.Error("[ShiftChange] could not store or place " + apparel.LabelCap + " — it may be lost.");
-                    }
-                }
+                PutBack(stand, apparel);
             }
 
             if (undressing)
@@ -233,6 +263,72 @@ namespace ShiftChange
             {
                 comp.NotifyDressed(pawn, stored, issued, storedForced);
             }
+        }
+
+        /// <summary>
+        /// The plan came up empty on arrival. Nothing has been moved yet, so
+        /// the two directions want opposite things.
+        /// </summary>
+        internal void NothingToWear(CompShiftStand comp)
+        {
+            if (!undressing)
+            {
+                // Dressing at a stand with nothing this pawn can put on. No
+                // state changed, so there is nothing to record — they work in
+                // their own clothes, which is exactly what the selector's
+                // WouldDress check exists to avoid and this is its backstop.
+                return;
+            }
+
+            // The return trip with nothing to return to: their own clothes
+            // burnt, were hauled off, or no longer fit. Stripping the uniform
+            // regardless would leave the pawn naked — and the standing rule is
+            // that the worst case of any failure path here is a pawn in the
+            // WRONG clothes, never a pawn without them. So hand the uniform
+            // over as ordinary clothing (forced cleared, so vanilla's
+            // optimizer will re-dress them from the stockpile in the normal
+            // way) and free the stand back into the pool.
+            List<Apparel> uniform = comp.IssuedUniformForReading;
+            for (int i = 0; i < uniform.Count; i++)
+            {
+                if (uniform[i] != null && pawn.apparel.WornApparel.Contains(uniform[i]))
+                {
+                    pawn.outfits?.forcedHandler?.SetForced(uniform[i], forced: false);
+                }
+            }
+            comp.AbandonLedger(pawn);
+        }
+
+        /// <summary>
+        /// Put a garment somewhere real. Called wherever a transfer step can
+        /// leave an item held by neither the stand nor the pawn — the stand
+        /// first, then the ground beside it, then the ground beside the pawn.
+        /// Doing nothing in that state deletes the item from the world, so
+        /// this never gives up silently. (Vanilla's own stand driver takes the
+        /// unchecked gamble; we do not.)
+        /// </summary>
+        internal void PutBack(Building_OutfitStand stand, Apparel apparel)
+        {
+            if (apparel == null || apparel.ParentHolder != null)
+            {
+                return;
+            }
+            if (stand.Spawned && stand.AddApparel(apparel))
+            {
+                return;
+            }
+            if (stand.Spawned
+                && GenPlace.TryPlaceThing(apparel, stand.Position, stand.Map, ThingPlaceMode.Near))
+            {
+                return;
+            }
+            if (pawn.Spawned
+                && GenPlace.TryPlaceThing(apparel, pawn.Position, pawn.Map, ThingPlaceMode.Near))
+            {
+                return;
+            }
+            Log.Error("[ShiftChange] could not return " + apparel.LabelCap
+                      + " to the stand, the floor or " + pawn.LabelShort + " — it may be lost.");
         }
     }
 }
