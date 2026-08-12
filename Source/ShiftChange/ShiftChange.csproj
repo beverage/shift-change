@@ -1,11 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Shift Change's only assembly. Same shape as Fine Establishments'
-       (DEC-023): RimWorld is .NET Framework 4.7.2, game references come from
-       Krafs.Rimworld.Ref (no game-DLL copying), Harmony from Lib.Harmony.
-       Both are compile-time only — ExcludeAssets keeps their DLLs out of
-       Assemblies/, because RimWorld loads every DLL it finds there and
-       Harmony ships as its own mod (brrainz.harmony). -->
+  <!-- Shift Change's only assembly. RimWorld is .NET Framework 4.7.2. Game
+       references resolve below, either from a local install or from
+       Krafs.Rimworld.Ref; Harmony comes from Lib.Harmony. All package
+       references are compile-time only, because RimWorld loads every DLL it
+       finds in Assemblies/ and Harmony ships as its own mod
+       (brrainz.harmony). -->
 
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
@@ -37,20 +37,31 @@
   </ItemGroup>
 
   <!-- Game references, two modes, one committed file (same pattern as Fine
-       Establishments). RELEASE always compiles against Krafs.Rimworld.Ref, so
-       the shipping dll is built from identical references on every machine and
-       in CI. A DEBUG build (including the editor's design-time build) upgrades
-       itself to the REAL game assemblies when a standard Steam install exists
-       below — identical public surface, but go-to-definition then decompiles
-       genuine engine code with bodies. Non-standard install: set
-       RimWorldManaged (env var or -p:). Opt out: DisableLocalGameRefs=true.
-       The Odyssey outfit-stand code needs no extra reference — DLC types ship
-       inside Assembly-CSharp. -->
+       Establishments).
+
+       A machine with a RimWorld install compiles against the REAL game
+       assemblies, in every configuration. A machine without one (CI, a fresh
+       clone) falls back to Krafs.Rimworld.Ref. Identical public surface; the
+       difference is that reference assemblies carry signatures and no IL, so
+       only the real DLLs let go-to-definition decompile engine bodies.
+
+       The gate used to be Configuration == Debug. That broke F12 in practice:
+       the rule is to end every Debug session with a Release build (it sweeps
+       the hot-reload artifacts), which left the editor's design-time build
+       resolving Krafs, so navigation landed on empty stubs until someone
+       rebuilt Debug. Keying on install presence instead removes the conflict.
+
+       Reproducibility is unaffected: CI has no game install, so it always
+       builds against Krafs, and the release job rebuilds before packaging, so
+       the dll players receive is always the Krafs-built one. To reproduce CI
+       locally, pass -p:DisableLocalGameRefs=true. Non-standard install: set
+       RimWorldManaged (env var or -p:). The Odyssey outfit-stand code needs no
+       extra reference — DLC types ship inside Assembly-CSharp. -->
   <PropertyGroup>
     <RimWorldManaged Condition="'$(RimWorldManaged)' == '' AND Exists('$(HOME)/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app/Contents/Resources/Data/Managed')">$(HOME)/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app/Contents/Resources/Data/Managed</RimWorldManaged>
     <RimWorldManaged Condition="'$(RimWorldManaged)' == '' AND Exists('C:\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed')">C:\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed</RimWorldManaged>
     <RimWorldManaged Condition="'$(RimWorldManaged)' == '' AND Exists('$(HOME)/.steam/steam/steamapps/common/RimWorld/RimWorldLinux_Data/Managed')">$(HOME)/.steam/steam/steamapps/common/RimWorld/RimWorldLinux_Data/Managed</RimWorldManaged>
-    <LocalGameRefs Condition="'$(Configuration)' == 'Debug' AND '$(RimWorldManaged)' != '' AND '$(DisableLocalGameRefs)' != 'true'">true</LocalGameRefs>
+    <LocalGameRefs Condition="'$(RimWorldManaged)' != '' AND '$(DisableLocalGameRefs)' != 'true'">true</LocalGameRefs>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(LocalGameRefs)' != 'true'">
