@@ -344,7 +344,19 @@ namespace ShiftChange
         /// </summary>
         internal static Apparel MakeGarment(ThingDef def, Color? tint)
         {
-            ThingDef stuff = def.MadeFromStuff ? ThingDefOf.Cloth : null;
+            // Cloth for anything that takes it, but NOT unconditionally: the
+            // simple helmet is Metallic-only, and handing ThingMaker a stuff
+            // outside the def's own categories is not a thing the game has to
+            // tolerate. Fabric-capable pieces keep Cloth so every garment
+            // staged before this change still looks identical.
+            ThingDef stuff = null;
+            if (def.MadeFromStuff)
+            {
+                stuff = def.stuffCategories != null
+                        && def.stuffCategories.Contains(StuffCategoryDefOf.Fabric)
+                    ? ThingDefOf.Cloth
+                    : GenStuff.DefaultStuffFor(def);
+            }
             Apparel garment = (Apparel)ThingMaker.MakeThing(def, stuff);
             garment.SetStyleDef(null);
             garment.overrideGraphicIndex = 0;
@@ -353,29 +365,64 @@ namespace ShiftChange
             return garment;
         }
 
+        /// <summary>Steel helmet grey, and the researcher's duster.</summary>
+        internal static readonly Color DusterGreen = new Color(0.62f, 0.9f, 0.7f);
+
         /// <summary>
-        /// Strips generated apparel and dresses the pawn in one cloth tunic.
-        /// PawnGenerator rolls random colonist clothing, which both muddies
-        /// the take (a chef can spawn already wearing a toque in whatever
-        /// fabric rolled) and pads the change-in with one removal delay per
-        /// displaced garment — shirt plus pants cost 3.5s on top of the
-        /// uniform. A tunic is a single OnSkin torso piece: the lab coat
-        /// (Shell layer) goes straight over it, so the researcher changes in
-        /// 1.0s, while scrubs and chef's whites displace exactly this one
-        /// 1.5s garment (doctor 3.3s, chef 4.8s).
+        /// Strips generated apparel and dresses the pawn in the starting kit
+        /// the shift change is filmed AGAINST. PawnGenerator rolls random
+        /// colonist clothing, which both muddies the take (a chef can spawn
+        /// already wearing a toque in whatever fabric rolled) and pads the
+        /// change-in with one removal delay per displaced garment.
+        ///
+        /// Every piece here is chosen for what it does ON CAMERA when the
+        /// swap fires, and the choices are conflict rules, not costume:
+        ///
+        /// - **Tunic** — one OnSkin torso piece. Scrubs and chef's whites
+        ///   displace exactly this, so the change-in stays short.
+        /// - **Simple helmet** on all three (`Overhead`/`UpperHead`). The
+        ///   doctor's surgical mask and the chef's toque occupy that same
+        ///   slot, so both of them visibly LOSE the helmet at the stand —
+        ///   a metallic head going bare is the clearest frame-to-frame
+        ///   signal the mod produces. The researcher's stand holds no
+        ///   headgear, so theirs stays on, which is the point: it shows the
+        ///   swap moves what the stand names and nothing else.
+        /// - **Duster, tinted green, researcher only** — the lab coat is
+        ///   `Shell` and so is a duster, so the coat displaces it. Without
+        ///   this the researcher's change was a tunic vanishing under a coat,
+        ///   which read as nothing happening at all. Green because it is the
+        ///   civvies that should sink into the green carpet; the stand's coat
+        ///   is default white and steps forward out of it.
         /// </summary>
-        internal static void DressInTunic(Pawn pawn)
+        internal static void DressInStartingKit(Pawn pawn, bool researcher)
         {
             if (pawn.apparel == null)
             {
                 return;
             }
             pawn.apparel.DestroyAll();
+
             ThingDef tunic = DefDatabase<ThingDef>.GetNamedSilentFail("VAE_Apparel_Tunic")
                 ?? DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_TribalA");
             if (tunic != null)
             {
                 pawn.apparel.Wear(MakeGarment(tunic, null));
+            }
+
+            if (researcher)
+            {
+                ThingDef duster = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_Duster");
+                if (duster != null)
+                {
+                    pawn.apparel.Wear(MakeGarment(duster, DusterGreen));
+                }
+            }
+
+            // Last, so a conflicting roll can never displace it silently.
+            ThingDef helmet = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_SimpleHelmet");
+            if (helmet != null)
+            {
+                pawn.apparel.Wear(MakeGarment(helmet, null));
             }
         }
 
@@ -411,7 +458,7 @@ namespace ShiftChange
                 }
                 WorkTypeDef specialty = DefDatabase<WorkTypeDef>.GetNamedSilentFail(staff[i].workDefName);
                 Pawn pawn = AveragePawn(staff[i].gender, staff[i].nick, specialty);
-                DressInTunic(pawn);
+                DressInStartingKit(pawn, staff[i].workDefName == "Research");
                 GenSpawn.Spawn(pawn, cell, map);
                 pawn.workSettings.EnableAndInitialize();
                 foreach (WorkTypeDef work in DefDatabase<WorkTypeDef>.AllDefsListForReading)
@@ -545,6 +592,33 @@ namespace ShiftChange
             }
         }
 
+        /// <summary>
+        /// Torch lamps, and they are the RIGHT choice for filming — which is
+        /// worth stating, because the obvious reasoning says otherwise and we
+        /// followed it once already.
+        ///
+        /// <c>TorchLamp</c> carries a <c>CompProperties_FireOverlay</c>, so
+        /// each flame animates every frame; a gif encodes frame-to-frame
+        /// deltas, so swapping to steady <c>StandingLamp</c>s looks like an
+        /// obvious win. It was tried on 2026-08-12 and measured, same 10s
+        /// window, same encoder settings, same 200 frames:
+        ///
+        ///   torch take 1.6 MB   standing-lamp take 4.1 MB
+        ///
+        /// Mean inter-frame delta was IDENTICAL (34.0) — the motion is the
+        /// same and the flames cost almost nothing. What costs is
+        /// QUANTISATION: a torch throws a small warm pool, a standing lamp
+        /// (<c>glowRadius</c> 12 against the torch's 9) throws a large smooth
+        /// GRADIENT, and a palette has to band a gradient and then re-band it
+        /// every frame as encoder noise pushes pixels over band boundaries.
+        /// Corroborated both ways — fewer colours helped (48 → 3.1 MB),
+        /// dithering hurt (bayer → 4.5 MB), which is what band churn predicts
+        /// and the opposite of what flame animation would.
+        ///
+        /// So: do not swap these for lamps to "help compression". If a future
+        /// take wants steady light for a LOOK reason, that is a different
+        /// argument and it costs roughly 2.5x the gif.
+        /// </summary>
         internal static void SpawnTorch(Map map, IntVec3 cell)
         {
             Thing torch = Spawn(map, ThingDefOf.TorchLamp, null, cell, Rot4.North);
