@@ -10,6 +10,13 @@ change into the stand's outfit before starting, and change back when their
 work takes them elsewhere. Their own clothes wait in the stand, and come back
 exactly as they were, force-worn markers included.
 
+![A doctor, researcher and cook changing into work clothes and back again](media/demo.gif)
+
+*Three colonists arrive for work in their own clothes — steel helmets, a green
+duster — change into what their room's stand holds, and change back on the way
+to dinner. Each stand keeps its borrower's civvies while they are on shift.
+Sped up 3–6×.*
+
 ## How to use it
 
 1. **Build a vanilla outfit stand** (Odyssey) in a work room — hospital,
