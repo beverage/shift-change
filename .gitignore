@@ -4,6 +4,15 @@
 # Editor state
 .vscode/
 
+# Agent instructions are shared in AGENTS.md, which is vendor-neutral and
+# checked in. Assistant-specific files import it and add whatever is local to
+# one working copy, so they stay untracked.
+CLAUDE.md
+CLAUDE.local.md
+.cursorrules
+.cursor/
+.github/copilot-instructions.md
+
 # C# build output
 obj/
 bin/

@@ -77,13 +77,34 @@ waiting in the stand.
 Release candidate. Played extensively in a live colony; not yet on the
 Workshop.
 
+## How this is built
+
+This mod is built with AI assistance and it is worth being precise about where.
+
+**The code, the defs and these documents** are written with
+[Claude Code](https://claude.com/claude-code). The repository is MIT-licensed
+and contains all of it, so none of this has to be taken on trust.
+
+**There is no generated art, because there is no art.** The mod ships no
+textures and no apparel of any kind — no diffusion model, no image pipeline, not
+a single PNG. It adds behaviour to a building the base game already draws, and
+its icons come from vanilla's own UI atlas. That was a deliberate scoping choice
+before it was anything else, and it happens to remove the question entirely.
+
+**The engine claims are checkable.** Every assertion in
+[docs/DESIGN.md](docs/DESIGN.md) about how RimWorld behaves cites the decompiled
+assembly by file and line, at a stated game version. The behaviour itself was
+found and corrected in a live colony rather than reasoned about: the reservation
+carry, the forced-flag capture, the optimizer pause and the recolor guard are all
+fixes for things that went wrong in play.
+
 ## For modders
 
-[docs/DESIGN.md](docs/DESIGN.md) is the technical design: what the mod
-interfaces with inside the game and why each piece took the shape it did — the
-job-interception point and its traps, what the vanilla stand does and doesn't
-provide, the ownership and forced-apparel lifecycles, room-role scoring, and
-the state model. It assumes no RimWorld modding background, only programming.
+| Doc | Contents |
+|---|---|
+| [docs/DESIGN.md](docs/DESIGN.md) | What the mod interfaces with inside the game and why each piece took its shape: the job-interception point and its traps, what the vanilla stand does and does not provide, the ownership and forced-apparel lifecycles, room-role scoring, the state model. Assumes programming, not RimWorld modding. |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Build, engine navigation, the hot-reload rig and the rules it imposes, CI, file map. |
+| [AGENTS.md](AGENTS.md) | Short form of the invariants, for coding agents. |
 
 ## Building from source
 
@@ -94,8 +115,9 @@ dotnet build Source/ShiftChange/ShiftChange.csproj -c Release
 Output goes to `Assemblies/`, which must contain only `ShiftChange.dll` — the
 game loads every DLL it finds there, and all package references are
 compile-time only. A `-c Debug` build additionally wires in a hot-reload rig
-for UI iteration (dev use only; see `CLAUDE.md`) — always build Release before
-shipping or committing, which also sweeps the dev artifacts.
+for UI iteration (dev use only; see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)).
+Always build Release before shipping or committing, which also sweeps the dev
+artifacts.
 
 ## Credit
 

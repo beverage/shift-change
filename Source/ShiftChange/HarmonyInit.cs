@@ -26,8 +26,8 @@ namespace ShiftChange
         {
             new Harmony("MrBeverage.ShiftChange").PatchAll();
 #if DEBUG
-            // ECR hot reload is compiled into Debug builds only — see the
-            // dev-loop section of CLAUDE.md. Route its logging into the dev
+            // ECR hot reload is compiled into Debug builds only — see
+            // docs/DEVELOPMENT.md. Route its logging into the dev
             // log so a swap landing (or failing) is visible, not an act of
             // faith. The watchdog replaces ECR's FileSystemWatcher trigger,
             // which never fires under Unity's Mono on macOS.

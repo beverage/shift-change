@@ -1,8 +1,7 @@
-# CI stage 1 — build, lint, and the invariants this codebase actually broke
-# once each. Zero secrets; arms itself the first time the repo is pushed to
-# GitHub. Tag a commit v* to additionally get a packaged mod zip on a GitHub
-# Release (Workshop publishing is deliberately NOT here — see the release
-# plan in the constellation's BL-049).
+# Build, lint, and the invariants this codebase actually broke once each.
+# Zero secrets. Tag a commit v* to additionally get a packaged mod zip on a
+# GitHub Release. Workshop publishing is deliberately not automated here.
+# Each check is explained in docs/DEVELOPMENT.md.
 
 name: CI
 
@@ -40,7 +39,7 @@ jobs:
           done
           exit $bad
 
-      # The hot-reload rig (see CLAUDE.md) makes two language features
+      # The hot-reload rig (see docs/DEVELOPMENT.md) makes two language features
       # runtime hazards: a `private` member and an auto-property both compile
       # clean and then throw FieldAccessException the first time a hot-swapped
       # body touches them. These greps turn the invisible rules into build
@@ -50,11 +49,11 @@ jobs:
         run: |
           bad=0
           if grep -rEn '^[[:space:]]*private[[:space:]]' Source/; then
-            echo "::error::private member declared — this codebase is internal-by-default (hot-swapped bodies are cross-assembly; see CLAUDE.md)"
+            echo "::error::private member declared — this codebase is internal-by-default (hot-swapped bodies are cross-assembly; see docs/DEVELOPMENT.md)"
             bad=1
           fi
           if grep -rEn '\{[[:space:]]*get[[:space:]]*;' Source/; then
-            echo "::error::auto-property declared — its backing field is private beyond reach of the IVT grants (see CLAUDE.md)"
+            echo "::error::auto-property declared — its backing field is private beyond reach of the IVT grants (see docs/DEVELOPMENT.md)"
             bad=1
           fi
           exit $bad

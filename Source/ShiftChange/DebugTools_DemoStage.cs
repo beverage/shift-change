@@ -26,8 +26,8 @@ namespace ShiftChange
     /// stays. Ordering between doctor and chef is approximate — the knob is
     /// the surgery-bill count and the starting food levels below.
     ///
-    /// Ships in Release ON PURPOSE: footage is filmed on live builds (see
-    /// CLAUDE.md's live/lab discipline). Dev mode gates its visibility, and
+    /// Ships in Release ON PURPOSE: footage is filmed on live builds (see the
+    /// live/lab discipline in docs/DEVELOPMENT.md). Dev mode gates it, and
     /// requiresOdyssey hides it exactly where the mod itself is inert.
     /// </summary>
     internal static class DebugTools_DemoStage

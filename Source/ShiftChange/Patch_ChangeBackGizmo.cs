@@ -22,7 +22,7 @@ namespace ShiftChange
     ///
     /// <b>Deliberately not automatic.</b> No auto-change on raid, and
     /// nothing here reacts to drafting: a player may well want a pawn
-    /// drafted in uniform (BL-049 — direct orders are never second-guessed).
+    /// drafted in uniform. Direct orders are never second-guessed.
     /// The button is the whole of the feature.
     ///
     /// <b>The room-exit latch.</b> Changing back is pointless if the think
