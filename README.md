@@ -1,5 +1,9 @@
 # Shift Change
 
+> **Requires RimWorld 1.6, the Odyssey expansion, and Harmony.** The outfit
+> stand this mod builds on is Odyssey content, so without it the mod does
+> nothing at all.
+
 A RimWorld mod. Colonists change into the right clothes for the room they work
 in, and back out again afterwards — using the vanilla outfit stand.
 
@@ -131,3 +135,7 @@ avoid.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+Portions of the materials used to create this content/mod are trademarks and/or
+copyrighted works of Ludeon Studios Inc. All rights reserved by Ludeon. This
+content/mod is not official and is not endorsed by Ludeon.

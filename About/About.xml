@@ -23,7 +23,9 @@
     <li>Ludeon.RimWorld.Odyssey</li>
     <li>brrainz.harmony</li>
   </loadAfter>
-  <description>Colonists change into the right clothes for the room they work in, and back out again afterwards.
+  <description>REQUIRES ODYSSEY (for the outfit stand) AND HARMONY.
+
+Colonists change into the right clothes for the room they work in, and back out again afterwards.
 
 Put a vanilla outfit stand in a work room and put a work outfit on it. When a colonist takes on automatic work of that room's kind — doctoring in the hospital, researching or synthesizing drugs in the lab, cooking in the kitchen — they change into the stand's outfit before starting, and change back when their work takes them elsewhere. Their own clothes wait in the stand and come back exactly as they were, force-worn markers included.
 
@@ -42,5 +44,5 @@ One setting: Unassigned stands are shared, on by default.
 
 Adds no clothing, no buildings and no art of its own. It uses the vanilla outfit stand and whatever apparel you put on it.
 
-Requires Odyssey (for the outfit stand) and Harmony.</description>
+Portions of the materials used to create this content/mod are trademarks and/or copyrighted works of Ludeon Studios Inc. All rights reserved by Ludeon. This content/mod is not official and is not endorsed by Ludeon.</description>
 </ModMetaData>
