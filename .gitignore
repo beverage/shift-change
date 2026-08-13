@@ -20,6 +20,10 @@ CLAUDE.local.md
 obj/
 bin/
 
+# Staging area for the Workshop upload (devtools/publish-workshop.sh) and the
+# CI release zip. Assembled from tracked files, never edited in place.
+dist/
+
 # RimWorld's texture cache. The game never writes these itself, but tools on
 # this machine do (FasterGameLoading-Continued, RimPy, RimSort) — and a .dds
 # beside a PNG makes the game ignore the PNG entirely, with no timestamp check.

@@ -152,7 +152,41 @@ way once.
 | Release build | compile errors against Krafs |
 
 Tagging a commit `v*` additionally packages the mod folder and publishes a
-GitHub release. Workshop upload is deliberately manual.
+GitHub release.
+
+## Workshop upload
+
+Deliberately manual, but **never through the dev symlink**. RimWorld's uploader
+publishes the mod's folder verbatim: `Workshop.cs` hands `hook.Directory.FullName`
+to `SteamUGC.SetItemContent`, `ModMetaData.GetWorkshopUploadDirectory()` returns
+`RootDir` unfiltered, and `PrepareForWorkshopUpload()` has an empty body. Since
+`Mods/ShiftChange` is a symlink to this repository, uploading through it ships
+`Source/`, `media/`, `.github/` and the entire `.git` directory to subscribers.
+
+```
+devtools/publish-workshop.sh stage      # Release build + allowlist -> dist/
+devtools/publish-workshop.sh install    # into Mods/, dev symlink parked
+#   ... upload in game, then quit ...
+devtools/publish-workshop.sh restore    # dev symlink back, item id recovered
+```
+
+Staged is ~1.1 MB against ~15 MB for the working tree. `install` parks the dev
+symlink rather than leaving it beside the staged copy, because two folders
+sharing `packageId` would both load and the uploader would target whichever the
+game resolved first.
+
+Two things the game does not upload, and one it does that matters:
+
+- **The description comes from `About.xml`, not the BBCode.** `SetItemDescription`
+  is called only on the create branch, so `media/steam-description.bbcode` has to
+  be pasted into the Steam web editor by hand, and no later in-game update will
+  push it.
+- **Only `About/Preview.png` is uploaded.** `media/cards/*.png` need adding to the
+  item's gallery in the browser.
+- **`About/PublishedFileId.txt` is written into the upload root** after a
+  successful publish, and the create-vs-update branch keys off it. `restore`
+  copies it back into the repo; commit it, or the next upload mints a duplicate
+  listing instead of updating this one.
 
 ## Logs
 

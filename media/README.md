@@ -1,9 +1,15 @@
 # Media
 
-Assets for the README and the Workshop page. **Not shipped to players** — the
-release zip copies `About Assemblies Defs Patches Languages docs LICENSE
-README.md` and deliberately not this folder, so a 2 MB gif never lands in
-anyone's mod directory.
+Assets for the README and the Workshop page. **Kept out of the shipped mod on
+purpose** — both the CI release zip and `devtools/publish-workshop.sh` copy an
+allowlist (`About Assemblies Defs Patches Languages docs LICENSE README.md`)
+and not this folder, so a 2 MB gif never lands in anyone's mod directory.
+
+That exclusion is the allowlist's doing and nothing else's. RimWorld's in-game
+uploader publishes the mod folder verbatim — `Mods/ShiftChange` is a symlink to
+this repository, so uploading through it would ship `media/`, `Source/`,
+`.github/` and the whole `.git` directory to every subscriber. Always publish
+via `devtools/publish-workshop.sh`; never through the dev symlink.
 
 ## demo.gif
 
