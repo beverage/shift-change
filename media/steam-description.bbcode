@@ -1,0 +1,101 @@
+[h1]Shift Change[/h1]
+
+[b]Requires the Odyssey expansion[/b] — the outfit stand this mod builds on is
+Odyssey content, so without it nothing happens at all. Harmony is also required.
+
+Colonists change into the right clothes for the room they work in, and back out
+again afterwards.
+
+[img]https://i.imgur.com/flyDb1M.gif[/img]
+
+Put a vanilla outfit stand in a work room and put a work outfit on it. When a
+colonist takes on [b]automatic[/b] work of that room's kind — doctoring in the
+hospital, researching or synthesizing drugs in the lab, cooking in the kitchen —
+they change into the stand's outfit before starting, and change back when their
+work takes them elsewhere. Their own clothes wait in the stand and come back
+exactly as they were, force-worn markers included.
+
+[h2]How to use it[/h2]
+
+That is the whole setup. Two optional controls per stand:
+
+[list]
+[*][b]Set owner[/b] reserves a stand for one colonist. Left unassigned, a stand
+is shared by whoever is free to use it, like beds — so a kitchen needs one stand
+per cook working [i]at once[/i], not one per cook.
+[*][b]Set work types[/b] opens a checklist for rooms the game reads oddly, rooms
+that do two jobs, or a decorative stand you do not want used at all.
+[/list]
+
+The stand's inspect pane always tells you its state: what work it dresses for,
+who owns or is currently wearing it, and whether it is empty.
+
+[h2]The rules it follows[/h2]
+
+Deliberately narrow, so it never fights you:
+
+[list]
+[*][b]Automatic work only.[/b] Ordering a doctor to tend someone right now never
+sends them across the base to change first, and a colonist already in uniform
+keeps it on for a direct order.
+[*][b]Emergencies are never delayed[/b], and nothing happens while the map is
+under threat.
+[*][b]Personal kit stays personal.[/b] Nobody takes clothes out of a stand
+somebody else is using.
+[*]Passing through a room, or eating in it, changes nothing — only doing the
+room's work does.
+[*]A [b]Change back[/b] button appears on any colonist currently in a uniform,
+for when you want them out of it now.
+[/list]
+
+One setting: [b]Unassigned stands are shared[/b], on by default. Turn it off and
+only stands with an explicit owner ever dress anyone.
+
+[h2]Best used with Vanilla Apparel Expanded[/h2]
+
+[b]Not required, and not a dependency[/b] — but worth knowing before you install.
+Vanilla has no scrubs, no lab coat and no chef's whites, so in a pure vanilla
+game there is very little to actually dress anyone [i]in[/i]. Vanilla Apparel
+Expanded adds exactly those, and they are what every screenshot here uses.
+
+[url=https://steamcommunity.com/sharedfiles/filedetails/?id=1814987817]Vanilla Apparel Expanded[/url]
+by Oskar Potocki, Trunken and Sarg.
+
+Any apparel mod works. That one is simply the closest fit, and this mod is not
+affiliated with the Vanilla Expanded team in any way.
+
+[h2]Save safety[/h2]
+
+Add it to an existing save freely — your existing outfit stands gain the new
+controls on load, and nothing needs rebuilding. Removing it is also safe: stands
+revert to ordinary vanilla furniture, and a colonist who was mid-shift simply
+keeps the uniform (un-force it in their gear tab) with their own clothes waiting
+in the stand.
+
+[h2]Adds no art[/h2]
+
+No clothing, no buildings, no textures. It adds behaviour to a building the game
+already draws, and its icons come from vanilla's own UI. The code and defs are
+written with AI assistance; there is no generated art anywhere, because there is
+no art at all.
+
+[h2]Source[/h2]
+
+MIT licensed, and the repository includes the technical design notes, so none of
+it has to be taken on trust.
+
+REPLACE-WITH-GITHUB-URL
+
+[h2]Credit[/h2]
+
+[url=https://github.com/aedbia/AutomaticSwapForStand]Automatic Swap Outfit[/url]
+by aedbia (MIT) covers adjacent ground — automatic swapping at an outfit stand,
+triggered by allowed-area boundaries. Shift Change is an independent
+implementation with a different trigger (the room and its work type) and
+per-stand ownership, but that mod is why several dead ends were cheap to avoid.
+
+[hr][/hr]
+
+Portions of the materials used to create this content/mod are trademarks and/or
+copyrighted works of Ludeon Studios Inc. All rights reserved by Ludeon. This
+content/mod is not official and is not endorsed by Ludeon.
