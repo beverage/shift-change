@@ -219,19 +219,33 @@ namespace ShiftChange
             Stock(stand, new[] { "VAE_Apparel_LabCoat" }, new Color(0.62f, 0.9f, 0.7f));
         }
 
-        internal static void BuildKitchen(Map map, CellRect interior, Building_OutfitStand stand)
+        /// <summary>
+        /// <paramref name="stoveNorth"/> flips the stove to the room's north
+        /// end, for a kitchen whose door is on the SOUTH wall. The rule is
+        /// that the stove sits opposite the door, so the stand meets the chef
+        /// as they arrive and the walk to the work is visible rather than
+        /// happening in one corner. The demo stage's kitchen is a bottom room
+        /// with a north door and takes the default; the preview stage's is
+        /// standalone with a south door and passes true.
+        /// </summary>
+        internal static void BuildKitchen(Map map, CellRect interior, Building_OutfitStand stand,
+            bool stoveNorth = false)
         {
             Carpet(map, interior, "CarpetBlue");
             SpawnTorch(map, new IntVec3(interior.maxX, 0, interior.minZ));
 
-            // South wall, facing north into the room (the kitchen's door is
-            // on its NORTH wall, so the stand meets the chef at the door and
-            // the stove sits deep in the room).
+            // The stove is 3x1 with drawSize (3.5,1.5), so it overdraws its
+            // footprint on every side. At the north end that means one row in
+            // from the wall, exactly as the research bench needs — flush, it
+            // draws onto the wall. Rotation follows: interactionCellOffset is
+            // (0,0,-1), so North puts the chef south of the stove and South
+            // puts them north of it. Either way they stand inside the room.
             ThingDef stoveDef = DefDatabase<ThingDef>.GetNamedSilentFail("FueledStove");
             if (stoveDef != null)
             {
                 Thing stove = Spawn(map, stoveDef, ThingDefOf.WoodLog,
-                    new IntVec3(interior.minX + 2, 0, interior.minZ), Rot4.South);
+                    new IntVec3(interior.minX + 2, 0, stoveNorth ? interior.maxZ - 1 : interior.minZ),
+                    stoveNorth ? Rot4.North : Rot4.South);
                 CompRefuelable fuel = stove.TryGetComp<CompRefuelable>();
                 fuel?.Refuel(fuel.Props.fuelCapacity);
 
@@ -252,7 +266,12 @@ namespace ShiftChange
             {
                 Thing stack = ThingMaker.MakeThing(potatoes);
                 stack.stackCount = 40;
-                GenPlace.TryPlaceThing(stack, new IntVec3(interior.maxX, 0, interior.minZ + 1), map, ThingPlaceMode.Near);
+                // Beside the stove, wherever the stove ended up: the chef
+                // fetches them as part of the bill, and a fetch across the
+                // whole room is dead time in the middle of a take.
+                GenPlace.TryPlaceThing(stack,
+                    new IntVec3(interior.maxX, 0, stoveNorth ? interior.maxZ - 1 : interior.minZ + 1),
+                    map, ThingPlaceMode.Near);
             }
 
             Stock(stand,
