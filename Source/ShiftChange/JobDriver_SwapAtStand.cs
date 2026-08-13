@@ -172,8 +172,23 @@ namespace ShiftChange
             // then discovering the incoming set is empty is what left a naked
             // colonist standing at a stand that now advertised their own
             // civvies as the room's uniform.
+            //
+            // An empty incoming set does NOT by itself mean the swap has to be
+            // abandoned. On the return trip it also happens when the dress trip
+            // displaced nothing at all — a stand whose stock shares no apparel
+            // layer with what the pawn arrived in (a Shell-layer lab coat over
+            // a shirt and trousers, a headgear-only stand on a bare head)
+            // stores nothing, so there is nothing to hand back. The pawn is
+            // still wearing their own clothes UNDER the uniform, and taking the
+            // uniform off is both safe and the whole point of the trip.
+            // Abandoning here instead donated the uniform permanently: forced
+            // cleared, ledger dropped, and the stand left reading empty so it
+            // never dressed anyone again.
+            //
+            // So the test is what is underneath, not what the ledger says.
+            // Give up only when the uniform is all the pawn has on.
             toWear.RemoveAll(a => a == null || a.ParentHolder != stand || !SwapPlan.CanWear(pawn, a));
-            if (toWear.Count == 0)
+            if (toWear.Count == 0 && (!undressing || !WearingAnythingBesides(toStore)))
             {
                 NothingToWear(comp);
                 return;
@@ -268,6 +283,15 @@ namespace ShiftChange
         /// <summary>
         /// The plan came up empty on arrival. Nothing has been moved yet, so
         /// the two directions want opposite things.
+        ///
+        /// On the return trip this is the LAST RESORT only. An empty incoming
+        /// set has two causes and they want opposite handling: the pawn's own
+        /// clothes are gone (burnt, hauled off, no longer fit), or the dress
+        /// trip displaced nothing in the first place and there was never
+        /// anything to give back. The caller separates them with
+        /// <see cref="WearingAnythingBesides"/> and only sends the first case
+        /// here — see the guard in <see cref="DoTransfer"/> for why the second
+        /// must not arrive.
         /// </summary>
         internal void NothingToWear(CompShiftStand comp)
         {
@@ -297,6 +321,27 @@ namespace ShiftChange
                 }
             }
             comp.AbandonLedger(pawn);
+        }
+
+        /// <summary>
+        /// Is the pawn wearing anything that is not in <paramref name="set"/>?
+        /// Asked of the outgoing set on the return trip: true means the uniform
+        /// can come off without stripping them, false means it is all they have
+        /// on. Deliberately counts garments rather than body coverage — the
+        /// standing rule is only that a failure path never leaves a pawn
+        /// NAKED, and one surviving shirt satisfies it.
+        /// </summary>
+        internal bool WearingAnythingBesides(List<Apparel> set)
+        {
+            List<Apparel> worn = pawn.apparel.WornApparel;
+            for (int i = 0; i < worn.Count; i++)
+            {
+                if (!set.Contains(worn[i]))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
