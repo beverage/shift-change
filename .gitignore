@@ -1,6 +1,9 @@
 # macOS
 .DS_Store
 
+# Build artifact of devtools/bbcode-preview.py, written beside its source.
+_bbcode-preview.html
+
 # Editor state
 .vscode/
 
