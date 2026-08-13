@@ -313,6 +313,25 @@ namespace ShiftChange
         public override void PostDeSpawn(Map map, DestroyMode mode = DestroyMode.Vanish)
         {
             base.PostDeSpawn(map, mode);
+            if (mode == DestroyMode.WillReplace)
+            {
+                // NOT a teardown — the stand is being lifted to another map and
+                // will be put back down intact. Odyssey's gravship despawns
+                // everything aboard this way (GravshipUtility.cs:389,397), and
+                // Building_OutfitStand.DeSpawn deliberately KEEPS its contents
+                // in this mode (:392), so the stand, the parked civvies and the
+                // borrower all survive the flight. Releasing here destroyed
+                // only the record of who owned what: the cook landed
+                // permanently in whites with no return trip, and her next shift
+                // read her own clothes as the room's uniform and force-wore
+                // them — uniform and civvies swapped for good.
+                //
+                // The ledger is re-registered on landing by PostSpawnSetup, and
+                // PostSwapMap below handles a borrower who did not come along.
+                // Vanilla's own comp on this same building guards the identical
+                // case (CompAssignableToPawn.cs:199).
+                return;
+            }
             // Deconstructed, burnt down, or minified into a box — either way
             // the stand is out of the borrower's reach and the ledger cannot
             // be honoured. Dropping the registry entry alone was not enough:
@@ -320,6 +339,33 @@ namespace ShiftChange
             // uniform stick. See ReleaseBorrower for why that is a trap with
             // no way out.
             ReleaseBorrower();
+        }
+
+        /// <summary>
+        /// The stand has been set back down on a new map after a gravship
+        /// flight. The ledger was kept across the trip on purpose (see
+        /// <see cref="PostDeSpawn"/>), so the only open question is whether the
+        /// borrower came too — a colonist left behind cannot walk back for
+        /// their clothes, and their uniform would stay force-worn forever.
+        ///
+        /// Mirrors vanilla's <c>CompAssignableToPawn.PostSwapMap</c>
+        /// (<c>CompAssignableToPawn.cs:222-230</c>) on the same building.
+        /// </summary>
+        public override void PostSwapMap()
+        {
+            base.PostSwapMap();
+            if (borrower == null || !OnShift)
+            {
+                return;
+            }
+            if (borrower.DestroyedOrNull() || !borrower.SpawnedOrAnyParentSpawned)
+            {
+                ReleaseBorrower();
+                return;
+            }
+            // Idempotent with PostSpawnSetup's own rebuild; ordering between
+            // the two is not guaranteed and both must leave the registry right.
+            OnShiftStands[borrower] = this;
         }
 
         /// <summary>
