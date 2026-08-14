@@ -639,10 +639,20 @@ namespace ShiftChange
             // job, two places, and the tracker chokes on it. StartJob never
             // consults the queue, so enqueueing after is equivalent on
             // success and strictly safer on failure.
+            // InterruptForced, not None. When a pawn already has a job — which
+            // is every override path, and most of them in play —
+            // Pawn_JobTracker warns "starting job ... without a specific job
+            // end condition" and then substitutes InterruptForced itself
+            // (:288-292). Passing None was therefore never a behaviour
+            // difference, only a warning per swap in the player's log, which
+            // is noise they cannot act on and which buries the lines that
+            // matter. Says exactly what the sibling call at TryDressMidJob
+            // already says.
             inserting = true;
             try
             {
-                tracker.StartJob(swap, JobCondition.None, null, resumeCurJobAfterwards: false,
+                tracker.StartJob(swap, JobCondition.InterruptForced, null,
+                    resumeCurJobAfterwards: false,
                     cancelBusyStances: true, null, JobTag.ChangingApparel);
             }
             catch (Exception e)
