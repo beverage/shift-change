@@ -64,8 +64,10 @@ Overrides:
 | Reproduce the CI build exactly | `-p:DisableLocalGameRefs=true` |
 
 CI has no game install, so it always compiles against Krafs, and the release job
-rebuilds before packaging. The dll players receive is always the Krafs-built
-one regardless of how it was built locally.
+rebuilds before packaging — so the GitHub release zip is always the Krafs build.
+The Workshop dll is not: `publish-workshop.sh` stages a local Release build,
+which carries whichever references the machine resolved — the real DLLs wherever
+an install is present. Same public surface either way.
 
 ## Hot reload
 
@@ -135,7 +137,7 @@ a save.
 
 Dev mode → **Shift Change** → **Build demo stage**, then click a cell: three
 roofed rooms (hospital, laboratory, kitchen) with stocked stands, a
-self-starting kitchen bill and two workers. This ships in Release deliberately.
+self-starting kitchen bill and three workers. This ships in Release deliberately.
 
 ## Testing
 
@@ -150,8 +152,8 @@ covers, what it deliberately does not, the rules it follows and the two engine
 traps it had to pay for are all in [TESTING.md](TESTING.md).
 
 ```bash
-devtools/run-harness.sh              # minimal mod list — the iteration loop
-devtools/run-harness.sh --full       # the real mod list — the release gate
+devtools/run-harness.sh              # a four-mod list — the iteration loop
+devtools/run-harness.sh --full       # your own mod list — the release gate
 devtools/run-harness.sh --alongside  # a second instance beside a live game
 ```
 
@@ -161,13 +163,16 @@ failure. Measured 2026-08-14, launch to process exit:
 
 | Mod list | Wall clock |
 |---|---|
-| Minimal (4 mods) | ~20 s |
-| Development (233 entries) | ~160 s |
-| Minimal, alongside a live colony | ~25 s paused, several minutes if actively ticking |
+| The four-mod list | ~20 s |
+| `--full`, on a 233-entry list | ~160 s |
+| Four-mod, alongside a live colony | ~25 s paused, several minutes if actively ticking |
 
-**Minimal is for iterating; `--full` is what a release is signed off on.** This
-mod patches a vanilla building other mods also touch, so the minimal profile is
-precisely the environment in which a conflict cannot appear.
+Those are one machine's numbers; `--full` scales with whatever list is active,
+since almost all of it is RimWorld's own load time.
+
+**The four-mod list is for iterating; `--full` is what a release is signed off
+on.** This mod patches a vanilla building other mods also touch, so the small
+list is precisely the environment in which a conflict cannot appear.
 
 ### Driving it by hand
 
@@ -181,12 +186,12 @@ For a fast interactive session without the headless run,
 `devtools/rimworld-profile.sh minimal` / `restore` swaps the live mod list. It
 refuses while RimWorld is running: the game rewrites `ModsConfig.xml` on exit
 and would undo the swap, or write the minimal list over the real one. It parks
-the development list once and restores it verbatim.
+your list once and restores it verbatim.
 
 ## CI
 
-`.github/workflows/ci.yml`. Every check exists because the codebase broke that
-way once.
+`.github/workflows/ci.yml`. Most of these checks exist because the codebase
+broke that way once; the rest block a failure that would land silently.
 
 | Check | Catches |
 |---|---|

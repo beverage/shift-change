@@ -60,8 +60,9 @@ Deliberately narrow, so it never fights you:
   stored. The exception is food already in their hands or their pack: that
   they just eat. Otherwise a cook would carry a meal across the base in
   whites to reach a chair, which is the walk this mod exists to prevent.
-- If a stand frees up while someone is already working bare in its room,
-  they'll step over and change — unless they're mid-treatment on a patient.
+- If a stand frees up while someone is already working in its room out of
+  uniform, they'll step over and change — unless they're mid-treatment on a
+  patient.
 - **Change back** appears on any colonist currently in a uniform, for when
   you want them out of it now — a raid, say, since they will not change back
   on their own while the map is under threat.
@@ -81,19 +82,19 @@ The kid outfit stand (Biotech) is not used, by design.
 vanilla has no scrubs, no lab coat and no chef's whites, so in a pure vanilla
 game there is very little to actually dress anyone *in*. Any apparel mod fixes
 that; [Vanilla Apparel Expanded](https://steamcommunity.com/sharedfiles/filedetails/?id=1814987817)
-adds exactly those three and is what every screenshot here uses.
+adds exactly those three and is what all the footage here uses.
 
 ## Save safety
 
 Add it to an existing save freely — your existing outfit stands gain the new
 controls on load, nothing needs rebuilding. Removing it is also safe: stands
 revert to ordinary vanilla furniture, and a colonist who was mid-shift simply
-keeps the uniform (un-force it in their gear tab) with their own clothes
-waiting in the stand.
+keeps the uniform (**Clear forced apparel** on the Assign tab un-forces it)
+with their own clothes waiting in the stand.
 
 ## Status
 
-Release candidate. Played extensively in a live colony, and the lifecycle
+Release candidate. Played for days in a live colony, and the lifecycle
 paths that are impractical to arrange by hand — gravship flights, death,
 banishment, repeated faults — are covered by an automated harness
 (`devtools/run-harness.sh`).
@@ -107,10 +108,11 @@ This mod is built with AI assistance and it is worth being precise about where.
 and contains all of it, so none of this has to be taken on trust.
 
 **There is no generated art, because there is no art.** The mod ships no
-textures and no apparel of any kind — no diffusion model, no image pipeline, not
-a single PNG. It adds behaviour to a building the base game already draws, and
-its icons come from vanilla's own UI atlas. That was a deliberate scoping choice
-before it was anything else, and it happens to remove the question entirely.
+textures and no apparel of any kind — no diffusion model, no image pipeline. The
+only PNG in the mod folder is the Workshop preview, a screenshot of the game. It
+adds behaviour to a building the base game already draws, and its icons come
+from vanilla's own UI atlas. That was a deliberate scoping choice before it was
+anything else, and it happens to remove the question entirely.
 
 **The engine claims are checkable.** Every assertion in
 [docs/DESIGN.md](docs/DESIGN.md) about how RimWorld behaves cites the decompiled
@@ -119,7 +121,7 @@ assembly by file and line, at a stated game version.
 **Some of it was found in play, and some of it was not.** The reservation carry,
 the forced-flag capture, the optimizer pause and the recolor guard are fixes for
 things that went wrong in a live colony. But an adversarial review of the whole
-codebase later found three release blockers that months of play had not — one of
+codebase later found three release blockers that days of play had not — one of
 them had been running unnoticed on the demo film set — and those were caught by
 reading the engine, not by playing. Both kinds of bug are real. Neither method
 catches the other's.

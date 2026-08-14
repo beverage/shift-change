@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
 #
 # Swap RimWorld's active mod list, so the lifecycle harness can be run against
-# a four-mod profile instead of the development one.
+# a four-mod list instead of whatever you normally play with.
 #
 # WHY
 #
-# A harness run on the full development profile costs about two and a half
-# minutes to reach a map and then needs three other mods' welcome dialogs
-# dismissed before anything can be clicked. Worse, it is not deterministic:
+# A harness run on a large mod list costs about two and a half minutes to reach
+# a map and then needs other mods' welcome dialogs dismissed before anything can
+# be clicked. Worse, it is not deterministic:
 # on 2026-08-14 the harness fixture failed once and passed once on identical
 # code, because `Pawn_HealthTracker.Notify_Spawned` threw `Collection was
 # modified` under seven third-party postfixes on `Pawn.SpawnSetup`.
 #
-# The minimal profile is the smallest set that still loads the mod and the
-# building it patches, so the harness measures our code and not the modlist.
+# The four-mod list is the smallest set that still loads the mod and the
+# building it patches, so the harness measures our code and not the mod list.
 #
-# READ THIS BEFORE MAKING MINIMAL THE DEFAULT
+# READ THIS BEFORE MAKING IT THE DEFAULT
 #
-# Minimal is for ITERATION. It is not the release gate, and it must not
+# The small list is for ITERATION. It is not the release gate, and it must not
 # silently become one. Shift Change's whole job is patching a vanilla building
-# that other mods also touch, so a full-profile run is the only evidence we
-# ever get that the mod behaves in the environment players actually run. Do
-# both before an upload: minimal to iterate, full to sign off.
+# that other mods also touch, so a run against a large list is the only evidence
+# we ever get that the mod behaves in the environment players actually run. Do
+# both before an upload: small to iterate, large to sign off.
 #
 # USAGE
 #
-#   devtools/rimworld-profile.sh show      # which profile is live
-#   devtools/rimworld-profile.sh minimal   # back up, then swap to minimal
-#   devtools/rimworld-profile.sh restore   # put the development profile back
+#   devtools/rimworld-profile.sh show      # which list is live
+#   devtools/rimworld-profile.sh minimal   # back up, then swap to four mods
+#   devtools/rimworld-profile.sh restore   # put your own mod list back
 #
 set -euo pipefail
 
@@ -68,10 +68,10 @@ cmd_show() {
   count="$(grep -c '<li>' "$CONFIG" || true)"
   printf 'active entries (incl. knownExpansions): %s\n' "$count"
   if [ -f "$PRESWAP" ]; then
-    printf 'state: SWAPPED — development profile is parked at %s\n' "$PRESWAP"
+    printf 'state: SWAPPED — your mod list is parked at %s\n' "$PRESWAP"
     printf 'run "%s restore" to put it back\n' "$0"
   else
-    printf 'state: development profile live (no swap in effect)\n'
+    printf 'state: your own mod list is live (no swap in effect)\n'
   fi
   printf '\nactive mods:\n'
   awk '/<activeMods>/,/<\/activeMods>/' "$CONFIG" | grep '<li>' | sed 's/.*<li>/  /; s/<\/li>.*//'
@@ -82,13 +82,13 @@ cmd_minimal() {
   [ -f "$CONFIG" ] || die "no ModsConfig.xml at $CONFIG"
   mkdir -p "$STORE"
 
-  # Park the development profile ONCE. Swapping twice without restoring must
+  # Park your own mod list ONCE. Swapping twice without restoring must
   # not overwrite the real list with an already-minimal one.
   if [ ! -f "$PRESWAP" ]; then
     cp "$CONFIG" "$PRESWAP"
-    printf 'parked the development profile at %s\n' "$PRESWAP"
+    printf 'parked your mod list at %s\n' "$PRESWAP"
   else
-    printf 'already swapped; development profile stays parked at %s\n' "$PRESWAP"
+    printf 'already swapped; your mod list stays parked at %s\n' "$PRESWAP"
   fi
   cp "$CONFIG" "$STORE/live-$(date +%Y%m%d-%H%M%S).xml"
 
@@ -120,11 +120,11 @@ cmd_minimal() {
 
 cmd_restore() {
   assert_game_closed
-  [ -f "$PRESWAP" ] || die "nothing parked — the development profile is already live"
+  [ -f "$PRESWAP" ] || die "nothing parked — your own mod list is already live"
   xmllint --noout "$PRESWAP" || die "parked profile is not well-formed; refusing to restore it"
   cp "$PRESWAP" "$CONFIG"
   rm "$PRESWAP"
-  printf 'restored the development profile\n'
+  printf 'restored your mod list\n'
 }
 
 case "${1:-show}" in

@@ -27,8 +27,8 @@ checked.
 One exception, and it is narrow — the lifecycle harness:
 
 ```bash
-devtools/run-harness.sh          # ~30s, four-mod profile, no hands
-devtools/run-harness.sh --full   # the development profile; run before a release
+devtools/run-harness.sh          # ~20s, a four-mod list, no hands
+devtools/run-harness.sh --full   # whatever mod list is active; run before a release
 ```
 
 It asserts where the ledger lands after each despawn/death/banishment event, by
@@ -39,8 +39,9 @@ if a case fails. Touch `PostDeSpawn`, `PostSwapMap`, `ReleaseBorrower`,
 A harness pass is not a play observation, and a `GAP` line is a known failure
 being tracked, not a pass. There are no gaps today. It does now run
 `JobDriver_SwapAtStand` for real, through the pawn's own tracker, so "the
-driver builds a correct ledger" is covered; a save/load round trip and a real
-gravship launch are still out of reach.
+driver builds a correct ledger" is covered, and the player-facing rules have
+functional cases; a save/load round trip and a real gravship launch are still
+out of reach.
 
 **Two engine traps live in the driver cases**, both invisible from the API and
 both already paid for once. Pathfinding in 1.6 is asynchronous, so ticking a

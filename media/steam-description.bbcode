@@ -20,15 +20,15 @@ exactly as they were, force-worn markers included.
 That is the whole setup. Two optional controls per stand:
 
 [list]
-[*][b]Set owner[/b] reserves a stand for one colonist. Left unassigned, a stand
+[*][b]Shared (set owner)[/b] reserves a stand for one colonist. Left unassigned, a stand
 is shared by whoever is free to use it, like beds — so a kitchen needs one stand
 per cook working [i]at once[/i], not one per cook.
 [*][b]Set work types[/b] opens a checklist for rooms the game reads oddly, rooms
 that do two jobs, or a decorative stand you do not want used at all.
 [/list]
 
-The stand's inspect pane always tells you its state: what work it dresses for,
-who owns or is currently wearing it, and whether it is empty.
+A stand that is dressing anyone says so in its inspect pane: what work it
+dresses for, who owns or is currently wearing it, and whether it is empty.
 
 [h2]The rules it follows[/h2]
 
@@ -44,11 +44,11 @@ under threat.
 somebody else is using.
 [*]Passing through a room changes nothing — only doing the room's work does.
 [*][b]A meal break gets them out of uniform first[/b], wherever the food is
-stored — unless it is already in their hands or their pack, which they just
+stored — unless it is already in their hands or their pack; that they just
 eat. Otherwise a cook carries a meal across the base in whites to reach a
 chair, which is the walk this mod exists to prevent.
-[*]If a stand frees up while someone is already working bare in its room, they
-step over and change — unless they are mid-treatment on a patient.
+[*]If a stand frees up while someone is already working in its room out of
+uniform, they step over and change — unless they are mid-treatment on a patient.
 [*]A [b]Change back[/b] button appears on any colonist currently in a uniform,
 for when you want them out of it now.
 [/list]
@@ -77,8 +77,8 @@ affiliated with the Vanilla Expanded team in any way.
 Add it to an existing save freely — your existing outfit stands gain the new
 controls on load, and nothing needs rebuilding. Removing it is also safe: stands
 revert to ordinary vanilla furniture, and a colonist who was mid-shift simply
-keeps the uniform (un-force it in their gear tab) with their own clothes waiting
-in the stand.
+keeps the uniform ([b]Clear forced apparel[/b] on the Assign tab un-forces it)
+with their own clothes waiting in the stand.
 
 [h2]Adds no art[/h2]
 
@@ -91,8 +91,8 @@ no art at all.
 
 Behaviour is covered by an automated suite that runs inside RimWorld itself. The
 cases that matter most are the ones that are hard to undo — a gravship flight, a
-colonist dying or being banished while wearing a stand's outfit — and they run on
-every build.
+colonist dying or being banished while wearing a stand's outfit — and they run
+before every release.
 
 That does not make it bug-free. It means the specific ways this could lose your
 colonists' clothes fail loudly in testing instead of quietly in your save. The

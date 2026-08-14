@@ -51,9 +51,11 @@
        resolving Krafs, so navigation landed on empty stubs until someone
        rebuilt Debug. Keying on install presence instead removes the conflict.
 
-       Reproducibility is unaffected: CI has no game install, so it always
-       builds against Krafs, and the release job rebuilds before packaging, so
-       the dll players receive is always the Krafs-built one. To reproduce CI
+       Reproducibility: CI has no game install, so it always builds against
+       Krafs, and the release job rebuilds before packaging — the GitHub release
+       zip is always the Krafs build. The Workshop upload is staged from a local
+       Release build, so it carries whichever references that machine resolved.
+       To reproduce CI
        locally, pass -p:DisableLocalGameRefs=true. Non-standard install: set
        RimWorldManaged (env var or -p:). The Odyssey outfit-stand code needs no
        extra reference — DLC types ship inside Assembly-CSharp. -->

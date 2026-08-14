@@ -2,8 +2,8 @@
 #
 # Run the lifecycle harness end to end, in an ISOLATED game instance.
 #
-#   devtools/run-harness.sh          # minimal mod list — the iteration loop
-#   devtools/run-harness.sh --full   # your real mod list, copied — the release gate
+#   devtools/run-harness.sh          # a four-mod list — the iteration loop
+#   devtools/run-harness.sh --full   # your own mod list, copied — the release gate
 #
 # Builds Release, launches RimWorld with -quicktest -shiftchange-harness against
 # a throwaway save-data folder, waits for the game to run every case and quit
@@ -92,7 +92,7 @@ then
   [ -f "$LIVE_CONFIG" ] || die "no live ModsConfig.xml to copy from"
   # Read-only copy. The live file is never written.
   cp "$LIVE_CONFIG" "$TESTDATA/Config/ModsConfig.xml"
-  printf 'mod list: your development list (copied, not swapped)\n'
+  printf 'mod list: yours, copied (not swapped)\n'
 else
   version="$(grep -m1 '<version>' "$LIVE_CONFIG" 2>/dev/null || printf '  <version>1.6.4871 rev595</version>')"
   {

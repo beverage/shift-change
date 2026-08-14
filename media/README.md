@@ -22,7 +22,7 @@ devtools/footage.sh gif "<master>.mov" --autocrop --ramp 1:11:3,11:23:6,23:47:3
 ```
 
 Everything else is the tool's defaults — 480 wide, 20 fps, 256 colours, bayer
-dither, gifsicle pass. Output is 480×580, 13.3 s, ~2.1 MB.
+dither, gifsicle pass. Output is 480×580, 13.2 s, ~2.2 MB.
 
 The ramp is the point: 3× over the arrival and the two changes, 6× through the
 stretch where the pawns are only working, 3× again for the change-out and the

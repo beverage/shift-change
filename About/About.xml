@@ -33,7 +33,7 @@ Put a vanilla outfit stand in a work room and put a work outfit on it. When a co
 Rooms are read from their role, so hospitals, laboratories, kitchens, workshops and barns all work with no setup at all.
 
 That is the whole setup. Two optional controls per stand:
-- Set owner reserves a stand for one colonist. Left unassigned, a stand is shared by whoever is free to use it, like beds — so a kitchen needs one stand per cook working at once, not one per cook.
+- Shared (set owner) reserves a stand for one colonist. Left unassigned, a stand is shared by whoever is free to use it, like beds — so a kitchen needs one stand per cook working at once, not one per cook.
 - Set work types opens a checklist for rooms the game reads oddly, rooms that do two jobs, or a decorative stand you do not want used at all.
 
 Deliberately narrow, so it never fights you:
@@ -42,7 +42,7 @@ Deliberately narrow, so it never fights you:
 - Nobody takes clothes out of a stand somebody else is using.
 - Passing through a room changes nothing — only doing the room's work does.
 - A meal break gets them out of uniform first, unless the food is already in their hands or their pack.
-- If a stand frees up while someone is already working bare in its room, they step over and change — unless they are mid-treatment on a patient.
+- If a stand frees up while someone is already working in its room out of uniform, they step over and change — unless they are mid-treatment on a patient.
 - A Change back button appears on any colonist currently in a uniform, for when you want them out of it now.
 
 One setting: Unassigned stands are shared, on by default.

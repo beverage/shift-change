@@ -13,7 +13,7 @@ decompilation.
 | Constraint | Consequence |
 |---|---|
 | The engine cannot be mocked | Every claim this mod makes is about how RimWorld behaves. A test double would assert the author's model of the engine, which is the thing most likely to be wrong. The suite therefore runs **inside the game**, and drives the engine's own entry points. |
-| A test that is slow is not run | One command, no hands, roughly twenty seconds on the minimal profile. Anything requiring a human to click through menus stops happening within a week. |
+| A test that is slow is not run | One command, no hands, roughly twenty seconds on the four-mod list. Anything requiring a human to click through menus stops happening within a week. |
 | A test that is flaky is worse than none | Every negative assertion carries a positive control; every timeout reports state; the harness asserts its own accounting. Three assertions in draft were satisfiable by the thing they were meant to exclude. |
 | It must not touch a live game | Runs against its own save-data folder and its own log, and refuses to signal a process it did not start. The machine this was written on is also the machine somebody plays on. |
 | Some things stay out of reach | A real save/load round trip and a real gravship launch cannot be driven in-process. Those are named below rather than approximated. |
@@ -21,8 +21,8 @@ decompilation.
 ## Running it
 
 ```bash
-devtools/run-harness.sh              # minimal mod list — the iteration loop
-devtools/run-harness.sh --full       # the real mod list — the release gate
+devtools/run-harness.sh              # a four-mod list — the iteration loop
+devtools/run-harness.sh --full       # your own mod list — the release gate
 devtools/run-harness.sh --alongside  # a second instance beside a live game
 ```
 
@@ -31,17 +31,20 @@ game to run every case and quit itself, prints the report, exits non-zero on any
 failure. By hand: dev mode → **Shift Change** → **Run lifecycle harness**, then
 click a clear 7×7 area.
 
-**Minimal is for iterating; `--full` is what a release is signed off on.** This
-mod patches a vanilla building that other mods also touch, so the minimal
-profile is precisely the environment in which a conflict cannot appear. The
-development profile is also what surfaced the fixture flakiness described below.
+**The minimal list is for iterating; `--full` is what a release is signed off
+on.** `--full` copies whatever mod list is active on the machine running it, so
+it is only ever as good as that list — it is not a compatibility matrix, and it
+proves nothing about a mod you do not have installed. What it does prove is that
+the suite still passes with a large list loaded, which the four-mod list by
+construction cannot: that is precisely the environment in which a conflict
+cannot appear. It is also what surfaced the fixture flakiness described below.
 
 ## Isolation
 
 `-savedatafolder` moves the test instance's `ModsConfig.xml`, `Saves/` and prefs
 under `dist/testdata` (`GenFilePaths.cs:93-110, :179`); Unity's `-logfile` moves
 `Player.log` there too. Nothing under the live installation is read or written,
-and `--full` *copies* the real mod list in rather than swapping it.
+and `--full` *copies* the active mod list in rather than swapping it.
 
 An earlier version swapped the live `ModsConfig.xml` back and forth. It worked,
 but it edited a player's installation in order to run a test, and the day
@@ -78,7 +81,7 @@ automatic work only, emergencies never delayed, drafted pawns left alone, work
 the stand does not serve ignored, and the meal-break policy in both directions.
 That last one is the reason this kind exists: all three descriptions claimed
 eating in a room changed nothing, while the code had always done the opposite
-deliberately, and nothing caught it for months.
+deliberately, and nothing caught it until this case was written.
 
 Two further cases cover neither the mod's behaviour nor a past bug. One walks
 the room-role table and asserts every `RoomRoleDef` and `WorkTypeDef` it names
@@ -97,17 +100,19 @@ green log out of a suite that checks nothing.
   built or flown.
 - **The walk.** Fixtures stage the pawn on the stand's interaction cell, so
   pathing and interruption mid-walk are untested. See the traps below.
-- **Mod compatibility.** `--full` proves the suite passes with the development
-  profile loaded. It does not prove correct interaction with any particular mod.
+- **Mod compatibility.** `--full` proves the suite passes with one large mod
+  list loaded — whichever one is active on the machine that ran it. It proves
+  nothing about correct interaction with any particular mod, and nothing at all
+  about a mod that was not installed.
 - **UI.** No case draws a gizmo, opens the work-type dialog, or reads an inspect
   string.
 - **Pooling on and off, the optimizer pause, the recolor guard, `SwapPlan`'s
   rollback, the change-back latch, the retry cooldown.** No cases yet.
 
 A green run is a floor, not a certificate. Play observation is still required,
-and the mod's own history is the argument for saying so: months of play found
+and the mod's own history is the argument for saying so: days of play found
 real bugs that reading never would have, and a later reading found three release
-blockers that months of play had not.
+blockers that play had not.
 
 ## Rules the suite follows
 
