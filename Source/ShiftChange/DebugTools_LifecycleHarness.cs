@@ -141,6 +141,10 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.NonDisplacing), NonDisplacingReturns);
             Case(map, pad, "the driver returns own clothes and their forced flags",
                  (m, p) => Stage(m, p, StageKit.Displacing), DriverRoundTrip);
+            Case(map, pad, "the rules the description promises hold",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 PromisesHold);
             Case("the room-role table resolves", RoomRoleTableResolves);
             // Last: it drives a deliberately failing assertion, and the tallies
             // are global.
@@ -408,6 +412,98 @@ namespace ShiftChange
                 & Expect(!fix.Comp.OnShift, "ledger cleared")
                 & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == null,
                          "registry entry cleared");
+        }
+
+        /// <summary>
+        /// THE PROMISES, as a decision table.
+        ///
+        /// Everything above this is bug-shaped — a guard against something
+        /// that once went wrong. This is the other kind: the mod's advertised
+        /// behaviour, asserted against the rules the README and the store
+        /// description actually print. Those are promises to players, and M4
+        /// showed a promise can be wrong in all three descriptions at once
+        /// with nothing to notice.
+        ///
+        /// <para>Driven through <c>TryInsertSwap</c>, the real decision
+        /// function the interception prefix calls. Every negative is paired
+        /// with a POSITIVE CONTROL — the same setup without the gate — because
+        /// "did not divert" is worthless on its own: a stand that was never
+        /// eligible would satisfy it just as well.</para>
+        /// </summary>
+        internal static bool PromisesHold(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+            WorkGiverDef urgent = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendEmergency");
+            if (doctor == null || tend == null)
+            {
+                return Expect(false, "the doctor work defs resolve");
+            }
+            // The pad's room has no role, so name the work explicitly rather
+            // than relying on an inference this fixture cannot make.
+            fix.Comp.ToggleWork(doctor);
+
+            bool ok = Expect(fix.Comp.HandlesWork(doctor), "the stand serves doctoring")
+                    & Expect(Diverts(fix, WorkJob(fix, tend)),
+                             "an automatic doctoring job dresses (positive control)");
+
+            Job forced = WorkJob(fix, tend);
+            forced.playerForced = true;
+            ok &= Expect(!Diverts(fix, forced), "a right-click order is never diverted");
+
+            if (urgent != null)
+            {
+                ok &= Expect(urgent.emergency, "DoctorTendEmergency is still flagged emergency")
+                    & Expect(!Diverts(fix, WorkJob(fix, urgent)),
+                             "an emergency is never delayed by a wardrobe trip");
+            }
+
+            if (fix.Pawn.drafter != null)
+            {
+                fix.Pawn.drafter.Drafted = true;
+                ok &= Expect(!Diverts(fix, WorkJob(fix, tend)), "a drafted pawn is never diverted");
+                fix.Pawn.drafter.Drafted = false;
+                ok &= Expect(Diverts(fix, WorkJob(fix, tend)),
+                             "and is diverted again once undrafted (control)");
+            }
+
+            // "Only doing the room's work does." A job of a work type this
+            // stand does not serve must not dress anyone.
+            WorkGiverDef cook = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoBillsCook");
+            if (cook != null)
+            {
+                ok &= Expect(!Diverts(fix, WorkJob(fix, cook)),
+                             "work the stand does not serve is not diverted");
+            }
+            return ok;
+        }
+
+        /// <summary>
+        /// Ask the real decision function what it would do, and leave no trace:
+        /// cancel any swap it started, and clear the retry cooldown it stamps
+        /// on a refusal — that cooldown would otherwise silently make every
+        /// later probe in this case return false for the wrong reason.
+        /// </summary>
+        internal static bool Diverts(Fixture fix, Job job)
+        {
+            bool inserted = Patch_JobInterception.TryInsertSwap(job, null, fix.Pawn, fix.Pawn.jobs);
+            if (inserted && fix.Pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand)
+            {
+                fix.Pawn.jobs.EndCurrentJob(JobCondition.InterruptForced, startNewJob: false);
+            }
+            Patch_JobInterception.LastBlockedTick.Remove(fix.Pawn.thingIDNumber);
+            return inserted;
+        }
+
+        /// <summary>
+        /// A job of the given work type, targeted where the pawn stands — so
+        /// it reads as work done in the stand's own room.
+        /// </summary>
+        internal static Job WorkJob(Fixture fix, WorkGiverDef giver)
+        {
+            Job job = JobMaker.MakeJob(JobDefOf.Wait, fix.Pawn.Position);
+            job.workGiverDef = giver;
+            return job;
         }
 
         /// <summary>
@@ -719,13 +815,49 @@ namespace ShiftChange
         /// <see cref="Build"/> starts here too and then hand-assembles a
         /// checked-out state for the lifecycle cases.
         /// </summary>
-        internal static Fixture Stage(Map map, CellRect pad, StageKit kit)
+        /// <summary>
+        /// Wall, roof and floor the pad's perimeter, so its interior is a
+        /// PROPER ROOM.
+        ///
+        /// The lifecycle cases do not need this — they act on a ledger
+        /// directly. The functional cases do: <c>FindAvailableStand</c> walks
+        /// <c>room.ContainedThings</c>, and on the open pad that room is the
+        /// whole outdoors. Testing the decision table out there would assert
+        /// against a huge-room path that the review has already flagged as
+        /// questionable, and would then break the day it is tightened.
+        /// </summary>
+        internal static void EnclosePad(Map map, CellRect pad)
+        {
+            TerrainDef floor = DefDatabase<TerrainDef>.GetNamedSilentFail("WoodPlankFloor");
+            foreach (IntVec3 cell in pad)
+            {
+                if (floor != null)
+                {
+                    map.terrainGrid.SetTerrain(cell, floor);
+                }
+                map.roofGrid.SetRoof(cell, RoofDefOf.RoofConstructed);
+                bool edge = cell.x == pad.minX || cell.x == pad.maxX
+                            || cell.z == pad.minZ || cell.z == pad.maxZ;
+                if (edge)
+                {
+                    GenSpawn.Spawn(ThingMaker.MakeThing(ThingDefOf.Wall, ThingDefOf.WoodLog),
+                                   cell, map);
+                }
+            }
+        }
+
+        internal static Fixture Stage(Map map, CellRect pad, StageKit kit,
+                                      bool enclose = false, WorkTypeDef capableOf = null)
         {
             GenDebug.ClearArea(pad, map);
             ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
             if (standDef == null)
             {
                 return null;
+            }
+            if (enclose)
+            {
+                EnclosePad(map, pad);
             }
             IntVec3 standCell = new IntVec3(pad.minX + 1, 0, pad.minZ + 1);
 
@@ -736,8 +868,12 @@ namespace ShiftChange
                 return null;
             }
 
-            Pawn pawn = DebugTools_DemoStage.AveragePawn(Gender.Male, "Test");
+            Pawn pawn = DebugTools_DemoStage.AveragePawn(Gender.Male, "Test", capableOf);
             pawn.apparel?.DestroyAll();
+            if (capableOf != null)
+            {
+                pawn.workSettings?.EnableAndInitialize();
+            }
             // ON the interaction cell, so the driver's Goto toil arrives
             // immediately and no path is ever requested.
             //
