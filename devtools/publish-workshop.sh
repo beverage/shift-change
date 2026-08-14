@@ -31,7 +31,6 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST="$REPO/dist/ShiftChange"
 MODS="/Users/alexbeverage/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app/Mods"
 LIVE="$MODS/ShiftChange"
-PARKED="$MODS/.ShiftChange-devlink"
 
 # Exactly the set in .github/workflows/ci.yml's "Assemble mod folder" step:
 # what the game loads, plus the human-readable documents. Keep the two in step.
@@ -81,12 +80,14 @@ cmd_install() {
   [ -d "$MODS" ] || die "game Mods folder not found: $MODS"
 
   # Two folders sharing packageId MrBeverage.ShiftChange would both appear in
-  # the mod list, and the uploader would target whichever the game resolved
-  # first. Park the dev symlink so exactly one exists.
+  # the mod list, and ModLister's first-wins race would decide which one the
+  # uploader publishes. A dot prefix does NOT hide a directory from the game —
+  # ModLister.cs:111 enumerates GetDirectories() unfiltered — so the dev
+  # symlink cannot be parked anywhere inside Mods/. Delete it instead; restore
+  # recreates it with one ln -s.
   if [ -L "$LIVE" ]; then
-    [ -e "$PARKED" ] && die "$PARKED already exists — run 'restore' first"
-    mv "$LIVE" "$PARKED"
-    printf 'parked the dev symlink at %s\n' "$PARKED"
+    rm "$LIVE"
+    printf 'removed the dev symlink (restore recreates it)\n'
   elif [ -d "$LIVE" ]; then
     die "$LIVE is a real directory, not the dev symlink — resolve by hand"
   fi
@@ -127,8 +128,11 @@ EOF
 cmd_restore() {
   # The uploader wrote the new item id into the staged copy. It is the only
   # record of which Workshop item this mod is, and losing it means the next
-  # upload creates a duplicate listing instead of updating this one.
-  if [ -f "$LIVE/About/PublishedFileId.txt" ]; then
+  # upload creates a duplicate listing instead of updating this one. Guarded
+  # on the staged copy actually being present: with the dev symlink already
+  # back in place there is nothing to recover, and a repeat run is a no-op,
+  # not an error.
+  if [ ! -L "$LIVE" ] && [ -f "$LIVE/About/PublishedFileId.txt" ]; then
     local id
     id="$(cat "$LIVE/About/PublishedFileId.txt")"
     if [ -f "$REPO/About/PublishedFileId.txt" ] \
@@ -137,17 +141,15 @@ cmd_restore() {
     fi
     cp "$LIVE/About/PublishedFileId.txt" "$REPO/About/"
     printf 'recovered item id %s into the repo — COMMIT IT\n' "$id"
-  else
+  elif [ ! -L "$LIVE" ] && [ -d "$LIVE" ]; then
     printf 'no PublishedFileId.txt in the uploaded copy (upload not run, or it failed)\n'
   fi
 
   if [ -d "$LIVE" ] && [ ! -L "$LIVE" ]; then
     rm -rf "$LIVE"
   fi
-  if [ -L "$PARKED" ]; then
-    mv "$PARKED" "$LIVE"
-    printf 'restored the dev symlink\n'
-  fi
+  ln -sfn "$REPO" "$LIVE"
+  printf 'dev symlink in place\n'
 }
 
 case "${1:-stage}" in

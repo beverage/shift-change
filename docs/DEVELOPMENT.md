@@ -218,15 +218,17 @@ to `SteamUGC.SetItemContent`, `ModMetaData.GetWorkshopUploadDirectory()` returns
 
 ```
 devtools/publish-workshop.sh stage      # Release build + allowlist -> dist/
-devtools/publish-workshop.sh install    # into Mods/, dev symlink parked
+devtools/publish-workshop.sh install    # into Mods/, dev symlink removed
 #   ... upload in game, then quit ...
 devtools/publish-workshop.sh restore    # dev symlink back, item id recovered
 ```
 
-Staged is ~1.1 MB against ~15 MB for the working tree. `install` parks the dev
-symlink rather than leaving it beside the staged copy, because two folders
-sharing `packageId` would both load and the uploader would target whichever the
-game resolved first.
+Staged is ~1.1 MB against ~100 MB for the working tree — most of that is
+`dist/testdata`, the harness's isolated save-data folder, which holds this
+machine's own log and a copy of its mod list. `install` deletes the dev symlink
+outright rather than parking it, because the game enumerates every directory
+under `Mods/`, dot-prefixed or not, and two folders sharing `packageId` race
+first-wins for which one the uploader publishes. `restore` recreates the link.
 
 Two things the game does not upload, and one it does that matters:
 
