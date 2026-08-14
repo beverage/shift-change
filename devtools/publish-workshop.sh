@@ -38,6 +38,15 @@ CONTENT=(About Assemblies Defs Patches Languages docs LICENSE README.md)
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
 
+# install and restore both replace the path a running game loaded the mod
+# from, and the game rewrites ModsConfig.xml on exit over whatever the swap
+# did. Same refusal as run-harness.sh: quit first.
+ensure_game_closed() {
+  if pgrep -x "RimWorld by Ludeon Studios" >/dev/null; then
+    die "RimWorld is running — quit it before touching Mods/"
+  fi
+}
+
 cmd_stage() {
   command -v dotnet >/dev/null || die "dotnet not on PATH"
 
@@ -76,6 +85,7 @@ cmd_stage() {
 }
 
 cmd_install() {
+  ensure_game_closed
   [ -d "$DIST" ] || die "nothing staged — run 'stage' first"
   [ -d "$MODS" ] || die "game Mods folder not found: $MODS"
 
@@ -97,14 +107,37 @@ cmd_install() {
   du -sh "$LIVE"
   cat <<'EOF'
 
-Now, in game:
-  1. Enable Shift Change in the mod list and confirm it loads clean.
-  2. Select it, then Upload to Steam Workshop.
-  3. Quit the game, then run: devtools/publish-workshop.sh restore
+Now, in game (launch fresh — Development mode must be ON in Options, or the
+upload entry does not exist at all; Page_ModsConfig.cs:718):
 
-THEN, IN THE BROWSER, BEFORE MAKING IT PUBLIC:
+  1. Enable Shift Change in the mod list and confirm it loads clean: exactly
+     ONE Shift Change entry, and no "same packageId multiple times" error in
+     the log.
+  2. Select it -> More actions -> Upload to Steam Workshop -> Confirm.
+     The confirm dialog has a "Tag as translation" checkbox — leave it
+     UNTICKED, or the item trades its Mod tag for Translation and drops out
+     of the Workshop's default mod browse.
+  3. Wait for the progress dialog to finish and the item page to open.
+     Then quit the game.
 
-  1. Paste media/steam-description.bbcode into the description field.
+THEN, IMMEDIATELY, IN THIS ORDER:
+
+  1. BROWSER: set the item's visibility to PRIVATE and confirm it by eye
+     (owner controls on the item page). The game never sets visibility —
+     SetItemVisibility appears nowhere in the engine — so until checked the
+     item sits in whatever state Steam defaulted it to. Everything below
+     happens while it is private.
+
+  2. BROWSER: confirm the item actually published — open its page from a
+     private window. The game reports success even if the Workshop Legal
+     Agreement was never accepted, and an unaccepted agreement leaves an
+     item only its owner can see.
+
+  3. TERMINAL: devtools/publish-workshop.sh restore
+     Then commit About/PublishedFileId.txt — it is the only record of which
+     Workshop item this mod is.
+
+  4. BROWSER: paste media/steam-description.bbcode into the description.
 
      Do not skip this and plan to do it later from the game. RimWorld calls
      SetItemDescription only on the CREATE branch (Workshop.cs:262-265), from
@@ -114,18 +147,29 @@ THEN, IN THE BROWSER, BEFORE MAKING IT PUBLIC:
      section, the source link and the AI-assistance disclosure, none of which
      are in About.xml by design.
 
-  2. Add the gallery images from media/cards/. The game uploads only
-     About/Preview.png (SetItemPreview, Workshop.cs:265-273) and never calls
+  5. BROWSER: add the gallery images from media/cards/. The game uploads only
+     About/Preview.png (SetItemPreview, Workshop.cs:266-272) and never calls
      AddItemPreviewFile, so the cards have no path up from inside the game.
+     Skip card-doc.png — it is byte-identical to the preview tile Steam
+     already shows first.
 
-  3. Re-host the demo gif on the item itself and repoint the description at it.
-     It currently hotlinks i.imgur.com, which nothing here controls.
+  6. The demo gif stays hotlinked from i.imgur.com: Steam's item-image limit
+     is under 1 MB and the gif is 2.26 MB, so it cannot be re-hosted on the
+     item as-is. Hotlinked imgur is the community norm; re-encode under 1 MB
+     later if that ever changes.
 
-  4. Only then set visibility to public.
+  7. VERIFY AS A SUBSCRIBER, still private: subscribe in the browser, launch
+     the game, and enable the STEAM-sourced Shift Change entry (with the dev
+     symlink back, both copies appear in the list; leave the local one
+     disabled). Confirm a clean load with no red errors. Quit, unsubscribe,
+     re-enable the local copy.
+
+  8. Only then set visibility to PUBLIC.
 EOF
 }
 
 cmd_restore() {
+  ensure_game_closed
   # The uploader wrote the new item id into the staged copy. It is the only
   # record of which Workshop item this mod is, and losing it means the next
   # upload creates a duplicate listing instead of updating this one. Guarded

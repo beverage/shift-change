@@ -106,7 +106,10 @@ def render(text):
 
     out = re.sub(r"\[img\](.*?)\[/img\]", as_img, out, flags=re.S)
 
-    blocks = [b.strip() for b in re.split(r"\n\s*\n", out) if b.strip()]
+    # Steam renders EVERY newline as a line break, so the preview must too —
+    # the earlier version reflowed wrapped lines, certifying a source that
+    # Steam would render with a break mid-sentence at every 76th column.
+    blocks = [b.strip().replace("\n", "<br>") for b in re.split(r"\n\s*\n", out) if b.strip()]
     return "\n".join(
         b if b.startswith(("<h", "<ul", "<ol", "<bl", "<pre", "<hr", "<div"))
         else f"<p>{b}</p>"
