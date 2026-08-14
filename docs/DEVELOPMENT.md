@@ -144,157 +144,44 @@ Behaviour is verified in game, on a clean Release restart. Two tools help.
 **The demo stage** is the general fixture — a colony in one click, where a swap
 can be watched end to end.
 
-**The lifecycle harness** covers what the demo stage cannot: dev mode → **Shift
-Change** → **Run lifecycle harness**, then click a clear 7×7 area. It builds a
-throwaway stand-and-borrower, fires one real engine lifecycle event at it,
-checks where the ledger landed, tears the fixture down, and repeats. Results go
-to the dev log with a toast tally.
-
-It exists because some situations are prohibitively expensive to arrange by
-hand. A gravship launch needs substructure, fuel, thrusters and a pilot console
-before the game will let one leave the ground, and the moment worth observing
-lasts one tick. That cost is why the gravship path shipped reasoned-about
-rather than tested — and it was wrong.
-
-Each case splits in two, and only one half is testable here:
-
-| Half | Example | Settled by |
-|---|---|---|
-| Engine | "a launch despawns aboard-things with `WillReplace`" | reading `GravshipUtility.cs:389` — playing it does not make it truer |
-| Ours | "given that call, our ledger survives" | the harness |
-
-**The rule that keeps it honest: every case calls the engine's own entry
-points** — `Thing.DeSpawn`, `GenSpawn.Spawn`, `Pawn.Kill`,
-`PawnBanishUtility.Banish` — never our `PostDeSpawn` directly. The engine's comp
-dispatch and ordering then run for real, and only the orchestration around them
-is simulated. A harness that hand-rolls the call sequence tests the author's
-model of the engine and certifies whatever that model got wrong.
-
-Two kinds of fixture. The lifecycle cases hand-assemble a checked-out state,
-because what they test is what happens to a ledger afterwards. The driver cases
-stage an undressed pawn and run `JobDriver_SwapAtStand` for real through the
-pawn's own tracker, because what they test is whether the driver builds that
-ledger correctly — which nothing covered until 2026-08-14, and which is where
-B1 lived.
-
-Two engine traps had to be paid for to make that work, neither guessable from
-the API surface:
-
-- **Pathfinding in 1.6 is asynchronous.** `Pawn_PathFollower.PatherTick` waits
-  on a path request served by a job system the game's update loop drives, not
-  by `Pawn.DoTick()`. Ticking one pawn leaves it flagged `moving` forever, one
-  cell short. Fixtures therefore stage the pawn *on* the stand's interaction
-  cell, so no path is ever requested — at the cost of not exercising the walk,
-  which is vanilla's `Toils_Goto` and not ours.
-- **Jobs are pooled.** When a job ends it returns to `JobMaker`'s pool and is
-  handed straight back out for the pawn's next job, so a `Job` reference held
-  across its own completion silently becomes a different job. The pump watches
-  `jobs.curDriver`, which is built per job and never pooled.
-
-Still out of reach in-process: a real save/load round trip, and a real gravship
-launch.
-
-A case can also be marked `GAP` — a known failure with its reason recorded,
-counted apart from `Failed` so a green run stays meaningful, and reported as
-`FIXED` if it ever starts passing. There are none today. Banishment was the
-last one, and closing it is the clearest thing the harness has done: the fix
-that made the obvious four assertions pass was still wrong, because it only
-made the stand *disbelieve* a ledger it had never emptied. Recruit the wanderer
-back and the stand died a second time. The `still reaped after re-recruitment`
-assertion exists to hold that door shut.
-
-### Running it
+**The lifecycle harness** covers what the demo stage cannot: thirteen cases that
+drive the engine's own entry points and assert where the ledger landed. What it
+covers, what it deliberately does not, the rules it follows and the two engine
+traps it had to pay for are all in [TESTING.md](TESTING.md).
 
 ```bash
 devtools/run-harness.sh              # minimal mod list — the iteration loop
-devtools/run-harness.sh --full       # your real mod list — the release gate
-devtools/run-harness.sh --alongside  # second instance beside a live game
+devtools/run-harness.sh --full       # the real mod list — the release gate
+devtools/run-harness.sh --alongside  # a second instance beside a live game
 ```
 
-One command, no hands. It builds Release, launches with `-quicktest
--shiftchange-harness`, waits for the game to run every case and quit itself,
-prints the report, and exits non-zero if anything failed — so it can gate
-something.
+One command, no hands: builds Release, launches an isolated instance, waits for
+it to run every case and quit itself, prints the report, exits non-zero on
+failure. Measured 2026-08-14, launch to process exit:
 
-**It runs isolated.** `-savedatafolder=dist/testdata` gives the test instance
-its own `Config/ModsConfig.xml`, `Saves/` and prefs (`GenFilePaths.cs:93-110`,
-`:179`); Unity's `-logfile` moves `Player.log` there too. Nothing under
-`~/Library/Application Support/RimWorld` or `~/Library/Logs` is read or written,
-and `--full` *copies* your mod list in rather than swapping the live file.
+| Mod list | Wall clock |
+|---|---|
+| Minimal (4 mods) | ~20 s |
+| Development (233 entries) | ~160 s |
+| Minimal, alongside a live colony | ~25 s paused, several minutes if actively ticking |
 
-**It will not touch a game it did not start.** Another instance running is
-somebody's colony with unsaved progress in it, so the default is to stop.
-`--alongside` is the deliberate opt-in. The script launches the binary directly
-rather than through `open` so it has a real PID, and only ever waits on — or
-signals — that one. Never `pkill` to get past the refusal; that has already cost
-a colony once.
-
-Measured 2026-08-14, same machine, same harness, launch to process exit:
-
-| Mod list | Mods | Wall clock | Exceptions in log |
-|---|---|---|---|
-| Minimal | 4 | **~20 s** | 0 |
-| Development | 233 entries | ~125 s | 47 |
-| Minimal, `--alongside` a live colony | 4 | ~300 s | 0 |
-
-Identical result on all three. The 47 exceptions on the development list are
-other mods' and predate us; the point of that column is that on minimal there is
-nothing to sift. The `--alongside` cost is plain CPU/GPU contention, not Steam
-(`SteamAPI_Init` loads fine in both) — use it when you need an answer without
-interrupting a game, not as the normal loop.
-
-The minimal list is Harmony, Core, Odyssey and Shift Change. Vanilla Apparel
-Expanded is deliberately absent: the fixture falls back to vanilla apparel
-without it and displaces two garments instead of one, which exercises the same
-lifecycle paths and drops the VEF Core dependency VAE drags in.
-
-**Minimal is for iteration, not for sign-off.** This mod's whole job is patching
-a vanilla building other mods also touch, so a `--full` run is the only evidence
-we get that it behaves where players actually run it. Do both before an upload.
-The development run is also what surfaced the fixture flakiness above — a
-minimal-only habit would have hidden it.
-
-`devtools/rimworld-profile.sh` still swaps the live mod list, for when you want
-a fast *interactive* session rather than a headless run. It refuses while the
-game is running, for the same reason.
+**Minimal is for iterating; `--full` is what a release is signed off on.** This
+mod patches a vanilla building other mods also touch, so the minimal profile is
+precisely the environment in which a conflict cannot appear.
 
 ### Driving it by hand
 
-Still works, and is what you want when a case fails and you need to watch:
-dev mode → **Shift Change** → **Run lifecycle harness**, then click a clear 7×7
-area. Two things save time. The debug actions menu has a **search box** — type
-`lifecycle` and it filters to the one entry, which beats hunting by eye because
-the menu's layout shifts with the mod list. And `devtools/rimworld-profile.sh
-minimal` / `restore` swaps the profile on its own if you want the fast load
-without the headless run.
+What you want when a case fails and you need to watch it: dev mode → **Shift
+Change** → **Run lifecycle harness**, then click a clear 7×7 area. The debug
+actions menu has a search box — type `lifecycle` and it filters to the single
+entry, which beats hunting by eye, because the menu's layout shifts with the
+mod list.
 
-The swapper refuses to act while RimWorld is running, because the game rewrites
-`ModsConfig.xml` on exit and would undo the swap or, worse, write the minimal
-list over the real one. It parks the development list once and restores it
-verbatim.
-
-Identical harness result on both. Vanilla Apparel Expanded is deliberately
-excluded: the fixture falls back to vanilla apparel without it and displaces
-two garments instead of one, which exercises the same lifecycle paths and drops
-the VEF Core dependency VAE drags in.
-
-**Minimal is for iteration, not for sign-off.** This mod's whole job is
-patching a vanilla building other mods also touch, so a full-profile run is the
-only evidence we get that it behaves where players actually run it. Do both
-before an upload. The development run is also what surfaced the fixture
-flakiness described above — a minimal-only habit would have hidden it.
-
-The script refuses to swap while RimWorld is running, because the game rewrites
-`ModsConfig.xml` on exit and would undo the swap or, worse, write the minimal
-list over the real one. It parks the development list once and restores it
-verbatim.
-
-### Finding the action in game
-
-The debug actions menu has a search box at top left. Type `lifecycle` and the
-list filters to the single entry. That beats hunting for it by eye — the menu's
-layout shifts with the mod list, so a position that worked on one profile is
-wrong on the other.
+For a fast interactive session without the headless run,
+`devtools/rimworld-profile.sh minimal` / `restore` swaps the live mod list. It
+refuses while RimWorld is running: the game rewrites `ModsConfig.xml` on exit
+and would undo the swap, or write the minimal list over the real one. It parks
+the development list once and restores it verbatim.
 
 ## CI
 
@@ -303,12 +190,14 @@ way once.
 
 | Check | Catches |
 |---|---|
-| `xmllint` well-formedness | malformed XML |
-| Patch root is `<Patch>` | the plural form silently discards every operation in the file, and well-formedness still passes |
-| No `private` declarations in `Source/` | hot-reload `FieldAccessException` |
-| No auto-properties in `Source/` | same, via the compiler's private backing field |
+| `xmllint` well-formedness | malformed XML. Runs under `pipefail`, or a `find` that fails on a renamed directory drops a whole tree from validation with a green tick. |
+| `devtools/check-invariants.py` | hot-reload hazards, translation keys in both directions, XML-to-C# type bindings, the `<Patch>` root walk, and the Workshop preview size. Runs locally too — see [TESTING.md](TESTING.md). |
+| `devtools/bbcode-preview.py` | an unclosed tag in the store description, which makes Steam render the rest of the page as literal text |
 | Committed dll is uninstrumented, and alone | an instrumented Debug build reaching the mod's load path |
 | Release build | compile errors against Krafs |
+
+The behavioural suite is **not** in CI and cannot be: it needs the game. It runs
+on this machine, and `--full` is what a release is signed off on.
 
 Tagging a commit `v*` additionally packages the mod folder and publishes a
 GitHub release.
@@ -422,7 +311,8 @@ flowchart LR
 | `CompAssignableToPawn_ShiftStand.cs` | Ownership. Narrows candidates to pawns capable of the stand's work. |
 | `Patch_ChangeBackGizmo.cs` | "Change back" command on a pawn in uniform, plus the room-exit latch. |
 | `Patch_OptimizeApparelOnShift.cs` | Pauses the vanilla wardrobe optimizer while a pawn is checked out. |
-| `Patch_UnclaimStands.cs` | Releases stands when vanilla unclaims beds and thrones. |
+| `Patch_UnclaimStands.cs` | Releases stands when vanilla unclaims beds and thrones. Holds the reaper both it and the banish patch call. |
+| `Patch_BanishStands.cs` | Calls the same reaper for banishment, the one colony exit vanilla routes past `UnclaimAll`. |
 | `RoomWorkTypes.cs` | Room role to work type sets. Keyed by defName, silent-fail. |
 | `Dialog_SetStandWorkTypes.cs` | Per-stand work type picker. |
 | `ShiftChangeMod.cs` | Mod settings. |
@@ -431,7 +321,8 @@ flowchart LR
 | `HarmonyInit.cs` | Patch bootstrap. |
 | `DebugTools_DemoStage.cs` | The demo stage. Test fixture and film set. |
 | `DebugTools_PreviewStage.cs` | The title-card stage. Three standalone rooms sized to crop to Workshop cards. |
-| `DebugTools_LifecycleHarness.cs` | Lifecycle assertions. Fires real engine events at a throwaway fixture and checks where the ledger lands. |
+| `DebugTools_LifecycleHarness.cs` | The test suite. Thirteen cases driving real engine entry points — see [TESTING.md](TESTING.md). |
+| `Patch_HarnessAutoRun.cs` | Runs the harness and quits, when launched with `-shiftchange-harness`. Inert without the flag. |
 | `HotReloadVisibility.cs` | Debug only. `InternalsVisibleTo` grants for the reload twins. |
 | `EcrWatchdog.cs` | Debug only. Polls for rebuilds, because Mono's `FileSystemWatcher` never fires on macOS. |
 | `Patch_ModeBadge.cs` | Debug only. The on-screen live/lab badge. |
@@ -445,3 +336,17 @@ flowchart LR
 | `Patches/` | Adds the two comps to the vanilla outfit stand def. |
 | `Languages/English/Keyed/` | Gizmo and inspect strings. |
 | `Assemblies/` | Build output. Exactly one dll. |
+
+### `devtools/`
+
+Not shipped — the release allowlist is `About Assemblies Defs Patches Languages
+docs LICENSE README.md`.
+
+| Script | Does |
+|---|---|
+| `run-harness.sh` | Runs the test suite headless in an isolated instance. `--full`, `--alongside`. |
+| `check-invariants.py` | The static checks CI runs. Run it before pushing. |
+| `rimworld-profile.sh` | Swaps the live mod list for a fast interactive session. |
+| `publish-workshop.sh` | Stages a Workshop upload out of the working tree, and swaps it into `Mods/`. |
+| `bbcode-preview.py` | Validates the store description and renders a local preview. |
+| `footage.sh` | Screen capture for the demo gif. |

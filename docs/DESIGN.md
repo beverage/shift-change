@@ -432,11 +432,23 @@ was not designed; it fell out of reading what vanilla declares about its own job
 
 ## Development tooling
 
-A Debug-only hot-reload rig (Zetrith's EditCompileReload) supports UI iteration.
-It never ships: Release compiles none of it and sweeps its artifacts from the
-mod's load path.
+Two kinds, and only one of them stays behind.
 
-It constrains the source in ways that look arbitrary from the code alone — no
-`private` members, no auto-properties, no protected base members — because a
-hot-swapped method body executes cross-assembly. Build, debug and the full rules
-are in [DEVELOPMENT.md](DEVELOPMENT.md).
+**The hot-reload rig never ships.** Zetrith's EditCompileReload supports UI
+iteration in Debug; Release compiles none of it and sweeps its artifacts from
+the mod's load path. It constrains the source in ways that look arbitrary from
+the code alone — no `private` members, no auto-properties, no protected base
+members — because a hot-swapped method body executes cross-assembly. Build,
+debug and the full rules are in [DEVELOPMENT.md](DEVELOPMENT.md).
+
+**The debug actions do ship, deliberately.** The demo stage, the preview stage
+and the lifecycle harness are compiled into Release and gated on dev mode, as
+vanilla's own debug actions are. Two reasons. Footage and screenshots are taken
+on live builds, so a fixture that existed only in Debug would be a fixture for a
+mod nobody runs. And the harness is the release gate: it has to run against
+exactly the assembly that ships, or it is testing something else. The cost is a
+handful of entries in a menu no player opens, and one string comparison at game
+load for the `-shiftchange-harness` launch flag.
+
+What the harness covers, and the rather larger list of what it does not, is in
+[TESTING.md](TESTING.md).
