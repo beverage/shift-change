@@ -36,9 +36,18 @@ firing the engine's real entry points at a throwaway fixture, and exits non-zero
 if a case fails. Touch `PostDeSpawn`, `PostSwapMap`, `ReleaseBorrower`,
 `AbandonLedger` or `Patch_UnclaimStands` and run it.
 
-A harness pass is not a play observation. It says nothing about the job driver,
-which builds the ledger in the first place, and a `GAP` line is a known failure
-being tracked, not a pass. There are no gaps today.
+A harness pass is not a play observation, and a `GAP` line is a known failure
+being tracked, not a pass. There are no gaps today. It does now run
+`JobDriver_SwapAtStand` for real, through the pawn's own tracker, so "the
+driver builds a correct ledger" is covered; a save/load round trip and a real
+gravship launch are still out of reach.
+
+**Two engine traps live in the driver cases**, both invisible from the API and
+both already paid for once. Pathfinding in 1.6 is asynchronous, so ticking a
+single pawn never completes a walk — fixtures stage the pawn on the stand's
+interaction cell. And Jobs are pooled, so a `Job` reference held across its own
+completion silently becomes the pawn's *next* job — watch `jobs.curDriver`,
+never the job.
 
 **Every colony exit must reach the reaper.** Vanilla routes death, trade,
 kidnap and map exit through `Pawn_Ownership.UnclaimAll`, which

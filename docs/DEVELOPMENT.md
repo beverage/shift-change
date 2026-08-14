@@ -170,9 +170,29 @@ dispatch and ordering then run for real, and only the orchestration around them
 is simulated. A harness that hand-rolls the call sequence tests the author's
 model of the engine and certifies whatever that model got wrong.
 
-One limit worth stating: fixture setup calls `NotifyDressed` directly rather
-than running the job driver, so a pass says nothing about whether the DRIVER
-builds a correct ledger. That stays a play observation.
+Two kinds of fixture. The lifecycle cases hand-assemble a checked-out state,
+because what they test is what happens to a ledger afterwards. The driver cases
+stage an undressed pawn and run `JobDriver_SwapAtStand` for real through the
+pawn's own tracker, because what they test is whether the driver builds that
+ledger correctly — which nothing covered until 2026-08-14, and which is where
+B1 lived.
+
+Two engine traps had to be paid for to make that work, neither guessable from
+the API surface:
+
+- **Pathfinding in 1.6 is asynchronous.** `Pawn_PathFollower.PatherTick` waits
+  on a path request served by a job system the game's update loop drives, not
+  by `Pawn.DoTick()`. Ticking one pawn leaves it flagged `moving` forever, one
+  cell short. Fixtures therefore stage the pawn *on* the stand's interaction
+  cell, so no path is ever requested — at the cost of not exercising the walk,
+  which is vanilla's `Toils_Goto` and not ours.
+- **Jobs are pooled.** When a job ends it returns to `JobMaker`'s pool and is
+  handed straight back out for the pawn's next job, so a `Job` reference held
+  across its own completion silently becomes a different job. The pump watches
+  `jobs.curDriver`, which is built per job and never pooled.
+
+Still out of reach in-process: a real save/load round trip, and a real gravship
+launch.
 
 A case can also be marked `GAP` — a known failure with its reason recorded,
 counted apart from `Failed` so a green run stays meaningful, and reported as

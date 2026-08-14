@@ -5,6 +5,7 @@ using LudeonTK;
 using RimWorld;
 using UnityEngine;
 using Verse;
+using Verse.AI;
 
 namespace ShiftChange
 {
@@ -40,13 +41,25 @@ namespace ShiftChange
     /// call sequence tests the author's model of the engine and certifies
     /// whatever that model got wrong.</para>
     ///
-    /// <para><b>Fixture setup is not tested by this.</b> Getting a pawn on
-    /// shift here moves apparel and calls <c>NotifyDressed</c> directly rather
-    /// than running <see cref="JobDriver_SwapAtStand"/>, because the driver
-    /// needs a walk and a delay. The plan still comes from
-    /// <see cref="SwapPlan"/>, so the wearability answer is the shared one —
-    /// but a harness pass says nothing about whether the DRIVER builds a
-    /// correct ledger. That remains a play observation.</para>
+    /// <para><b>Two kinds of fixture.</b> The lifecycle cases hand-assemble a
+    /// checked-out state (<see cref="Build"/> moves apparel and calls
+    /// <c>NotifyDressed</c>) because what they test is what happens to a
+    /// ledger AFTERWARDS. The driver cases stage an undressed pawn
+    /// (<see cref="Stage"/>) and run <see cref="JobDriver_SwapAtStand"/> for
+    /// real through the pawn's own tracker (<see cref="RunSwap"/>), because
+    /// what they test is whether the driver builds that ledger correctly in
+    /// the first place — which nothing covered until 2026-08-14, and which is
+    /// where B1 lived.</para>
+    ///
+    /// <para><b>Two engine traps the driver cases had to pay for</b>, both
+    /// invisible from the API surface and both recorded at their call sites:
+    /// pathfinding in 1.6 is ASYNCHRONOUS, so ticking one pawn never completes
+    /// a walk (hence staging on the interaction cell); and Jobs are POOLED, so
+    /// a Job reference held across its own completion silently becomes the
+    /// pawn's next job (hence watching the driver, not the job).</para>
+    ///
+    /// <para>What is still out of reach in-process: a real save/load round
+    /// trip, and a real gravship launch.</para>
     ///
     /// <para>Ships in Release, dev-mode gated, like the other two debug tools.
     /// A test you have to switch build configurations to run is a test that
@@ -56,7 +69,9 @@ namespace ShiftChange
     /// profile, quicktest map: 4 passed, 0 failed, 1 known gap. The gravship
     /// case passed on all four assertions, which is what the
     /// <c>WillReplace</c> guard in <see cref="CompShiftStand.PostDeSpawn"/> was
-    /// written for and had until then only been reasoned about.</para>
+    /// written for and had until then only been reasoned about. Later the same
+    /// day, with the banishment gap closed and the driver cases added:
+    /// <b>10 passed, 0 failed, 0 known gaps</b>, 51 assertions.</para>
     /// </summary>
     internal static class DebugTools_LifecycleHarness
     {
@@ -122,6 +137,14 @@ namespace ShiftChange
             Case(map, pad, "borrower death reaps the ledger", DeathReaps);
             Case(map, pad, "borrower banishment reaps the ledger", BanishmentReaps);
             Case(map, pad, "repeated faults disable interception, a load re-arms it", FaultLatchRecovers);
+            Case(map, pad, "a stand that displaces nothing still hands the uniform back",
+                 (m, p) => Stage(m, p, StageKit.NonDisplacing), NonDisplacingReturns);
+            Case(map, pad, "the driver returns own clothes and their forced flags",
+                 (m, p) => Stage(m, p, StageKit.Displacing), DriverRoundTrip);
+            Case("the room-role table resolves", RoomRoleTableResolves);
+            // Last: it drives a deliberately failing assertion, and the tallies
+            // are global.
+            Case("the harness counts its own results correctly", HarnessAccounting);
 
             Report.Append("result: ").Append(Passed).Append(" passed, ")
                   .Append(Failed).Append(" failed, ")
@@ -291,6 +314,190 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// B1'S REGRESSION GUARD, and the only one.
+        ///
+        /// A stand whose stock displaces nothing — a Shell-layer duster over
+        /// shirt and trousers, which share no layer with it — used to donate
+        /// its uniform permanently: <c>DoTransfer</c> gated the whole return
+        /// trip on <c>toWear.Count == 0</c>, so the pawn walked away still
+        /// wearing it and the stand emptied itself forever. Silent, and
+        /// cumulative.
+        ///
+        /// Both legs go through the real driver on the real tracker, because
+        /// the bug lives past a job boundary that the hand-assembled
+        /// <see cref="Build"/> fixture never crosses.
+        ///
+        /// With the fix reverted, the ledger and forced-flag assertions still
+        /// pass — <c>NothingToWear</c> runs <c>AbandonLedger</c>, which tidies
+        /// both. The three that fail are the ones that matter: the uniform is
+        /// off the pawn, it is back in the stand, and the stand can dress
+        /// somebody again.
+        /// </summary>
+        internal static bool NonDisplacingReturns(Fixture fix)
+        {
+            bool ok = Expect(RunSwap(fix), "dress leg ran to completion");
+            Apparel uniform = fix.Comp.IssuedUniformForReading.Count > 0
+                ? fix.Comp.IssuedUniformForReading[0]
+                : null;
+            ok &= Expect(uniform != null, "the duster was issued")
+                & Expect(fix.Comp.StoredOwnerApparelForReading.Count == 0,
+                         "and displaced nothing, which is the whole point");
+            if (uniform == null)
+            {
+                return false;
+            }
+
+            ok &= Expect(RunSwap(fix), "return leg ran to completion");
+            return ok
+                & Expect(!fix.Pawn.apparel.WornApparel.Contains(uniform),
+                         "the uniform came off")
+                & Expect(uniform.ParentHolder == fix.Stand,
+                         "and went back into the stand")
+                & Expect(fix.Pawn.apparel.WornApparel.Count == 2,
+                         "the pawn kept their own clothes")
+                & Expect(!fix.Comp.OnShift, "ledger cleared")
+                & Expect(SwapPlan.WouldDress(fix.Pawn, fix.Stand),
+                         "the stand can dress somebody again");
+        }
+
+        /// <summary>
+        /// The driver builds a correct ledger, and gives everything back.
+        ///
+        /// The forced-flag half is what nothing else covers:
+        /// <c>Pawn_ApparelTracker.Notify_ApparelRemoved</c> clears the forced
+        /// flag on every removal, so the driver captures it BEFORE removing and
+        /// restores it on the way back. <see cref="Build"/> hands
+        /// <c>NotifyDressed</c> an empty forced list, so that path has been at
+        /// zero coverage.
+        /// </summary>
+        internal static bool DriverRoundTrip(Fixture fix)
+        {
+            Apparel parka = null;
+            List<Apparel> worn = fix.Pawn.apparel.WornApparel;
+            for (int i = 0; i < worn.Count; i++)
+            {
+                if (worn[i].def.defName == "Apparel_Parka")
+                {
+                    parka = worn[i];
+                }
+            }
+            if (parka == null)
+            {
+                return Expect(false, "fixture is wearing a parka to displace");
+            }
+            // The player's explicit choice, which the swap must not quietly
+            // downgrade to policy-managed.
+            fix.Pawn.outfits.forcedHandler.SetForced(parka, forced: true);
+
+            bool ok = Expect(RunSwap(fix), "dress leg ran to completion")
+                    & Expect(fix.Comp.Borrower == fix.Pawn, "borrower recorded")
+                    & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == fix.Comp,
+                             "registry points at the stand")
+                    & Expect(parka.ParentHolder == fix.Stand, "the parka was parked")
+                    & Expect(fix.Comp.StoredOwnerApparelForReading.Contains(parka),
+                             "and recorded in the ledger")
+                    & Expect(fix.Comp.WasForcedWhenStored(parka),
+                             "its force-worn flag was captured before removal");
+
+            ok &= Expect(RunSwap(fix), "return leg ran to completion");
+            return ok
+                & Expect(fix.Pawn.apparel.WornApparel.Contains(parka),
+                         "the parka came back on")
+                & Expect(fix.Pawn.outfits.forcedHandler.IsForced(parka),
+                         "still force-worn — the player's choice survived the shift")
+                & Expect(!fix.Comp.OnShift, "ledger cleared")
+                & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == null,
+                         "registry entry cleared");
+        }
+
+        /// <summary>
+        /// Every def the room-role table names still exists.
+        ///
+        /// <c>RoomWorkTypes</c> resolves through <c>GetNamedSilentFail</c> and
+        /// drops whatever is missing, so a renamed def empties a role's work
+        /// list, <c>HandlesWork</c> returns false everywhere, and the mod does
+        /// nothing at all — with a green harness and no log line. Most likely
+        /// to fire on a game update rather than on an edit.
+        /// </summary>
+        internal static bool RoomRoleTableResolves()
+        {
+            bool ok = Expect(RoomWorkTypes.Defaults.Count > 0, "the table is not empty");
+            foreach (KeyValuePair<string, string[]> entry in RoomWorkTypes.Defaults)
+            {
+                RoomRoleDef role = DefDatabase<RoomRoleDef>.GetNamedSilentFail(entry.Key);
+                ok &= Expect(role != null, "room role " + entry.Key + " resolves");
+                int resolved = 0;
+                for (int i = 0; i < entry.Value.Length; i++)
+                {
+                    if (DefDatabase<WorkTypeDef>.GetNamedSilentFail(entry.Value[i]) != null)
+                    {
+                        resolved++;
+                    }
+                    else
+                    {
+                        Expect(false, "work type " + entry.Value[i] + " resolves");
+                        ok = false;
+                    }
+                }
+                if (role != null)
+                {
+                    ok &= Expect(RoomWorkTypes.ForRole(role).Count == resolved,
+                                 entry.Key + " maps to all " + resolved + " of its work types");
+                }
+            }
+            return ok;
+        }
+
+        /// <summary>
+        /// The harness checks itself. Register LAST — it deliberately drives a
+        /// failing assertion, and the tallies are global.
+        ///
+        /// Without this, <c>run-harness.sh</c> greps the log for PASSED and
+        /// exits zero on a harness whose <see cref="Expect"/> has been inverted
+        /// or whose counters have stopped moving — and the cases above are
+        /// trusted on nothing.
+        /// </summary>
+        internal static bool HarnessAccounting()
+        {
+            int passedBefore = Passed;
+            int failedBefore = Failed;
+            int gapsBefore = KnownGaps;
+            bool gapFlagBefore = GapThisCase;
+            StringBuilder saved = new StringBuilder(Report.ToString());
+
+            bool truePassed = Expect(true, "(self-check) a true assertion returns true");
+            bool falsePassed = Expect(false, "(self-check) a false assertion returns false");
+            bool gapReturned = ExpectKnownGap(false, "(self-check) a gap", "expected");
+
+            int passedDelta = Passed - passedBefore;
+            int failedDelta = Failed - failedBefore;
+            int gapsDelta = KnownGaps - gapsBefore;
+
+            // Put the counters and the transcript back before reporting, so the
+            // three deliberate assertions above do not reach the tally or the
+            // log the author reads.
+            Passed = passedBefore;
+            Failed = failedBefore;
+            KnownGaps = gapsBefore;
+            GapThisCase = gapFlagBefore;
+            Report.Length = 0;
+            Report.Append(saved);
+
+            // Expect REPORTS; Case COUNTS. A case with ten failing assertions
+            // is one failure, not ten — deliberate, so the tally counts
+            // behaviours rather than sentences. Asserted explicitly because
+            // the first version of this self-check assumed the opposite and
+            // was wrong about the harness it was checking.
+            return Expect(truePassed, "Expect(true) returns true")
+                 & Expect(!falsePassed, "Expect(false) returns false")
+                 & Expect(failedDelta == 0 && passedDelta == 0,
+                          "assertions do not touch the tally — Case does")
+                 & Expect(gapReturned, "a known gap returns true, so it is not a failure")
+                 & Expect(gapsDelta == 1, "and increments KnownGaps exactly once")
+                 & Expect(GapThisCase == gapFlagBefore, "the gap flag was restored");
+        }
+
+        /// <summary>
         /// The fault latch, driven by real throws through the real
         /// <see cref="Patch_JobInterception.Prefix"/> catch block rather than
         /// by calling the counter directly — the same rule as every other case
@@ -371,6 +578,34 @@ namespace ShiftChange
             internal Pawn Pawn;
             internal CompShiftStand Comp;
             internal int StoredCount;
+
+            /// <summary>Extra pawns a case spawned; swept by <see cref="Teardown"/>.</summary>
+            internal List<Pawn> Extras = new List<Pawn>();
+        }
+
+        /// <summary>
+        /// What a staged fixture wears and what its stand holds. Named CORE
+        /// defs throughout, never the demo stage's defaults: the harness runs
+        /// on a four-mod profile by default and on the development list under
+        /// <c>--full</c>, and a fixture built from Vanilla Apparel Expanded
+        /// defs would silently become a different test between the two.
+        /// </summary>
+        internal enum StageKit
+        {
+            /// <summary>
+            /// Stand: a duster (Shell). Pawn: shirt and trousers (OnSkin) plus
+            /// a parka (Shell) — so the duster displaces the parka and the
+            /// ledger has something in it.
+            /// </summary>
+            Displacing,
+
+            /// <summary>
+            /// The same without the parka, so the duster (Shell) shares no
+            /// layer with shirt and trousers (OnSkin) and displaces NOTHING.
+            /// This is B1's shape, and <see cref="Build"/> structurally cannot
+            /// produce it — it returns null when nothing is displaced.
+            /// </summary>
+            NonDisplacing,
         }
 
         /// <summary>
@@ -390,6 +625,43 @@ namespace ShiftChange
 
         internal static void Case(Map map, CellRect pad, string name, Func<Fixture, bool> body)
         {
+            Case(map, pad, name, Build, body);
+        }
+
+        /// <summary>
+        /// A case with no fixture at all — for anything that asserts about
+        /// static tables or the harness's own machinery and needs no map.
+        /// </summary>
+        internal static void Case(string name, Func<bool> body)
+        {
+            Report.Append("  ").AppendLine(name);
+            GapThisCase = false;
+            try
+            {
+                if (!body())
+                {
+                    Failed++;
+                }
+                else if (!GapThisCase)
+                {
+                    Passed++;
+                }
+            }
+            catch (Exception e)
+            {
+                Fail("threw: " + e);
+            }
+        }
+
+        /// <summary>
+        /// A case that stages its own fixture. <paramref name="stage"/> returns
+        /// null to mean "this fixture cannot be built", which is a failure —
+        /// the retry loop is for THROWS, which are a modlist hazard rather
+        /// than ours (see <see cref="BuildAttempts"/>).
+        /// </summary>
+        internal static void Case(Map map, CellRect pad, string name,
+                                  Func<Map, CellRect, Fixture> stage, Func<Fixture, bool> body)
+        {
             Report.Append("  ").AppendLine(name);
             GapThisCase = false;
             Fixture fix = null;
@@ -400,7 +672,7 @@ namespace ShiftChange
                 {
                     try
                     {
-                        fix = Build(map, pad);
+                        fix = stage(map, pad);
                     }
                     catch (Exception e)
                     {
@@ -415,7 +687,7 @@ namespace ShiftChange
                 {
                     Fail(lastBuildError != null
                         ? "fixture build failed " + BuildAttempts + " times, last: " + lastBuildError
-                        : "fixture could not be built (nothing displaced — check the stocked apparel)");
+                        : "fixture could not be staged");
                     return;
                 }
 
@@ -438,6 +710,150 @@ namespace ShiftChange
             {
                 Teardown(fix, map, pad);
             }
+        }
+
+        /// <summary>
+        /// A stand and a pawn, dressed per <paramref name="kit"/>, with NO
+        /// ledger — nothing has swapped yet. Cases that want to watch the
+        /// driver build the ledger start here and call <see cref="RunSwap"/>;
+        /// <see cref="Build"/> starts here too and then hand-assembles a
+        /// checked-out state for the lifecycle cases.
+        /// </summary>
+        internal static Fixture Stage(Map map, CellRect pad, StageKit kit)
+        {
+            GenDebug.ClearArea(pad, map);
+            ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
+            if (standDef == null)
+            {
+                return null;
+            }
+            IntVec3 standCell = new IntVec3(pad.minX + 1, 0, pad.minZ + 1);
+
+            Building_OutfitStand stand = (Building_OutfitStand)DebugTools_DemoStage.Spawn(
+                map, standDef, ThingDefOf.WoodLog, standCell, Rot4.North);
+            if (!StockOne(stand, "Apparel_Duster"))
+            {
+                return null;
+            }
+
+            Pawn pawn = DebugTools_DemoStage.AveragePawn(Gender.Male, "Test");
+            pawn.apparel?.DestroyAll();
+            // ON the interaction cell, so the driver's Goto toil arrives
+            // immediately and no path is ever requested.
+            //
+            // This is not tidiness, it is the only way the pump works.
+            // Pathfinding in 1.6 is ASYNCHRONOUS — Pawn_PathFollower.PatherTick
+            // waits on `curPathRequest.TryGetPath(...)` (:261), and that
+            // request is served by a job system the game's own update loop
+            // drives, not by Pawn.DoTick(). Ticking one pawn therefore leaves
+            // it "moving" forever, one cell from the stand, which is exactly
+            // what the first version of these cases did for 5000 ticks.
+            //
+            // What it costs: these cases do not exercise the walk. The walk is
+            // vanilla's Toils_Goto, not ours, and what they are here to prove
+            // is the transfer.
+            GenSpawn.Spawn(pawn, stand.InteractionCell, map, Rot4.North);
+            WearOne(pawn, "Apparel_BasicShirt");
+            WearOne(pawn, "Apparel_Pants");
+            if (kit == StageKit.Displacing)
+            {
+                WearOne(pawn, "Apparel_Parka");
+            }
+
+            CompShiftStand comp = stand.TryGetComp<CompShiftStand>();
+            if (comp == null)
+            {
+                return null;
+            }
+            return new Fixture { Map = map, Stand = stand, Pawn = pawn, Comp = comp, StoredCount = 0 };
+        }
+
+        internal static bool StockOne(Building_OutfitStand stand, string defName)
+        {
+            ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(defName);
+            return def != null && stand.AddApparel(DebugTools_DemoStage.MakeGarment(def, null));
+        }
+
+        internal static bool WearOne(Pawn pawn, string defName)
+        {
+            ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(defName);
+            if (def == null || pawn.apparel == null)
+            {
+                return false;
+            }
+            Apparel garment = DebugTools_DemoStage.MakeGarment(def, null);
+            pawn.apparel.Wear(garment);
+            return pawn.apparel.WornApparel.Contains(garment);
+        }
+
+        /// <summary>
+        /// Run one swap to completion through the REAL driver: start the job on
+        /// the pawn's own tracker, then tick that pawn until the job ends.
+        ///
+        /// <para>One pawn is a complete pump. <c>Pawn.Tick</c> drives
+        /// <c>pather.PatherTick()</c> and <c>jobs.JobTrackerTick()</c>
+        /// (<c>Verse/Pawn.cs:1555,:1573</c>), the toil delay counts down in
+        /// <c>JobDriver.DriverTick</c>, and nothing in this driver reads
+        /// <c>TicksGame</c> — so no <c>TickManager</c>, no world tick, and no
+        /// other pawn's AI is involved. That is what makes this runnable from
+        /// a debug action at all.</para>
+        ///
+        /// <para>Returns false on timeout rather than throwing, and every
+        /// caller asserts on it: a pump that gave up must FAIL loudly, not
+        /// fall through into assertions that then pass for the wrong
+        /// reason.</para>
+        /// </summary>
+        internal static bool RunSwap(Fixture fix, int maxTicks = 5000)
+        {
+            Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, fix.Stand);
+            fix.Pawn.jobs.StartJob(swap, JobCondition.InterruptForced, null,
+                resumeCurJobAfterwards: false, cancelBusyStances: true, null,
+                JobTag.ChangingApparel);
+
+            // Watch the DRIVER, never the Job. Jobs are POOLED: when ours ends
+            // it goes back to JobMaker's pool and is handed straight out again
+            // for the pawn's next job — so `CurJob != swap` compares a
+            // reference that vanilla has already recycled under us and stays
+            // equal forever. The first version of this waited 5000 ticks on a
+            // JobDriver_WaitMaintainPosture that was wearing our job object.
+            // Drivers are built per job and never pooled.
+            JobDriver started = fix.Pawn.jobs.curDriver;
+            if (started == null)
+            {
+                return false;
+            }
+            for (int i = 0; i < maxTicks; i++)
+            {
+                if (fix.Pawn.jobs.curDriver != started)
+                {
+                    return true;
+                }
+                // The whole pawn, so a third-party Pawn.Tick postfix can throw
+                // in here. The case-level catch reports that as FAIL threw:
+                // rather than swallowing it.
+                fix.Pawn.DoTick();
+            }
+
+            // A timeout that says only "timed out" costs an entire debugging
+            // cycle. Say where it got stuck.
+            JobDriver driver = fix.Pawn.jobs?.curDriver;
+            JobDriver_SwapAtStand ours = driver as JobDriver_SwapAtStand;
+            Report.Append("      stuck after ").Append(maxTicks).Append(" ticks — driver ")
+                  .Append(driver == null ? "null" : driver.GetType().Name)
+                  .Append(", toil ").Append(driver == null ? -1 : driver.CurToilIndex)
+                  .Append(", ticksLeft ").Append(driver == null ? -1 : driver.ticksLeftThisToil)
+                  .Append(", sameDriver ").Append(fix.Pawn.jobs.curDriver == started)
+                  .Append(", undressing ").Append(ours != null && ours.undressing)
+                  .Append(", toWear ").Append(ours == null ? -1 : ours.toWear.Count)
+                  .Append(", toStore ").Append(ours == null ? -1 : ours.toStore.Count)
+                  .Append(", onShift ").Append(fix.Comp.OnShift)
+                  .Append(", moving ").Append(fix.Pawn.pather != null && fix.Pawn.pather.Moving)
+                  .Append(", at ").Append(fix.Pawn.Position)
+                  .Append(" vs cell ").Append(fix.Stand.InteractionCell)
+                  .Append(", stanceBusy ")
+                  .Append(fix.Pawn.stances != null && fix.Pawn.stances.FullBodyBusy)
+                  .AppendLine();
+            return false;
         }
 
         /// <summary>
@@ -530,6 +946,19 @@ namespace ShiftChange
         {
             if (fix != null)
             {
+                for (int i = 0; i < fix.Extras.Count; i++)
+                {
+                    Pawn extra = fix.Extras[i];
+                    if (extra == null)
+                    {
+                        continue;
+                    }
+                    CompShiftStand.OnShiftStands.Remove(extra);
+                    if (!extra.Destroyed)
+                    {
+                        extra.Destroy();
+                    }
+                }
                 if (fix.Pawn != null)
                 {
                     CompShiftStand.OnShiftStands.Remove(fix.Pawn);
