@@ -101,10 +101,26 @@ Now, in game:
   2. Select it, then Upload to Steam Workshop.
   3. Quit the game, then run: devtools/publish-workshop.sh restore
 
-After the first publish the Workshop item still needs, by hand, in the browser:
-  - the description pasted from media/steam-description.bbcode
-  - the gallery images from media/cards/ (the game uploads only About/Preview.png)
-  - visibility set to public
+THEN, IN THE BROWSER, BEFORE MAKING IT PUBLIC:
+
+  1. Paste media/steam-description.bbcode into the description field.
+
+     Do not skip this and plan to do it later from the game. RimWorld calls
+     SetItemDescription only on the CREATE branch (Workshop.cs:262-265), from
+     About.xml's <description> — so the store page opens showing the in-game
+     mod-list blurb, and no later in-game update will ever replace it. The web
+     editor is the only route. The BBCode carries the demo gif, the apparel
+     section, the source link and the AI-assistance disclosure, none of which
+     are in About.xml by design.
+
+  2. Add the gallery images from media/cards/. The game uploads only
+     About/Preview.png (SetItemPreview, Workshop.cs:265-273) and never calls
+     AddItemPreviewFile, so the cards have no path up from inside the game.
+
+  3. Re-host the demo gif on the item itself and repoint the description at it.
+     It currently hotlinks i.imgur.com, which nothing here controls.
+
+  4. Only then set visibility to public.
 EOF
 }
 

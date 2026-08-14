@@ -319,13 +319,36 @@ Two things the game does not upload, and one it does that matters:
 - **The description comes from `About.xml`, not the BBCode.** `SetItemDescription`
   is called only on the create branch, so `media/steam-description.bbcode` has to
   be pasted into the Steam web editor by hand, and no later in-game update will
-  push it.
+  push it. Get it right on day one; there is no second chance from inside the
+  game.
 - **Only `About/Preview.png` is uploaded.** `media/cards/*.png` need adding to the
-  item's gallery in the browser.
+  item's gallery in the browser, and the demo gif wants re-hosting on the item
+  rather than hotlinked from imgur.
 - **`About/PublishedFileId.txt` is written into the upload root** after a
   successful publish, and the create-vs-update branch keys off it. `restore`
   copies it back into the repo; commit it, or the next upload mints a duplicate
   listing instead of updating this one.
+
+`publish-workshop.sh install` prints the browser checklist; follow it before
+setting the item public.
+
+### What goes in About.xml, and what does not
+
+`About.xml`'s `<description>` is the in-game mod-list blurb — a small scrolling
+panel answering "what does this do, and what does it need". It is not a store
+page, and it is read by someone standing in the mod list, not browsing.
+
+So it carries the things that change what a player does: the requirements, the
+behaviour, the controls, and the apparel caveat (vanilla ships nothing worth
+changing into, which is the first thing a new installer trips over).
+
+It deliberately does **not** carry the meta: the AI-assistance disclosure, the
+Ludeon trademark disclaimer, the source link as prose, or the gif. Those belong
+on the surfaces where the mod is distributed — the Workshop page and the
+README — which is where every one of them lives. Convention agrees: of 251
+subscribed mods on this machine, **none** put the Ludeon disclaimer in
+`About.xml`. The source link is in `About.xml` as `<url>`, which is the field
+the game provides for exactly that and renders as a button.
 
 ## Logs
 
