@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate a Steam Workshop BBCode description and render a local preview.
 
-    ./devtools/bbcode-preview.py About/steam-description.bbcode
+    ./devtools/bbcode-preview.py media/steam-description.bbcode
 
 Exits non-zero on a structural error and writes `_bbcode-preview.html` beside
 the source, which opens in any browser.

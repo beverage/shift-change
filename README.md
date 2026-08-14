@@ -28,16 +28,19 @@ Sped up 3–6×.*
 2. That's it, for the common case. The stand reads its room and dresses
    whoever comes to work there.
 3. Optional, per stand:
-   - **Set owner** reserves the stand for one colonist — their personal kit,
-     off-limits to everyone else. Left unassigned, the stand is **shared**:
-     any capable colonist may use whichever stand is free, like beds. A
-     kitchen needs one stand per cook *working at once*, not one per cook.
+   - **Shared (set owner)** reserves the stand for one colonist — their
+     personal kit, off-limits to everyone else. Left unassigned, the stand is
+     **shared**: any capable colonist may use whichever stand is free, like
+     beds. A kitchen needs one stand per cook *working at once*, not one per
+     cook.
    - **Set work types** opens a checklist when the room's reading isn't what
      you want — a multi-purpose room, a room the game scores oddly, or a
      stand you don't want used at all ("Not used for shift changes").
 
-The stand's inspect pane always tells you its state: what work it dresses
-for, who owns or is currently wearing it, and whether it's empty.
+A stand that is dressing anyone says so in its inspect pane: what work it
+dresses for, who owns or is currently wearing it, and whether it's empty. A
+stand in a room with no work role says nothing at all, and behaves like
+ordinary furniture.
 
 ## The rules it follows
 
@@ -52,10 +55,16 @@ Deliberately narrow, so it never fights you:
 - **Personal kit stays personal.** Nobody takes clothes out of a stand
   someone else is using; whoever checked a uniform out is whom it goes back
   to.
-- Passing through a room, or eating in it, changes nothing — only doing the
-  room's work does.
+- Passing through a room changes nothing — only doing the room's work does.
+- **A meal break gets them out of uniform first**, wherever the food is
+  stored. The exception is food already in their hands or their pack: that
+  they just eat. Otherwise a cook would carry a meal across the base in
+  whites to reach a chair, which is the walk this mod exists to prevent.
 - If a stand frees up while someone is already working bare in its room,
   they'll step over and change — unless they're mid-treatment on a patient.
+- **Change back** appears on any colonist currently in a uniform, for when
+  you want them out of it now — a raid, say, since they will not change back
+  on their own while the map is under threat.
 
 One mod setting: **"Unassigned stands are shared"** (default on). Turn it off
 and only stands with an explicit owner ever dress anyone.
@@ -68,6 +77,12 @@ and only stands with an explicit owner ever dress anyone.
 
 The kid outfit stand (Biotech) is not used, by design.
 
+**An apparel mod is worth having.** Not required and not a dependency, but
+vanilla has no scrubs, no lab coat and no chef's whites, so in a pure vanilla
+game there is very little to actually dress anyone *in*. Any apparel mod fixes
+that; [Vanilla Apparel Expanded](https://steamcommunity.com/sharedfiles/filedetails/?id=1814987817)
+adds exactly those three and is what every screenshot here uses.
+
 ## Save safety
 
 Add it to an existing save freely — your existing outfit stands gain the new
@@ -78,8 +93,10 @@ waiting in the stand.
 
 ## Status
 
-Release candidate. Played extensively in a live colony; not yet on the
-Workshop.
+Release candidate. Played extensively in a live colony, and the lifecycle
+paths that are impractical to arrange by hand — gravship flights, death,
+banishment, repeated faults — are covered by an automated harness
+(`devtools/run-harness.sh`).
 
 ## How this is built
 

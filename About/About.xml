@@ -30,6 +30,8 @@ Colonists change into the right clothes for the room they work in, and back out 
 
 Put a vanilla outfit stand in a work room and put a work outfit on it. When a colonist takes on automatic work of that room's kind — doctoring in the hospital, researching or synthesizing drugs in the lab, cooking in the kitchen — they change into the stand's outfit before starting, and change back when their work takes them elsewhere. Their own clothes wait in the stand and come back exactly as they were, force-worn markers included.
 
+Rooms are read from their role, so hospitals, laboratories, kitchens, workshops and barns all work with no setup at all.
+
 That is the whole setup. Two optional controls per stand:
 - Set owner reserves a stand for one colonist. Left unassigned, a stand is shared by whoever is free to use it, like beds — so a kitchen needs one stand per cook working at once, not one per cook.
 - Set work types opens a checklist for rooms the game reads oddly, rooms that do two jobs, or a decorative stand you do not want used at all.
@@ -38,7 +40,9 @@ Deliberately narrow, so it never fights you:
 - Automatic work only. Ordering a doctor to tend someone right now never sends them across the base to change first, and a colonist already in uniform keeps it on for a direct order.
 - Emergencies are never delayed, and nothing happens while the map is under threat.
 - Nobody takes clothes out of a stand somebody else is using.
-- Passing through a room, or eating in it, changes nothing.
+- Passing through a room changes nothing — only doing the room's work does.
+- A meal break gets them out of uniform first, unless the food is already in their hands or their pack.
+- If a stand frees up while someone is already working bare in its room, they step over and change — unless they are mid-treatment on a patient.
 - A Change back button appears on any colonist currently in a uniform, for when you want them out of it now.
 
 One setting: Unassigned stands are shared, on by default.
