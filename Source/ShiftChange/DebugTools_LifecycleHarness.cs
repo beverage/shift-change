@@ -74,21 +74,40 @@ namespace ShiftChange
             requiresOdyssey = true)]
         internal static void RunHarness()
         {
-            Map map = Find.CurrentMap;
-            IntVec3 origin = UI.MouseCell();
+            Run(Find.CurrentMap, UI.MouseCell(), toast: true);
+        }
+
+        /// <summary>
+        /// The whole harness, for both entry points — the debug action above
+        /// and the <c>-shiftchange-harness</c> auto-run in
+        /// <see cref="Patch_HarnessAutoRun"/>. One body, because a headless run
+        /// that exercised a different path from the one a human clicks would be
+        /// worth very little.
+        /// </summary>
+        /// <param name="toast">
+        /// Player-facing messages for the interactive run; log lines for the
+        /// headless one, where nobody is watching the screen and a toast on a
+        /// map about to be torn down goes nowhere.
+        /// </param>
+        /// <returns>true when nothing failed. Known gaps do not count as failures.</returns>
+        internal static bool Run(Map map, IntVec3 origin, bool toast)
+        {
+            if (map == null)
+            {
+                Complain("no current map — cannot run the harness.", toast);
+                return false;
+            }
             CellRect pad = new CellRect(origin.x, origin.z, PadSize, PadSize);
             if (!pad.InBounds(map))
             {
-                Messages.Message("Lifecycle harness needs a clear " + PadSize + "×" + PadSize
-                    + " area — click further from the map edge.",
-                    MessageTypeDefOf.RejectInput, historical: false);
-                return;
+                Complain("Lifecycle harness needs a clear " + PadSize + "×" + PadSize
+                    + " area — click further from the map edge.", toast);
+                return false;
             }
             if (DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand") == null)
             {
-                Messages.Message("Odyssey outfit stand def not found — cannot run the harness.",
-                    MessageTypeDefOf.RejectInput, historical: false);
-                return;
+                Complain("Odyssey outfit stand def not found — cannot run the harness.", toast);
+                return false;
             }
 
             Report.Length = 0;
@@ -107,10 +126,29 @@ namespace ShiftChange
                   .Append(Failed).Append(" failed, ")
                   .Append(KnownGaps).Append(" known gaps");
             Log.Message(Report.ToString());
-            Messages.Message("Lifecycle harness: " + Passed + " passed, " + Failed + " failed, "
-                + KnownGaps + " known gaps — see the dev log.",
-                Failed > 0 ? MessageTypeDefOf.NegativeEvent : MessageTypeDefOf.TaskCompletion,
-                historical: false);
+            if (toast)
+            {
+                Messages.Message("Lifecycle harness: " + Passed + " passed, " + Failed + " failed, "
+                    + KnownGaps + " known gaps — see the dev log.",
+                    Failed > 0 ? MessageTypeDefOf.NegativeEvent : MessageTypeDefOf.TaskCompletion,
+                    historical: false);
+            }
+            return Failed == 0;
+        }
+
+        /// <summary>
+        /// A refusal, addressed to whoever is actually there to read it.
+        /// </summary>
+        internal static void Complain(string what, bool toast)
+        {
+            if (toast)
+            {
+                Messages.Message(what, MessageTypeDefOf.RejectInput, historical: false);
+            }
+            else
+            {
+                Log.Error("[ShiftChange] " + what);
+            }
         }
 
         // ------------------------------------------------------------ cases
@@ -218,20 +256,37 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// KNOWN GAP, deliberately left failing until it is fixed.
+        /// The exit vanilla does not route through <c>UnclaimAll</c>, caught
+        /// by <see cref="Patch_BanishStands"/> instead.
         ///
-        /// <c>PawnBanishUtility.Banish</c> on a spawned colonist reaches
-        /// <c>pawn.SetFaction(null)</c> and stops — it never calls
-        /// <c>Pawn_Ownership.UnclaimAll</c>, so our reaper never fires and the
-        /// stand holds a ledger for a colonist who is gone. Recovery today is
-        /// uninstall-and-reinstall the stand, which nobody will guess.
+        /// Asserted to the same depth as <see cref="DeathReaps"/>, plus the
+        /// forced flag — which matters here and not there, because banishment
+        /// leaves the pawn ALIVE and standing on the map. A ledger cleared
+        /// without clearing forced pins them into the uniform with every route
+        /// out already closed.
         /// </summary>
         internal static bool BanishmentReaps(Fixture fix)
         {
+            Apparel uniform = fix.Comp.IssuedUniformForReading.Count > 0
+                ? fix.Comp.IssuedUniformForReading[0]
+                : null;
+
             PawnBanishUtility.Banish(fix.Pawn, giveThoughts: false);
-            return ExpectKnownGap(!fix.Comp.OnShift, "ledger reaped on banishment",
-                "PawnBanishUtility.Banish never calls UnclaimAll, so Patch_UnclaimStands "
-                + "never fires; the stand stays OnShift to an absent colonist");
+
+            bool ok = Expect(!fix.Comp.OnShift, "ledger reaped on banishment")
+                    & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == null,
+                             "registry entry cleared");
+            if (uniform != null && fix.Pawn.outfits != null)
+            {
+                ok &= Expect(!fix.Pawn.outfits.forcedHandler.IsForced(uniform),
+                             "uniform no longer force-worn");
+            }
+            // The reap must survive the pawn coming back. A liveness-only fix
+            // passes everything above and then fails this, because the ledger
+            // was never emptied — it was only being disbelieved.
+            fix.Pawn.SetFaction(Faction.OfPlayer);
+            ok &= Expect(!fix.Comp.OnShift, "still reaped after re-recruitment");
+            return ok;
         }
 
         // -------------------------------------------------------- fixturing
@@ -431,6 +486,10 @@ namespace ShiftChange
         /// An assertion we expect to fail, with the reason recorded. Counted
         /// separately so a green run stays meaningful — and so that the day it
         /// starts passing, the harness says so instead of staying quiet.
+        ///
+        /// Nothing calls this today: banishment was the last gap and it is
+        /// closed. Kept because the counting semantics are fiddly enough to get
+        /// wrong twice, and the next gap will want them.
         /// </summary>
         internal static bool ExpectKnownGap(bool condition, string what, string why)
         {

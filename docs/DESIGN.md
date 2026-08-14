@@ -241,6 +241,22 @@ so a postfix extends the same moment to stands. The same postfix reaps *borrowed
 stands, which unassignment alone would miss entirely, because a pool borrower was
 never assigned to anything.
 
+**Banishment is not on that list, and does not join it later.** On a spawned
+colonist `PawnBanishUtility.Banish` clears guest status and runs
+`pawn.SetFaction(null)` (`:53-56, :66-69`), reaching no unclaim. Nor does the
+map-exit route rescue it afterwards: `Pawn.ExitMap` gates its `UnclaimAll` on a
+flag (`Pawn.cs:2552, :2565`) that the guest-status clear has already made false.
+So the pawn walks away alive, still holding the uniform, with the ledger intact
+behind them. `Patch_BanishStands` calls the same reaper at the moment of
+banishment.
+
+It is deliberately eager rather than a liveness test at the read points, and the
+distinction is not cosmetic. A stand that merely *disbelieves* a ledger naming a
+departed pawn believes it again the moment that pawn is recruited back — the
+ledger was never emptied. The harness asserts exactly this
+(`still reaped after re-recruitment`), because the first version of the fix
+passed every other assertion and had that hole in it.
+
 ## Wearability: one authority
 
 "What would this swap move for this pawn?" is asked twice: by the stand selector

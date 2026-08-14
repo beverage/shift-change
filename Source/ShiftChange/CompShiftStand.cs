@@ -87,6 +87,47 @@ namespace ShiftChange
         public Pawn Borrower => borrower;
 
         /// <summary>
+        /// Is this pawn still the colony's, for ledger purposes?
+        ///
+        /// <b>Faction, never spawnedness.</b> Banishment on a spawned colonist
+        /// runs <c>pawn.SetFaction(null)</c> and stops
+        /// (<c>PawnBanishUtility.cs:66-69</c>) — faction is the only field it
+        /// touches, so faction is what we test. The mirror image is why
+        /// spawnedness is the wrong axis: a gravship flight despawns the
+        /// borrower with <c>WillReplace</c> and never touches their faction,
+        /// and the stand is set back down BEFORE the pawns are
+        /// (<c>GravshipPlacementUtility.cs:35-36</c>) — so at the moment
+        /// <see cref="PostSpawnSetup"/> asks this on landing, a perfectly good
+        /// borrower is despawned. Testing spawnedness here would destroy a
+        /// live ledger on every landing.
+        ///
+        /// The <c>HostFaction</c> clause is vanilla's phrasing, from
+        /// <c>CompAssignableToPawn.PlayerCanSeeAssignments</c>
+        /// (<c>:28</c>) and <c>Banish</c>'s own entry guard (<c>:22</c>).
+        /// </summary>
+        internal static bool StillOurs(Pawn pawn)
+        {
+            if (pawn == null)
+            {
+                return false;
+            }
+            // Not Faction.OfPlayer — it logs an error when it cannot resolve
+            // (Faction.cs:214-224). Not Faction.OfPlayerSilentFail either: it
+            // ends in Find.FactionManager.OfPlayer (Faction.cs:259) and
+            // Find.FactionManager dereferences World.factionManager unguarded
+            // (Find.cs:188), so it throws when Find.World is null. This chain
+            // is null-safe (Find.cs:100-109) and silent.
+            Faction player = Find.World?.factionManager?.OfPlayer;
+            if (player == null)
+            {
+                // Cannot tell, so keep the ledger. A predicate that reaps when
+                // it does not know is one that eats live ledgers.
+                return true;
+            }
+            return pawn.Faction == player || pawn.HostFaction == player;
+        }
+
+        /// <summary>
         /// The pawn this stand is reserved for, or null when it is a pool
         /// stand. Distinct from <see cref="Borrower"/>: assignment is the
         /// player's standing intent, borrowing is who is wearing it now.
@@ -274,7 +315,26 @@ namespace ShiftChange
             // from ownership was only ever right by coincidence — reassign a
             // stand while its uniform is out and the return trip would have
             // pointed at the wrong pawn.
-            if (borrower != null && OnShift)
+            if (OnShift && !StillOurs(borrower))
+            {
+                // Nobody left to honour the ledger. Two ways in: a save from
+                // before pooling (borrower null), or a borrower who left the
+                // colony without reaching Pawn_Ownership.UnclaimAll —
+                // banishment, which Patch_BanishStands now catches eagerly.
+                // This branch is the repair path for saves that predate that
+                // patch, and the backstop for any other faction-loss route we
+                // do not hook.
+                //
+                // ReleaseBorrower rather than clearing the lists by hand: it
+                // takes the FORCED flags off too, and a banished pawn is alive
+                // and standing on the map in our force-worn uniform. It
+                // null-guards the holder, so the pre-pooling case still works.
+                // Not AbandonLedger — that fires Notify_StandFreed, which
+                // sweeps the map for a catch-up dress, and running that from
+                // inside Map.FinalizeLoading is a fine way to break a load.
+                ReleaseBorrower();
+            }
+            else if (borrower != null && OnShift)
             {
                 CompShiftStand incumbent;
                 if (OnShiftStands.TryGetValue(borrower, out incumbent)
@@ -297,16 +357,6 @@ namespace ShiftChange
                 {
                     OnShiftStands[borrower] = this;
                 }
-            }
-            else if (borrower == null && OnShift)
-            {
-                // Ledger with no borrower: a save from before pooling, or a
-                // borrower who vanished without the reaper firing. Nothing can
-                // return these, so free the stand and let vanilla's eviction
-                // deal with whatever is inside.
-                storedOwnerApparel.Clear();
-                issuedUniform.Clear();
-                storedForcedApparel.Clear();
             }
         }
 
@@ -369,6 +419,36 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// Take the forced flag off every issued garment the holder still has
+        /// on. Split out so <see cref="AbandonLedger"/> shares it with
+        /// <see cref="ReleaseBorrower"/>: "ledger cleared ⇒ forced flags
+        /// cleared" is one invariant, not a property that happened to hold on
+        /// the routes we had thought about.
+        ///
+        /// It did not matter while every abandonment followed a DEATH, where
+        /// the flags go with the corpse. Banishment leaves the pawn alive,
+        /// spawned and wearing the uniform, and forced is what makes a uniform
+        /// stick — so an abandonment that skipped this pinned a living
+        /// colonist into it with every route back out already closed.
+        /// </summary>
+        internal void UnforceIssued(Pawn holder)
+        {
+            if (holder == null)
+            {
+                return;
+            }
+            for (int i = 0; i < issuedUniform.Count; i++)
+            {
+                Apparel apparel = issuedUniform[i];
+                if (apparel != null && holder.apparel != null
+                    && holder.apparel.WornApparel.Contains(apparel))
+                {
+                    holder.outfits?.forcedHandler?.SetForced(apparel, forced: false);
+                }
+            }
+        }
+
+        /// <summary>
         /// Hand the uniform to whoever is wearing it and free the stand.
         ///
         /// Clearing the ledger without clearing the forced flags pins the
@@ -388,15 +468,7 @@ namespace ShiftChange
             Pawn holder = borrower;
             if (holder != null)
             {
-                for (int i = 0; i < issuedUniform.Count; i++)
-                {
-                    Apparel apparel = issuedUniform[i];
-                    if (apparel != null && holder.apparel != null
-                        && holder.apparel.WornApparel.Contains(apparel))
-                    {
-                        holder.outfits?.forcedHandler?.SetForced(apparel, forced: false);
-                    }
-                }
+                UnforceIssued(holder);
                 OnShiftStands.Remove(holder);
             }
             storedOwnerApparel.Clear();
@@ -508,6 +580,11 @@ namespace ShiftChange
         /// </summary>
         public void AbandonLedger(Pawn formerBorrower)
         {
+            // On death and trade this is a no-op that costs nothing. On
+            // banishment it is the whole point: that pawn is alive, spawned,
+            // and would otherwise keep the force-worn uniform forever with the
+            // ledger — and so every route out of it — already gone.
+            UnforceIssued(borrower ?? formerBorrower);
             if (formerBorrower != null)
             {
                 OnShiftStands.Remove(formerBorrower);

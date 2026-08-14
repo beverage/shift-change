@@ -34,7 +34,18 @@ namespace ShiftChange
         // ReSharper disable once InconsistentNaming — Harmony field injection.
         public static void Postfix(Pawn ___pawn)
         {
-            if (___pawn == null)
+            ReapStandsFor(___pawn);
+        }
+
+        /// <summary>
+        /// The reaper itself, callable without going through
+        /// <c>UnclaimAll</c>. <see cref="Patch_BanishStands"/> needs it because
+        /// banishment is the one colony exit vanilla never routes through that
+        /// method, so the postfix above never fires for it.
+        /// </summary>
+        internal static void ReapStandsFor(Pawn pawn)
+        {
+            if (pawn == null)
             {
                 return;
             }
@@ -43,9 +54,9 @@ namespace ShiftChange
             {
                 // Free anything they had on loan first — this covers pool
                 // stands, which no assignment would ever have named.
-                foreach (CompShiftStand borrowed in CompShiftStand.StandsBorrowedBy(___pawn).ToList())
+                foreach (CompShiftStand borrowed in CompShiftStand.StandsBorrowedBy(pawn).ToList())
                 {
-                    borrowed.AbandonLedger(___pawn);
+                    borrowed.AbandonLedger(pawn);
                 }
 
                 ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
@@ -64,16 +75,16 @@ namespace ShiftChange
                     for (int j = stands.Count - 1; j >= 0; j--)
                     {
                         CompAssignableToPawn comp = stands[j].TryGetComp<CompAssignableToPawn>();
-                        if (comp != null && comp.AssignedPawnsForReading.Contains(___pawn))
+                        if (comp != null && comp.AssignedPawnsForReading.Contains(pawn))
                         {
-                            comp.TryUnassignPawn(___pawn);
+                            comp.TryUnassignPawn(pawn);
                         }
                     }
                 }
             }
             catch (System.Exception e)
             {
-                Log.Error("[ShiftChange] failed to unassign stands for " + ___pawn.LabelShort + ": " + e);
+                Log.Error("[ShiftChange] failed to unassign stands for " + pawn.LabelShort + ": " + e);
             }
         }
     }

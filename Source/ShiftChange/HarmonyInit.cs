@@ -9,11 +9,13 @@ namespace ShiftChange
     /// <summary>
     /// Applies Shift Change's patches once at game start.
     ///
-    /// Two residents: <see cref="Patch_JobInterception"/>, which inserts the
-    /// swap ahead of automatic work (and the return trip on the way out), and
-    /// <see cref="Patch_UnclaimStands"/>, which releases a pawn's assigned and
-    /// borrowed stands when vanilla unclaims their beds and thrones — death,
-    /// trade, kidnap, map exit.
+    /// The load-bearing residents: <see cref="Patch_JobInterception"/>, which
+    /// inserts the swap ahead of automatic work (and the return trip on the way
+    /// out), and the reaper pair — <see cref="Patch_UnclaimStands"/>, which
+    /// releases a pawn's assigned and borrowed stands when vanilla unclaims
+    /// their beds and thrones (death, trade, kidnap, map exit), and
+    /// <see cref="Patch_BanishStands"/>, which calls the same reaper for the
+    /// one colony exit vanilla routes past it.
     ///
     /// Both are wrapped so an exception degrades to vanilla behaviour rather
     /// than breaking job assignment, which would brick the colony — the
