@@ -20,9 +20,16 @@ Release is not optional at the end of a session: Debug builds are instrumented
 with a hot-reload rig and write to the same output path. Committing one ships a
 broken mod. CI rejects it, but only after you have pushed.
 
-There is no test suite. Behaviour is verified in game, on a clean Release
+There is no unit test suite. Behaviour is verified in game, on a clean Release
 restart. Do not claim a behavioural change works without saying how it was
 checked.
+
+One exception, and it is narrow: **dev mode → Shift Change → Run lifecycle
+harness** asserts where the ledger lands after each despawn/death/banishment
+event, by firing the engine's real entry points at a throwaway fixture. Touch
+`PostDeSpawn`, `PostSwapMap`, `ReleaseBorrower`, `AbandonLedger` or
+`Patch_UnclaimStands` and run it. A harness pass is not a play observation — it
+says nothing about the job driver, which builds the ledger in the first place.
 
 ## Rules that compile fine and fail later
 

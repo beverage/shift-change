@@ -137,6 +137,87 @@ Dev mode → **Shift Change** → **Build demo stage**, then click a cell: three
 roofed rooms (hospital, laboratory, kitchen) with stocked stands, a
 self-starting kitchen bill and two workers. This ships in Release deliberately.
 
+## Testing
+
+Behaviour is verified in game, on a clean Release restart. Two tools help.
+
+**The demo stage** is the general fixture — a colony in one click, where a swap
+can be watched end to end.
+
+**The lifecycle harness** covers what the demo stage cannot: dev mode → **Shift
+Change** → **Run lifecycle harness**, then click a clear 7×7 area. It builds a
+throwaway stand-and-borrower, fires one real engine lifecycle event at it,
+checks where the ledger landed, tears the fixture down, and repeats. Results go
+to the dev log with a toast tally.
+
+It exists because some situations are prohibitively expensive to arrange by
+hand. A gravship launch needs substructure, fuel, thrusters and a pilot console
+before the game will let one leave the ground, and the moment worth observing
+lasts one tick. That cost is why the gravship path shipped reasoned-about
+rather than tested — and it was wrong.
+
+Each case splits in two, and only one half is testable here:
+
+| Half | Example | Settled by |
+|---|---|---|
+| Engine | "a launch despawns aboard-things with `WillReplace`" | reading `GravshipUtility.cs:389` — playing it does not make it truer |
+| Ours | "given that call, our ledger survives" | the harness |
+
+**The rule that keeps it honest: every case calls the engine's own entry
+points** — `Thing.DeSpawn`, `GenSpawn.Spawn`, `Pawn.Kill`,
+`PawnBanishUtility.Banish` — never our `PostDeSpawn` directly. The engine's comp
+dispatch and ordering then run for real, and only the orchestration around them
+is simulated. A harness that hand-rolls the call sequence tests the author's
+model of the engine and certifies whatever that model got wrong.
+
+Two limits worth stating. Fixture setup calls `NotifyDressed` directly rather
+than running the job driver, so a pass says nothing about whether the DRIVER
+builds a correct ledger — that stays a play observation. And a case marked
+`GAP` is a known failure with its reason recorded; banishment is one today,
+because `PawnBanishUtility.Banish` never calls `UnclaimAll`. Gaps are counted
+separately so a green run stays meaningful, and the harness reports `FIXED` if
+one starts passing.
+
+### Run it on the minimal profile
+
+```
+devtools/rimworld-profile.sh minimal    # swap the mod list, dev list parked
+open ".../RimWorldMac.app" --args -quicktest
+#   ... run the harness in game ...
+devtools/rimworld-profile.sh restore    # dev list back
+```
+
+Four mods — Harmony, Core, Odyssey, Shift Change. Measured 2026-08-14, same
+machine, same harness, both to a playable map:
+
+| Profile | Mods | To map | Popups to dismiss | Exceptions in log |
+|---|---|---|---|---|
+| Development | 233 entries | ~150 s | 2 | 47 |
+| Minimal | 4 | ~35 s | 0 | 0 |
+
+Identical harness result on both. Vanilla Apparel Expanded is deliberately
+excluded: the fixture falls back to vanilla apparel without it and displaces
+two garments instead of one, which exercises the same lifecycle paths and drops
+the VEF Core dependency VAE drags in.
+
+**Minimal is for iteration, not for sign-off.** This mod's whole job is
+patching a vanilla building other mods also touch, so a full-profile run is the
+only evidence we get that it behaves where players actually run it. Do both
+before an upload. The development run is also what surfaced the fixture
+flakiness described above — a minimal-only habit would have hidden it.
+
+The script refuses to swap while RimWorld is running, because the game rewrites
+`ModsConfig.xml` on exit and would undo the swap or, worse, write the minimal
+list over the real one. It parks the development list once and restores it
+verbatim.
+
+### Finding the action in game
+
+The debug actions menu has a search box at top left. Type `lifecycle` and the
+list filters to the single entry. That beats hunting for it by eye — the menu's
+layout shifts with the mod list, so a position that worked on one profile is
+wrong on the other.
+
 ## CI
 
 `.github/workflows/ci.yml`. Every check exists because the codebase broke that
@@ -248,6 +329,8 @@ flowchart LR
 | `SessionGuard.cs` | Clears session-scoped statics when the loaded game changes. Route any new static through it. |
 | `HarmonyInit.cs` | Patch bootstrap. |
 | `DebugTools_DemoStage.cs` | The demo stage. Test fixture and film set. |
+| `DebugTools_PreviewStage.cs` | The title-card stage. Three standalone rooms sized to crop to Workshop cards. |
+| `DebugTools_LifecycleHarness.cs` | Lifecycle assertions. Fires real engine events at a throwaway fixture and checks where the ledger lands. |
 | `HotReloadVisibility.cs` | Debug only. `InternalsVisibleTo` grants for the reload twins. |
 | `EcrWatchdog.cs` | Debug only. Polls for rebuilds, because Mono's `FileSystemWatcher` never fires on macOS. |
 | `Patch_ModeBadge.cs` | Debug only. The on-screen live/lab badge. |
