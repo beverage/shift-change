@@ -87,10 +87,22 @@ already draws, and its icons come from vanilla's own UI. The code and defs are
 written with AI assistance; there is no generated art anywhere, because there is
 no art at all.
 
+[h2]It is tested[/h2]
+
+Behaviour is covered by an automated suite that runs inside RimWorld itself. The
+cases that matter most are the ones that are hard to undo — a gravship flight, a
+colonist dying or being banished while wearing a stand's outfit — and they run on
+every build.
+
+That does not make it bug-free. It means the specific ways this could lose your
+colonists' clothes fail loudly in testing instead of quietly in your save. The
+suite is in the repository, it runs with one command, and the notes say plainly
+what it does not cover.
+
 [h2]Source[/h2]
 
-MIT licensed, and the repository includes the technical design notes, so none of
-it has to be taken on trust.
+MIT licensed, and the repository includes the technical design notes and the test
+suite, so none of it has to be taken on trust.
 
 [url=https://github.com/beverage/shift-change]github.com/beverage/shift-change[/url]
 

@@ -114,10 +114,23 @@ before it was anything else, and it happens to remove the question entirely.
 
 **The engine claims are checkable.** Every assertion in
 [docs/DESIGN.md](docs/DESIGN.md) about how RimWorld behaves cites the decompiled
-assembly by file and line, at a stated game version. The behaviour itself was
-found and corrected in a live colony rather than reasoned about: the reservation
-carry, the forced-flag capture, the optimizer pause and the recolor guard are all
-fixes for things that went wrong in play.
+assembly by file and line, at a stated game version.
+
+**Some of it was found in play, and some of it was not.** The reservation carry,
+the forced-flag capture, the optimizer pause and the recolor guard are fixes for
+things that went wrong in a live colony. But an adversarial review of the whole
+codebase later found three release blockers that months of play had not — one of
+them had been running unnoticed on the demo film set — and those were caught by
+reading the engine, not by playing. Both kinds of bug are real. Neither method
+catches the other's.
+
+**The behaviour is tested, and you can run the tests.**
+`devtools/run-harness.sh` runs a suite inside RimWorld itself, against the real
+engine rather than mocks, in about twenty seconds. Every bug found in that review
+now has a case that fails without its fix, and the rules listed further up this
+page are asserted against the code rather than only written down. It does not
+cover everything — [docs/TESTING.md](docs/TESTING.md) says plainly what it does
+not, and play observation is still required.
 
 ## For modders
 
@@ -125,6 +138,7 @@ fixes for things that went wrong in play.
 |---|---|
 | [docs/DESIGN.md](docs/DESIGN.md) | What the mod interfaces with inside the game and why each piece took its shape: the job-interception point and its traps, what the vanilla stand does and does not provide, the ownership and forced-apparel lifecycles, room-role scoring, the state model. Assumes programming, not RimWorld modding. |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Build, engine navigation, the hot-reload rig and the rules it imposes, CI, file map. |
+| [docs/TESTING.md](docs/TESTING.md) | What the test suite covers, what it deliberately does not, the rules it follows, and two engine traps it had to pay for. |
 | [AGENTS.md](AGENTS.md) | Short form of the invariants, for coding agents. |
 
 ## Building from source
