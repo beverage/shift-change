@@ -35,7 +35,11 @@ LIVE_CONFIG="/Users/alexbeverage/Library/Application Support/RimWorld/Config/Mod
 TESTDATA="$REPO/dist/testdata"
 LOG="$TESTDATA/Player.log"
 PROC="RimWorld by Ludeon Studios"
-TIMEOUT=600
+# Generous, because it has to cover the slow case: --alongside a live colony
+# has been measured at 300s, and once at more than 600s. A run that is going to
+# pass takes ~20s, so a high ceiling costs nothing except when something is
+# genuinely wrong.
+TIMEOUT=1200
 
 # Harmony, Core, Odyssey (the outfit stand is Odyssey content) and us. Vanilla
 # Apparel Expanded is deliberately absent: the fixture falls back to vanilla
