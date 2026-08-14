@@ -24,6 +24,14 @@ namespace ShiftChange
     {
         internal int duration;
         internal bool undressing;
+
+        /// <summary>
+        /// Set by <see cref="DoTransfer"/> when this trip actually returned a
+        /// uniform, and consumed by the global finish action that announces
+        /// it. Not scribed, and does not need to be: both run inside the same
+        /// job teardown, in the same tick, with no save point between them.
+        /// </summary>
+        internal CompShiftStand freedStand;
         internal List<Apparel> toWear = new List<Apparel>();
         internal List<Apparel> toStore = new List<Apparel>();
 
@@ -131,6 +139,19 @@ namespace ShiftChange
 
         protected override IEnumerable<Toil> MakeNewToils()
         {
+            // GLOBAL finish action, deliberately — not a toil one. The tracker
+            // releases this job's reservations at
+            // Pawn_JobTracker.CleanupCurrentJob:492 and only then runs the
+            // driver's global finish actions at :497
+            // (JobDriver.Cleanup:274-280). A toil finish action runs earlier
+            // still, from TryActuallyStartNextToil, so anything announced there
+            // is announced while this pawn still holds the stand.
+            //
+            // Registered here rather than in Notify_Starting because
+            // SetupToils re-enumerates this on load, and a swap interrupted by
+            // a save should still announce the stand when it finishes.
+            AddFinishAction(AnnounceFreedStand);
+
             this.FailOnBurningImmobile(TargetIndex.A);
             // Driver-level, not toil-level. Scoped to the Goto alone, a stand
             // deconstructed or burnt down during the WAIT toil left the job
@@ -273,6 +294,9 @@ namespace ShiftChange
             if (undressing)
             {
                 comp.NotifyUndressed(pawn);
+                // Announced later, from the global finish action, once this
+                // pawn's claim on the stand has actually been released.
+                freedStand = comp;
             }
             else
             {
@@ -320,7 +344,33 @@ namespace ShiftChange
                     pawn.outfits?.forcedHandler?.SetForced(uniform[i], forced: false);
                 }
             }
-            comp.AbandonLedger(pawn);
+            // Deferred, for the same reason as the normal return trip: this
+            // runs from a toil finish action, so the pawn still holds the
+            // stand and nobody else could reserve it yet.
+            comp.AbandonLedger(pawn, announce: false);
+            freedStand = comp;
+        }
+
+        /// <summary>
+        /// Tell the catch-up that this stand is back in the pool — from the
+        /// job's teardown, after the tracker has released this pawn's claim on
+        /// it, so a colonist already working bare in the room can actually
+        /// reserve it.
+        ///
+        /// Fires for any end condition, because the only thing that arms it is
+        /// <see cref="DoTransfer"/> having genuinely returned a uniform. A swap
+        /// that failed, was interrupted, or never reached its last toil leaves
+        /// <see cref="freedStand"/> null and announces nothing.
+        /// </summary>
+        internal void AnnounceFreedStand(JobCondition condition)
+        {
+            CompShiftStand freed = freedStand;
+            freedStand = null;
+            if (freed == null || freed.parent == null || freed.parent.Destroyed)
+            {
+                return;
+            }
+            Patch_JobInterception.Notify_StandFreed(freed, pawn);
         }
 
         /// <summary>

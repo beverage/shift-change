@@ -551,10 +551,16 @@ namespace ShiftChange
             storedForcedApparel.Clear();
             borrower = null;
             OnShiftStands.Remove(pawn);
-            // The stand just returned to the pool. Someone may have started
-            // working bare in this room while every stand was out — catch
-            // them up now rather than at their next job.
-            Patch_JobInterception.Notify_StandFreed(this, pawn);
+            // NOT Notify_StandFreed. The stand is free in the ledger, but the
+            // pawn who just undressed still holds its maxPawns=1 RESERVATION —
+            // this runs from a toil finish action, and the tracker does not
+            // release reservations until later in the teardown
+            // (Pawn_JobTracker.CleanupCurrentJob:492). Every candidate the
+            // catch-up looked at was rejected by CanReserveAndReach, so it
+            // could never fire on its own trigger.
+            //
+            // JobDriver_SwapAtStand raises it from a GLOBAL finish action
+            // instead, which the tracker runs at :497 — after the release.
         }
 
         /// <summary>
@@ -578,7 +584,16 @@ namespace ShiftChange
         /// vanilla's <c>TryDropThingsToMakeRoomForThingOfDef</c> evict whatever
         /// conflicts. Frees the stand back into the pool.
         /// </summary>
-        public void AbandonLedger(Pawn formerBorrower)
+        /// <param name="announce">
+        /// Raise the catch-up for whoever is working bare in this room. The
+        /// reaper paths (death, trade, kidnap, banishment) want this: the
+        /// borrower is gone and their claims went with them. The JOB DRIVER
+        /// does not — it runs from a toil finish action, while the pawn still
+        /// holds the stand's reservation, so an announcement there reaches a
+        /// candidate list that CanReserveAndReach has already emptied. The
+        /// driver defers it to a global finish action instead.
+        /// </param>
+        public void AbandonLedger(Pawn formerBorrower, bool announce = true)
         {
             // On death and trade this is a no-op that costs nothing. On
             // banishment it is the whole point: that pawn is alive, spawned,
@@ -597,7 +612,10 @@ namespace ShiftChange
             // the same. Excluding the former borrower matters here: an owner
             // unassigned mid-shift is still WEARING the untracked uniform and
             // must not be the one interrupted to claim it again.
-            Patch_JobInterception.Notify_StandFreed(this, formerBorrower);
+            if (announce)
+            {
+                Patch_JobInterception.Notify_StandFreed(this, formerBorrower);
+            }
         }
 
         /// <summary>Every stand on every map that this pawn has out on loan.</summary>
