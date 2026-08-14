@@ -1076,13 +1076,32 @@ namespace ShiftChange
             JobDriver started = fix.Pawn.jobs.curDriver;
             if (started == null)
             {
+                Report.AppendLine("      the swap job never got a driver");
                 return false;
             }
+
+            // Capture how it ENDED, not merely that it ended. "The driver
+            // changed" is satisfied by a job that failed its reservations and
+            // died before its transfer toil — which is exactly what a flaky
+            // run looked like, reported as a pass, while every assertion after
+            // it failed with no explanation.
+            JobCondition ended = JobCondition.None;
+            started.AddFinishAction(c => ended = c);
+
             for (int i = 0; i < maxTicks; i++)
             {
                 if (fix.Pawn.jobs.curDriver != started)
                 {
-                    return true;
+                    if (ended == JobCondition.Succeeded)
+                    {
+                        return true;
+                    }
+                    Report.Append("      the swap ended with ").Append(ended)
+                          .Append(", not Succeeded — toil ").Append(started.CurToilIndex)
+                          .Append(", pawn at ").Append(fix.Pawn.Position)
+                          .Append(" vs cell ").Append(fix.Stand.InteractionCell)
+                          .AppendLine();
+                    return false;
                 }
                 // The whole pawn, so a third-party Pawn.Tick postfix can throw
                 // in here. The case-level catch reports that as FAIL threw:

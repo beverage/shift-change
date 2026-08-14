@@ -69,7 +69,8 @@ namespace ShiftChange
             {
                 // This giver is consulted on every think cycle, so a throw
                 // here recurs forever rather than once. Fail open.
-                Log.Error("[ShiftChange] optimizer pause threw, letting vanilla run: " + e);
+                Log.Error("[ShiftChange] optimizer pause threw for "
+                          + pawn.LabelShort + ", letting vanilla run: " + e);
                 return true;
             }
             __result = null;
@@ -128,7 +129,9 @@ namespace ShiftChange
             }
             catch (Exception e)
             {
-                Log.Error("[ShiftChange] recolor guard threw, letting vanilla run: " + e);
+                Log.Error("[ShiftChange] recolor guard threw for "
+                          + (__instance?.pawn?.LabelShort ?? "an unknown pawn")
+                          + ", letting vanilla run: " + e);
             }
             return true;
         }

@@ -118,10 +118,17 @@ namespace ShiftChange
         /// dev mode, and "my colonists stopped changing" with no visible cause
         /// is the worst version of this bug.
         /// </summary>
-        internal static void NoteFault(string where, Exception e)
+        /// <param name="pawn">
+        /// Whoever this happened to. Always pass it if you have it: a throw
+        /// with no name in it tells a player their colonists stopped changing
+        /// and nothing about which one, and tells us nothing about whether the
+        /// fault is one pawn's odd state or everyone's.
+        /// </param>
+        internal static void NoteFault(string where, Exception e, Pawn pawn = null)
         {
             faultCount++;
-            Log.Error("[ShiftChange] " + where + " threw (" + faultCount + " of "
+            string who = pawn != null ? " for " + pawn.LabelShort : "";
+            Log.Error("[ShiftChange] " + where + who + " threw (" + faultCount + " of "
                       + FaultLimit + " before disabling): " + e);
             if (faultCount < FaultLimit || faulted)
             {
@@ -273,7 +280,10 @@ namespace ShiftChange
             {
                 // Called from inside another pawn's job cleanup — breaking
                 // THAT would turn a convenience into a job-system fault.
-                Log.Error("[ShiftChange] stand-freed catch-up threw: " + e);
+                Log.Error("[ShiftChange] stand-freed catch-up threw at "
+                          + (stand?.parent?.LabelShort ?? "an unknown stand")
+                          + ", freed by "
+                          + (except?.LabelShort ?? "nobody") + ": " + e);
             }
         }
 
@@ -406,7 +416,7 @@ namespace ShiftChange
             }
             catch (Exception e)
             {
-                NoteFault("job interception", e);
+                NoteFault("job interception", e, ___pawn);
                 return true;
             }
         }
@@ -666,7 +676,7 @@ namespace ShiftChange
                 // pawn to vanilla's own error recovery. Return true so the
                 // original StartJob body does not run on top of the corrupt
                 // state — the original job is deliberately NOT enqueued.
-                NoteFault("swap StartJob for " + pawn.LabelShort, e);
+                NoteFault("swap StartJob", e, pawn);
                 pawn.ClearReservationsForJob(swap);
                 pawn.ClearReservationsForJob(originalJob);
                 try
