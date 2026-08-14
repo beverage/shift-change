@@ -170,30 +170,88 @@ dispatch and ordering then run for real, and only the orchestration around them
 is simulated. A harness that hand-rolls the call sequence tests the author's
 model of the engine and certifies whatever that model got wrong.
 
-Two limits worth stating. Fixture setup calls `NotifyDressed` directly rather
+One limit worth stating: fixture setup calls `NotifyDressed` directly rather
 than running the job driver, so a pass says nothing about whether the DRIVER
-builds a correct ledger — that stays a play observation. And a case marked
-`GAP` is a known failure with its reason recorded; banishment is one today,
-because `PawnBanishUtility.Banish` never calls `UnclaimAll`. Gaps are counted
-separately so a green run stays meaningful, and the harness reports `FIXED` if
-one starts passing.
+builds a correct ledger. That stays a play observation.
 
-### Run it on the minimal profile
+A case can also be marked `GAP` — a known failure with its reason recorded,
+counted apart from `Failed` so a green run stays meaningful, and reported as
+`FIXED` if it ever starts passing. There are none today. Banishment was the
+last one, and closing it is the clearest thing the harness has done: the fix
+that made the obvious four assertions pass was still wrong, because it only
+made the stand *disbelieve* a ledger it had never emptied. Recruit the wanderer
+back and the stand died a second time. The `still reaped after re-recruitment`
+assertion exists to hold that door shut.
 
+### Running it
+
+```bash
+devtools/run-harness.sh              # minimal mod list — the iteration loop
+devtools/run-harness.sh --full       # your real mod list — the release gate
+devtools/run-harness.sh --alongside  # second instance beside a live game
 ```
-devtools/rimworld-profile.sh minimal    # swap the mod list, dev list parked
-open ".../RimWorldMac.app" --args -quicktest
-#   ... run the harness in game ...
-devtools/rimworld-profile.sh restore    # dev list back
-```
 
-Four mods — Harmony, Core, Odyssey, Shift Change. Measured 2026-08-14, same
-machine, same harness, both to a playable map:
+One command, no hands. It builds Release, launches with `-quicktest
+-shiftchange-harness`, waits for the game to run every case and quit itself,
+prints the report, and exits non-zero if anything failed — so it can gate
+something.
 
-| Profile | Mods | To map | Popups to dismiss | Exceptions in log |
-|---|---|---|---|---|
-| Development | 233 entries | ~150 s | 2 | 47 |
-| Minimal | 4 | ~35 s | 0 | 0 |
+**It runs isolated.** `-savedatafolder=dist/testdata` gives the test instance
+its own `Config/ModsConfig.xml`, `Saves/` and prefs (`GenFilePaths.cs:93-110`,
+`:179`); Unity's `-logfile` moves `Player.log` there too. Nothing under
+`~/Library/Application Support/RimWorld` or `~/Library/Logs` is read or written,
+and `--full` *copies* your mod list in rather than swapping the live file.
+
+**It will not touch a game it did not start.** Another instance running is
+somebody's colony with unsaved progress in it, so the default is to stop.
+`--alongside` is the deliberate opt-in. The script launches the binary directly
+rather than through `open` so it has a real PID, and only ever waits on — or
+signals — that one. Never `pkill` to get past the refusal; that has already cost
+a colony once.
+
+Measured 2026-08-14, same machine, same harness, launch to process exit:
+
+| Mod list | Mods | Wall clock | Exceptions in log |
+|---|---|---|---|
+| Minimal | 4 | **~20 s** | 0 |
+| Development | 233 entries | ~125 s | 47 |
+| Minimal, `--alongside` a live colony | 4 | ~300 s | 0 |
+
+Identical result on all three. The 47 exceptions on the development list are
+other mods' and predate us; the point of that column is that on minimal there is
+nothing to sift. The `--alongside` cost is plain CPU/GPU contention, not Steam
+(`SteamAPI_Init` loads fine in both) — use it when you need an answer without
+interrupting a game, not as the normal loop.
+
+The minimal list is Harmony, Core, Odyssey and Shift Change. Vanilla Apparel
+Expanded is deliberately absent: the fixture falls back to vanilla apparel
+without it and displaces two garments instead of one, which exercises the same
+lifecycle paths and drops the VEF Core dependency VAE drags in.
+
+**Minimal is for iteration, not for sign-off.** This mod's whole job is patching
+a vanilla building other mods also touch, so a `--full` run is the only evidence
+we get that it behaves where players actually run it. Do both before an upload.
+The development run is also what surfaced the fixture flakiness above — a
+minimal-only habit would have hidden it.
+
+`devtools/rimworld-profile.sh` still swaps the live mod list, for when you want
+a fast *interactive* session rather than a headless run. It refuses while the
+game is running, for the same reason.
+
+### Driving it by hand
+
+Still works, and is what you want when a case fails and you need to watch:
+dev mode → **Shift Change** → **Run lifecycle harness**, then click a clear 7×7
+area. Two things save time. The debug actions menu has a **search box** — type
+`lifecycle` and it filters to the one entry, which beats hunting by eye because
+the menu's layout shifts with the mod list. And `devtools/rimworld-profile.sh
+minimal` / `restore` swaps the profile on its own if you want the fast load
+without the headless run.
+
+The swapper refuses to act while RimWorld is running, because the game rewrites
+`ModsConfig.xml` on exit and would undo the swap or, worse, write the minimal
+list over the real one. It parks the development list once and restores it
+verbatim.
 
 Identical harness result on both. Vanilla Apparel Expanded is deliberately
 excluded: the fixture falls back to vanilla apparel without it and displaces

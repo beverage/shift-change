@@ -24,12 +24,29 @@ There is no unit test suite. Behaviour is verified in game, on a clean Release
 restart. Do not claim a behavioural change works without saying how it was
 checked.
 
-One exception, and it is narrow: **dev mode → Shift Change → Run lifecycle
-harness** asserts where the ledger lands after each despawn/death/banishment
-event, by firing the engine's real entry points at a throwaway fixture. Touch
-`PostDeSpawn`, `PostSwapMap`, `ReleaseBorrower`, `AbandonLedger` or
-`Patch_UnclaimStands` and run it. A harness pass is not a play observation — it
-says nothing about the job driver, which builds the ledger in the first place.
+One exception, and it is narrow — the lifecycle harness:
+
+```bash
+devtools/run-harness.sh          # ~30s, four-mod profile, no hands
+devtools/run-harness.sh --full   # the development profile; run before a release
+```
+
+It asserts where the ledger lands after each despawn/death/banishment event, by
+firing the engine's real entry points at a throwaway fixture, and exits non-zero
+if a case fails. Touch `PostDeSpawn`, `PostSwapMap`, `ReleaseBorrower`,
+`AbandonLedger` or `Patch_UnclaimStands` and run it.
+
+A harness pass is not a play observation. It says nothing about the job driver,
+which builds the ledger in the first place, and a `GAP` line is a known failure
+being tracked, not a pass. There are no gaps today.
+
+**Every colony exit must reach the reaper.** Vanilla routes death, trade,
+kidnap and map exit through `Pawn_Ownership.UnclaimAll`, which
+`Patch_UnclaimStands` hooks. **Banishment does not** — it runs
+`pawn.SetFaction(null)` and stops — so `Patch_BanishStands` calls the same
+reaper directly. Reap eagerly, never by disbelieving the ledger at the read
+points: a departed pawn can be recruited back, and a ledger that was only being
+disbelieved comes back with them.
 
 ## Rules that compile fine and fail later
 
