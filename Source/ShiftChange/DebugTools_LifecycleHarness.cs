@@ -70,8 +70,10 @@ namespace ShiftChange
     /// case passed on all four assertions, which is what the
     /// <c>WillReplace</c> guard in <see cref="CompShiftStand.PostDeSpawn"/> was
     /// written for and had until then only been reasoned about. Later the same
-    /// day, with the banishment gap closed and the driver cases added:
-    /// <b>10 passed, 0 failed, 0 known gaps</b>, 51 assertions.</para>
+    /// day, with the banishment gap closed and the driver, functional and
+    /// meta cases added: <b>13 passed, 0 failed, 0 known gaps</b>. Every bug
+    /// fixed that day now has a guard, and six of the rules the store
+    /// description promises players are asserted against the code.</para>
     /// </summary>
     internal static class DebugTools_LifecycleHarness
     {
@@ -145,6 +147,12 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  PromisesHold);
+            Case(map, pad, "a meal break gets them out of uniform first",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), MealBreakChangesOut);
+            Case(map, pad, "a freed stand catches up a colonist working bare",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 FreedStandCatchesUp);
             Case("the room-role table resolves", RoomRoleTableResolves);
             // Last: it drives a deliberately failing assertion, and the tallies
             // are global.
@@ -476,6 +484,118 @@ namespace ShiftChange
                              "work the stand does not serve is not diverted");
             }
             return ok;
+        }
+
+        /// <summary>
+        /// The meal-break promise — and the one the copy got WRONG.
+        ///
+        /// All three descriptions used to say "eating in a room changes
+        /// nothing". The code has always said the opposite, deliberately
+        /// (principal, 2026-08-08): a meal is a sit-down break, so the uniform
+        /// comes off first wherever the food is stored, because otherwise a
+        /// cook carries a meal across the base in whites to reach a chair —
+        /// the exact walk this mod exists to prevent. The single exception is
+        /// food already in hand or pack, which is just eaten.
+        ///
+        /// Nothing caught that for months. This is what would have.
+        /// </summary>
+        internal static bool MealBreakChangesOut(Fixture fix)
+        {
+            bool ok = Expect(RunSwap(fix), "dressed for the shift")
+                    & Expect(fix.Comp.OnShift, "and is on shift (control)");
+            if (!fix.Comp.OnShift)
+            {
+                return false;
+            }
+
+            ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
+            if (mealDef == null)
+            {
+                return Expect(false, "MealSimple resolves");
+            }
+
+            Thing stored = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef),
+                                          fix.Pawn.Position, fix.Map);
+            ok &= Expect(Diverts(fix, IngestJob(stored)),
+                         "a meal break gets them out of uniform first");
+
+            Thing carried = ThingMaker.MakeThing(mealDef);
+            fix.Pawn.inventory.innerContainer.TryAdd(carried);
+            ok &= Expect(!Diverts(fix, IngestJob(carried)),
+                         "but food already carried is simply eaten");
+            return ok;
+        }
+
+        internal static Job IngestJob(Thing food)
+        {
+            Job job = JobMaker.MakeJob(JobDefOf.Ingest, food);
+            job.count = 1;
+            return job;
+        }
+
+        /// <summary>
+        /// M3'S REGRESSION GUARD: a freed stand catches up a colonist already
+        /// working bare in its room.
+        ///
+        /// The announcement used to fire from a TOIL finish action, while the
+        /// departing pawn still held the stand's <c>maxPawns = 1</c>
+        /// reservation — so every candidate died on
+        /// <c>CanReserveAndReach</c> and the interrupt simply never happened.
+        /// It moved to a global finish action, which the tracker runs after
+        /// <c>CleanupCurrentJob</c> releases reservations
+        /// (<c>:492</c> then <c>:497</c>).
+        ///
+        /// Binary, with no timing subtlety: under the regression the second
+        /// colonist is never interrupted at all.
+        /// </summary>
+        internal static bool FreedStandCatchesUp(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+            if (doctor == null || tend == null)
+            {
+                return Expect(false, "the doctor work defs resolve");
+            }
+            fix.Comp.ToggleWork(doctor);
+
+            bool ok = Expect(fix.Map.dangerWatcher.DangerRating == StoryDanger.None,
+                             "the map is calm — the catch-up is danger-gated")
+                    & Expect(RunSwap(fix), "the first colonist dressed");
+
+            Pawn bare = DebugTools_DemoStage.AveragePawn(Gender.Female, "Bare", doctor);
+            bare.apparel?.DestroyAll();
+            bare.workSettings?.EnableAndInitialize();
+            GenSpawn.Spawn(bare, fix.Stand.Position + new IntVec3(2, 0, 2), fix.Map, Rot4.North);
+            fix.Extras.Add(bare);
+            WearOne(bare, "Apparel_BasicShirt");
+            WearOne(bare, "Apparel_Pants");
+
+            // Working in the room, in their own clothes, on a job the catch-up
+            // is allowed to interrupt.
+            //
+            // Goto rather than Wait, because Core's Wait is suspendable=false
+            // and the filter rejects it outright. Targeted at ANOTHER cell,
+            // not this pawn's own: StartJob runs ReadyForNextToil
+            // synchronously, so a Goto to where the pawn already stands
+            // arrives and completes inside StartJob, and the think tree hands
+            // them a Wait_Wander — suspendable=false, filtered out, and the
+            // case then fails for a reason that has nothing to do with M3.
+            // Aimed elsewhere the job stays open: the path request is never
+            // served, because nothing ticks this pawn.
+            Job working = JobMaker.MakeJob(JobDefOf.Goto,
+                                           fix.Stand.Position + new IntVec3(3, 0, 2));
+            working.workGiverDef = tend;
+            bare.jobs.StartJob(working, JobCondition.InterruptForced, null,
+                resumeCurJobAfterwards: false, cancelBusyStances: true, null, null);
+
+            ok &= Expect(SwapPlan.WouldDress(bare, fix.Stand),
+                         "the second colonist could wear what the stand holds")
+                & Expect(bare.CurJobDef == JobDefOf.Goto,
+                         "and is still on the interruptible job we gave them (control)");
+
+            ok &= Expect(RunSwap(fix), "the first colonist changed back, freeing the stand");
+            return ok & Expect(bare.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
+                               "the freed stand interrupted them to dress");
         }
 
         /// <summary>
