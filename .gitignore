@@ -20,6 +20,9 @@ CLAUDE.local.md
 obj/
 bin/
 
+# Python bytecode from the devtools scripts
+__pycache__/
+
 # Staging area for the Workshop upload (devtools/publish-workshop.sh) and the
 # CI release zip. Assembled from tracked files, never edited in place.
 dist/
