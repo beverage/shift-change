@@ -34,23 +34,105 @@ namespace ShiftChange
     public static class Patch_JobInterception
     {
         /// <summary>
-        /// The INTERCEPTION kill switch, and nothing more. Read by
-        /// <see cref="Prefix"/> and <see cref="Notify_StandFreed"/> only.
+        /// The INTERCEPTION kill switch, and nothing more — a STANDING
+        /// decision, held deliberately by a player at the tweak panel or by
+        /// the hot-reload quarantine. Accidents live in
+        /// <see cref="faulted"/> instead; this one never latches on a throw.
+        /// Read by <see cref="Prefix"/> and <see cref="Notify_StandFreed"/>
+        /// only.
         ///
-        /// It latches false whenever anything throws inside the nested
-        /// <c>StartJob</c> — which includes a throw from another mod's patch,
-        /// so it is not a reliable signal that WE are broken. The on-shift
-        /// protections (the optimizer pause, the recolor execution guard) and
-        /// the Change back button therefore do NOT consult it: a pawn standing
-        /// in a uniform still needs their uniform protected and still needs a
-        /// way out of it, and gating those here meant a neighbour's exception
-        /// re-opened the dye path on staged kit while simultaneously removing
-        /// the player's only manual remedy. Those three key off the ledger
-        /// instead. Keep it that way when adding hooks: ask "does this ACT on
-        /// its own, or protect something already in progress?"
+        /// The on-shift protections (the optimizer pause, the recolor
+        /// execution guard) and the Change back button do NOT consult either
+        /// flag: a pawn standing in a uniform still needs their uniform
+        /// protected and still needs a way out of it, and gating those here
+        /// meant a neighbour's exception re-opened the dye path on staged kit
+        /// while simultaneously removing the player's only manual remedy.
+        /// Those three key off the ledger instead. Keep it that way when
+        /// adding hooks: ask "does this ACT on its own, or protect something
+        /// already in progress?"
         /// </summary>
         [TweakValue("ShiftChange")]
         public static bool Enabled = true;
+
+        /// <summary>
+        /// Interception has thrown too often and has taken itself out of
+        /// service FOR THIS GAME. Distinct from <see cref="Enabled"/> on
+        /// purpose, and the distinction is the whole point:
+        ///
+        /// <list type="bullet">
+        /// <item><see cref="Enabled"/> is a standing decision — the player's
+        /// or the developer's — and includes the hot-reload quarantine
+        /// (<c>HarmonyInit.OnEditCompileReload</c>), which MUST survive a save
+        /// load, because the twin JobDriver that wedges a tracker is still
+        /// loaded.</item>
+        /// <item>This is an accident, and accidents should not outlive the
+        /// game they happened in.</item>
+        /// </list>
+        ///
+        /// They were one flag until 2026-08-14, and a single throw therefore
+        /// disabled the mod for the whole process — through a save load, a new
+        /// colony, everything, until RimWorld was restarted. With
+        /// <c>Log.Error</c> not even opening the log window outside dev mode
+        /// (<c>Log.cs:151</c>), what a player saw was colonists quietly never
+        /// changing again, with nothing to connect it to.
+        ///
+        /// Cleared by <see cref="ResetSessionState"/>, so loading a save
+        /// re-arms.
+        /// </summary>
+        internal static bool faulted;
+
+        /// <summary>How many throws have been counted this game.</summary>
+        internal static int faultCount;
+
+        /// <summary>
+        /// TEST SEAM. While positive, the next N interceptions throw from
+        /// inside <see cref="TryInsertSwap"/> and decrement it. Set only by
+        /// <see cref="DebugTools_LifecycleHarness"/>; zero in every other
+        /// circumstance, so the cost in play is one int comparison per
+        /// interception.
+        ///
+        /// It exists because the alternative was worse. The fault latch is
+        /// the mod's response to something going wrong, and there is no honest
+        /// way to test a response to a throw without a throw — calling
+        /// <see cref="NoteFault"/> directly would exercise the counter while
+        /// proving nothing about whether a real exception in interception
+        /// actually reaches it. This makes the harness drive the same
+        /// <see cref="Prefix"/> catch block a live failure would.
+        /// </summary>
+        internal static int injectFaults;
+
+        /// <summary>
+        /// Throws tolerated before <see cref="faulted"/> latches. Not one:
+        /// these catch blocks also fire for a NEIGHBOUR's exception thrown
+        /// through our frame, and taking a mod out of service for the rest of
+        /// the colony over one transient throw somewhere else is a worse
+        /// failure than the throw. Repeated throws are a different claim, and
+        /// that is what this counts.
+        /// </summary>
+        [TweakValue("ShiftChange", 1f, 20f)]
+        public static int FaultLimit = 3;
+
+        /// <summary>
+        /// Record a throw, and latch off if they are piling up. Always tells
+        /// the PLAYER when it latches — a dev-log line is invisible without
+        /// dev mode, and "my colonists stopped changing" with no visible cause
+        /// is the worst version of this bug.
+        /// </summary>
+        internal static void NoteFault(string where, Exception e)
+        {
+            faultCount++;
+            Log.Error("[ShiftChange] " + where + " threw (" + faultCount + " of "
+                      + FaultLimit + " before disabling): " + e);
+            if (faultCount < FaultLimit || faulted)
+            {
+                return;
+            }
+            faulted = true;
+            Log.Error("[ShiftChange] interception disabled for this game after " + faultCount
+                      + " faults. Load a save or start a new game to re-arm it.");
+            Messages.Message("ShiftChange.Faulted".Translate(),
+                MessageTypeDefOf.NegativeEvent, historical: true);
+        }
 
         /// <summary>Log every decision, not just the swaps. Noisy.</summary>
         [TweakValue("ShiftChange")]
@@ -150,6 +232,12 @@ namespace ShiftChange
         {
             LastBlockedTick.Clear();
             ChangedBackAt.Clear();
+            // Re-arm after a fault. Deliberately NOT `Enabled = true`: that
+            // flag also carries the hot-reload quarantine, and the wedging
+            // twin JobDriver is still loaded after a save load, so re-arming
+            // it here would resurrect the 2026-08-08 tracker wedge.
+            faultCount = 0;
+            faulted = false;
         }
 
         /// <summary>Toggle for the mid-job catch-up below.</summary>
@@ -173,7 +261,7 @@ namespace ShiftChange
         /// </summary>
         public static void Notify_StandFreed(CompShiftStand stand, Pawn except)
         {
-            if (!Enabled || !DressMidJob)
+            if (!Enabled || faulted || !DressMidJob)
             {
                 return;
             }
@@ -298,7 +386,14 @@ namespace ShiftChange
         // ReSharper disable once InconsistentNaming — Harmony field/instance injection.
         public static bool Prefix(Job newJob, JobTag? tag, Pawn ___pawn, Pawn_JobTracker __instance)
         {
-            if (!Enabled || inserting)
+            // BEFORE the gate, not after. The fault latch is cleared by
+            // ResetSessionState, which only runs from here — gate first and a
+            // faulted mod could never notice the game had changed, so the
+            // latch would never lift and "cleared on save load" would be a
+            // comment rather than a behaviour. One reference comparison.
+            SessionGuard.Ensure();
+
+            if (!Enabled || faulted || inserting)
             {
                 return true;
             }
@@ -311,8 +406,7 @@ namespace ShiftChange
             }
             catch (Exception e)
             {
-                Enabled = false;
-                Log.Error("[ShiftChange] job interception threw, disabling itself: " + e);
+                NoteFault("job interception", e);
                 return true;
             }
         }
@@ -320,6 +414,11 @@ namespace ShiftChange
         /// <returns>true if a swap job was started in place of the incoming one.</returns>
         internal static bool TryInsertSwap(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker)
         {
+            if (injectFaults > 0)
+            {
+                injectFaults--;
+                throw new Exception("[ShiftChange] injected test fault");
+            }
             SessionGuard.Ensure();
             if (job == null || pawn == null || Current.ProgramState != ProgramState.Playing)
             {
@@ -557,9 +656,7 @@ namespace ShiftChange
                 // pawn to vanilla's own error recovery. Return true so the
                 // original StartJob body does not run on top of the corrupt
                 // state — the original job is deliberately NOT enqueued.
-                Enabled = false;
-                Log.Error("[ShiftChange] swap StartJob threw — disabling and recovering "
-                          + pawn.LabelShort + ": " + e);
+                NoteFault("swap StartJob for " + pawn.LabelShort, e);
                 pawn.ClearReservationsForJob(swap);
                 pawn.ClearReservationsForJob(originalJob);
                 try

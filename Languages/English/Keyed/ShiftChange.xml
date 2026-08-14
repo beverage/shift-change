@@ -35,4 +35,6 @@
   <ShiftChange.SettingPoolUnassigned>Unassigned stands are shared</ShiftChange.SettingPoolUnassigned>
   <ShiftChange.SettingPoolUnassignedDesc>When on, an outfit stand with no assigned owner, standing in a work room, may be used by any colonist capable of that room's work.\n\nWhen off, only stands explicitly assigned to a colonist ever dress anyone — every unassigned stand behaves exactly like vanilla furniture.</ShiftChange.SettingPoolUnassignedDesc>
 
+  <ShiftChange.Faulted>Shift Change hit repeated errors and has stopped changing colonists for this game. Outfit stands still work as ordinary furniture. Loading a save will start it again; the details are in the dev log.</ShiftChange.Faulted>
+
 </LanguageData>

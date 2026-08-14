@@ -121,6 +121,7 @@ namespace ShiftChange
             Case(map, pad, "plain despawn (deconstruct, minify) releases the ledger", MinifyReleases);
             Case(map, pad, "borrower death reaps the ledger", DeathReaps);
             Case(map, pad, "borrower banishment reaps the ledger", BanishmentReaps);
+            Case(map, pad, "repeated faults disable interception, a load re-arms it", FaultLatchRecovers);
 
             Report.Append("result: ").Append(Passed).Append(" passed, ")
                   .Append(Failed).Append(" failed, ")
@@ -287,6 +288,77 @@ namespace ShiftChange
             fix.Pawn.SetFaction(Faction.OfPlayer);
             ok &= Expect(!fix.Comp.OnShift, "still reaped after re-recruitment");
             return ok;
+        }
+
+        /// <summary>
+        /// The fault latch, driven by real throws through the real
+        /// <see cref="Patch_JobInterception.Prefix"/> catch block rather than
+        /// by calling the counter directly — the same rule as every other case
+        /// here. A test that pokes <c>NoteFault</c> would prove the arithmetic
+        /// and nothing about whether an exception in interception reaches it.
+        ///
+        /// Three claims, and the third is the bug this was written for. Until
+        /// 2026-08-14 a single throw disabled the mod for the whole PROCESS —
+        /// through a save load, a new colony, everything, until RimWorld was
+        /// restarted — and said nothing to the player, because
+        /// <c>Log.Error</c> does not open the log window outside dev mode.
+        ///
+        /// The one thing this cannot do is load an actual save; it changes the
+        /// game reference under <see cref="SessionGuard"/> instead, which is
+        /// the same trigger a load pulls.
+        /// </summary>
+        internal static bool FaultLatchRecovers(Fixture fix)
+        {
+            int limitBefore = Patch_JobInterception.FaultLimit;
+            bool enabledBefore = Patch_JobInterception.Enabled;
+            Patch_JobInterception.ResetSessionState();
+            Patch_JobInterception.FaultLimit = 3;
+
+            bool ok = Expect(!Patch_JobInterception.faulted, "starts armed");
+
+            // Below the limit: counted, still serving. These catch blocks also
+            // fire for a NEIGHBOUR's exception thrown through our frame, so
+            // one throw must not take the mod out for the rest of the colony.
+            Fault(fix.Pawn, 2);
+            ok &= Expect(Patch_JobInterception.faultCount == 2, "throws are counted")
+                & Expect(!Patch_JobInterception.faulted, "still armed below the limit");
+
+            Fault(fix.Pawn, 1);
+            ok &= Expect(Patch_JobInterception.faulted, "latched at the limit");
+
+            // What a save load does. This is the whole fix: before it, the
+            // only way back was quitting the game.
+            SessionGuard.current = null;
+            SessionGuard.Ensure();
+            ok &= Expect(!Patch_JobInterception.faulted, "a game change re-arms it")
+                & Expect(Patch_JobInterception.faultCount == 0, "the count resets with it");
+
+            // Enabled is a STANDING decision — the player's, or the hot-reload
+            // quarantine's — and the quarantine has to survive a load because
+            // the wedging twin JobDriver is still loaded. Re-arming it here
+            // would resurrect the 2026-08-08 tracker wedge.
+            ok &= Expect(Patch_JobInterception.Enabled == enabledBefore,
+                         "Enabled is left alone");
+
+            Patch_JobInterception.FaultLimit = limitBefore;
+            return ok;
+        }
+
+        /// <summary>
+        /// Make interception throw <paramref name="times"/> times, through the
+        /// real patch entry point.
+        /// </summary>
+        internal static void Fault(Pawn pawn, int times)
+        {
+            Patch_JobInterception.injectFaults = times;
+            for (int i = 0; i < times; i++)
+            {
+                Patch_JobInterception.Prefix(
+                    JobMaker.MakeJob(JobDefOf.Wait), null, pawn, pawn.jobs);
+            }
+            // Belt and braces: if a call did not reach the injection point the
+            // counter would otherwise stay armed into the next case.
+            Patch_JobInterception.injectFaults = 0;
         }
 
         // -------------------------------------------------------- fixturing
