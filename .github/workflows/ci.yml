@@ -20,43 +20,33 @@ jobs:
       - name: Install xmllint
         run: sudo apt-get update && sudo apt-get install -y libxml2-utils
 
+      # pipefail matters here: GitHub's shell sets errexit but not pipefail, so
+      # a `find` that fails on a renamed directory would drop a whole tree out
+      # of validation and still show a green tick.
       - name: XML well-formedness
-        run: find About Defs Patches Languages -name '*.xml' -print0 | xargs -0 xmllint --noout
-
-      # ModContentPack.LoadPatches silently discards EVERY operation in a
-      # patch file whose root element is not exactly <Patch> — well-formedness
-      # passes, one log line at runtime is the only symptom. Costs a restart
-      # to notice in game; costs nothing here.
-      - name: Patch files use the singular <Patch> root
+        shell: bash
         run: |
-          bad=0
-          for f in Patches/*.xml; do
-            root=$(xmllint --xpath 'name(/*)' "$f")
-            if [ "$root" != "Patch" ]; then
-              echo "::error file=$f::root element is <$root> — must be <Patch>, or every operation in the file is silently discarded"
-              bad=1
-            fi
-          done
-          exit $bad
+          set -o pipefail
+          find About Defs Patches Languages -name '*.xml' -print0 | xargs -0 xmllint --noout
 
-      # The hot-reload rig (see docs/DEVELOPMENT.md) makes two language features
-      # runtime hazards: a `private` member and an auto-property both compile
-      # clean and then throw FieldAccessException the first time a hot-swapped
-      # body touches them. These greps turn the invisible rules into build
-      # failures. Declaration-shaped patterns only, so comments that mention
-      # the word "private" stay legal.
-      - name: Hot-reload invariants (internal-by-default, no auto-properties)
-        run: |
-          bad=0
-          if grep -rEn '^[[:space:]]*private[[:space:]]' Source/; then
-            echo "::error::private member declared — this codebase is internal-by-default (hot-swapped bodies are cross-assembly; see docs/DEVELOPMENT.md)"
-            bad=1
-          fi
-          if grep -rEn '\{[[:space:]]*get[[:space:]]*;' Source/; then
-            echo "::error::auto-property declared — its backing field is private beyond reach of the IVT grants (see docs/DEVELOPMENT.md)"
-            bad=1
-          fi
-          exit $bad
+      # Hot-reload invariants, translation keys in both directions, XML-to-C#
+      # type bindings, the <Patch> root walk, and the Workshop preview size.
+      # One script so the same checks run locally before a push — see its
+      # docstring for why each one exists.
+      #
+      # It replaced two shell greps that were anchored to the start of a line
+      # and to a single line, and so missed `static private int x;`,
+      # `[Attr] private int y;`, `class N { private int z; }` and every
+      # multi-line auto-property. Measured against a file of such
+      # declarations: the greps found 0, this finds 7.
+      - name: Static invariants
+        run: python3 devtools/check-invariants.py
+
+      # An unclosed tag makes Steam render the remainder of the store page as
+      # literal text, publicly, until someone notices. The validator has always
+      # existed; nothing ran it.
+      - name: Steam description BBCode
+        run: python3 devtools/bbcode-preview.py media/steam-description.bbcode
 
       # A Debug build is instrumented and references EditCompileReload by
       # name; the Release build references nothing of it. The committed dll
