@@ -102,6 +102,24 @@ work without the expansion. Ludeon's published modding rules forbid exactly
 that: expansion code may not run for players who do not own the expansion. A
 non-Odyssey version means writing our own rack from scratch.
 
+## Branching — the mod is released
+
+Since v1.0.0 (2026-08-14), **main is the shippable branch**: every commit on
+it must be releasable as-is, because the Workshop upload is staged from a
+local build of it. Long-running feature threads live on `feature/<thread>`
+branches (`feature/recreation`, `feature/enclosures`, …) and merge back via
+pull request when the thread is accepted — PRs are also what runs CI, which
+does not fire on plain branch pushes. Small fixes and docs may still land on
+main directly. Workshop publishing is manual and deliberately not automated
+(`.github/workflows/ci.yml` says so in as many words); a `v*` tag
+additionally produces a GitHub release zip.
+
+One machine-local consequence: the game's `Mods/` folder holds a symlink to
+this checkout, so a running game loads WHATEVER BRANCH is checked out —
+check out main before a play session that should see only released
+behavior, and mind that two simultaneous code threads need two checkouts
+(`git worktree`), not two branches of one tree.
+
 ## Commits
 
 One line, no body: an emoji, then an imperative subject.
