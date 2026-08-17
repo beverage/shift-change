@@ -13,6 +13,7 @@
     <RootNamespace>ShiftChange</RootNamespace>
     <AssemblyName>ShiftChange</AssemblyName>
     <Version>0.0.1</Version>
+    <Configurations>Debug;Release;Media</Configurations>
 
     <!-- Straight into the mod's load path, no framework subfolder, no pdb —
          the game cannot read one, and stack traces stay useful through
@@ -26,6 +27,36 @@
 
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
+  </PropertyGroup>
+
+  <!-- Three configurations, three jobs.
+
+         Debug    SCENES, ECR      test runs: the default for observation
+         Media    SCENES, no ECR   footage: Release codegen, fixtures present
+         Release  neither          shipping, and the harness release gate
+
+       SCENES compiles in the demo/preview stage fixtures and the harness's
+       [DebugAction] attribute. Release ships NEITHER, because the debug
+       actions menu is a surface players use, and the stages are destructive:
+       each one GenDebug.ClearArea's a footprint of 200-320 cells (vanishing
+       any pawn standing there), then leaves permanent player-faction
+       colonists, buildings and terrain behind. The harness's BODY and its
+       -shiftchange-harness launch flag keep shipping in every config — that
+       is the release gate, and evicting it would mean testing a build nobody
+       installs. Only its menu entry compiles out.
+
+       SCENES on Debug is mandatory, not a nicety: test runs happen on Debug
+       now, and without it that build loses the fixtures they exist to drive.
+
+       Media exists because Patch_ModeBadge draws "lab build — reload armed"
+       on every Debug frame, which lands in the shot. Footage needs a
+       badge-free, ECR-free build that still has the stages. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DefineConstants>$(DefineConstants);SCENES</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Media'">
+    <DefineConstants>$(DefineConstants);TRACE;SCENES</DefineConstants>
+    <Optimize>true</Optimize>
   </PropertyGroup>
 
   <ItemGroup>
@@ -100,13 +131,18 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
-  <!-- The Release build is the choke point that sweeps dev artifacts out of
+  <!-- Any non-Debug build is a choke point that sweeps dev artifacts out of
        the mod's load path — same philosophy as the FE texture generator
        deleting stale .dds at the write site. Hygiene by construction, not by
        memory: whatever a Debug session dropped in (the ECR runtime, its
-       dependencies, the instrumented-original copy), a Release build removes,
-       leaving exactly the one dll the mod ships. -->
-  <Target Name="CleanDevArtifacts" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+       dependencies, the instrumented-original copy), the next Release or
+       Media build removes, leaving exactly the one dll the mod ships.
+
+       Media sweeps too because it writes the same Assemblies/ShiftChange.dll
+       and a Debug session may well precede a filming one. It does NOT make a
+       Media dll safe to commit — that build has the fixtures compiled in, and
+       the CI guard is what catches it. -->
+  <Target Name="CleanDevArtifacts" AfterTargets="Build" Condition="'$(Configuration)' != 'Debug'">
     <ItemGroup>
       <DevJunk Include="$(OutputPath)*.dll" Exclude="$(OutputPath)$(AssemblyName).dll" />
       <DevJunk Include="$(OutputPath)*.dll_orig" />

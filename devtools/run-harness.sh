@@ -39,6 +39,12 @@ PROC="RimWorld by Ludeon Studios"
 # has been measured at 300s, and once at more than 600s. A run that is going to
 # pass takes ~20s, so a high ceiling costs nothing except when something is
 # genuinely wrong.
+#
+# The usual cause of a multi-minute run is NOT slowness: RimWorld's loading
+# screen stalls while its window is backgrounded, and resumes when it comes
+# forward. A four-mod run was observed at 715s that way (2026-08-17). Leave the
+# window in front, or expect the wall clock to measure your attention rather
+# than the game.
 TIMEOUT=1200
 
 # Harmony, Core, Odyssey (the outfit stand is Odyssey content) and us. Vanilla

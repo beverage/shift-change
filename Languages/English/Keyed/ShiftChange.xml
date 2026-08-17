@@ -35,6 +35,12 @@
   <ShiftChange.SettingPoolUnassigned>Unassigned stands are shared</ShiftChange.SettingPoolUnassigned>
   <ShiftChange.SettingPoolUnassignedDesc>When on, an outfit stand with no assigned owner, standing in a work room, may be used by any colonist capable of that room's work.\n\nWhen off, only stands explicitly assigned to a colonist ever dress anyone — every unassigned stand behaves exactly like vanilla furniture.</ShiftChange.SettingPoolUnassignedDesc>
 
+  <!-- Rich text: Unity IMGUI supports &lt;b&gt;, &lt;i&gt;, &lt;size&gt; and
+       &lt;color&gt; — but NOT &lt;u&gt;, which is TextMeshPro only and would
+       render as literal tag text. #E5E54C is vanilla's own caution yellow
+       (Royalty's precept descriptions use it for "Gameplay effect:"). -->
+  <ShiftChange.AllowRemovingDesc>&lt;color=#E5E54C&gt;&lt;b&gt;Shift Change: leave this off.&lt;/b&gt;&lt;/color&gt;\n\nColonists stock the stand either way, and changing into its outfit ignores this setting completely — shift changes work with it off.\n\nTurning it on exposes the stand's contents to every colonist's outfit optimizer, which may simply take the uniform and wear it as everyday clothes.</ShiftChange.AllowRemovingDesc>
+
   <ShiftChange.Faulted>Shift Change hit repeated errors and has stopped changing colonists for this game. Outfit stands still work as ordinary furniture. Loading a save will start it again; the details are in the dev log.</ShiftChange.Faulted>
 
 </LanguageData>

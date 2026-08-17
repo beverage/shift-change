@@ -68,12 +68,33 @@ jobs:
             exit 1
           fi
 
+      # The other half of the same question, and deliberately NOT a grep: the
+      # debug stages must be absent and the harness must be present, and .NET
+      # keeps type names in #Strings (UTF-8) but string literals in #US
+      # (UTF-16), so a grep for "-shiftchange-harness" finds nothing whether or
+      # not it shipped. The script explains the trap and searches both.
+      - name: Committed dll ships no debug scenes
+        run: python3 devtools/check-shipped-dll.py
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
 
+      # Media carries the SCENES fixtures with Release codegen. It is only
+      # built on filming days, so without this it can rot for weeks and the
+      # breakage surfaces when someone is trying to capture footage.
+      - name: Build (Media)
+        run: dotnet build Source/ShiftChange/ShiftChange.csproj -c Media
+
       - name: Build (Release)
         run: dotnet build Source/ShiftChange/ShiftChange.csproj -c Release
+
+      # Re-run against the FRESHLY BUILT dll, not just the committed one. The
+      # committed check catches a mis-staged config; this catches a new debug
+      # action that nobody wrapped in #if SCENES, which is the failure that
+      # would otherwise ship silently.
+      - name: Release build ships no debug scenes
+        run: python3 devtools/check-shipped-dll.py
 
       - name: Assemblies swept after Release build
         run: |

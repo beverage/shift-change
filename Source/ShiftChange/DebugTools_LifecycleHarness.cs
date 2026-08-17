@@ -61,9 +61,21 @@ namespace ShiftChange
     /// <para>What is still out of reach in-process: a real save/load round
     /// trip, and a real gravship launch.</para>
     ///
-    /// <para>Ships in Release, dev-mode gated, like the other two debug tools.
-    /// A test you have to switch build configurations to run is a test that
-    /// stops being run.</para>
+    /// <para><b>What ships and what does not (2026-08-17).</b> This
+    /// BODY ships in every configuration, and that is load-bearing: the
+    /// release gate is <c>-shiftchange-harness</c> via
+    /// <see cref="Patch_HarnessAutoRun"/>, and <c>run-harness.sh</c> builds
+    /// plain Release itself, so the gate keeps asserting against the literal
+    /// dll players install. The <c>[DebugAction]</c> wrapper is SCENES only.
+    ///
+    /// This corrects the rationale that used to sit here — "ships in Release,
+    /// dev-mode gated, like the other two debug tools; a test you have to
+    /// switch build configurations to run is a test that stops being run."
+    /// The second half is true and is why the body still ships. The first half
+    /// was wrong twice over: the debug actions menu is a surface players
+    /// genuinely use, and menu presence was never what kept this test alive —
+    /// the launch flag is. Both halves are satisfied at once by compiling out
+    /// the entry and keeping the code.</para>
     ///
     /// <para><b>First run, 2026-08-14</b>, clean Release restart on the ~100-mod
     /// profile, quicktest map: 4 passed, 0 failed, 1 known gap. The gravship
@@ -85,14 +97,27 @@ namespace ShiftChange
         internal static int Failed;
         internal static int KnownGaps;
 
-        [DebugAction("Shift Change", "Run lifecycle harness",
-            actionType = DebugActionType.ToolMap,
-            allowedGameStates = AllowedGameStates.PlayingOnMap,
-            requiresOdyssey = true)]
+#if SCENES
+        /// <summary>
+        /// The hand-driven entry point, SCENES only — so it is absent from a
+        /// shipped build's debug menu. Reached from the "Dev tools..." submenu
+        /// (<see cref="DebugTools_Menu"/>), which carries the game-state and
+        /// Odyssey gating.
+        ///
+        /// <see cref="Run"/> below is the shared body and ships in EVERY
+        /// configuration, because <c>-shiftchange-harness</c> is the release
+        /// gate and has to assert against the assembly players install.
+        ///
+        /// The menu entry is what cannot ship: this is a <c>ToolMap</c> action
+        /// with no confirmation, and on a live colony it clears its 7×7 pad 22
+        /// times over — destroying buildings and stock outright and vanishing
+        /// any pawn standing there, gear and all, with no corpse and no letter.
+        /// </summary>
         internal static void RunHarness()
         {
             Run(Find.CurrentMap, UI.MouseCell(), toast: true);
         }
+#endif
 
         /// <summary>
         /// The whole harness, for both entry points — the debug action above
@@ -562,7 +587,7 @@ namespace ShiftChange
                              "the map is calm — the catch-up is danger-gated")
                     & Expect(RunSwap(fix), "the first colonist dressed");
 
-            Pawn bare = DebugTools_DemoStage.AveragePawn(Gender.Female, "Bare", doctor);
+            Pawn bare = DebugTools_Fixtures.AveragePawn(Gender.Female, "Bare", doctor);
             bare.apparel?.DestroyAll();
             bare.workSettings?.EnableAndInitialize();
             GenSpawn.Spawn(bare, fix.Stand.Position + new IntVec3(2, 0, 2), fix.Map, Rot4.North);
@@ -981,14 +1006,14 @@ namespace ShiftChange
             }
             IntVec3 standCell = new IntVec3(pad.minX + 1, 0, pad.minZ + 1);
 
-            Building_OutfitStand stand = (Building_OutfitStand)DebugTools_DemoStage.Spawn(
+            Building_OutfitStand stand = (Building_OutfitStand)DebugTools_Fixtures.Spawn(
                 map, standDef, ThingDefOf.WoodLog, standCell, Rot4.North);
             if (!StockOne(stand, "Apparel_Duster"))
             {
                 return null;
             }
 
-            Pawn pawn = DebugTools_DemoStage.AveragePawn(Gender.Male, "Test", capableOf);
+            Pawn pawn = DebugTools_Fixtures.AveragePawn(Gender.Male, "Test", capableOf);
             pawn.apparel?.DestroyAll();
             if (capableOf != null)
             {
@@ -1027,7 +1052,7 @@ namespace ShiftChange
         internal static bool StockOne(Building_OutfitStand stand, string defName)
         {
             ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(defName);
-            return def != null && stand.AddApparel(DebugTools_DemoStage.MakeGarment(def, null));
+            return def != null && stand.AddApparel(DebugTools_Fixtures.MakeGarment(def, null));
         }
 
         internal static bool WearOne(Pawn pawn, string defName)
@@ -1037,7 +1062,7 @@ namespace ShiftChange
             {
                 return false;
             }
-            Apparel garment = DebugTools_DemoStage.MakeGarment(def, null);
+            Apparel garment = DebugTools_Fixtures.MakeGarment(def, null);
             pawn.apparel.Wear(garment);
             return pawn.apparel.WornApparel.Contains(garment);
         }
@@ -1149,13 +1174,13 @@ namespace ShiftChange
             IntVec3 standCell = new IntVec3(pad.minX + 1, 0, pad.minZ + 1);
             IntVec3 pawnCell = new IntVec3(pad.minX + 3, 0, pad.minZ + 1);
 
-            Building_OutfitStand stand = (Building_OutfitStand)DebugTools_DemoStage.Spawn(
+            Building_OutfitStand stand = (Building_OutfitStand)DebugTools_Fixtures.Spawn(
                 map, standDef, ThingDefOf.WoodLog, standCell, Rot4.North);
-            DebugTools_DemoStage.Stock(stand, new[] { "VAE_Apparel_LabCoat" },
-                DebugTools_DemoStage.DusterGreen);
+            DebugTools_Fixtures.Stock(stand, new[] { "VAE_Apparel_LabCoat" },
+                DebugTools_Fixtures.DusterGreen);
 
-            Pawn pawn = DebugTools_DemoStage.AveragePawn(Gender.Male, "Test");
-            DebugTools_DemoStage.DressInStartingKit(pawn, researcher: true);
+            Pawn pawn = DebugTools_Fixtures.AveragePawn(Gender.Male, "Test");
+            DebugTools_Fixtures.DressInStartingKit(pawn, researcher: true);
             GenSpawn.Spawn(pawn, pawnCell, map, Rot4.North);
 
             CompShiftStand comp = stand.TryGetComp<CompShiftStand>();

@@ -16,9 +16,31 @@ buildings.
 dotnet build Source/ShiftChange/ShiftChange.csproj -c Release
 ```
 
-Release is not optional at the end of a session: Debug builds are instrumented
-with a hot-reload rig and write to the same output path. Committing one ships a
-broken mod. CI rejects it, but only after you have pushed.
+Release is not optional at the end of a session: Debug and Media builds write to
+the same output path, Debug is instrumented with a hot-reload rig, and both
+carry the `SCENES` fixtures. Committing either ships a broken or a dangerous
+mod. CI rejects it, but only after you have pushed, so run this too:
+
+```bash
+python3 devtools/check-shipped-dll.py
+```
+
+**Three configurations: `Debug` and `Media` define `SCENES`, `Release` does
+not.** Anything that builds a scene — the demo and preview stages, the
+harness's `[DebugAction]`, the whole debug menu — goes behind `#if SCENES` and
+must never reach a player. These are not harmless menu entries: each stage
+builder clears a 200–320 cell footprint, destroying every building, item and
+pawn inside it, then leaves permanent colonists and buildings behind.
+
+**The harness BODY and `-shiftchange-harness` ship in every configuration**, and
+that is deliberate — `run-harness.sh` builds plain Release and drives it through
+the flag, so the release gate asserts against the literal dll players install.
+Over-gating silently deletes the gate; `check-shipped-dll.py` fails on that too,
+not just on the reverse.
+
+**The five `[TweakValue]` fields also ship, on purpose.** The bar is
+destructiveness, not reachability: they are how a player is walked through
+diagnosing a report. Do not "clean them up".
 
 There is no unit test suite. Behaviour is verified in game, on a clean Release
 restart. Do not claim a behavioural change works without saying how it was
@@ -65,6 +87,14 @@ auto-property.** Hot-swapped method bodies execute in a separate assembly, and
 Unity's Mono honours only `InternalsVisibleTo`. A `private` field or an
 auto-property's backing field throws `FieldAccessException` at runtime. CI greps
 for both.
+
+**Assigning a `TaggedString` to a `string` silently strips rich text.**
+`TaggedString`'s implicit conversion to `string` calls `StripTags()`
+(`TaggedString.cs:120-123`), so `someCommand.defaultDesc = "Key".Translate()`
+deletes every `<b>` and `<color>` in the string — no error, no literal tags on
+screen, just quietly unformatted text. Use `.Translate().RawText` when the
+markup is meant to survive. Rich text is `<b>`, `<i>`, `<size>`, `<color>`;
+`<u>` is TextMeshPro-only and does not work in RimWorld's IMGUI at all.
 
 **Every wearability predicate belongs in `SwapPlan.cs`.** "Can this pawn wear
 what this stand holds" is asked by the selector and again by the driver. It was

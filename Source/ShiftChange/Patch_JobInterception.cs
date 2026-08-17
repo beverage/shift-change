@@ -51,6 +51,22 @@ namespace ShiftChange
         /// adding hooks: ask "does this ACT on its own, or protect something
         /// already in progress?"
         /// </summary>
+        // These five TweakValues SHIP, deliberately (principal, 2026-08-17),
+        // and the sweep of the debug menu explicitly does not extend to
+        // them. They were gated behind SCENES for one afternoon on the
+        // reasoning that the Tweak values window is "the same player-facing
+        // surface" as the debug actions menu. It is the same surface and that
+        // is the POINT — it is how a player is walked through diagnosing a
+        // report: turn Enabled off to establish whether this mod is even
+        // involved, turn Verbose on to get a log that says why a stand did
+        // nothing.
+        //
+        // The distinction that matters is not who can reach a thing, it is
+        // what happens when they do. A debug action here clears 200+ cells and
+        // vanishes any pawn standing in them; a TweakValue moves a number and
+        // resets at the next launch. Non-destructive and non-persistent is
+        // exactly the right shape for a diagnostic, and the wrong shape for a
+        // setting — a real player-facing toggle would still mean mod settings.
         [TweakValue("ShiftChange")]
         public static bool Enabled = true;
 

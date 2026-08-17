@@ -33,6 +33,12 @@ PREVIEW_WARN = 1000000
 # here is deliberate reuse and must be justified in this list.
 VANILLA_KEYS = {
     "CommandThingSetOwnerLabel",
+    # Patch_AllowRemovingTooltip matches the stand's "Allow removing items"
+    # toggle by its vanilla LABEL (the command is an anonymous Command_Toggle
+    # with no other handle) and APPENDS to its vanilla DESC rather than
+    # replacing it, so vanilla's half stays translated in every language.
+    "CommandAllowRemovingApparel",
+    "CommandAllowRemovingApparelDesc",
 }
 
 failures = []
@@ -183,6 +189,49 @@ def check_preview():
                      % (size, 100.0 * size / PREVIEW_MAX, PREVIEW_MAX))
 
 
+# ------------------------------------------------------------ private tracking
+
+# This repository is public. The backlog and decision log that drive it are not,
+# and their identifiers mean nothing to a reader here — a bare "as the tracker
+# decided" reference in a source comment points at a document nobody outside
+# can open, and leaks how the work is organised into a mod's shipped source.
+#
+# No literal identifier appears in this file, deliberately: it is on the skip
+# list below, so an example written here would be the one place the check
+# cannot see.
+#
+# Write the REASON in the comment instead; the tracking item is where the
+# argument lives, not what a stranger reading the code needs.
+#
+# Caught by hand in review after eight of them reached a pushed branch in one
+# session (2026-08-17). Everything below the repo root is scanned except this
+# script and the untracked agent context file.
+TRACKING_ID = re.compile(r"\b(?:BL|DEC)-\d{3}\b")
+TRACKING_SKIP_DIRS = {".git", "obj", "bin", "dist", "node_modules"}
+TRACKING_SKIP_FILES = {"check-invariants.py", "CLAUDE.md"}
+TRACKING_EXTS = (".cs", ".py", ".sh", ".md", ".xml", ".yml", ".yaml", ".csproj", ".bbcode")
+
+
+def check_private_tracking_refs():
+    for base, dirs, names in os.walk(ROOT):
+        dirs[:] = [d for d in dirs if d not in TRACKING_SKIP_DIRS]
+        for name in names:
+            if name in TRACKING_SKIP_FILES or not name.endswith(TRACKING_EXTS):
+                continue
+            path = os.path.join(base, name)
+            try:
+                text = open(path, encoding="utf-8").read()
+            except (UnicodeDecodeError, OSError):
+                continue
+            for number, line in enumerate(text.splitlines(), 1):
+                match = TRACKING_ID.search(line)
+                if match:
+                    fail("tracking-ref",
+                         "%s:%d references %s — the tracker is private; state the "
+                         "reason in the comment instead"
+                         % (rel(path), number, match.group(0)))
+
+
 # ----------------------------------------------------------------- patch roots
 
 # ModContentPack.LoadPatches discards EVERY operation in a file whose root is
@@ -211,6 +260,7 @@ def main():
     check_xml_bindings()
     check_preview()
     check_patch_roots()
+    check_private_tracking_refs()
 
     for note in notes:
         print("note: %s" % note)
