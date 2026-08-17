@@ -1,3 +1,8 @@
+// SCENES only — see the config table in ShiftChange.csproj. Like the demo
+// stage this BUILDS A SCENE and must never reach a player: it clears a 32x10
+// footprint (destroying any pawn in it) and leaves three permanent
+// player-faction colonists and three roomfuls of owned buildings behind.
+#if SCENES
 using LudeonTK;
 using RimWorld;
 using UnityEngine;
@@ -91,10 +96,11 @@ namespace ShiftChange
         /// </remarks>
         internal const int DoorX = 4;
 
-        [DebugAction("Shift Change", "Build preview stage",
-            actionType = DebugActionType.ToolMap,
-            allowedGameStates = AllowedGameStates.PlayingOnMap,
-            requiresOdyssey = true)]
+        /// <summary>
+        /// Reached from the "Dev tools..." submenu
+        /// (<see cref="DebugTools_Menu"/>), which carries the game-state and
+        /// Odyssey gating this method used to declare itself.
+        /// </summary>
         internal static void BuildPreviewStage()
         {
             Map map = Find.CurrentMap;
@@ -205,7 +211,7 @@ namespace ShiftChange
                         continue;
                     }
                     ThingDef built = cell == door ? ThingDefOf.Door : ThingDefOf.Wall;
-                    DebugTools_DemoStage.Spawn(map, built, ThingDefOf.WoodLog, cell, Rot4.North);
+                    DebugTools_Fixtures.Spawn(map, built, ThingDefOf.WoodLog, cell, Rot4.North);
                 }
             }
         }
@@ -253,8 +259,8 @@ namespace ShiftChange
             }
 
             WorkTypeDef specialty = DefDatabase<WorkTypeDef>.GetNamedSilentFail(workDefName);
-            Pawn pawn = DebugTools_DemoStage.AveragePawn(gender, nick, specialty);
-            DebugTools_DemoStage.DressInStartingKit(pawn, workDefName == "Research");
+            Pawn pawn = DebugTools_Fixtures.AveragePawn(gender, nick, specialty);
+            DebugTools_Fixtures.DressInStartingKit(pawn, workDefName == "Research");
             GenSpawn.Spawn(pawn, cell, map);
 
             // Their specialty and nothing else, so each stays in their own
@@ -283,3 +289,4 @@ namespace ShiftChange
         }
     }
 }
+#endif

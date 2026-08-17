@@ -18,8 +18,35 @@ dotnet build Source/ShiftChange/ShiftChange.csproj -c Release
 ```
 
 Output goes straight to `Assemblies/`, which must contain exactly one file.
-Release runs a `CleanDevArtifacts` target that deletes anything else it finds
-there, including hot-reload leftovers.
+Any non-Debug build runs a `CleanDevArtifacts` target that deletes anything else
+it finds there, including hot-reload leftovers.
+
+### Three configurations
+
+| Config | `SCENES` | ECR | Job |
+|---|---|---|---|
+| `Debug` | yes | yes | test runs — the default for observation and iteration |
+| `Media` | yes | no | footage and screenshots: Release codegen, fixtures present |
+| `Release` | no | no | shipping, and the harness release gate |
+
+`SCENES` compiles in the demo and preview stage builders and the harness's
+`[DebugAction]`. **Release ships none of them** — the stages are destructive
+enough that a player reaching one is a colony-scale accident, and the reasoning
+is in [DESIGN.md](DESIGN.md#development-tooling). The harness *body* and the
+`-shiftchange-harness` flag ship in every configuration, deliberately, because
+that is the release gate.
+
+`SCENES` on Debug is mandatory rather than a nicety: test runs happen on Debug,
+and without it that build loses the fixtures they exist to drive.
+
+`Media` is not redundant with Debug — `Patch_ModeBadge` draws the lab badge on
+every Debug frame, which lands in the shot. Filming needs a badge-free, ECR-free
+build that still has the stages.
+
+**A `Media` build writes the same `Assemblies/ShiftChange.dll`**, so the
+end-every-session-with-Release rule now covers filming sessions too. Committing
+a Media dll would ship the fixtures; `devtools/check-shipped-dll.py` is what
+catches it, in CI and before you push.
 
 ## Install
 
@@ -84,12 +111,13 @@ messages are prefixed `[ShiftChange/ECR]`.
 **UI and layout only.** Behaviour (jobs, ledger, scribing) is verified on a
 clean Release restart, never in a swapped session.
 
-| | Live | Lab |
-|---|---|---|
-| Build | Release | Debug |
-| On-screen badge | none | cyan, turns orange at first reload |
-| Gameplay interception | full | full until first reload, then disabled |
-| Saving | freely | never after a reload |
+| | Live | Media | Lab |
+|---|---|---|---|
+| Build | Release | Media | Debug |
+| On-screen badge | none | none | cyan, turns orange at first reload |
+| Gameplay interception | full | full | full until first reload, then disabled |
+| Saving | freely | freely | never after a reload |
+| Scene builders | absent | present | present |
 
 A Debug build behaves identically to Release until the first reload. The first
 reload forks the session into a lab: gameplay interception disables itself and
@@ -135,9 +163,12 @@ Mod settings carry one player-facing toggle, `poolUnassignedStands` (default
 on). Settings live in vanilla's config file, so uninstalling leaves no trace in
 a save.
 
-Dev mode → **Shift Change** → **Build demo stage**, then click a cell: three
-roofed rooms (hospital, laboratory, kitchen) with stocked stands, a
-self-starting kitchen bill and three workers. This ships in Release deliberately.
+On a Debug or Media build: dev mode → **Shift Change** → **Dev tools…** →
+**Build demo stage**, then click a cell: three roofed rooms (hospital,
+laboratory, kitchen) with stocked stands, a self-starting kitchen bill and three
+workers. **It clears a 13×16 footprint first** — every building, item and pawn
+inside it is destroyed, so click somewhere empty. A Release build has no
+**Shift Change** category at all.
 
 ## Testing
 
@@ -170,17 +201,38 @@ failure. Measured 2026-08-14, launch to process exit:
 Those are one machine's numbers; `--full` scales with whatever list is active,
 since almost all of it is RimWorld's own load time.
 
+**A run that takes many minutes is almost certainly suspended, not slow.**
+RimWorld's loading screen stops making progress when its window is swiped away
+or otherwise backgrounded, and the run resumes when it comes forward again —
+which is why the timeout below is generous and why a four-mod run has been
+observed at 715 s. Before investigating a "performance regression", check
+whether the window was in front for the whole run. The harness itself executes
+in a single frame and cannot account for minutes.
+
 **The four-mod list is for iterating; `--full` is what a release is signed off
 on.** This mod patches a vanilla building other mods also touch, so the small
 list is precisely the environment in which a conflict cannot appear.
 
 ### Driving it by hand
 
-What you want when a case fails and you need to watch it: dev mode → **Shift
-Change** → **Run lifecycle harness**, then click a clear 7×7 area. The debug
-actions menu has a search box — type `lifecycle` and it filters to the single
-entry, which beats hunting by eye, because the menu's layout shifts with the
-mod list.
+What you want when a case fails and you need to watch it: **on a Debug or Media
+build**, dev mode → **Shift Change** → **Dev tools…** → **Run lifecycle
+harness**, then click a clear 7×7 area — the pad is cleared before use, so
+anything standing in it is destroyed.
+
+**Search only filters the level you are looking at.** `DebugTabMenu.VisibleActions`
+is `CurrentNode.children` and the filter tests each node's own label, so it does
+not descend into submenus: typing `lifecycle` at the top level now matches
+nothing. Type `dev tools` to filter down to our entry — the category header still
+renders above it, so a collision with another mod's identically-named entry is
+still distinguishable — then open it and pick. This is the one ergonomic cost of
+collapsing three loose entries into one; it is paid on a dev build only,
+where the submenu holds three items and hunting is not the problem it was when
+they sat loose among vanilla's hundreds.
+
+A **Release** build has no menu entry for this by design; drive it there with
+`run-harness.sh`, which uses the launch flag. That is not a lesser path — it is
+the release gate, and it is the reason the harness body still ships.
 
 For a fast interactive session without the headless run,
 `devtools/rimworld-profile.sh minimal` / `restore` swaps the live mod list. It
@@ -199,6 +251,8 @@ broke that way once; the rest block a failure that would land silently.
 | `devtools/check-invariants.py` | hot-reload hazards, translation keys in both directions, XML-to-C# type bindings, the `<Patch>` root walk, and the Workshop preview size. Runs locally too — see [TESTING.md](TESTING.md). |
 | `devtools/bbcode-preview.py` | an unclosed tag in the store description, which makes Steam render the rest of the page as literal text |
 | Committed dll is uninstrumented, and alone | an instrumented Debug build reaching the mod's load path |
+| `devtools/check-shipped-dll.py` | a `SCENES` build shipping the destructive scene builders, **and** the opposite failure — over-gating that deletes the release gate. Run against the committed dll and again against the fresh Release build. |
+| Media build | the filming config rotting between shoots, discovered on a shoot |
 | Release build | compile errors against Krafs |
 
 The behavioural suite is **not** in CI and cannot be: it needs the game. It runs
@@ -326,10 +380,13 @@ flowchart LR
 | `ShiftChangeDefOf.cs` | Def references. |
 | `SessionGuard.cs` | Clears session-scoped statics when the loaded game changes. Route any new static through it. |
 | `HarmonyInit.cs` | Patch bootstrap. |
-| `DebugTools_DemoStage.cs` | The demo stage. Test fixture and film set. |
-| `DebugTools_PreviewStage.cs` | The title-card stage. Three standalone rooms sized to crop to Workshop cards. |
-| `DebugTools_LifecycleHarness.cs` | The test suite. Thirteen cases driving real engine entry points — see [TESTING.md](TESTING.md). |
-| `Patch_HarnessAutoRun.cs` | Runs the harness and quits, when launched with `-shiftchange-harness`. Inert without the flag. |
+| `Patch_AllowRemovingTooltip.cs` | Appends the Shift Change truth to the stand's "Allow removing items" tooltip. UI only. |
+| `DebugTools_Fixtures.cs` | Fixture primitives — make a thing, a pawn, a garment. **Always compiled**, because the harness builds its fixtures from these in Release. |
+| `DebugTools_LifecycleHarness.cs` | The test suite. Thirteen cases driving real engine entry points — see [TESTING.md](TESTING.md). Body always compiled; its `[DebugAction]` is `SCENES` only. |
+| `Patch_HarnessAutoRun.cs` | Runs the harness and quits, when launched with `-shiftchange-harness`. Inert without the flag. Always compiled — this is the release gate. |
+| `DebugTools_Menu.cs` | `SCENES` only. The mod's entire debug-menu surface: one "Dev tools…" submenu. Absent in Release, so the category never renders. |
+| `DebugTools_DemoStage.cs` | `SCENES` only. The demo stage. Test fixture and film set. Clears 13×16 before building. |
+| `DebugTools_PreviewStage.cs` | `SCENES` only. The title-card stage, sized to crop to Workshop cards. Clears 32×10 before building. |
 | `HotReloadVisibility.cs` | Debug only. `InternalsVisibleTo` grants for the reload twins. |
 | `EcrWatchdog.cs` | Debug only. Polls for rebuilds, because Mono's `FileSystemWatcher` never fires on macOS. |
 | `Patch_ModeBadge.cs` | Debug only. The on-screen live/lab badge. |
@@ -353,6 +410,7 @@ docs LICENSE README.md`.
 |---|---|
 | `run-harness.sh` | Runs the test suite headless in an isolated instance. `--full`, `--alongside`. |
 | `check-invariants.py` | The static checks CI runs. Run it before pushing. |
+| `check-shipped-dll.py` | Asserts the built assembly ships no debug scenes and still carries the release gate. Run it before pushing. |
 | `rimworld-profile.sh` | Swaps the live mod list for a fast interactive session. |
 | `publish-workshop.sh` | Stages a Workshop upload out of the working tree, and swaps it into `Mods/`. |
 | `bbcode-preview.py` | Validates the store description and renders a local preview. |

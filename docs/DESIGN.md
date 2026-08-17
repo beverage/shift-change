@@ -432,7 +432,7 @@ was not designed; it fell out of reading what vanilla declares about its own job
 
 ## Development tooling
 
-Two kinds, and only one of them stays behind.
+Three kinds, and only one of them stays behind.
 
 **The hot-reload rig never ships.** Zetrith's EditCompileReload supports UI
 iteration in Debug; Release compiles none of it and sweeps its artifacts from
@@ -441,14 +441,43 @@ the code alone — no `private` members, no auto-properties, no protected base
 members — because a hot-swapped method body executes cross-assembly. Build,
 debug and the full rules are in [DEVELOPMENT.md](DEVELOPMENT.md).
 
-**The debug actions do ship, deliberately.** The demo stage, the preview stage
-and the lifecycle harness are compiled into Release and gated on dev mode, as
-vanilla's own debug actions are. Two reasons. Footage and screenshots are taken
-on live builds, so a fixture that existed only in Debug would be a fixture for a
-mod nobody runs. And the harness is the release gate: it has to run against
-exactly the assembly that ships, or it is testing something else. The cost is a
-handful of entries in a menu no player opens, and one string comparison at game
-load for the `-shiftchange-harness` launch flag.
+**The scene builders never ship either**, and this reverses what this section
+used to say. Through v1.0.0 the demo stage, the preview stage and the lifecycle
+harness were all compiled into Release, on the argument that "the cost is a
+handful of entries in a menu no player opens." That was wrong twice over. The
+debug actions menu is a surface players genuinely use for fine control over
+finished mods — and these are not harmless entries. Each stage builder is a
+`ToolMap` action with no confirmation that `GenDebug.ClearArea`s a 200–320 cell
+footprint, destroying every building and item in it and vanishing any pawn
+standing there — gear and all, no corpse, no letter — and then leaves permanent
+player-faction colonists, owned buildings and rewritten terrain behind. The
+harness clears its 7×7 pad twenty-two times per run.
+
+The two real arguments in the old rationale both survive, and neither ever
+required *menu presence*:
+
+- *Footage is filmed on live builds.* That binds the build **configuration**,
+  not the shipped dll. The `Media` config films identical product behaviour
+  with the fixtures riding along.
+- *The harness must run against exactly the assembly that ships.* That binds
+  the harness **code**, not its menu entry. `-shiftchange-harness`
+  (`Patch_HarnessAutoRun`) is the release gate and never touches the menu, and
+  `run-harness.sh` builds plain Release itself — so the gate still asserts
+  against the literal dll players install.
+
+**So the harness body ships and its menu entry does not.** `SCENES` (defined on
+Debug and Media, never Release) carries the stage files and the harness's
+`[DebugAction]`; the shared fixture primitives live in `DebugTools_Fixtures`,
+which always compiles because the harness builds its fixtures from them. A
+shipped build registers no debug actions at all, so the "Shift Change" category
+never renders. `devtools/check-shipped-dll.py` asserts both directions in CI —
+stages absent, gate present.
+
+**The five `[TweakValue]` fields do still ship**, and that is not an
+inconsistency. The bar here is destructiveness, not reachability: a TweakValue
+moves a number and resets at the next launch, and they are how a player gets
+walked through a report — turn `Enabled` off to see whether this mod is
+involved, turn `Verbose` on to get a log saying why a stand did nothing.
 
 What the harness covers, and the rather larger list of what it does not, is in
 [TESTING.md](TESTING.md).
