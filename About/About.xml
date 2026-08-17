@@ -36,6 +36,8 @@ That is the whole setup. Two optional controls per stand:
 - Shared (set owner) reserves a stand for one colonist. Left unassigned, a stand is shared by whoever is free to use it, like beds — so a kitchen needs one stand per cook working at once, not one per cook.
 - Set work types opens a checklist for rooms the game reads oddly, rooms that do two jobs, or a decorative stand you do not want used at all.
 
+Leave the stand's Allow removing items toggle off, which is its default. Colonists stock the stand either way and shift changes ignore the setting entirely, so nothing here needs it on — while turning it on lets any colonist's outfit optimizer take the uniform and wear it as everyday clothes.
+
 Deliberately narrow, so it never fights you:
 - Automatic work only. Ordering a doctor to tend someone right now never sends them across the base to change first, and a colonist already in uniform keeps it on for a direct order.
 - Emergencies are never delayed, and nothing happens while the map is under threat.

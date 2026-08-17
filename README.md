@@ -36,6 +36,12 @@ borrower's civvies while they are on shift. Sped up 3–6×.*
      you want — a multi-purpose room, a room the game scores oddly, or a
      stand you don't want used at all ("Not used for shift changes").
 
+**Leave "Allow removing items" off** — its default. Colonists stock the stand
+either way, and shift changes ignore the setting completely, so nothing here
+needs it on. Turning it on is the one way to make a stand misbehave: it hands
+the stand's contents to every colonist's outfit optimizer, which may take the
+uniform and wear it as everyday clothes.
+
 A stand that is dressing anyone says so in its inspect pane: what work it
 dresses for, who owns or is currently wearing it, and whether it's empty. A
 stand in a room with no work role says nothing at all, and behaves like

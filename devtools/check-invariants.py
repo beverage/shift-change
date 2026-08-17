@@ -33,6 +33,12 @@ PREVIEW_WARN = 1000000
 # here is deliberate reuse and must be justified in this list.
 VANILLA_KEYS = {
     "CommandThingSetOwnerLabel",
+    # Patch_AllowRemovingTooltip matches the stand's "Allow removing items"
+    # toggle by its vanilla LABEL (the command is an anonymous Command_Toggle
+    # with no other handle) and APPENDS to its vanilla DESC rather than
+    # replacing it, so vanilla's half stays translated in every language.
+    "CommandAllowRemovingApparel",
+    "CommandAllowRemovingApparelDesc",
 }
 
 failures = []
