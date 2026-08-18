@@ -32,15 +32,22 @@ borrower's civvies while they are on shift. Sped up 3–6×.*
      **shared**: any capable colonist may use whichever stand is free, like
      beds. A kitchen needs one stand per cook *working at once*, not one per
      cook.
-   - **Set work types** opens a checklist when the room's reading isn't what
-     you want — a multi-purpose room, a room the game scores oddly, or a
-     stand you don't want used at all ("Not used for shift changes").
+   - **The work-type switch** — labelled with what the stand currently
+     dresses for ("Shift stand: doctoring", "Not used for shift changes") —
+     opens a checklist when the room's reading isn't what you want: a
+     multi-purpose room, a room the game scores oddly, or a stand you don't
+     want used at all. The dialog names what the game currently reads the
+     room as, which explains the surprises — a crib in a hospital, for
+     instance, makes the room a barracks as far as the game is concerned,
+     and the stand goes idle until the checklist says otherwise.
 
-**Leave "Allow removing items" off** — its default. Colonists stock the stand
-either way, and shift changes ignore the setting completely, so nothing here
-needs it on. Turning it on is the one way to make a stand misbehave: it hands
-the stand's contents to every colonist's outfit optimizer, which may take the
-uniform and wear it as everyday clothes.
+**"Allow removing items" holds itself off while a stand is in service.**
+Shift changes never need it, and turning it on hands the stand's contents to
+every colonist's outfit optimizer — which may take the uniform and wear it as
+everyday clothes, and assigning an owner does not prevent that. A stand
+already switched on stays switchable, so there is always a way back. To
+decommission a stand and let haulers empty it, set "Not used for shift
+changes" first — the toggle unlocks with it.
 
 A stand that is dressing anyone says so in its inspect pane: what work it
 dresses for, who owns or is currently wearing it, and whether it's empty. A
@@ -83,6 +90,30 @@ and only stands with an explicit owner ever dress anyone.
 
 The kid outfit stand (Biotech) is not used, by design.
 
+## Mod compatibility
+
+**[Outfit Stands Plus](https://steamcommunity.com/workshop/filedetails/?id=3545172389)**
+works alongside this mod, in either load order — tested with both. The two
+divide a stand cleanly: its mechanized and mending stands are full shift
+stands here (shift changes run at their boosted swap speeds, and the mending
+stand repairs a borrower's parked clothes while they work), and each stand
+shows exactly one Set owner control — this mod's while the stand is in
+service, theirs when the stand is set to "Not used for shift changes". Its
+wardrobe features, its "allow adding items" toggle and its research are all
+untouched.
+
+Two of its behaviours are worth knowing about, because they can look like
+faults here: it switches off its own "allow adding items" after a manual
+swap, which quietly stops haulers restocking that stand until it is switched
+back on; and its right-click "Return to stand", used on a colonist who is
+mid-shift, moves clothes the shift system was tracking — nothing is lost,
+and the next change-back sorts it out, but the walk is wasted.
+
+**Pick Up And Haul** users may see a burst of red "could not reserve"
+messages when several freshly built stands are stocked at once. That is its
+batch hauling racing itself over the new containers — cosmetic, the items
+arrive, and it stops once the stands are full.
+
 **An apparel mod is worth having.** Not required and not a dependency, but
 vanilla has no scrubs, no lab coat and no chef's whites, so in a pure vanilla
 game there is very little to actually dress anyone *in*. Any apparel mod fixes
@@ -99,10 +130,11 @@ with their own clothes waiting in the stand.
 
 ## Status
 
-Release candidate. Played for days in a live colony, and the lifecycle
-paths that are impractical to arrange by hand — gravship flights, death,
-banishment, repeated faults — are covered by an automated harness
-(`devtools/run-harness.sh`).
+Live on the [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3783456242).
+Played daily in a live colony, and the lifecycle paths that are impractical
+to arrange by hand — gravship flights, death, banishment, repeated faults —
+are covered by an automated harness (`devtools/run-harness.sh`) that runs
+before every release.
 
 ## How this is built
 

@@ -39,7 +39,7 @@ Rooms are read from their role, so hospitals, laboratories, kitchens, workshops 
 
 That is the whole setup. Two optional controls per stand:
 - Shared (set owner) reserves a stand for one colonist. Left unassigned, a stand is shared by whoever is free to use it, like beds — so a kitchen needs one stand per cook working at once, not one per cook.
-- Set work types opens a checklist for rooms the game reads oddly, rooms that do two jobs, or a decorative stand you do not want used at all.
+- The work-type switch, labelled with what the stand currently dresses for, opens a checklist for rooms the game reads oddly, rooms that do two jobs, or a decorative stand you do not want used at all. Its dialog names what the game currently reads the room as.
 
 Leave the stand's Allow removing items toggle off, which is its default. Colonists stock the stand either way and shift changes ignore the setting entirely, so nothing here needs it on — while turning it on lets any colonist's outfit optimizer take the uniform and wear it as everyday clothes.
 

@@ -134,12 +134,24 @@ namespace ShiftChange
 
             // Mode radios. The automatic label names what the room currently
             // resolves to, so "automatic" is never a mystery box.
-            List<WorkTypeDef> roomDefaults = RoomWorkTypes.ForRole(
-                comp.parent.Spawned ? comp.parent.GetRoom()?.Role : null);
+            RoomRoleDef roomRole = comp.parent.Spawned ? comp.parent.GetRoom()?.Role : null;
+            List<WorkTypeDef> roomDefaults = RoomWorkTypes.ForRole(roomRole);
             string autoLabel = "ShiftChange.WorkTypeAuto".Translate();
             autoLabel += ": " + (roomDefaults.Count > 0
                 ? roomDefaults.Select(w => w.gerundLabel ?? w.defName).ToCommaList()
                 : "ShiftChange.None".Translate().RawText);
+            if (roomDefaults.Count == 0)
+            {
+                // Name what the game itself thinks this room is, so "nothing"
+                // stops reading as a detection failure. The room-role scorer
+                // has quirks no player can guess from here — one prisoner bed
+                // in or adjacent to a hospital zeroes its Hospital score
+                // outright (RoomRoleWorker_Hospital.GetScore) — and this
+                // label is where they can at least see WHICH role won.
+                autoLabel += " — " + (roomRole != null
+                    ? (string)"ShiftChange.RoomReadsAs".Translate(roomRole.label)
+                    : (string)"ShiftChange.NoRoomRole".Translate());
+            }
 
             if (Widgets.RadioButtonLabeled(listing.GetRect(RowHeight), autoLabel, comp.IsAutomatic))
             {

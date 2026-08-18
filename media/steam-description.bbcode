@@ -14,10 +14,10 @@ That is the whole setup. Two optional controls per stand:
 
 [list]
 [*][b]Shared (set owner)[/b] reserves a stand for one colonist. Left unassigned, a stand is shared by whoever is free to use it, like beds — so a kitchen needs one stand per cook working [i]at once[/i], not one per cook.
-[*][b]Set work types[/b] opens a checklist for rooms the game reads oddly, rooms that do two jobs, or a decorative stand you do not want used at all.
+[*][b]The work-type switch[/b] — labelled with what the stand currently dresses for ("Shift stand: doctoring", "Not used for shift changes") — opens a checklist for rooms the game reads oddly, rooms that do two jobs, or a decorative stand you do not want used at all. The dialog also names what the game currently reads the room as, which explains the surprises: a crib in a hospital, for instance, makes the room a barracks as far as the game is concerned.
 [/list]
 
-[b]Leave the stand's Allow removing items toggle off[/b], which is its default. Colonists stock the stand either way and shift changes ignore the setting entirely, so nothing here needs it on — while turning it on lets any colonist's outfit optimizer take the uniform and wear it as everyday clothes.
+[b]The stand's Allow removing items toggle holds itself off while the stand is in service.[/b] Shift changes never need it, and turning it on hands the stand's contents to every colonist's outfit optimizer — which may take the uniform and wear it as everyday clothes, and assigning an owner does not prevent that. A stand already switched on stays switchable, so there is always a way back. To let haulers empty a stand, set it to [b]Not used for shift changes[/b] first — the toggle unlocks with it.
 
 A stand that is dressing anyone says so in its inspect pane: what work it dresses for, who owns or is currently wearing it, and whether it is empty.
 
@@ -46,6 +46,14 @@ One setting: [b]Unassigned stands are shared[/b], on by default. Turn it off and
 [url=https://steamcommunity.com/sharedfiles/filedetails/?id=1814987817]Vanilla Apparel Expanded[/url] by Oskar Potocki, Trunken and Sarg.
 
 Any apparel mod works. That one is simply the closest fit, and this mod is not affiliated with the Vanilla Expanded team in any way.
+
+[h2]Mod compatibility[/h2]
+
+[url=https://steamcommunity.com/workshop/filedetails/?id=3545172389]Outfit Stands Plus[/url] works alongside this mod, in either load order — tested with both. Its mechanized and mending stands are full shift stands (shift changes run at their boosted swap speeds, and the mending stand repairs a borrower's parked clothes while they work), and each stand shows exactly one Set owner control: this mod's while the stand is in service, theirs when the stand is set to Not used for shift changes. Its wardrobe features, its allow adding items toggle and its research are all untouched.
+
+Two of its behaviours are worth knowing about, because they can look like faults here: it switches off its own allow adding items after a manual swap, which quietly stops haulers restocking that stand until it is switched back on; and its right-click Return to stand, used on a colonist who is mid-shift, moves clothes the shift system was tracking — nothing is lost, and the next change-back sorts it out.
+
+Pick Up And Haul users may see a burst of red "could not reserve" messages when several freshly built stands are stocked at once. That is its batch hauling racing itself over the new containers — cosmetic, the items arrive, and it stops once the stands are full.
 
 [h2]Save safety[/h2]
 

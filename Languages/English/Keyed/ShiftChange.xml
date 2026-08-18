@@ -12,12 +12,17 @@
   <ShiftChange.OwnerGizmoLabel>Owner: {0}</ShiftChange.OwnerGizmoLabel>
   <ShiftChange.PoolGizmoLabel>Shared (set owner)</ShiftChange.PoolGizmoLabel>
 
-  <ShiftChange.SetWorkTypeLabel>Set work types</ShiftChange.SetWorkTypeLabel>
-  <ShiftChange.SetWorkTypeDesc>This stand dresses for: {0} ({1}).\n\nWhoever uses it changes into the outfit before starting automatic work of those kinds in this room, and changes back when they leave.</ShiftChange.SetWorkTypeDesc>
+  <ShiftChange.SetWorkTypeDesc>This stand dresses for: {0} ({1}).\n\nWhoever uses it changes into the outfit before starting automatic work of those kinds in this room, and changes back when they leave.\n\nThis switch also decides which mod's owner control the stand shows when another outfit-stand mod is installed: in service, Shift Change's; not used, the other mod's.</ShiftChange.SetWorkTypeDesc>
+  <ShiftChange.RegimeShift>Shift stand: {0}</ShiftChange.RegimeShift>
+  <ShiftChange.RegimeShiftMore>Shift stand: {0} (+{1})</ShiftChange.RegimeShiftMore>
+  <ShiftChange.RegimeIdle>Shift stand (no work here yet)</ShiftChange.RegimeIdle>
+  <ShiftChange.RegimeOff>Not used for shift changes</ShiftChange.RegimeOff>
   <ShiftChange.WorkTypesTitle>Work types</ShiftChange.WorkTypesTitle>
   <ShiftChange.WorkTypesExplainer>Ticked kinds of work, done in this room, trigger a change into this stand's outfit:</ShiftChange.WorkTypesExplainer>
   <ShiftChange.WorkTypeAuto>Automatic (from the room)</ShiftChange.WorkTypeAuto>
   <ShiftChange.WorkTypeNone>Not used for shift changes</ShiftChange.WorkTypeNone>
+  <ShiftChange.RoomReadsAs>the game reads this room as: {0}</ShiftChange.RoomReadsAs>
+  <ShiftChange.NoRoomRole>this spot is not in a roled room</ShiftChange.NoRoomRole>
   <ShiftChange.FromRoom>from the room</ShiftChange.FromRoom>
   <ShiftChange.Manual>set manually</ShiftChange.Manual>
   <ShiftChange.Excluded>excluded</ShiftChange.Excluded>
@@ -40,6 +45,8 @@
        render as literal tag text. #E5E54C is vanilla's own caution yellow
        (Royalty's precept descriptions use it for "Gameplay effect:"). -->
   <ShiftChange.AllowRemovingDesc>&lt;color=#E5E54C&gt;&lt;b&gt;Shift Change: leave this off.&lt;/b&gt;&lt;/color&gt;\n\nColonists stock the stand either way, and changing into its outfit ignores this setting completely — shift changes work with it off.\n\nTurning it on exposes the stand's contents to every colonist's outfit optimizer, which may simply take the uniform and wear it as everyday clothes.</ShiftChange.AllowRemovingDesc>
+
+  <ShiftChange.AllowRemovingDisabled>In service for shift changes, which keeps this off: turned on, the stand's contents are exposed to every colonist's outfit optimizer, and an assigned owner does not protect them.\n\nTo let haulers empty the stand, set it to 'Not used for shift changes' first.</ShiftChange.AllowRemovingDisabled>
 
   <ShiftChange.Faulted>Shift Change hit repeated errors and has stopped changing colonists for this game. Outfit stands still work as ordinary furniture. Loading a save will start it again; the details are in the dev log.</ShiftChange.Faulted>
 

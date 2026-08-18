@@ -392,6 +392,16 @@ namespace ShiftChange
 
         internal static List<ThingDef> standDefs;
 
+        /// <summary>
+        /// Every def the XML patched into the shift system: the
+        /// <see cref="Building_OutfitStand"/> class family, filtered to defs
+        /// actually carrying our comp. Class alone is not enough — a stand
+        /// mod we did not patch has no comp, no ledger, and no business in
+        /// the pool — and a hardcoded defName stopped being true when
+        /// Outfit Stands Plus' powered stands joined. The XML decides
+        /// coverage; this list only reads it. Resolved once: the def set is
+        /// fixed for the process lifetime.
+        /// </summary>
         internal static List<ThingDef> StandDefs
         {
             get
@@ -399,10 +409,16 @@ namespace ShiftChange
                 if (standDefs == null)
                 {
                     standDefs = new List<ThingDef>();
-                    ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
-                    if (def != null)
+                    List<ThingDef> all = DefDatabase<ThingDef>.AllDefsListForReading;
+                    for (int i = 0; i < all.Count; i++)
                     {
-                        standDefs.Add(def);
+                        ThingDef def = all[i];
+                        if (def.thingClass != null
+                            && typeof(Building_OutfitStand).IsAssignableFrom(def.thingClass)
+                            && def.GetCompProperties<CompProperties_ShiftStand>() != null)
+                        {
+                            standDefs.Add(def);
+                        }
                     }
                 }
                 return standDefs;

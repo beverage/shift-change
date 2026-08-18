@@ -1,8 +1,9 @@
 # AGENTS.md
 
-A RimWorld 1.6 mod: one C# assembly, a job def, and an XML patch that adds two
-components to the vanilla Odyssey outfit stand. No art, no apparel, no new
-buildings.
+A RimWorld 1.6 mod: one C# assembly, a job def, and XML patches that add two
+components across the outfit-stand family — the vanilla Odyssey stand, and
+Outfit Stands Plus' powered stands when that mod is present. No art, no
+apparel, no new buildings.
 
 | Doc | Contents |
 |---|---|

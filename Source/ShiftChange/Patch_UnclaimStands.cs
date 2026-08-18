@@ -59,33 +59,34 @@ namespace ShiftChange
                     borrowed.AbandonLedger(pawn);
                 }
 
-                ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
-                if (standDef == null)
-                {
-                    return;
-                }
-
                 // A sweep, but this fires on death, trade, kidnap and map exit
                 // only — rare events, and the alternative is a registry that
-                // has to stay correct across save/load for no benefit.
+                // has to stay correct across save/load for no benefit. The
+                // def list is the whole patched family, not just the vanilla
+                // stand.
+                List<ThingDef> standDefs = Patch_JobInterception.StandDefs;
                 List<Map> maps = Find.Maps;
                 for (int i = 0; i < maps.Count; i++)
                 {
-                    List<Thing> stands = maps[i].listerThings.ThingsOfDef(standDef);
-                    for (int j = stands.Count - 1; j >= 0; j--)
+                    for (int d = 0; d < standDefs.Count; d++)
                     {
-                        // Exact type first, any assignable as fallback — the
-                        // same order AssignedOwner reads with, and for the
-                        // same reason (see its comment). The
-                        // fallback WRITE is deliberate: if a foreign comp is
-                        // what our reservation logic reads, a corpse left in
-                        // that comp's list would reserve the stand forever
-                        // unless this reaper can clear it too.
-                        CompAssignableToPawn comp = stands[j].TryGetComp<CompAssignableToPawn_ShiftStand>()
-                            ?? stands[j].TryGetComp<CompAssignableToPawn>();
-                        if (comp != null && comp.AssignedPawnsForReading.Contains(pawn))
+                        List<Thing> stands = maps[i].listerThings.ThingsOfDef(standDefs[d]);
+                        for (int j = stands.Count - 1; j >= 0; j--)
                         {
-                            comp.TryUnassignPawn(pawn);
+                            // Exact type first, any assignable as fallback —
+                            // the same order AssignedOwner reads with, and
+                            // for the same reason (see its comment). The
+                            // fallback WRITE is deliberate: if a foreign comp
+                            // is what our reservation logic reads, a corpse
+                            // left in that comp's list would reserve the
+                            // stand forever unless this reaper can clear it
+                            // too.
+                            CompAssignableToPawn comp = stands[j].TryGetComp<CompAssignableToPawn_ShiftStand>()
+                                ?? stands[j].TryGetComp<CompAssignableToPawn>();
+                            if (comp != null && comp.AssignedPawnsForReading.Contains(pawn))
+                            {
+                                comp.TryUnassignPawn(pawn);
+                            }
                         }
                     }
                 }
