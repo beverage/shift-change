@@ -164,6 +164,17 @@ change out first, wherever the food is stored.
 Used as-is, with two comps patched onto its def and its container API called from
 the swap driver.
 
+The def is patched as a **commons**: the `<comps>` node is ensured
+first and appended into second, because other mods add comps to this same def —
+Outfit Stands Plus does — and a def left with two `<comps>` nodes is resolved
+last-wins with a red "defines the same field twice" error, deleting whichever
+mod's node came first. For the same reason our assignable comp scribes
+mod-prefixed keys (comps scribe flat into the thing's save node, so two
+`CompAssignableToPawn` subclasses writing vanilla's generic `assignedPawns`
+cross-read on load), and every lookup of our assignable comp is exact-type first
+(`TryGetComp<CompAssignableToPawn_ShiftStand>`) with a base-typed fallback — comp
+order, which follows patch order, decides nothing.
+
 | Vanilla provides | Detail |
 |---|---|
 | Apparel storage with filters | storage-group support, contents displayed on the stand model |

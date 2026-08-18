@@ -13,27 +13,49 @@
        An unassigned stand is untouched by all of this and behaves exactly as
        it does in vanilla.
 
-       PatchOperationConditional so the whole thing is a no-op without Odyssey
-       (the stand is Odyssey content) instead of logging a failed xpath. The
-       def carries no <comps> node at all, so this Add creates one. -->
+       TWO operations, because this def is a commons. The vanilla def ships
+       without a <comps> node, but other mods add one — Outfit Stands Plus
+       puts its own comps on this exact def — and a def that ends up with two
+       <comps> nodes does not merge them: the loader logs "defines the same
+       field twice" and keeps the LAST node (DirectXmlToObject.cs:183-199,
+       verified 1.6.4871), silently deleting the other mod's comps. So: make
+       sure the node exists, then append into it. Composes identically in
+       either load order. (Found the hard way against Outfit Stands Plus,
+       2026-08-18 — the blind-Add version deleted their comps whenever they
+       loaded first.)
+
+       Each operation is guarded on the def existing so the whole file is a
+       no-op without Odyssey (the stand is Odyssey content) instead of
+       logging a failed xpath. -->
   <Operation Class="PatchOperationConditional">
     <xpath>/Defs/ThingDef[defName="Building_OutfitStand"]</xpath>
+    <match Class="PatchOperationConditional">
+      <xpath>/Defs/ThingDef[defName="Building_OutfitStand"]/comps</xpath>
+      <nomatch Class="PatchOperationAdd">
+        <xpath>/Defs/ThingDef[defName="Building_OutfitStand"]</xpath>
+        <value>
+          <comps />
+        </value>
+      </nomatch>
+    </match>
+  </Operation>
+
+  <Operation Class="PatchOperationConditional">
+    <xpath>/Defs/ThingDef[defName="Building_OutfitStand"]/comps</xpath>
     <match Class="PatchOperationAdd">
-      <xpath>/Defs/ThingDef[defName="Building_OutfitStand"]</xpath>
+      <xpath>/Defs/ThingDef[defName="Building_OutfitStand"]/comps</xpath>
       <value>
-        <comps>
-          <li Class="ShiftChange.CompProperties_ShiftStand" />
-          <li Class="CompProperties_AssignableToPawn">
-            <compClass>ShiftChange.CompAssignableToPawn_ShiftStand</compClass>
-            <!-- The overlay is how a room of pool stands is read at a glance:
-                 our comp draws the current BORROWER's name when one is out,
-                 and falls back to the base's owner name otherwise. Unowned
-                 stays off so a shelf of idle stands is not a wall of
-                 "Unowned". -->
-            <drawAssignmentOverlay>true</drawAssignmentOverlay>
-            <drawUnownedAssignmentOverlay>false</drawUnownedAssignmentOverlay>
-          </li>
-        </comps>
+        <li Class="ShiftChange.CompProperties_ShiftStand" />
+        <li Class="CompProperties_AssignableToPawn">
+          <compClass>ShiftChange.CompAssignableToPawn_ShiftStand</compClass>
+          <!-- The overlay is how a room of pool stands is read at a glance:
+               our comp draws the current BORROWER's name when one is out,
+               and falls back to the base's owner name otherwise. Unowned
+               stays off so a shelf of idle stands is not a wall of
+               "Unowned". -->
+          <drawAssignmentOverlay>true</drawAssignmentOverlay>
+          <drawUnownedAssignmentOverlay>false</drawUnownedAssignmentOverlay>
+        </li>
       </value>
     </match>
   </Operation>

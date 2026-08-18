@@ -8,10 +8,11 @@ namespace ShiftChange
 {
     /// <summary>
     /// Ownership for an outfit stand. The base comp already supplies the "set
-    /// owner" gizmo, the <c>Dialog_AssignBuildingOwner</c> window and reference
-    /// scribing (<c>CompAssignableToPawn.cs:164-195</c>), so all this adds is a
-    /// narrower candidate list: a stand that dresses for doctoring should not
-    /// offer itself to a colonist who cannot doctor.
+    /// owner" gizmo and the <c>Dialog_AssignBuildingOwner</c> window; this
+    /// subclass narrows the candidate list — a stand that dresses for
+    /// doctoring should not offer itself to a colonist who cannot doctor —
+    /// and owns its own scribing (see <see cref="PostExposeData"/>: the
+    /// base's generic keys collide with Outfit Stands Plus' sibling comp).
     ///
     /// <c>maxAssignedPawnsCount</c> stays at its default of 1, and that is not
     /// merely tidiness — <c>Building_OutfitStand.HasRoomForApparelOfDef</c> is a
@@ -42,6 +43,96 @@ namespace ShiftChange
                 // Capable of ANY of the set — a workshop stand covering
                 // crafting and tailoring is assignable to a pure tailor.
                 return colonists.Where(p => works.Any(w => !p.WorkTypeIsDisabled(w)));
+            }
+        }
+
+        /// <summary>
+        /// Scribes the assignment lists under mod-prefixed keys, replacing the
+        /// base comp's scribing entirely — deliberately no base call.
+        ///
+        /// Comps scribe FLAT into their parent thing's save node
+        /// (<c>ThingWithComps.ExposeData</c> just runs each comp in order,
+        /// <c>:237-251</c>), and the base writes the generic
+        /// <c>assignedPawns</c>/<c>uninstalledAssignedPawns</c> keys
+        /// (<c>CompAssignableToPawn.cs:185-195</c>). Outfit Stands Plus puts a
+        /// second <c>CompAssignableToPawn</c> subclass on this same building,
+        /// and duplicate keys do not error on load — BOTH comps read the
+        /// FIRST node under the name, so ownership smears between the two
+        /// mods on every save/load. Unique keys end our half of that; theirs
+        /// then round-trips correctly too, because ours no longer shadows
+        /// its key.
+        /// </summary>
+        /// <summary>
+        /// Per-load migration decisions, made in LoadingVars and REPLAYED in
+        /// ResolvingCrossRefs. Working state, never scribed. Fields, not a
+        /// property, and internal — the hot-swap rules.
+        /// </summary>
+        internal bool migrateAssigned;
+        internal bool migrateUninstalled;
+
+        public override void PostExposeData()
+        {
+            Scribe_Collections.Look(ref assignedPawns, "shiftChangeAssignedPawns", LookMode.Reference);
+            Scribe_Collections.Look(ref uninstalledAssignedPawns, "shiftChangeUninstalledAssignedPawns", LookMode.Reference);
+            if (Scribe.mode == LoadSaveMode.LoadingVars)
+            {
+                // Decide the migration HERE, and only here. LoadingVars is
+                // the one pass where a Look's outcome reveals whether the
+                // node exists: the loader's XML cursor is only alive during
+                // it (ScribeLoader.EnterNode consults the document iff
+                // curXmlParent != null; in the later passes it is pure path
+                // bookkeeping and always "succeeds"), and a missing node
+                // nulls the list while a present one leaves it untouched.
+                migrateAssigned = assignedPawns == null;
+                migrateUninstalled = uninstalledAssignedPawns == null;
+            }
+            if (Scribe.mode == LoadSaveMode.LoadingVars
+                || Scribe.mode == LoadSaveMode.ResolvingCrossRefs)
+            {
+                // v1.0.0/v1.0.1 saves scribed through the base under its
+                // generic keys; read those under the SAME decision in BOTH
+                // load passes. Reference lists load in two phases —
+                // LoadingVars registers the wanted load-ids in a bank keyed
+                // on parent + node path, ResolvingCrossRefs collects them —
+                // so an asymmetric fallback registers an owner it never
+                // collects.
+                //
+                // The flags, not a null re-test, carry the decision into
+                // the second pass. By then the primary Looks above have
+                // already consumed their own missing-node placeholders and
+                // handed back EMPTY lists (TakeResolvedRefList never
+                // returns null), so "is the list null" stops meaning
+                // anything. That exact re-test shipped once and lost the
+                // owner: registered in pass one, skipped in pass two,
+                // reaped as "List with 1 elements" in the loader's
+                // unconsumed-loadIDs warning.
+                //
+                // Beside Outfit Stands Plus, the one-time migration load
+                // also has their comp reading the same legacy node: the
+                // bank rejects their duplicate registration and their comp
+                // comes up unowned, at the cost of two log errors — one
+                // load, on already-degraded saves, and strictly better than
+                // the silent cross-adoption it replaces.
+                if (migrateAssigned)
+                {
+                    Scribe_Collections.Look(ref assignedPawns, "assignedPawns", LookMode.Reference);
+                }
+                if (migrateUninstalled)
+                {
+                    Scribe_Collections.Look(ref uninstalledAssignedPawns, "uninstalledAssignedPawns", LookMode.Reference);
+                }
+            }
+            if (Scribe.mode == LoadSaveMode.PostLoadInit)
+            {
+                migrateAssigned = false;
+                migrateUninstalled = false;
+                // The base's PostLoadInit scrub, applied to lists the base no
+                // longer loads for us — plus null-safety for saves that
+                // predate the comp entirely.
+                assignedPawns = assignedPawns ?? new List<Pawn>();
+                uninstalledAssignedPawns = uninstalledAssignedPawns ?? new List<Pawn>();
+                assignedPawns.RemoveAll(p => p == null);
+                uninstalledAssignedPawns.RemoveAll(p => p == null);
             }
         }
 

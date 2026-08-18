@@ -136,7 +136,16 @@ namespace ShiftChange
         {
             get
             {
-                CompAssignableToPawn comp = parent.TryGetComp<CompAssignableToPawn>();
+                // OUR comp by exact type first, never "the first assignable".
+                // Outfit Stands Plus adds a second CompAssignableToPawn
+                // subclass to this same def, and comp order follows patch
+                // order — reading whichever came first meant our Set owner
+                // dialog could write a list this property never read. The
+                // base-typed fallback is deliberate: a stand carrying only a
+                // foreign assignable (an Outfit Stands Plus stand, say)
+                // still gets owner semantics from it.
+                CompAssignableToPawn comp = parent.TryGetComp<CompAssignableToPawn_ShiftStand>()
+                    ?? parent.TryGetComp<CompAssignableToPawn>();
                 List<Pawn> assigned = comp?.AssignedPawnsForReading;
                 return assigned != null && assigned.Count > 0 ? assigned[0] : null;
             }

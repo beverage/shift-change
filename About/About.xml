@@ -23,6 +23,11 @@
     <li>Ludeon.RimWorld</li>
     <li>Ludeon.RimWorld.Odyssey</li>
     <li>brrainz.harmony</li>
+    <!-- Soft ordering, not a dependency: when Outfit Stands Plus is present,
+         sorting after it lands both mods' comps on the stand def in one
+         deterministic order. The capital "PLus" is verbatim from their
+         About; packageIds compare case-insensitively. -->
+    <li>khamenman.OutfitStandsPLus</li>
   </loadAfter>
   <description>REQUIRES ODYSSEY (for the outfit stand) AND HARMONY.
 

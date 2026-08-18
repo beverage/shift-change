@@ -74,7 +74,15 @@ namespace ShiftChange
                     List<Thing> stands = maps[i].listerThings.ThingsOfDef(standDef);
                     for (int j = stands.Count - 1; j >= 0; j--)
                     {
-                        CompAssignableToPawn comp = stands[j].TryGetComp<CompAssignableToPawn>();
+                        // Exact type first, any assignable as fallback — the
+                        // same order AssignedOwner reads with, and for the
+                        // same reason (see its comment). The
+                        // fallback WRITE is deliberate: if a foreign comp is
+                        // what our reservation logic reads, a corpse left in
+                        // that comp's list would reserve the stand forever
+                        // unless this reaper can clear it too.
+                        CompAssignableToPawn comp = stands[j].TryGetComp<CompAssignableToPawn_ShiftStand>()
+                            ?? stands[j].TryGetComp<CompAssignableToPawn>();
                         if (comp != null && comp.AssignedPawnsForReading.Contains(pawn))
                         {
                             comp.TryUnassignPawn(pawn);
