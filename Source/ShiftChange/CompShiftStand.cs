@@ -627,24 +627,28 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>Every stand on every map that this pawn has out on loan.</summary>
+        /// <summary>Every stand on every map that this pawn has out on loan.
+        /// Sweeps the whole patched family, not just the vanilla def.</summary>
         public static IEnumerable<CompShiftStand> StandsBorrowedBy(Pawn pawn)
         {
-            ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
-            if (standDef == null || pawn == null)
+            if (pawn == null)
             {
                 yield break;
             }
+            List<ThingDef> standDefs = Patch_JobInterception.StandDefs;
             List<Map> maps = Find.Maps;
             for (int i = 0; i < maps.Count; i++)
             {
-                List<Thing> stands = maps[i].listerThings.ThingsOfDef(standDef);
-                for (int j = 0; j < stands.Count; j++)
+                for (int d = 0; d < standDefs.Count; d++)
                 {
-                    CompShiftStand comp = stands[j].TryGetComp<CompShiftStand>();
-                    if (comp != null && comp.borrower == pawn)
+                    List<Thing> stands = maps[i].listerThings.ThingsOfDef(standDefs[d]);
+                    for (int j = 0; j < stands.Count; j++)
                     {
-                        yield return comp;
+                        CompShiftStand comp = stands[j].TryGetComp<CompShiftStand>();
+                        if (comp != null && comp.borrower == pawn)
+                        {
+                            yield return comp;
+                        }
                     }
                 }
             }
@@ -698,9 +702,39 @@ namespace ShiftChange
                 : IsAutomatic
                     ? "ShiftChange.FromRoom".Translate().RawText
                     : "ShiftChange.Manual".Translate().RawText;
+            // The label reads the regime out loud: this one button decides
+            // whether the stand is a shift stand or a regular one — and,
+            // beside another outfit-stand mod, whose owner control it shows
+            // — so its face carries the state instead of a static caption.
+            //
+            // ONE work type on the face, "(+N)" for the rest (principal,
+            // 2026-08-18): a workshop's four gerunds overflow a gizmo label
+            // into unreadability, and future set-bearing stands (recreation)
+            // only grow the list. The full set stays on the hover desc and
+            // in the inspect pane.
+            string regime;
+            if (excluded)
+            {
+                regime = "ShiftChange.RegimeOff".Translate().RawText;
+            }
+            else
+            {
+                List<WorkTypeDef> effective = WorkTypes;
+                if (effective.Count == 0)
+                {
+                    regime = "ShiftChange.RegimeIdle".Translate().RawText;
+                }
+                else
+                {
+                    string first = effective[0].gerundLabel ?? effective[0].labelShort ?? effective[0].defName;
+                    regime = effective.Count == 1
+                        ? "ShiftChange.RegimeShift".Translate(first).RawText
+                        : "ShiftChange.RegimeShiftMore".Translate(first, effective.Count - 1).RawText;
+                }
+            }
             yield return new Command_Action
             {
-                defaultLabel = "ShiftChange.SetWorkTypeLabel".Translate(),
+                defaultLabel = regime,
                 defaultDesc = "ShiftChange.SetWorkTypeDesc".Translate(WorkTypesLabel(), source),
                 // The pencil, not ForbidOff — a forbid glyph on a
                 // configuration gizmo reads as "this stand is disabled".

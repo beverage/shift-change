@@ -70,6 +70,27 @@ namespace ShiftChange
         internal bool migrateAssigned;
         internal bool migrateUninstalled;
 
+        /// <summary>
+        /// Whether another mod's assignable comp shares this stand. When one
+        /// does, the generic <c>assignedPawns</c> nodes in a save belong to
+        /// IT — reading them as our legacy data would fight that comp over
+        /// the same load-id bank key (a duplicate-registration error on the
+        /// loading pass, a failed take on the resolving one, in red, on
+        /// every stand that predates us).
+        /// </summary>
+        internal bool ForeignAssignableBesideUs()
+        {
+            List<ThingComp> comps = parent.AllComps;
+            for (int i = 0; i < comps.Count; i++)
+            {
+                if (comps[i] is CompAssignableToPawn && !(comps[i] is CompAssignableToPawn_ShiftStand))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public override void PostExposeData()
         {
             Scribe_Collections.Look(ref assignedPawns, "shiftChangeAssignedPawns", LookMode.Reference);
@@ -83,8 +104,22 @@ namespace ShiftChange
                 // curXmlParent != null; in the later passes it is pure path
                 // bookkeeping and always "succeeds"), and a missing node
                 // nulls the list while a present one leaves it untouched.
-                migrateAssigned = assignedPawns == null;
-                migrateUninstalled = uninstalledAssignedPawns == null;
+                //
+                // And only when the generic keys are UNCONTESTED. On a stand
+                // that also carries another mod's assignable comp — Outfit
+                // Stands Plus' own stands always, and any stand in a save
+                // where that mod arrived first — the generic nodes are that
+                // comp's live data, not our legacy format. Missing prefixed
+                // keys there mean this comp is simply NEW on this stand:
+                // start empty, read nothing, and their comp loads its owner
+                // in peace. (The one edge given up: a save from the four
+                // pre-v1.0.2 days with BOTH mods and an owner set through
+                // us — the foreign comp shows that owner instead, and one
+                // manual re-assign recovers it. Clean first loads for every
+                // adopter outrank it.)
+                bool contested = ForeignAssignableBesideUs();
+                migrateAssigned = assignedPawns == null && !contested;
+                migrateUninstalled = uninstalledAssignedPawns == null && !contested;
             }
             if (Scribe.mode == LoadSaveMode.LoadingVars
                 || Scribe.mode == LoadSaveMode.ResolvingCrossRefs)
@@ -107,12 +142,6 @@ namespace ShiftChange
                 // reaped as "List with 1 elements" in the loader's
                 // unconsumed-loadIDs warning.
                 //
-                // Beside Outfit Stands Plus, the one-time migration load
-                // also has their comp reading the same legacy node: the
-                // bank rejects their duplicate registration and their comp
-                // comes up unowned, at the cost of two log errors — one
-                // load, on already-degraded saves, and strictly better than
-                // the silent cross-adoption it replaces.
                 if (migrateAssigned)
                 {
                     Scribe_Collections.Look(ref assignedPawns, "assignedPawns", LookMode.Reference);
@@ -145,6 +174,17 @@ namespace ShiftChange
         /// </summary>
         public override IEnumerable<Gizmo> CompGetGizmosExtra()
         {
+            // One Set owner per stand: a stand declared "Not used for shift
+            // changes" that carries another mod's assignable comp is that
+            // mod's stand — our owner control yields to theirs there, and
+            // Patch_ForeignOwnerGizmos hides theirs on stands declared ours.
+            // The declaration, never a room inference, picks the surface;
+            // without a foreign assignable present nothing is hidden.
+            CompShiftStand shift = parent.TryGetComp<CompShiftStand>();
+            if (shift != null && shift.IsExcluded && ForeignAssignableBesideUs())
+            {
+                yield break;
+            }
             foreach (Gizmo gizmo in base.CompGetGizmosExtra())
             {
                 // The base comp hardcodes Misc4 (N) on the assignment gizmo
@@ -175,6 +215,13 @@ namespace ShiftChange
         public override void DrawGUIOverlay()
         {
             CompShiftStand shift = parent.TryGetComp<CompShiftStand>();
+            if (shift != null && shift.IsExcluded)
+            {
+                // Declared not-ours: whatever owner overlay this stand shows
+                // belongs to the mod that owns it now; a dormant name from
+                // our ledger would draw beside it as a second label.
+                return;
+            }
             Pawn borrower = shift?.Borrower;
             if (borrower == null || !shift.OnShift)
             {

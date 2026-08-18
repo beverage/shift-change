@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Root element is <Patch>, singular. <Patches> silently discards every
+     operation in the file. -->
+<Patch>
+
+  <!-- Outfit Stands Plus' powered stands join the shift system: the same
+       two comps the vanilla stand gets, appended with the same care. Their
+       concrete defs already carry a <comps> node (their assignable), so the
+       ensure step should never fire — it is kept as the idiom, in case a
+       future version of theirs reshapes the def. Everything is guarded by
+       mod NAME (PatchOperationFindMod matches display names, not
+       packageIds) and then per-def existence, so the file is a silent no-op
+       without them and survives a def rename with nothing worse than that
+       def staying vanilla.
+
+       The kid variants are deliberately absent: shift changes stay
+       adult-only until the child-work path is verified end to end. -->
+  <Operation Class="PatchOperationFindMod">
+    <mods>
+      <li>Outfit Stands Plus</li>
+    </mods>
+    <match Class="PatchOperationSequence">
+      <operations>
+
+        <li Class="PatchOperationConditional">
+          <xpath>/Defs/ThingDef[defName="OutfitStandsPlus_MechanizedOutfitStand"]</xpath>
+          <match Class="PatchOperationSequence">
+            <operations>
+              <li Class="PatchOperationConditional">
+                <xpath>/Defs/ThingDef[defName="OutfitStandsPlus_MechanizedOutfitStand"]/comps</xpath>
+                <nomatch Class="PatchOperationAdd">
+                  <xpath>/Defs/ThingDef[defName="OutfitStandsPlus_MechanizedOutfitStand"]</xpath>
+                  <value>
+                    <comps />
+                  </value>
+                </nomatch>
+              </li>
+              <li Class="PatchOperationAdd">
+                <xpath>/Defs/ThingDef[defName="OutfitStandsPlus_MechanizedOutfitStand"]/comps</xpath>
+                <value>
+                  <li Class="ShiftChange.CompProperties_ShiftStand" />
+                  <li Class="CompProperties_AssignableToPawn">
+                    <compClass>ShiftChange.CompAssignableToPawn_ShiftStand</compClass>
+                    <drawAssignmentOverlay>true</drawAssignmentOverlay>
+                    <drawUnownedAssignmentOverlay>false</drawUnownedAssignmentOverlay>
+                  </li>
+                </value>
+              </li>
+            </operations>
+          </match>
+        </li>
+
+        <li Class="PatchOperationConditional">
+          <xpath>/Defs/ThingDef[defName="OutfitStandsPlus_MendingOutfitStand"]</xpath>
+          <match Class="PatchOperationSequence">
+            <operations>
+              <li Class="PatchOperationConditional">
+                <xpath>/Defs/ThingDef[defName="OutfitStandsPlus_MendingOutfitStand"]/comps</xpath>
+                <nomatch Class="PatchOperationAdd">
+                  <xpath>/Defs/ThingDef[defName="OutfitStandsPlus_MendingOutfitStand"]</xpath>
+                  <value>
+                    <comps />
+                  </value>
+                </nomatch>
+              </li>
+              <li Class="PatchOperationAdd">
+                <xpath>/Defs/ThingDef[defName="OutfitStandsPlus_MendingOutfitStand"]/comps</xpath>
+                <value>
+                  <li Class="ShiftChange.CompProperties_ShiftStand" />
+                  <li Class="CompProperties_AssignableToPawn">
+                    <compClass>ShiftChange.CompAssignableToPawn_ShiftStand</compClass>
+                    <drawAssignmentOverlay>true</drawAssignmentOverlay>
+                    <drawUnownedAssignmentOverlay>false</drawUnownedAssignmentOverlay>
+                  </li>
+                </value>
+              </li>
+            </operations>
+          </match>
+        </li>
+
+      </operations>
+    </match>
+  </Operation>
+
+</Patch>

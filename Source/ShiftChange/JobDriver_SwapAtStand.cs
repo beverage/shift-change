@@ -84,6 +84,10 @@ namespace ShiftChange
             {
                 duration += (int)(apparel.GetStatValue(StatDefOf.EquipDelay) * 60f);
             }
+            // Outfit Stands Plus' powered stands advertise faster swaps —
+            // honor their factor so a shift change is never slower than a
+            // manual swap at the same stand. No-op everywhere else.
+            duration = Interop_OutfitStandsPlus.ApplySwapSpeedFactor(Stand, duration);
         }
 
         /// <summary>
