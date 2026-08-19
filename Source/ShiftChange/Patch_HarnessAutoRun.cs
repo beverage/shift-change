@@ -40,12 +40,26 @@ namespace ShiftChange
     {
         internal const string Arg = "shiftchange-harness";
 
+        /// <summary>
+        /// One run per process.
+        ///
+        /// <c>FinalizeInit</c> is not once-per-launch: the save/load round-trip
+        /// cases load a game in-process through
+        /// <c>SavedGameLoaderNow.LoadGameFromSaveFileNow</c>, and
+        /// <c>Game.LoadGame</c> calls <c>FinalizeInit</c> at the end of it
+        /// (<c>Game.cs:636</c>). Without this latch the harness starts a nested
+        /// run from inside its own round-trip case, and the process quits on
+        /// whichever finishes first.
+        /// </summary>
+        internal static bool started;
+
         public static void Postfix()
         {
-            if (!GenCommandLine.CommandLineArgPassed(Arg))
+            if (!GenCommandLine.CommandLineArgPassed(Arg) || started)
             {
                 return;
             }
+            started = true;
             // FinalizeInit runs inside map generation's long event. Deferring
             // means the harness spawns into a map that has finished setting
             // itself up, which is the state a human clicking the debug action

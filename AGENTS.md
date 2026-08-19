@@ -63,8 +63,11 @@ A harness pass is not a play observation, and a `GAP` line is a known failure
 being tracked, not a pass. There are no gaps today. It does now run
 `JobDriver_SwapAtStand` for real, through the pawn's own tracker, so "the
 driver builds a correct ledger" is covered, and the player-facing rules have
-functional cases; a save/load round trip and a real gravship launch are still
-out of reach.
+functional cases. Save/load round trips are covered by three cases that load
+through the engine's synchronous loader (`SavedGameLoaderNow`;
+`GameDataSaveLoader.LoadGame` is async and never returns control) and assert on
+the written file as well as the loaded state. They run last, since they replace
+`Current.Game`. A real gravship launch is the one thing still out of reach.
 
 **Two engine traps live in the driver cases**, both invisible from the API and
 both already paid for once. Pathfinding in 1.6 is asynchronous, so ticking a

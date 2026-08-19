@@ -16,7 +16,7 @@ decompilation.
 | A test that is slow is not run | One command, no hands, roughly twenty seconds on the four-mod list. Anything requiring a human to click through menus stops happening within a week. |
 | A test that is flaky is worse than none | Every negative assertion carries a positive control; every timeout reports state; the harness asserts its own accounting. Three assertions in draft were satisfiable by the thing they were meant to exclude. |
 | It must not touch a live game | Runs against its own save-data folder and its own log, and refuses to signal a process it did not start. The machine this was written on is also the machine somebody plays on. |
-| Some things stay out of reach | A real save/load round trip and a real gravship launch cannot be driven in-process. Those are named below rather than approximated. |
+| Some things stay out of reach | A real gravship launch cannot be driven in-process, and is named below rather than approximated. The save/load round trip sat in this row until 2026-08-19 — it now runs for real, through the engine's own synchronous loader. |
 
 ## Running it
 
@@ -58,7 +58,7 @@ to stop, and `--alongside` is the deliberate opt-in.
 
 ## What the cases assert
 
-Thirteen cases, in three kinds.
+Sixteen cases, in four kinds.
 
 **Regression cases** guard a bug that happened. A stand whose stock shares no
 apparel layer with what the pawn wears once donated its uniform permanently and
@@ -83,6 +83,30 @@ That last one is the reason this kind exists: all three descriptions claimed
 eating in a room changed nothing, while the code had always done the opposite
 deliberately, and nothing caught it until this case was written.
 
+**Round-trip cases** save the game, load it back through the engine's own
+synchronous loader, and assert on what came out. There are three: a plain trip
+that carries the owner, the ledger and the forced flags; a legacy-key save that
+must migrate its owner and then re-save under the prefixed key; and a stand
+carrying a foreign `CompAssignableToPawn`, whose owner must survive untouched
+while ours stays empty.
+
+Each asserts on the written **file** as well as on the loaded comp state. Comp
+state alone cannot distinguish a value that scribed correctly from one that
+never left the object, and the migration leg's re-save is what shows the
+reference was collected rather than only registered. They also assert the
+absence of the three engine log lines that mark a contested key — see
+`rimworld-docs/gamedata/scribe-system.md`.
+
+Three things about them differ from every other case, all consequences of the
+load being real. `GameDataSaveLoader.LoadGame` is unusable here: it queues an
+async long event and disposes the game, so control never returns to an
+assertion. `SavedGameLoaderNow.LoadGameFromSaveFileNow` is the synchronous
+primitive underneath it, and runs both scribe passes inline. These cases
+therefore **replace `Current.Game`**, so they run last among the map cases and
+register without a fixture — a teardown would clear a pad on a disposed map.
+And `Game.LoadGame` ends in `FinalizeInit`, which `Patch_HarnessAutoRun`
+postfixes, so a one-shot latch there prevents a nested harness run.
+
 Two further cases cover neither the mod's behaviour nor a past bug. One walks
 the room-role table and asserts every `RoomRoleDef` and `WorkTypeDef` it names
 still resolves — the lookups are silent-fail, so a renamed def empties the table
@@ -93,8 +117,10 @@ green log out of a suite that checks nothing.
 
 ## What is not covered
 
-- **Save and load.** No case writes a save and reads it back. Scribing and the
-  repair branches in `PostSpawnSetup` are exercised only in play.
+- **The repair branches in `PostSpawnSetup`.** The round-trip cases cover
+  scribing itself — what gets written, and what survives coming back — but not
+  the paths that fix up a ledger found inconsistent on spawn. Those are still
+  exercised only in play.
 - **A real gravship launch.** The flight case drives `DeSpawn(WillReplace)` →
   `Spawn` → `PostSwapMap`, which is what the engine does, but no gravship is
   built or flown.

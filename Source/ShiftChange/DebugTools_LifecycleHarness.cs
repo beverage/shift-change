@@ -58,8 +58,10 @@ namespace ShiftChange
     /// a Job reference held across its own completion silently becomes the
     /// pawn's next job (hence watching the driver, not the job).</para>
     ///
-    /// <para>What is still out of reach in-process: a real save/load round
-    /// trip, and a real gravship launch.</para>
+    /// <para>Save/load round trips run in-process through the engine's
+    /// synchronous loader, as the last map cases, since they replace the whole
+    /// game — see <see cref="DebugTools_SaveRoundTrip"/>. Still out of reach: a
+    /// real gravship launch.</para>
     ///
     /// <para><b>What ships and what does not (2026-08-17).</b> This
     /// BODY ships in every configuration, and that is load-bearing: the
@@ -178,6 +180,20 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  FreedStandCatchesUp);
+            // Last among the map cases: these replace Current.Game, so `map`,
+            // `pad` and every fixture above them belong to a disposed game once
+            // they have run. They register through the fixture-less overload
+            // for the same reason — Teardown would clear a pad on the disposed
+            // map. See DebugTools_SaveRoundTrip.
+            Case("a save/load round trip keeps the owner, the ledger and the forced flags",
+                 () => DebugTools_SaveRoundTrip.RoundTrip(map, pad));
+            Case("a legacy-key save migrates its owner and re-saves prefixed",
+                 DebugTools_SaveRoundTrip.LegacyMigration);
+            Case("a foreign assignable's owner round-trips without contest",
+                 DebugTools_SaveRoundTrip.ForeignAssignable);
+
+            // The two below need no map, so they are unaffected by the game
+            // replacement above.
             Case("the room-role table resolves", RoomRoleTableResolves);
             // Last: it drives a deliberately failing assertion, and the tallies
             // are global.
