@@ -19,6 +19,9 @@
   <ShiftChange.RegimeOff>Not used for shift changes</ShiftChange.RegimeOff>
   <ShiftChange.WorkTypesTitle>Work types</ShiftChange.WorkTypesTitle>
   <ShiftChange.WorkTypesExplainer>Ticked kinds of work, done in this room, trigger a change into this stand's outfit:</ShiftChange.WorkTypesExplainer>
+  <ShiftChange.FullChange>Change the whole outfit</ShiftChange.FullChange>
+  <ShiftChange.FullChangeDesc>Normally a pawn keeps whatever this stand's kit does not conflict with, so the uniform goes on over their own clothes.\n\nWith this on they undress completely and wear only what the stand holds — right for a sauna robe or a swimsuit, and slower in both directions, since every garment is taken off and put back on.\n\nEverything their own clothes were providing comes off with them — warmth, armor, any bonuses those garments carried. They have exactly what the stand holds and nothing more.</ShiftChange.FullChangeDesc>
+  <ShiftChange.InspectFullChange>Changes the whole outfit</ShiftChange.InspectFullChange>
   <ShiftChange.WorkTypeAuto>Automatic (from the room)</ShiftChange.WorkTypeAuto>
   <ShiftChange.WorkTypeNone>Not used for shift changes</ShiftChange.WorkTypeNone>
   <ShiftChange.RoomReadsAs>the game reads this room as: {0}</ShiftChange.RoomReadsAs>

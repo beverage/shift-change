@@ -170,6 +170,8 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.NonDisplacing), NonDisplacingReturns);
             Case(map, pad, "the driver returns own clothes and their forced flags",
                  (m, p) => Stage(m, p, StageKit.Displacing), DriverRoundTrip);
+            Case(map, pad, "full change swaps the whole outfit and gives it all back",
+                 (m, p) => Stage(m, p, StageKit.Displacing), FullChangeSwapsEverything);
             Case(map, pad, "the rules the description promises hold",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
@@ -461,6 +463,82 @@ namespace ShiftChange
                 & Expect(!fix.Comp.OnShift, "ledger cleared")
                 & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == null,
                          "registry entry cleared");
+        }
+
+        /// <summary>
+        /// Full change: the pawn ends up wearing the stand's kit and nothing
+        /// else, and gets every garment back on the return trip.
+        ///
+        /// <para>The `Displacing` fixture is what makes this assert anything.
+        /// Its pawn wears a shirt and trousers (OnSkin) under a parka (Shell)
+        /// and the stand holds a duster (Shell), so the ordinary swap displaces
+        /// the parka ALONE. Anything the shirt and trousers do here is
+        /// therefore attributable to the flag and to nothing else.</para>
+        ///
+        /// <para>Also pins the gate the flag rides on: an empty stand must
+        /// still refuse. That assertion is a control as much as a rule — it
+        /// fails loudly if the full-change pass is ever moved above the
+        /// <c>toWear.Count > 0</c> test in <see cref="SwapPlan.BuildDress"/>.</para>
+        /// </summary>
+        internal static bool FullChangeSwapsEverything(Fixture fix)
+        {
+            List<Apparel> before = new List<Apparel>(fix.Pawn.apparel.WornApparel);
+            if (before.Count < 3)
+            {
+                return Expect(false, "fixture is wearing shirt, trousers and a parka");
+            }
+            fix.Comp.SetFullChange(true);
+
+            bool ok = Expect(RunSwap(fix), "dress leg ran to completion")
+                    & Expect(fix.Comp.OnShift, "the stand went on shift (control)");
+
+            // The point of the whole feature: nothing of their own is left on.
+            List<Apparel> nowWorn = fix.Pawn.apparel.WornApparel;
+            int ownStillWorn = 0;
+            for (int i = 0; i < before.Count; i++)
+            {
+                if (nowWorn.Contains(before[i]))
+                {
+                    ownStillWorn++;
+                }
+            }
+            ok &= Expect(ownStillWorn == 0, "every garment they arrived in came off")
+                & Expect(fix.Comp.StoredOwnerApparelForReading.Count == before.Count,
+                         "and all " + before.Count + " are in the ledger")
+                & Expect(nowWorn.Count > 0, "they are not standing there naked");
+
+            // The return trip is ledger-driven, so it must restore all of it
+            // without consulting the flag — turn the flag off first and it
+            // still has to hand everything back.
+            fix.Comp.SetFullChange(false);
+            ok &= Expect(RunSwap(fix), "return leg ran to completion");
+
+            int returned = 0;
+            for (int i = 0; i < before.Count; i++)
+            {
+                if (fix.Pawn.apparel.WornApparel.Contains(before[i]))
+                {
+                    returned++;
+                }
+            }
+            ok &= Expect(returned == before.Count,
+                         "all " + before.Count + " came back on, flag off or not")
+                & Expect(!fix.Comp.OnShift, "ledger cleared");
+
+            // The gate: full change on an empty stand still plans nothing.
+            fix.Comp.SetFullChange(true);
+            while (fix.Stand.HeldItems.Count > 0)
+            {
+                Thing held = fix.Stand.HeldItems[0];
+                if (!fix.Stand.RemoveApparel(held as Apparel))
+                {
+                    break;
+                }
+                held.Destroy();
+            }
+            return ok
+                & Expect(!SwapPlan.WouldDress(fix.Pawn, fix.Stand),
+                         "an empty stand still refuses, full change or not");
         }
 
         /// <summary>

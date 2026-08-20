@@ -41,6 +41,18 @@ borrower's civvies while they are on shift. Sped up 3–6×.*
      instance, makes the room a barracks as far as the game is concerned,
      and the stand goes idle until the checklist says otherwise.
 
+**"Change the whole outfit" is off by default, and belongs to the rack rather
+than the room.** Normally the kit goes on over whatever it doesn't conflict
+with, so a lab coat sits over ordinary clothes. Tick this and the colonist
+undresses completely and wears only what the stand holds — right for a sauna
+robe or a swimsuit, wrong for a lab coat. It costs the equip time of every
+garment in both directions, and everything their own clothes were providing
+comes off with them — warmth, armor, any bonuses those garments carried. They
+have exactly what the stand holds and nothing more, which is worth a thought
+before putting a robe rack in a cold biome. A stand holding nothing they can
+wear still won't undress them; there is no configuration in which a colonist
+strips for a shift and gets nothing back.
+
 **"Allow removing items" holds itself off while a stand is in service.**
 Shift changes never need it, and turning it on hands the stand's contents to
 every colonist's outfit optimizer — which may take the uniform and wear it as

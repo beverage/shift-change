@@ -287,6 +287,49 @@ namespace ShiftChange
                 issued.Add(apparel);
             }
 
+            // NOTHING WENT ON, AND THE CLOTHES ARE ALREADY OFF. Every incoming
+            // garment was declined late by Wear() — a body part lost during the
+            // walk, a biocode that changed hands. At this point `stored` is held
+            // by nothing: off the pawn, not yet in the stand.
+            //
+            // Falling through would post it into the stand and record a ledger
+            // with no borrower against it (NotifyDressed only sets a borrower
+            // when something was issued), so the pawn's own clothes end up
+            // locked in a rack nothing will ever hand back. With FULL CHANGE
+            // that is every garment they own, and it leaves them naked — which
+            // breaks the standing rule that the worst case on any failure path
+            // here is a pawn in the WRONG clothes, never a pawn without them.
+            //
+            // So dress them again and record nothing: the trip accomplished
+            // exactly as much as it should have. Re-wear goes through CanWear
+            // first, because the same late refusal that got us here would
+            // otherwise delete the garment — Wear() detaches before it checks.
+            // Anything that genuinely cannot go back on goes into the stand
+            // rather than nowhere; that is still a garment the player can
+            // retrieve, which an unheld one is not.
+            if (!undressing && issued.Count == 0 && stored.Count > 0)
+            {
+                foreach (Apparel apparel in stored)
+                {
+                    if (SwapPlan.CanWear(pawn, apparel))
+                    {
+                        pawn.apparel.Wear(apparel);
+                        if (pawn.apparel.WornApparel.Contains(apparel))
+                        {
+                            if (storedForced.Contains(apparel))
+                            {
+                                // Remove() cleared the forced flag on the way
+                                // off and nothing else restores it.
+                                pawn.outfits?.forcedHandler?.SetForced(apparel, forced: true);
+                            }
+                            continue;
+                        }
+                    }
+                    PutBack(stand, apparel);
+                }
+                return;
+            }
+
             foreach (Apparel apparel in stored)
             {
                 // Vanilla's own eviction: anything already in the stand that
