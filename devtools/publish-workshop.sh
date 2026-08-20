@@ -150,8 +150,11 @@ THEN, IMMEDIATELY, IN THIS ORDER:
   5. BROWSER: add the gallery images from media/cards/. The game uploads only
      About/Preview.png (SetItemPreview, Workshop.cs:266-272) and never calls
      AddItemPreviewFile, so the cards have no path up from inside the game.
-     Skip card-doc.png — it is byte-identical to the preview tile Steam
-     already shows first.
+     Skip card-doc.png — it is the same shot as the preview tile Steam
+     already shows first. It is the 16-bit master; About/Preview.png is the
+     same image re-encoded to 8-bit RGB (1016 KB -> 179 KB, no visible
+     change). Keep any future preview 8-bit: Steam's item-image limit is
+     under 1 MB and a 16-bit 640x360 scene shot lands within 5% of it.
 
   6. The demo gif stays hotlinked from i.imgur.com: Steam's item-image limit
      is under 1 MB and the gif is 2.26 MB, so it cannot be re-hosted on the
