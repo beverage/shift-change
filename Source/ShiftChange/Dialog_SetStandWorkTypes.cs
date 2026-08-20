@@ -37,7 +37,13 @@ namespace ShiftChange
         internal const float MaxLabelWidth = 260f;
         internal const float ColumnGutter = 36f;
         internal const float ScrollbarAllowance = 20f;
-        internal const float HeaderAllowance = 160f;
+        /// <summary>
+        /// Everything above the scrolling work-type grid: title, the two mode
+        /// radios, the full-change row and the explainer. Grow this when a row
+        /// is added above the grid, or the grid silently loses the height
+        /// instead — <see cref="DoWindowContents"/> hands it whatever is left.
+        /// </summary>
+        internal const float HeaderAllowance = 196f;
         internal const float MinWindowWidth = 420f;
 
         /// <summary>Rows a column aims for before the dialog grows another column.</summary>
@@ -162,6 +168,23 @@ namespace ShiftChange
             {
                 comp.SetExcluded();
             }
+
+            listing.GapLine();
+
+            // Full change is a property of what the rack HOLDS, not of which
+            // work it serves, so it sits outside the mode radios rather than
+            // becoming a fourth mode. Greyed out while excluded: an excluded
+            // stand builds no dress plan at all, so the flag would have nothing
+            // to act on and a live checkbox would imply otherwise.
+            bool full = comp.FullChange;
+            Rect fullRect = listing.GetRect(RowHeight);
+            Widgets.CheckboxLabeled(fullRect, "ShiftChange.FullChange".Translate(), ref full,
+                                    disabled: comp.IsExcluded);
+            if (!comp.IsExcluded && full != comp.FullChange)
+            {
+                comp.SetFullChange(full);
+            }
+            TooltipHandler.TipRegion(fullRect, "ShiftChange.FullChangeDesc".Translate());
 
             listing.GapLine();
             listing.Label("ShiftChange.WorkTypesExplainer".Translate());

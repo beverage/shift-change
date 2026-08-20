@@ -72,6 +72,26 @@ namespace ShiftChange
         internal bool excluded;
 
         /// <summary>
+        /// Swap the pawn's whole outfit rather than only what the stand's kit
+        /// conflicts with. Default off: a full change costs the equip time of
+        /// every garment in both directions, which is the right price for a
+        /// sauna robe or a set of scrubs and the wrong one for a lab coat worn
+        /// over ordinary clothes.
+        ///
+        /// <para>Per stand rather than a mod setting, because it is a property
+        /// of what the rack holds — a robe rack wants it, a lab-coat rack does
+        /// not.</para>
+        ///
+        /// <para>Read only when BUILDING a dress plan. The return trip is
+        /// driven entirely by the ledger (<see cref="JobDriver_SwapAtStand.PlanUndress"/>
+        /// walks <see cref="IssuedUniformForReading"/> and
+        /// <see cref="StoredOwnerApparelForReading"/>), so flipping this while a
+        /// uniform is out cannot strand anything: whatever went into the stand
+        /// comes back regardless of what the flag says by then.</para>
+        /// </summary>
+        internal bool fullChange;
+
+        /// <summary>
         /// Stands that currently have a uniform out on a pawn, so the return
         /// trip can be found without sweeping the map. Keyed by BORROWER and
         /// rebuilt on load, since <see cref="PostSpawnSetup"/> runs for every
@@ -230,6 +250,13 @@ namespace ShiftChange
         }
 
         public bool IsExcluded => excluded;
+
+        public bool FullChange => fullChange;
+
+        public void SetFullChange(bool on)
+        {
+            fullChange = on;
+        }
 
         public bool IsAutomatic => !excluded && (workTypeOverrides == null || workTypeOverrides.Count == 0);
 
@@ -501,6 +528,7 @@ namespace ShiftChange
                 Scribe_Defs.Look(ref workTypeOverrideLegacy, "workTypeOverride");
             }
             Scribe_Values.Look(ref excluded, "excluded", defaultValue: false);
+            Scribe_Values.Look(ref fullChange, "fullChange", defaultValue: false);
 
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
@@ -678,6 +706,16 @@ namespace ShiftChange
                     // Keep the UI honest: with pooling off, "shared" would be
                     // a lie the player debugs for an evening.
                     : "ShiftChange.InspectPoolDisabled".Translate()));
+
+            // Worth a line of its own: a full change is the difference between
+            // a pawn keeping their own clothes under the uniform and wearing
+            // nothing but the stand's kit, and nothing else on this pane would
+            // tell them which stand they are looking at. Suppressed while
+            // excluded, matching the dialog — the flag does nothing there.
+            if (fullChange && !excluded)
+            {
+                line += "\n" + "ShiftChange.InspectFullChange".Translate();
+            }
 
             if (OnShift && borrower != null)
             {

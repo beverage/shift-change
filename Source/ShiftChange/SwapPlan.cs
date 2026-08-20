@@ -129,7 +129,46 @@ namespace ShiftChange
                 }
             }
 
+            // Full change: everything else comes off too, so the pawn's
+            // insulation becomes entirely the stand's kit rather than the kit
+            // layered over their own clothes.
+            //
+            // Gated on toWear being non-empty: a stand that would issue NOTHING
+            // must still decline, so the selector never sends a pawn on a trip
+            // that cannot dress them.
+            //
+            // This is not the guard that keeps anyone clothed — DoTransfer
+            // refuses independently, returning before a garment comes off when
+            // the incoming set is empty in the dress direction. Undressing into
+            // a rack is a coherent action, but not one any pawn should reach by
+            // deciding to go do some hauling; it would need its own trigger.
+            //
+            // IsLocked is the one garment that stays, matching the conflict
+            // pass above and vanilla's own stand driver
+            // (JobDriver_UseOutfitStand.cs:49-53).
+            if (toWear.Count > 0 && IsFullChange(stand))
+            {
+                for (int j = 0; j < worn.Count; j++)
+                {
+                    Apparel wornItem = worn[j];
+                    if (!pawn.apparel.IsLocked(wornItem) && !toStore.Contains(wornItem))
+                    {
+                        toStore.Add(wornItem);
+                    }
+                }
+            }
+
             return toWear.Count > 0;
+        }
+
+        /// <summary>
+        /// Read from the stand rather than passed in by the caller, so the
+        /// selector and the driver cannot form different plans for the same
+        /// stand — the disagreement this whole file exists to prevent.
+        /// </summary>
+        internal static bool IsFullChange(Building_OutfitStand stand)
+        {
+            return stand?.TryGetComp<CompShiftStand>()?.FullChange == true;
         }
 
         /// <summary>
