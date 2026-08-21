@@ -65,6 +65,20 @@ namespace ShiftChange
         internal WorkTypeDef workTypeOverrideLegacy;
 
         /// <summary>
+        /// Player override for the RECREATION trigger. MUTUALLY
+        /// EXCLUSIVE with <see cref="workTypeOverrides"/> (principal,
+        /// 2026-08-16: one stand, one outfit, one purpose) — the toggles
+        /// enforce it, so true implies the work set is empty. True is itself
+        /// what marks that works-empty custom set as custom rather than
+        /// automatic — "recreation only" needs no extra mode flag — and in
+        /// automatic mode the room's role answers instead
+        /// (<see cref="RoomWorkTypes.RecreationForRole"/>). Absent from old
+        /// saves and defaults false, so every pre-branch state loads
+        /// unchanged.
+        /// </summary>
+        internal bool recreationOverride;
+
+        /// <summary>
         /// Opt-out. A decorative or storage stand standing in a roled room would
         /// otherwise join that room's pool, which is a surprise nobody asked
         /// for.
@@ -236,6 +250,14 @@ namespace ShiftChange
                 {
                     return workTypeOverrides;
                 }
+                // A recreation-only custom set: the override bool alone marks
+                // custom mode (see the field), and its work half is genuinely
+                // empty — falling through to the room's defaults here would
+                // resurrect work types the player just narrowed away.
+                if (recreationOverride)
+                {
+                    return NoWork;
+                }
                 if (!parent.Spawned)
                 {
                     return NoWork;
@@ -249,6 +271,30 @@ namespace ShiftChange
             return work != null && WorkTypes.Contains(work);
         }
 
+        /// <summary>
+        /// Whether this stand dresses for recreation — the joy-branch
+        /// parallel of <see cref="HandlesWork"/>. Excluded wins; a
+        /// custom set (either half non-empty) answers from its own bool;
+        /// automatic asks the room's role, so a stand in a rec room lights up
+        /// exactly the way a kitchen stand does for cooking.
+        /// </summary>
+        public bool HandlesRecreation()
+        {
+            if (excluded)
+            {
+                return false;
+            }
+            if ((workTypeOverrides != null && workTypeOverrides.Count > 0) || recreationOverride)
+            {
+                return recreationOverride;
+            }
+            if (!parent.Spawned)
+            {
+                return false;
+            }
+            return RoomWorkTypes.RecreationForRole(parent.GetRoom()?.Role);
+        }
+
         public bool IsExcluded => excluded;
 
         public bool FullChange => fullChange;
@@ -258,17 +304,24 @@ namespace ShiftChange
             fullChange = on;
         }
 
-        public bool IsAutomatic => !excluded && (workTypeOverrides == null || workTypeOverrides.Count == 0);
+        // Both threads narrowed "automatic": recreation is an explicit override
+        // like a custom work set, while fullChange is NOT — it is a property of
+        // the rack's contents, orthogonal to which trigger the stand answers to,
+        // so an automatic stand with a full-change robe on it is still automatic.
+        public bool IsAutomatic => !excluded && !recreationOverride
+            && (workTypeOverrides == null || workTypeOverrides.Count == 0);
 
         public void SetAutomatic()
         {
             excluded = false;
+            recreationOverride = false;
             workTypeOverrides?.Clear();
         }
 
         public void SetExcluded()
         {
             excluded = true;
+            recreationOverride = false;
             workTypeOverrides?.Clear();
         }
 
@@ -277,7 +330,11 @@ namespace ShiftChange
         /// wherever the stand currently is: toggling while automatic seeds the
         /// custom set from the room's defaults first, toggling while excluded
         /// starts a fresh set, and emptying the custom set collapses back to
-        /// excluded so the three states stay canonical.
+        /// excluded so the states stay canonical. Work and recreation are
+        /// mutually exclusive (principal, 2026-08-16), so touching any work
+        /// type also drops the recreation trigger — the dialog hides this
+        /// list while recreation is on, so reaching here from a rec stand is
+        /// a deliberate switch, not a surprise.
         /// </summary>
         public void ToggleWork(WorkTypeDef work)
         {
@@ -290,6 +347,7 @@ namespace ShiftChange
             workTypeOverrides = workTypeOverrides ?? new List<WorkTypeDef>();
             workTypeOverrides.Clear();
             workTypeOverrides.AddRange(effective);
+            recreationOverride = false;
             if (!workTypeOverrides.Remove(work))
             {
                 workTypeOverrides.Add(work);
@@ -300,18 +358,50 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>Display helper: "doctoring, researching" etc.</summary>
+        /// <summary>
+        /// Flips the recreation trigger. Recreation and work types are
+        /// MUTUALLY EXCLUSIVE on a stand (principal, 2026-08-16): the stand
+        /// holds one outfit, and one outfit serves one purpose — so turning
+        /// recreation on clears the work half outright rather than riding
+        /// beside it, and turning it off falls back to excluded (nothing
+        /// selected IS the excluded state under another name). No seeding
+        /// either way: there is nothing to preserve across an exclusive
+        /// switch.
+        /// </summary>
+        public void ToggleRecreation()
+        {
+            bool current = HandlesRecreation();
+            excluded = false;
+            workTypeOverrides = workTypeOverrides ?? new List<WorkTypeDef>();
+            workTypeOverrides.Clear();
+            recreationOverride = !current;
+            if (!recreationOverride)
+            {
+                SetExcluded();
+            }
+        }
+
+        /// <summary>
+        /// Display helper: "doctoring, researching" etc. The recreation
+        /// trigger joins the same list, so every surface that names the
+        /// stand's purpose names all of it.
+        /// </summary>
         public string WorkTypesLabel()
         {
             List<WorkTypeDef> works = WorkTypes;
-            if (works.Count == 0)
+            bool recreation = HandlesRecreation();
+            if (works.Count == 0 && !recreation)
             {
                 return "ShiftChange.None".Translate();
             }
-            List<string> labels = new List<string>(works.Count);
+            List<string> labels = new List<string>(works.Count + 1);
             for (int i = 0; i < works.Count; i++)
             {
                 labels.Add(works[i].gerundLabel ?? works[i].labelShort ?? works[i].defName);
+            }
+            if (recreation)
+            {
+                labels.Add("ShiftChange.Recreation".Translate().RawText);
             }
             return labels.ToCommaList();
         }
@@ -521,6 +611,7 @@ namespace ShiftChange
             Scribe_Collections.Look(ref storedForcedApparel, "storedForcedApparel", LookMode.Reference);
             Scribe_References.Look(ref borrower, "borrower");
             Scribe_Collections.Look(ref workTypeOverrides, "workTypeOverrides", LookMode.Def);
+            Scribe_Values.Look(ref recreationOverride, "recreation", defaultValue: false);
             if (Scribe.mode == LoadSaveMode.LoadingVars)
             {
                 // Read-only: saves from before the set redesign carried a
@@ -688,7 +779,7 @@ namespace ShiftChange
             {
                 return "ShiftChange.InspectExcluded".Translate();
             }
-            if (WorkTypes.Count == 0)
+            if (WorkTypes.Count == 0 && !HandlesRecreation())
             {
                 return null;
             }

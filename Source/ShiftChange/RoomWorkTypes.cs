@@ -91,5 +91,60 @@ namespace ShiftChange
             List<WorkTypeDef> works;
             return Resolved.TryGetValue(role, out works) ? works : None;
         }
+
+        /// <summary>
+        /// Role defNames whose rooms dress for RECREATION by default — the
+        /// joy-branch parallel of <see cref="Defaults"/>. Vanilla
+        /// RecRoom plus the third-party pool roles already sighted in the
+        /// wild (Gerrymon's Hotspring Expanded); silent-fail as ever, so an
+        /// absent mod just drops its rows. Biotech's Playroom is deliberately
+        /// NOT here — auto-dressing toddlers is its own decision, not a
+        /// default. Pure pool rooms are typically ROLELESS (GoSwimming is
+        /// terrain-driven, so RoomRoleWorker_RecRoom counts nothing in them)
+        /// and use the manual toggle instead.
+        /// </summary>
+        internal static readonly string[] RecreationRoles =
+        {
+            "RecRoom",
+            "GM_PrivatePool",
+            "GM_PublicPool",
+        };
+
+        internal static HashSet<RoomRoleDef> resolvedRecreation;
+
+        internal static HashSet<RoomRoleDef> ResolvedRecreation
+        {
+            get
+            {
+                if (resolvedRecreation == null)
+                {
+                    resolvedRecreation = new HashSet<RoomRoleDef>();
+                    foreach (string roleName in RecreationRoles)
+                    {
+                        RoomRoleDef role = DefDatabase<RoomRoleDef>.GetNamedSilentFail(roleName);
+                        // DISJOINTNESS IS LOAD-BEARING: automatic-mode
+                        // exclusivity (work XOR recreation, principal
+                        // 2026-08-16) holds only because no role appears in
+                        // BOTH tables — the toggles enforce it for custom
+                        // mode, but automatic mode answers straight from
+                        // these tables. Work wins on a collision, so a
+                        // future row added to both cannot silently
+                        // resurrect the dual-purpose stand (verified
+                        // impossible today; guarded anyway).
+                        if (role != null && !Resolved.ContainsKey(role))
+                        {
+                            resolvedRecreation.Add(role);
+                        }
+                    }
+                }
+                return resolvedRecreation;
+            }
+        }
+
+        /// <summary>Whether a room of this role dresses for recreation by default.</summary>
+        public static bool RecreationForRole(RoomRoleDef role)
+        {
+            return role != null && ResolvedRecreation.Contains(role);
+        }
     }
 }

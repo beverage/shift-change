@@ -403,6 +403,77 @@ The trigger is the **job**, not the doorway: work-type-in-set AND
 job-target-in-room. A doctor crossing the hospital to reach the storeroom, or
 anyone walking in to eat, changes nothing.
 
+## The recreation branch
+
+Work jobs name their purpose through `workGiverDef.workType`; recreation jobs
+name theirs differently. Every joy job a driver ticks carries a
+`JobDef.joyKind` — `JoyGiverDef` raises a config error when a giver and its
+jobDef disagree, and `JoyUtility.JoyTickCheckEnd` warns if a joyKind-less job
+ever ticks joy — so the interception's second arm keys on exactly that: a job
+carrying a joyKind, headed for a room whose stand has the recreation trigger
+on, diverts through the stand like any work shift. Everything downstream is
+the work arm's, untouched — reservation carry, ledger, optimizer pause,
+change-back latch, return trip — because none of it ever knew what a
+WorkTypeDef was.
+
+Two joy classes stay deliberately outside the arm. Consumption (beer, drugs,
+chocolate) rides `JobDefOf.Ingest`, which carries no joyKind at all — its joy
+lives on the ingestible and lands in `Thing.Ingested` — and its consumption
+spot is chosen mid-job, the same fact behind the eating policy in the return
+trip. It is undetectable and unplaceable at StartJob, and the branch does not
+pretend otherwise. Reading carries a joyKind but picks its spot mid-job too
+(`CarryToReadingSpot`), so it is excluded by driver class: at StartJob its
+target is the book, wherever that is shelved, and dressing for the shelf's
+room would be the packed-lunch misread with a cover on.
+
+The recreation arm reads the room targetB-first (`JoyTargetCell`): for the
+sit-and-play classes B is where the pawn actually sits while the joy ticks —
+the chair at the chess table, the watch cell in front of the television —
+while A is the venue building; where B is unset (swimming's water cell, a
+gather spot, art, a grave) A is already the venue. One vanilla job is BOTH
+work and joy-class — VisitSickPawn, Doctor work whose JobDef carries joyKind
+Social — and it deliberately resolves B-first (the visitor's chair) at every
+site, because the arms may differ but the answer to "where does this job
+happen" must not. The RETURN trip reads joy
+jobs with the same resolver — one definition of "where does this job happen"
+per job class, consumed by both directions — because split reads livelock: a
+vanilla SocialRelax can seat its chair across a held-open door from its
+gather spot (the chair search is line-of-sight only, no same-room check),
+and A-first-out, B-first-in turned that one job into an endless
+dress/undress ping-pong. The work arm keeps its A-first read: work jobs put
+the pawn at A.
+
+Outdoor joy is fenced off explicitly, not by accident. Every outdoor cell
+resolves a real Room — the one map-spanning, edge-touching outdoor room, not
+null — so without a guard, a rec-toggled stand in open ground would serve
+every walk, skygaze and snowman on the entire map. The arm (and the mid-job
+catch-up's joy twin) refuses rooms that touch the map edge. A walled but
+roofless yard is its own non-edge room and stays eligible on purpose;
+open-ground service belongs to a future fence-enclosure mode, done
+deliberately or not at all. Two more deliberate refusals: a pawn lying in
+bed is never diverted — vanilla issues in-bed joy precisely so patients stay
+put — and a rec shift's drink from the SAME room does not trigger the
+sit-down-break undress: a rec room stocks its own drinks, and the meal
+policy is a work-room rule.
+
+The trigger is one bit, not a joy-kind picker, because the room is the
+selector: a robe stand dresses for the sauna by standing in it. The ten
+JoyKindDefs cut across venues — Meditative alone spans prayer, snowmen,
+swimming and modded hot-spring bathing — so a kind picker would offer
+players categories their rooms do not have. Automatic stands light up in
+rooms whose role implies recreation (vanilla RecRoom, plus known third-party
+pool roles, silent-fail as ever); pure pool rooms are roleless — swimming is
+terrain-driven, so the rec-room worker counts nothing in them — and take the
+manual toggle. Recreation and work types are mutually exclusive on a stand:
+it holds one outfit, and one outfit serves one purpose, so ticking
+recreation clears the work set and the dialog hides the work grid outright
+(an interactable-looking list that silently unticks recreation would be a
+trap), while ticking any work type drops recreation. Exclusivity also makes
+the dual-purpose stand — the one configuration where the same-room meal
+exemption could touch a work shift — unreachable from the UI by
+construction. A stand with neither half selected is the excluded state
+under another name, so the canonical states survive intact.
+
 ## The mid-job catch-up
 
 With two workstations and two stands, a pawn can start working bare because both

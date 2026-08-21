@@ -257,7 +257,12 @@ namespace ShiftChange
         protected override string GetAssignmentGizmoDesc()
         {
             CompShiftStand comp = parent.TryGetComp<CompShiftStand>();
-            if (comp == null || comp.WorkTypes.Count == 0)
+            // The inert test must match CompInspectStringExtra's: a
+            // recreation-only stand has ZERO work types by design (the
+            // rec-only guard in CompShiftStand.WorkTypes), and calling the
+            // feature's flagship state "no work type yet" contradicted the
+            // inspect pane on the same stand (review, 2026-08-15).
+            if (comp == null || (comp.WorkTypes.Count == 0 && !comp.HandlesRecreation()))
             {
                 return "ShiftChange.AssignDescNoWork".Translate();
             }
