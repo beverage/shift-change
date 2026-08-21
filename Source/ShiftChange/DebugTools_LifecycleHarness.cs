@@ -170,6 +170,11 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.NonDisplacing), NonDisplacingReturns);
             Case(map, pad, "the driver returns own clothes and their forced flags",
                  (m, p) => Stage(m, p, StageKit.Displacing), DriverRoundTrip);
+            Case(map, pad, "work and recreation are mutually exclusive on a stand",
+                 (m, p) => Stage(m, p, StageKit.Displacing), WorkAndRecreationAreExclusive);
+            Case(map, pad, "a joy job in the stand's room dresses",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 JoyJobInTheRoomDresses);
             Case(map, pad, "full change swaps the whole outfit and gives it all back",
                  (m, p) => Stage(m, p, StageKit.Displacing), FullChangeSwapsEverything);
             Case(map, pad, "the rules the description promises hold",
@@ -196,6 +201,7 @@ namespace ShiftChange
 
             // The two below need no map, so they are unaffected by the game
             // replacement above.
+            Case("the recreation job classifier holds", RecreationClassifierHolds);
             Case("the room-role table resolves", RoomRoleTableResolves);
             // Last: it drives a deliberately failing assertion, and the tallies
             // are global.
@@ -539,6 +545,165 @@ namespace ShiftChange
             return ok
                 & Expect(!SwapPlan.WouldDress(fix.Pawn, fix.Stand),
                          "an empty stand still refuses, full change or not");
+        }
+
+        /// <summary>
+        /// The joy-branch classifier, as a table.
+        ///
+        /// <para><see cref="Patch_JobInterception.IsRecreationJob"/> decides
+        /// which arm a job reaches, and it keys on <c>joyKind</c> plus one
+        /// driver-class exclusion. Both halves have a case here because both
+        /// were found by review rather than by design: Reading carries a
+        /// joyKind but picks its spot MID-JOB, so at StartJob its target is
+        /// whatever shelf the book sits on; and VisitSickPawn is Doctor work
+        /// that carries joyKind Social, the one vanilla overlap, deliberately
+        /// left IN class so every room-resolver site reads it B-first and
+        /// they cannot disagree.</para>
+        ///
+        /// <para>No map: this is a static fact about the def database, and it
+        /// is most likely to break on a game update rather than on an edit.</para>
+        /// </summary>
+        internal static bool RecreationClassifierHolds()
+        {
+            JobDef chess = DefDatabase<JobDef>.GetNamedSilentFail("Play_Chess");
+            JobDef reading = DefDatabase<JobDef>.GetNamedSilentFail("Reading");
+            JobDef visitSick = DefDatabase<JobDef>.GetNamedSilentFail("VisitSickPawn");
+            if (chess == null || reading == null || visitSick == null)
+            {
+                return Expect(false, "the joy job defs resolve");
+            }
+
+            bool ok = Expect(chess.joyKind != null, "a plain joy job still carries a joyKind")
+                    & Expect(Patch_JobInterception.IsRecreationJob(JobMaker.MakeJob(chess)),
+                             "and classifies as recreation")
+                    & Expect(!Patch_JobInterception.IsRecreationJob(JobMaker.MakeJob(JobDefOf.Wait)),
+                             "a job with no joyKind does not (control)");
+
+            ok &= Expect(reading.joyKind != null,
+                         "Reading still carries a joyKind — the exclusion is by driver, not by kind")
+                & Expect(!Patch_JobInterception.IsRecreationJob(JobMaker.MakeJob(reading)),
+                         "and is excluded anyway, because it picks its spot mid-job");
+
+            ok &= Expect(visitSick.joyKind != null,
+                         "VisitSickPawn is still joy-class in vanilla")
+                & Expect(Patch_JobInterception.IsRecreationJob(JobMaker.MakeJob(visitSick)),
+                         "and stays in class, so every resolver reads it B-first");
+
+            // The room half of the same table.
+            RoomRoleDef recRoom = DefDatabase<RoomRoleDef>.GetNamedSilentFail("RecRoom");
+            RoomRoleDef hospital = DefDatabase<RoomRoleDef>.GetNamedSilentFail("Hospital");
+            return ok
+                & Expect(recRoom != null && RoomWorkTypes.RecreationForRole(recRoom),
+                         "a rec room dresses for recreation by default")
+                & Expect(hospital == null || !RoomWorkTypes.RecreationForRole(hospital),
+                         "a work room does not (control)")
+                & Expect(!RoomWorkTypes.RecreationForRole(null),
+                         "and neither does an unroled room");
+        }
+
+        /// <summary>
+        /// Work and recreation are MUTUALLY EXCLUSIVE on one stand (principal,
+        /// 2026-08-16): it holds one outfit, and one outfit serves one purpose.
+        ///
+        /// <para>Asserted in both directions, because the rule is enforced by
+        /// two separate methods that each clear the other's half — and a
+        /// half-applied version of it leaves a stand claiming both, which the
+        /// dialog then cannot render honestly (it hides the work grid while
+        /// recreation is on).</para>
+        /// </summary>
+        internal static bool WorkAndRecreationAreExclusive(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            if (doctor == null)
+            {
+                return Expect(false, "the Doctor work type resolves");
+            }
+
+            fix.Comp.ToggleWork(doctor);
+            bool ok = Expect(fix.Comp.HandlesWork(doctor), "work on: the stand serves doctoring")
+                    & Expect(!fix.Comp.HandlesRecreation(), "and not recreation");
+
+            fix.Comp.ToggleRecreation();
+            ok &= Expect(fix.Comp.HandlesRecreation(), "recreation on: the stand serves joy")
+                & Expect(!fix.Comp.HandlesWork(doctor), "and the work half was CLEARED, not stacked")
+                & Expect(fix.Comp.WorkTypes.Count == 0, "with no work types left behind");
+
+            fix.Comp.ToggleWork(doctor);
+            ok &= Expect(fix.Comp.HandlesWork(doctor), "work again: doctoring is back")
+                & Expect(!fix.Comp.HandlesRecreation(), "and recreation was cleared in turn");
+
+            // Turning recreation off leaves nothing selected, which IS the
+            // excluded state — a stand that serves neither must say so rather
+            // than silently falling back to the room.
+            fix.Comp.ToggleRecreation();
+            fix.Comp.ToggleRecreation();
+            return ok
+                & Expect(!fix.Comp.HandlesRecreation(), "recreation off again")
+                & Expect(fix.Comp.IsExcluded, "and the stand reads as excluded, not automatic");
+        }
+
+        /// <summary>
+        /// The joy trigger, driven through the real interception entry point:
+        /// a recreation job done in the stand's room dresses the pawn, and the
+        /// jobs that must not divert do not.
+        ///
+        /// <para>The joy job is built with targetB on the pawn's own cell,
+        /// because the recreation arm resolves B-FIRST — for the sit-and-play
+        /// classes B is where the pawn sits while joy ticks, and A is the
+        /// venue building. A work job targeted the same way is the control
+        /// that shows the stand's exclusivity is doing the work, not the
+        /// geometry.</para>
+        /// </summary>
+        internal static bool JoyJobInTheRoomDresses(Fixture fix)
+        {
+            JobDef chess = DefDatabase<JobDef>.GetNamedSilentFail("Play_Chess");
+            JobDef reading = DefDatabase<JobDef>.GetNamedSilentFail("Reading");
+            WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+            if (chess == null || reading == null)
+            {
+                return Expect(false, "the joy job defs resolve");
+            }
+
+            // The pad's room has no role, so declare the trigger explicitly —
+            // the same thing PromisesHold does for doctoring.
+            fix.Comp.ToggleRecreation();
+            bool ok = Expect(fix.Comp.HandlesRecreation(), "the stand serves recreation");
+
+            ok &= Expect(Diverts(fix, JoyJob(fix, chess)),
+                         "a joy job in this room dresses (positive control)");
+
+            Job forced = JoyJob(fix, chess);
+            forced.playerForced = true;
+            ok &= Expect(!Diverts(fix, forced), "a player-forced joy job is never diverted");
+
+            ok &= Expect(!Diverts(fix, JoyJob(fix, reading)),
+                         "reading is not served, even though it is joy-class");
+
+            if (tend != null)
+            {
+                ok &= Expect(!Diverts(fix, WorkJob(fix, tend)),
+                             "and work is not served by a recreation stand");
+            }
+
+            // Flip the stand back to work and the same joy job must stop
+            // diverting — the trigger, not the room, is what decides.
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            if (doctor != null)
+            {
+                fix.Comp.ToggleWork(doctor);
+                ok &= Expect(!Diverts(fix, JoyJob(fix, chess)),
+                             "a work stand ignores the joy job it just served");
+            }
+            return ok;
+        }
+
+        /// <summary>
+        /// A recreation job whose B target is the pawn's own cell — the shape
+        /// the joy arm resolves. <see cref="WorkJob"/> is its work-arm twin.
+        /// </summary>
+        internal static Job JoyJob(Fixture fix, JobDef def)
+        {
+            return JobMaker.MakeJob(def, fix.Pawn.Position, fix.Pawn.Position);
         }
 
         /// <summary>
