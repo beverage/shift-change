@@ -41,6 +41,11 @@
                   <li Class="ShiftChange.CompProperties_ShiftStand" />
                   <li Class="CompProperties_AssignableToPawn">
                     <compClass>ShiftChange.CompAssignableToPawn_ShiftStand</compClass>
+          <!-- Ownership is a SET, not a slot: a stand may be
+               restricted to any number of colonists. The cap only
+               feeds HasFreeSlot and vanilla's dialog, neither of
+               which we use, but it should not read as 1. -->
+          <maxAssignedPawnsCount>1000</maxAssignedPawnsCount>
                     <drawAssignmentOverlay>true</drawAssignmentOverlay>
                     <drawUnownedAssignmentOverlay>false</drawUnownedAssignmentOverlay>
                   </li>
@@ -69,6 +74,11 @@
                   <li Class="ShiftChange.CompProperties_ShiftStand" />
                   <li Class="CompProperties_AssignableToPawn">
                     <compClass>ShiftChange.CompAssignableToPawn_ShiftStand</compClass>
+          <!-- Ownership is a SET, not a slot: a stand may be
+               restricted to any number of colonists. The cap only
+               feeds HasFreeSlot and vanilla's dialog, neither of
+               which we use, but it should not read as 1. -->
+          <maxAssignedPawnsCount>1000</maxAssignedPawnsCount>
                     <drawAssignmentOverlay>true</drawAssignmentOverlay>
                     <drawUnownedAssignmentOverlay>false</drawUnownedAssignmentOverlay>
                   </li>

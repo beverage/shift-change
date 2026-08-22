@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
 
-  <ShiftChange.InspectWork>Work uniform for: {0}</ShiftChange.InspectWork>
+  <ShiftChange.InspectWork>Outfit for: {0}</ShiftChange.InspectWork>
   <ShiftChange.InspectOwner>Owner: {0}</ShiftChange.InspectOwner>
+  <ShiftChange.InspectOwners>Owners ({0}): {1}</ShiftChange.InspectOwners>
+  <ShiftChange.InspectOwnersOverflow>{0} and {1} more</ShiftChange.InspectOwnersOverflow>
   <ShiftChange.InspectPool>Shared — any capable colonist may use it.</ShiftChange.InspectPool>
   <ShiftChange.InspectPoolDisabled>Unassigned — shared use is turned off in mod settings.</ShiftChange.InspectPoolDisabled>
   <ShiftChange.InspectOnShift>{0} is wearing this outfit.</ShiftChange.InspectOnShift>
@@ -10,17 +12,31 @@
   <ShiftChange.InspectExcluded>Not used for shift changes.</ShiftChange.InspectExcluded>
 
   <ShiftChange.OwnerGizmoLabel>Owner: {0}</ShiftChange.OwnerGizmoLabel>
-  <ShiftChange.PoolGizmoLabel>Shared (set owner)</ShiftChange.PoolGizmoLabel>
+  <ShiftChange.OwnerGizmoLabelMany>Owners: {0}</ShiftChange.OwnerGizmoLabelMany>
+  <ShiftChange.FilterAll>All</ShiftChange.FilterAll>
+  <ShiftChange.FilterMen>Men</ShiftChange.FilterMen>
+  <ShiftChange.FilterWomen>Women</ShiftChange.FilterWomen>
+  <ShiftChange.AssignAllShown>Assign all {0}</ShiftChange.AssignAllShown>
+  <ShiftChange.ClearOwners>Remove all owners</ShiftChange.ClearOwners>
+  <ShiftChange.PoolGizmoLabel>Shared (set owners)</ShiftChange.PoolGizmoLabel>
 
-  <ShiftChange.SetWorkTypeDesc>This stand dresses for: {0} ({1}).\n\nWhoever uses it changes into the outfit before starting automatic work of those kinds in this room, and changes back when they leave.\n\nThis switch also decides which mod's owner control the stand shows when another outfit-stand mod is installed: in service, Shift Change's; not used, the other mod's.</ShiftChange.SetWorkTypeDesc>
+  <!-- Both halves of the merge: main's shipped three-state regime labels and
+       the owner-control sentence that names which mod's control shows, plus
+       the recreation trigger's own
+       strings. SetWorkTypeLabel is deliberately NOT carried over from the
+       branch — main's Regime* keys replaced it. -->
+  <ShiftChange.SetWorkTypeDesc>This stand dresses for: {0} ({1}).\n\nWhoever uses it changes into the outfit before starting automatic work or recreation of those kinds in this room, and changes back when they leave.\n\nThis switch also decides which mod's owner control the stand shows when another outfit-stand mod is installed: in service, Shift Change's; not used, the other mod's.</ShiftChange.SetWorkTypeDesc>
   <ShiftChange.RegimeShift>Shift stand: {0}</ShiftChange.RegimeShift>
   <ShiftChange.RegimeShiftMore>Shift stand: {0} (+{1})</ShiftChange.RegimeShiftMore>
   <ShiftChange.RegimeIdle>Shift stand (no work here yet)</ShiftChange.RegimeIdle>
   <ShiftChange.RegimeOff>Not used for shift changes</ShiftChange.RegimeOff>
   <ShiftChange.WorkTypesTitle>Work types</ShiftChange.WorkTypesTitle>
-  <ShiftChange.WorkTypesExplainer>Ticked kinds of work, done in this room, trigger a change into this stand's outfit:</ShiftChange.WorkTypesExplainer>
+  <ShiftChange.WorkTypesExplainer>Ticked activities, done in this room, trigger a change into this stand's outfit:</ShiftChange.WorkTypesExplainer>
+  <ShiftChange.Recreation>recreation</ShiftChange.Recreation>
+  <ShiftChange.RecreationRow>Recreation — any joy activity in this room</ShiftChange.RecreationRow>
+  <ShiftChange.RecreationExclusiveNote>While recreation is on, this stand serves recreation only — work types do not apply.</ShiftChange.RecreationExclusiveNote>
   <ShiftChange.FullChange>Change the whole outfit</ShiftChange.FullChange>
-  <ShiftChange.FullChangeDesc>Normally a pawn keeps whatever this stand's kit does not conflict with, so the uniform goes on over their own clothes.\n\nWith this on they undress completely and wear only what the stand holds — right for a sauna robe or a swimsuit, and slower in both directions, since every garment is taken off and put back on.\n\nEverything their own clothes were providing comes off with them — warmth, armor, any bonuses those garments carried. They have exactly what the stand holds and nothing more.</ShiftChange.FullChangeDesc>
+  <ShiftChange.FullChangeDesc>Normally a pawn keeps whatever this stand's kit does not conflict with, so the uniform goes on over their own clothes.\n\nWith this on they undress completely and wear only what the stand holds — right for a sauna robe, and slower in both directions, since every garment is taken off and put back on.\n\nEverything their own clothes were providing comes off with them — warmth, armor, any bonuses those garments carried. They have exactly what the stand holds and nothing more.</ShiftChange.FullChangeDesc>
   <ShiftChange.InspectFullChange>Changes the whole outfit</ShiftChange.InspectFullChange>
   <ShiftChange.WorkTypeAuto>Automatic (from the room)</ShiftChange.WorkTypeAuto>
   <ShiftChange.WorkTypeNone>Not used for shift changes</ShiftChange.WorkTypeNone>
@@ -31,9 +47,9 @@
   <ShiftChange.Excluded>excluded</ShiftChange.Excluded>
   <ShiftChange.None>nothing</ShiftChange.None>
 
-  <ShiftChange.AssignDesc>Reserve this stand for one colonist.\n\nLeave it unassigned and it is shared: any colonist about to do {0} in this room may use whichever stand is free. A kitchen therefore needs one stand per cook working at once, not one per cook.</ShiftChange.AssignDesc>
-  <ShiftChange.AssignDescNoPool>Reserve this stand for one colonist.\n\nShared use of unassigned stands is turned off in mod settings, so only an assigned owner will change at this stand for {0}.</ShiftChange.AssignDescNoPool>
-  <ShiftChange.AssignDescNoWork>Reserve this stand for one colonist. It has no work type yet — either put it in a room with a role, or set one manually.</ShiftChange.AssignDescNoWork>
+  <ShiftChange.AssignDesc>Restrict this stand to the colonists you list. Name one and it is their personal kit; name several and it serves that group and nobody outside it.\n\nLeave it unassigned and it is shared: any colonist about to do {0} in this room may use whichever stand is free. A kitchen therefore needs one stand per cook working at once, not one per cook.\n\nThe list filters by gender and can assign everyone shown at once — a stand holding gendered clothing is two clicks away.</ShiftChange.AssignDesc>
+  <ShiftChange.AssignDescNoPool>Restrict this stand to the colonists you list.\n\nShared use of unassigned stands is turned off in mod settings, so only a listed owner will change at this stand for {0}.</ShiftChange.AssignDescNoPool>
+  <ShiftChange.AssignDescNoWork>Restrict this stand to the colonists you list. It has no work type yet — either put it in a room with a role, or set one manually.</ShiftChange.AssignDescNoWork>
 
   <ShiftChange.ChangeBackLabel>Change back</ShiftChange.ChangeBackLabel>
   <ShiftChange.ChangeBackDesc>Cancel this colonist's orders and send them to {STAND} to change out of their work outfit.\n\nUse this when a raid or emergency starts: they will not change back on their own while the map is under threat.\n\nThey keep working in this room in their own clothes, and will not put the outfit back on until they have left the room and returned. Drafting them clears that straight away.</ShiftChange.ChangeBackDesc>
@@ -41,7 +57,7 @@
   <ShiftChange.ChangeBackUnavailable>This colonist cannot change right now.</ShiftChange.ChangeBackUnavailable>
 
   <ShiftChange.SettingPoolUnassigned>Unassigned stands are shared</ShiftChange.SettingPoolUnassigned>
-  <ShiftChange.SettingPoolUnassignedDesc>When on, an outfit stand with no assigned owner, standing in a work room, may be used by any colonist capable of that room's work.\n\nWhen off, only stands explicitly assigned to a colonist ever dress anyone — every unassigned stand behaves exactly like vanilla furniture.</ShiftChange.SettingPoolUnassignedDesc>
+  <ShiftChange.SettingPoolUnassignedDesc>When on, an outfit stand with no assigned owner, standing in a work room, may be used by any colonist capable of that room's work.\n\nWhen off, only stands with an explicit owner list ever dress anyone — every unassigned stand behaves exactly like vanilla furniture.</ShiftChange.SettingPoolUnassignedDesc>
 
   <!-- Rich text: Unity IMGUI supports &lt;b&gt;, &lt;i&gt;, &lt;size&gt; and
        &lt;color&gt; — but NOT &lt;u&gt;, which is TextMeshPro only and would

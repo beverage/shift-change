@@ -30,14 +30,14 @@ namespace ShiftChange
     /// search box filters ONE LEVEL. <c>DebugTabMenu.VisibleActions</c> is
     /// <c>CurrentNode.children</c> and the filter tests each node's own label,
     /// so nesting these makes them unreachable by typing <c>lifecycle</c> at
-    /// the top level — you filter to <c>dev tools</c> first, then open. Three
+    /// the top level — you filter to <c>dev tools</c> first, then open. Eight
     /// items behind one entry is the trade made deliberately, and it is paid on
     /// dev builds only.</para>
     ///
     /// <para>Children also lose the automatic <c>"T: "</c> tool prefix, which
     /// <c>GenerateCacheForMethod</c> adds only to attribute-driven nodes. Left
     /// off deliberately: every child here IS a map tool, so the prefix would
-    /// mark all three and distinguish none.</para>
+    /// mark all of them and distinguish none.</para>
     /// </summary>
     internal static class DebugTools_Menu
     {
@@ -58,6 +58,20 @@ namespace ShiftChange
                                     DebugTools_PreviewStage.BuildPreviewStage),
                 new DebugActionNode("Run lifecycle harness", DebugActionType.ToolMap,
                                     DebugTools_LifecycleHarness.RunHarness),
+                new DebugActionNode("Build pool room stage", DebugActionType.ToolMap,
+                                    DebugTools_PoolStage.BuildPoolStage),
+                // The one pawn-targeting child. DebugActionNode carries a
+                // separate pawnAction delegate for ToolMapForPawns (:19, and
+                // the ctor's fourth parameter) — passing this as `action`
+                // would compile and then do nothing when clicked.
+                new DebugActionNode("Drain recreation", DebugActionType.ToolMapForPawns,
+                                    null, DebugTools_PoolStage.DrainRecreation),
+                new DebugActionNode("Build rec room stage", DebugActionType.ToolMap,
+                                    DebugTools_RecRoomStage.BuildRecRoomStage),
+                new DebugActionNode("Explain recreation", DebugActionType.ToolMapForPawns,
+                                    null, DebugTools_Explain.ExplainRecreation),
+                new DebugActionNode("Export scene", DebugActionType.ToolMap,
+                                    DebugTools_ExportScene.ExportScene),
             };
         }
     }

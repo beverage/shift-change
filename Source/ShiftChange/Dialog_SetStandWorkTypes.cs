@@ -39,12 +39,33 @@ namespace ShiftChange
         internal const float ScrollbarAllowance = 20f;
         /// <summary>
         /// Everything above the scrolling work-type grid: title, the two mode
-        /// radios, the full-change row and the explainer. Grow this when a row
-        /// is added above the grid, or the grid silently loses the height
-        /// instead — <see cref="DoWindowContents"/> hands it whatever is left.
+        /// radios, the full-change row, the explainer and the recreation row.
+        /// Grow this when a row is added above the grid, or the grid silently
+        /// loses the height instead — <see cref="DoWindowContents"/> hands it
+        /// whatever is left.
+        ///
+        /// <para>160 was title + radios + explainer. The full-change row and
+        /// the recreation row each cost a row plus its separator, and both
+        /// landed in the same merge — hence 226 rather than either branch's
+        /// own figure.</para>
         /// </summary>
-        internal const float HeaderAllowance = 196f;
+        internal const float HeaderAllowance = 226f;
         internal const float MinWindowWidth = 420f;
+
+        /// <summary>
+        /// What <c>Widgets.RadioButtonLabeled</c> reserves on the right for the
+        /// button itself (<c>Widgets.RadioButtonSize</c> plus its gap), so the
+        /// label height can be measured against the width it will really get.
+        /// </summary>
+        internal const float RadioButtonWidth = 28f;
+
+        /// <summary>
+        /// Extra height the automatic label needed beyond one row, measured in
+        /// <see cref="DoWindowContents"/> and consumed by
+        /// <see cref="InitialSize"/>. Zero until the first frame draws, which is
+        /// harmless: <see cref="FitToMode"/> re-fits the window every frame.
+        /// </summary>
+        internal float autoLabelOverflow;
 
         /// <summary>Rows a column aims for before the dialog grows another column.</summary>
         internal const int TargetRows = 14;
@@ -109,6 +130,19 @@ namespace ShiftChange
             rowsPerColumn = Mathf.Max(1, Mathf.CeilToInt(works.Count / (float)columns));
         }
 
+        /// <summary>
+        /// Title plus the two mode radios — everything an EXCLUDED stand has.
+        /// </summary>
+        internal const float ModeOnlyAllowance = 96f;
+
+        /// <summary>
+        /// A stand excluded from shift changes has no shift-change settings, so
+        /// the window holds nothing but the two radios that let you bring it
+        /// back. Deliberately not "greyed out": a disabled control still
+        /// advertises a setting, and this stand does not have one.
+        /// </summary>
+        internal bool ModeOnly => comp.IsExcluded;
+
         public override Vector2 InitialSize
         {
             get
@@ -117,11 +151,26 @@ namespace ShiftChange
                     + (columns - 1) * ColumnGutter + ScrollbarAllowance;
                 width = Mathf.Clamp(width, MinWindowWidth, UI.screenWidth * 0.9f);
 
-                float height = WindowMargin * 2f + HeaderAllowance
-                    + rowsPerColumn * RowHeight + CloseButSize.y + 10f;
+                float height = WindowMargin * 2f + CloseButSize.y + 10f + autoLabelOverflow
+                    + (ModeOnly ? ModeOnlyAllowance : HeaderAllowance + rowsPerColumn * RowHeight);
                 height = Mathf.Min(height, UI.screenHeight * 0.85f);
 
                 return new Vector2(width, height);
+            }
+        }
+
+        /// <summary>
+        /// Toggling the mode while the dialog is OPEN has to resize it — the
+        /// engine reads <see cref="InitialSize"/> once, in PreOpen
+        /// (<c>Window.cs</c>), so without this the window keeps whatever height
+        /// it opened at and the collapse leaves a tall empty box.
+        /// </summary>
+        internal void FitToMode()
+        {
+            float wanted = InitialSize.y;
+            if (!Mathf.Approximately(windowRect.height, wanted))
+            {
+                windowRect.height = wanted;
             }
         }
 
@@ -139,12 +188,19 @@ namespace ShiftChange
             listing.Gap(4f);
 
             // Mode radios. The automatic label names what the room currently
-            // resolves to, so "automatic" is never a mystery box.
+            // resolves to — BOTH halves, works and recreation — so
+            // "automatic" is never a mystery box.
             RoomRoleDef roomRole = comp.parent.Spawned ? comp.parent.GetRoom()?.Role : null;
             List<WorkTypeDef> roomDefaults = RoomWorkTypes.ForRole(roomRole);
+            List<string> autoParts = roomDefaults
+                .Select(w => (string)(w.gerundLabel ?? w.defName)).ToList();
+            if (RoomWorkTypes.RecreationForRole(roomRole))
+            {
+                autoParts.Add("ShiftChange.Recreation".Translate().RawText);
+            }
             string autoLabel = "ShiftChange.WorkTypeAuto".Translate();
-            autoLabel += ": " + (roomDefaults.Count > 0
-                ? roomDefaults.Select(w => w.gerundLabel ?? w.defName).ToCommaList()
+            autoLabel += ": " + (autoParts.Count > 0
+                ? autoParts.ToCommaList()
                 : "ShiftChange.None".Translate().RawText);
             if (roomDefaults.Count == 0)
             {
@@ -159,7 +215,33 @@ namespace ShiftChange
                     : (string)"ShiftChange.NoRoomRole".Translate());
             }
 
-            if (Widgets.RadioButtonLabeled(listing.GetRect(RowHeight), autoLabel, comp.IsAutomatic))
+            // MEASURE the automatic label, do not assume one row. It names the
+            // room's resolved activities AND, when there are none, the role the
+            // game actually inferred — which on a two-column dialog wraps to a
+            // second line and gets clipped at a fixed RowHeight (the top line
+            // vanishes, so the row reads as a truncated fragment). Vanilla's
+            // radio draws its button on the right, so the label owns everything
+            // but that.
+            float autoLabelWidth = content.width - RadioButtonWidth;
+            float autoRowHeight = Mathf.Max(RowHeight, Text.CalcHeight(autoLabel, autoLabelWidth));
+            // Fed back into InitialSize so the window grows by however much the
+            // wrap cost; FitToMode below applies it on the same frame.
+            autoLabelOverflow = autoRowHeight - RowHeight;
+            // NOT Widgets.RadioButtonLabeled for this row. That helper draws the
+            // label across the FULL rect (Widgets.cs:1405) and then paints the
+            // button on top at rect.xMax - 24 (:1416) — it reserves nothing. A
+            // one-line label is unaffected because it simply ends before the
+            // button, but this one wraps, and the first line then runs
+            // underneath it and loses its last few characters. Compose the two
+            // halves instead so the label owns a rect the button is not in.
+            Rect autoRect = listing.GetRect(autoRowHeight);
+            Widgets.Label(new Rect(autoRect.x, autoRect.y,
+                                   autoRect.width - RadioButtonWidth, autoRect.height),
+                          autoLabel);
+            if (Widgets.RadioButton(autoRect.xMax - 24f,
+                                    autoRect.y + autoRect.height / 2f - 12f,
+                                    comp.IsAutomatic)
+                | Widgets.ButtonInvisible(autoRect))
             {
                 comp.SetAutomatic();
             }
@@ -169,18 +251,28 @@ namespace ShiftChange
                 comp.SetExcluded();
             }
 
+            // NOTHING BELOW HERE ON AN EXCLUDED STAND. The rest of this window
+            // configures shift changes, and this stand does not do them — so it
+            // has no full-change setting, no trigger, and no work types, and
+            // showing them disabled would claim otherwise. The two radios above
+            // are the whole control surface until one of them brings it back.
+            if (ModeOnly)
+            {
+                listing.End();
+                FitToMode();
+                return;
+            }
+            FitToMode();
+
             listing.GapLine();
 
             // Full change is a property of what the rack HOLDS, not of which
             // work it serves, so it sits outside the mode radios rather than
-            // becoming a fourth mode. Greyed out while excluded: an excluded
-            // stand builds no dress plan at all, so the flag would have nothing
-            // to act on and a live checkbox would imply otherwise.
+            // becoming a fourth mode.
             bool full = comp.FullChange;
             Rect fullRect = listing.GetRect(RowHeight);
-            Widgets.CheckboxLabeled(fullRect, "ShiftChange.FullChange".Translate(), ref full,
-                                    disabled: comp.IsExcluded);
-            if (!comp.IsExcluded && full != comp.FullChange)
+            Widgets.CheckboxLabeled(fullRect, "ShiftChange.FullChange".Translate(), ref full);
+            if (full != comp.FullChange)
             {
                 comp.SetFullChange(full);
             }
@@ -189,6 +281,37 @@ namespace ShiftChange
             listing.GapLine();
             listing.Label("ShiftChange.WorkTypesExplainer".Translate());
             listing.Gap(4f);
+
+            // Recreation is one trigger, not a work type — the room is the
+            // selector (a robe stand serves the sauna by standing in it), so
+            // a single row covers every joy activity. Above the work
+            // grid rather than inside it: it is not a WorkTypeDef and must
+            // not look like a modded one.
+            bool recreationOn = comp.HandlesRecreation();
+            bool recreationWas = recreationOn;
+            Widgets.CheckboxLabeled(listing.GetRect(RowHeight),
+                "ShiftChange.RecreationRow".Translate(), ref recreationOn);
+            if (recreationOn != recreationWas)
+            {
+                comp.ToggleRecreation();
+            }
+            listing.Gap(4f);
+
+            // Recreation and work types are mutually exclusive (principal,
+            // 2026-08-16: one stand, one outfit, one purpose) — while
+            // recreation is on the work grid is HIDDEN rather than greyed:
+            // an interactable-looking list that would silently untick
+            // recreation is a trap; an absent one is a statement. Re-queried
+            // after the toggle above so the grid vanishes the same frame the
+            // box is ticked.
+            if (comp.HandlesRecreation())
+            {
+                GUI.color = Color.gray;
+                listing.Label("ShiftChange.RecreationExclusiveNote".Translate());
+                GUI.color = Color.white;
+                listing.End();
+                return;
+            }
 
             Rect outRect = listing.GetRect(content.height - listing.CurHeight);
             Rect viewRect = new Rect(0f, 0f,

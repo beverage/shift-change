@@ -58,7 +58,7 @@ to stop, and `--alongside` is the deliberate opt-in.
 
 ## What the cases assert
 
-Sixteen cases, in four kinds.
+Twenty-two cases, in six kinds.
 
 **Regression cases** guard a bug that happened. A stand whose stock shares no
 apparel layer with what the pawn wears once donated its uniform permanently and
@@ -82,6 +82,25 @@ the stand does not serve ignored, and the meal-break policy in both directions.
 That last one is the reason this kind exists: all three descriptions claimed
 eating in a room changed nothing, while the code had always done the opposite
 deliberately, and nothing caught it until this case was written.
+
+**Recreation cases** cover the joy arm, which shares everything downstream
+with the work arm and nothing upstream. One asserts the classifier itself — a
+plain joy job carries a `joyKind` and is diverted, reading is excluded by driver
+class, and a job that is both work and joy resolves the same way from either
+side. One drives a real joy job in a stand's room and asserts the swap. A third
+asserts that recreation and work types clear each other on the same stand,
+because the exclusivity is what makes the dual-purpose stand unreachable from
+the UI rather than merely discouraged.
+
+**Ownership cases** guard the owner list, which went from one pawn to a set.
+One walks a stand through pool, one owner, two owners and back, asserting who
+may claim it at each step; its load-bearing assertion is the SECOND owner,
+because a single-owner reader passes everything before that and fails from
+there. The other drives the owner dialog's candidate list through all three
+filter states without opening a window, and asserts the one property a filter
+must have: an assigned pawn leaves the candidate list but stays visible as an
+owner even under a filter that excludes them. A filter that hid the owner you
+wanted to remove would be a trap.
 
 **Round-trip cases** save the game, load it back through the engine's own
 synchronous loader, and assert on what came out. There are three: a plain trip
@@ -107,11 +126,13 @@ register without a fixture — a teardown would clear a pad on a disposed map.
 And `Game.LoadGame` ends in `FinalizeInit`, which `Patch_HarnessAutoRun`
 postfixes, so a one-shot latch there prevents a nested harness run.
 
-Two further cases cover neither the mod's behaviour nor a past bug. One walks
-the room-role table and asserts every `RoomRoleDef` and `WorkTypeDef` it names
-still resolves — the lookups are silent-fail, so a renamed def empties the table
-and the mod does nothing at all with no error anywhere. The other asserts the
-harness's own accounting: `Expect` reports and returns, `Case` counts, and a
+Two further cases cover neither the mod's behaviour nor a past bug, and need no
+map at all. One walks the room-role table and asserts every `RoomRoleDef` and
+`WorkTypeDef` it names still resolves — the lookups are silent-fail, so a
+renamed def empties the table and the mod does nothing at all with no error
+anywhere. That table now carries recreation rows as well, including two
+third-party pool roles, so the same silence would take the joy arm with it. The
+other asserts the harness's own accounting: `Expect` reports and returns, `Case` counts, and a
 known gap is counted apart from a failure. Without it the runner can grep a
 green log out of a suite that checks nothing.
 

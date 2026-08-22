@@ -48,6 +48,11 @@
         <li Class="ShiftChange.CompProperties_ShiftStand" />
         <li Class="CompProperties_AssignableToPawn">
           <compClass>ShiftChange.CompAssignableToPawn_ShiftStand</compClass>
+          <!-- Ownership is a SET, not a slot: a stand may be
+               restricted to any number of colonists. The cap only
+               feeds HasFreeSlot and vanilla's dialog, neither of
+               which we use, but it should not read as 1. -->
+          <maxAssignedPawnsCount>1000</maxAssignedPawnsCount>
           <!-- The overlay is how a room of pool stands is read at a glance:
                our comp draws the current BORROWER's name when one is out,
                and falls back to the base's owner name otherwise. Unowned

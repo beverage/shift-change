@@ -344,11 +344,31 @@ namespace ShiftChange
                     continue;
                 }
                 WorkGiverDef giver = job.workGiverDef;
-                if (giver?.workType == null || giver.emergency || !stand.HandlesWork(giver.workType))
+                bool forWork = giver?.workType != null && !giver.emergency
+                    && stand.HandlesWork(giver.workType);
+                // The joy twin: a colonist already at recreation bare when
+                // this stand freed — the pool-party case — is caught up the
+                // same way. Joy jobs carry no workGiverDef, so the two arms
+                // are disjoint by construction.
+                bool forRecreation = !forWork && giver == null
+                    && stand.HandlesRecreation() && IsRecreationJob(job)
+                    // The dress arm's two guards apply here too: never pull a
+                    // pawn out of bed, and never treat the map-spanning
+                    // outdoor room as this stand's room.
+                    && !pawn.InBed() && !room.TouchesMapEdge;
+                if (!forWork && !forRecreation)
                 {
                     continue;
                 }
-                IntVec3 target = TargetCell(job, map);
+                // Resolve by job CLASS, not by which arm matched — the same
+                // rule as TryInsertSwap's shared resolver, and it must be:
+                // VisitSickPawn is the one vanilla job that is BOTH (Doctor
+                // work with joyKind Social), and resolving it A-first here
+                // while StartJob resolved it B-first re-opened a bounded
+                // dress/undress churn per stand-freed event (fix-verify,
+                // 2026-08-15). Every site answers "where does this job
+                // happen" identically or the two answers fight.
+                IntVec3 target = IsRecreationJob(job) ? JoyTargetCell(job, map) : TargetCell(job, map);
                 if (!target.IsValid || target.GetRoom(map) != room)
                 {
                     continue;
@@ -526,7 +546,15 @@ namespace ShiftChange
                 return false;
             }
 
-            IntVec3 target = TargetCell(job, map);
+            // ONE room resolver per job class, consumed by BOTH directions.
+            // The dress arm reads joy jobs B-first (JoyTargetCell), so the
+            // return trip must read them the same way: with split reads, a
+            // vanilla SocialRelax whose gather spot and chair straddle a
+            // held-open door (its chair search is LOS-only, no same-room
+            // check) makes the two arms disagree about where the job
+            // happens, and the pawn ping-pongs dress/undress forever
+            // (review, 2026-08-15).
+            IntVec3 target = IsRecreationJob(job) ? JoyTargetCell(job, map) : TargetCell(job, map);
 
             // The return trip. Checked first: a pawn already in uniform who is
             // leaving should change back whatever the new job is.
@@ -558,6 +586,30 @@ namespace ShiftChange
                     {
                         return false;
                     }
+                    // The sit-down-break policy above is a WORK-room rule
+                    // (principal, 2026-08-08) and stays exactly as set. A
+                    // recreation stand's room is different: it stores its own
+                    // drinks on purpose, and stripping the robe to fetch a
+                    // beer from the poolside shelf wrapped every drink taken
+                    // inside the room in two wardrobe trips (review,
+                    // 2026-08-15). Same-room food on a rec-capable stand is
+                    // part of the break — stay dressed. Carrying the drink
+                    // OUT in the robe is bounded churn, not a loop, and the
+                    // next job's ordinary return trip still fires. Work and
+                    // recreation are mutually exclusive on a stand
+                    // (2026-08-16), which closes the dual-purpose residual —
+                    // but note this tests the stand's CURRENT config, not
+                    // why the pawn was dressed: re-configure a stand to
+                    // recreation while its WORK uniform is out and the
+                    // borrower's next same-room meal skips the change-out
+                    // once (bounded — the next out-of-room job returns as
+                    // normal). Recording the dress REASON in the ledger is
+                    // the refinement, queued with the full-change ledger work.
+                    if (onShift.HandlesRecreation()
+                        && target.IsValid && target.GetRoom(map) == standRoom)
+                    {
+                        return false;
+                    }
                     return Insert(pawn, tracker, onShift, job, tag, "return");
                 }
                 if (!target.IsValid || target.GetRoom(map) == standRoom)
@@ -571,21 +623,83 @@ namespace ShiftChange
             }
 
             WorkTypeDef work = job.workGiverDef?.workType;
-            if (work == null || !target.IsValid)
+            if (work != null)
+            {
+                if (!target.IsValid)
+                {
+                    return false;
+                }
+
+                Room room = target.GetRoom(map);
+                if (room == null)
+                {
+                    return false;
+                }
+
+                // The change-back latch: they were pulled out of this very
+                // room and have not left it since, so dressing again here is
+                // the cycle the player just stopped.
+                if (IsLatchedIn(pawn, room))
+                {
+                    if (Verbose)
+                    {
+                        Log.Message($"[ShiftChange] {pawn.LabelShort} stays changed out — " +
+                                    "not left the room since the change-back order");
+                    }
+                    return false;
+                }
+
+                CompShiftStand stand = FindAvailableStand(room, pawn, work);
+                if (stand == null)
+                {
+                    if (Verbose)
+                    {
+                        Log.Message($"[ShiftChange] no free {work.defName} stand in {room.Role?.defName ?? "unroled"} " +
+                                    $"room for {pawn.LabelShort} ({job.def.defName})");
+                    }
+                    return false;
+                }
+
+                return Insert(pawn, tracker, stand, job, tag, "dress");
+            }
+
+            // The RECREATION arm. Joy jobs carry no workGiverDef, so
+            // the two arms are disjoint by construction, and every shared
+            // gate above — danger, player-forced, the latch sample, the
+            // cooldown, the return trip — has already run. The room is read
+            // B-first (see JoyTargetCell): a joy job's B is where the pawn
+            // will actually sit while A is the venue.
+            if (!IsRecreationJob(job))
             {
                 return false;
             }
-
-            Room room = target.GetRoom(map);
-            if (room == null)
+            // Vanilla hands joy to pawns lying in bed precisely so they stay
+            // there (JobGiver_GetJoyInBed, CanDoDuringMedicalRest) — in-bed
+            // TV or prayer must never pull a patient out of a sickbed to
+            // visit a wardrobe (review, 2026-08-15).
+            if (pawn.InBed())
             {
                 return false;
             }
-
-            // The change-back latch: they were pulled out of this very room
-            // and have not left it since, so dressing again here is the cycle
-            // the player just stopped.
-            if (IsLatchedIn(pawn, room))
+            IntVec3 joyTarget = JoyTargetCell(job, map);
+            if (!joyTarget.IsValid)
+            {
+                return false;
+            }
+            Room joyRoom = joyTarget.GetRoom(map);
+            // Outdoor cells resolve a REAL Room — the one map-spanning,
+            // edge-touching outdoor room — never null. Without this guard a
+            // rec-toggled stand in open ground serves every outdoor joy job
+            // on the map: every walk, skygaze and snowman, colony-wide
+            // (review, 2026-08-15). Rooms are this branch's scope; open
+            // ground is the fence rung's, done deliberately or not at all. A
+            // walled roofless yard is its own non-edge room and stays
+            // eligible on purpose.
+            if (joyRoom == null || joyRoom.TouchesMapEdge)
+            {
+                return false;
+            }
+            if (IsLatchedIn(pawn, joyRoom))
             {
                 if (Verbose)
                 {
@@ -594,19 +708,17 @@ namespace ShiftChange
                 }
                 return false;
             }
-
-            CompShiftStand stand = FindAvailableStand(room, pawn, work);
-            if (stand == null)
+            CompShiftStand recStand = FindAvailableStand(joyRoom, pawn, null, recreation: true);
+            if (recStand == null)
             {
                 if (Verbose)
                 {
-                    Log.Message($"[ShiftChange] no free {work.defName} stand in {room.Role?.defName ?? "unroled"} " +
+                    Log.Message($"[ShiftChange] no free recreation stand in {joyRoom.Role?.defName ?? "unroled"} " +
                                 $"room for {pawn.LabelShort} ({job.def.defName})");
                 }
                 return false;
             }
-
-            return Insert(pawn, tracker, stand, job, tag, "dress");
+            return Insert(pawn, tracker, recStand, job, tag, "dress-rec");
         }
 
         internal static bool Insert(Pawn pawn, Pawn_JobTracker tracker, CompShiftStand stand,
@@ -748,6 +860,76 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// A recreation job the room trigger can honestly serve: it
+        /// carries a <c>joyKind</c> — the marker every driver-ticked joy job
+        /// must carry (<c>JoyGiverDef</c> config-errors on a mismatch,
+        /// <c>JoyUtility.JoyTickCheckEnd</c> warns on its absence) — and is
+        /// not a late-room class. Consumption never reaches here at all:
+        /// Ingest carries no joyKind, its joy lives on the thing and lands in
+        /// <c>Thing.Ingested</c>. Reading DOES carry one but picks its
+        /// reading spot mid-job (<c>CarryToReadingSpot</c>), so it is
+        /// excluded by driver class: at StartJob its target is the BOOK,
+        /// wherever that is shelved, and dressing for the shelf's room is the
+        /// packed-lunch misread with a cover on.
+        ///
+        /// This classifies the JOB CLASS, not which arm serves it: the ARMS
+        /// are chosen by workGiverDef, and VisitSickPawn — Doctor work whose
+        /// JobDef carries joyKind Social, the one vanilla overlap — is
+        /// deliberately in-class here so that every room-resolver site reads
+        /// it B-first (the visitor's chair) and agrees with every other.
+        ///
+        /// <para><b>The reading exclusion is NARROWER than the principle behind
+        /// it, and knowingly so.</b> What disqualifies reading is not that it
+        /// is reading — it is that the job CHOOSES ITS SPOT MID-JOB, so the
+        /// target it carries at StartJob is not where the activity ends up
+        /// happening. Nothing in the engine flags that behaviour, so there is
+        /// no way to ask for it directly; the driver class is the only handle,
+        /// and it only catches vanilla's own.
+        ///
+        /// A modded reading job with its own driver would therefore slip
+        /// through, and dress a pawn for whichever room the book is shelved
+        /// in. As of 1.6 none in practice does: Alpha Books' own read job
+        /// (<c>ABooks_Reading</c>, driver <c>JobDriver_ReadAlphaBook</c>)
+        /// carries NO joyKind, so it fails the first test and never reaches
+        /// this one — excluded a step earlier, by luck rather than by design.
+        ///
+        /// If a report ever arrives of a stand firing while somebody reads,
+        /// this is the shape of it, and the fix is to widen the test — either
+        /// by naming the offending driver too, or by deferring the room
+        /// decision for any job whose target moves after it starts.</para>
+        /// </summary>
+        internal static bool IsRecreationJob(Job job)
+        {
+            JobDef def = job.def;
+            if (def?.joyKind == null)
+            {
+                return false;
+            }
+            Type driver = def.driverClass;
+            return driver == null || !typeof(JobDriver_Reading).IsAssignableFrom(driver);
+        }
+
+        /// <summary>
+        /// Where a recreation job happens: <c>targetB</c> FIRST, then the
+        /// work-style fallback. For the sit-and-play classes B is the cell
+        /// the pawn occupies while the joy ticks — the chair at the chess
+        /// table, the watch cell in front of the TV — and A is the venue
+        /// building; where B is unset (swimming's water cell, a gather spot,
+        /// art, a grave) A is already the venue. The work arm keeps its
+        /// A-first <see cref="TargetCell"/> untouched: work jobs put the pawn
+        /// at A.
+        /// </summary>
+        internal static IntVec3 JoyTargetCell(Job job, Map map)
+        {
+            IntVec3 cell = job.targetB.HasThing ? job.targetB.Thing.PositionHeld : job.targetB.Cell;
+            if (cell.IsValid && cell.InBounds(map))
+            {
+                return cell;
+            }
+            return TargetCell(job, map);
+        }
+
+        /// <summary>
         /// The job's food source is already on the pawn — in inventory (the
         /// same test the driver itself uses for eatingFromInventory,
         /// JobDriver_Ingest.cs:86) or in their hands.
@@ -779,7 +961,8 @@ namespace ShiftChange
         /// No free stand simply means no swap. Never queue for one: this is a
         /// nicety and must not become a bottleneck on the work itself.
         /// </summary>
-        internal static CompShiftStand FindAvailableStand(Room room, Pawn pawn, WorkTypeDef work)
+        internal static CompShiftStand FindAvailableStand(Room room, Pawn pawn, WorkTypeDef work,
+            bool recreation = false)
         {
             CompShiftStand best = null;
             bool bestIsPersonal = false;
@@ -791,7 +974,8 @@ namespace ShiftChange
                 foreach (Thing thing in room.ContainedThings(defs[i]))
                 {
                     CompShiftStand comp = thing.TryGetComp<CompShiftStand>();
-                    if (comp == null || comp.OnShift || !comp.HandlesWork(work)
+                    if (comp == null || comp.OnShift
+                        || !(recreation ? comp.HandlesRecreation() : comp.HandlesWork(work))
                         || !comp.CanBeClaimedBy(pawn))
                     {
                         continue;
@@ -822,7 +1006,7 @@ namespace ShiftChange
                         continue;
                     }
 
-                    bool personal = comp.AssignedOwner == pawn;
+                    bool personal = comp.IsAssignedTo(pawn);
                     int distance = pawn.Position.DistanceToSquared(thing.Position);
 
                     if (best == null

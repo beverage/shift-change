@@ -359,6 +359,7 @@ flowchart LR
   CA --> CS
   CS --> RWT["RoomWorkTypes"]
   CS --> DLG["Dialog_SetStandWorkTypes"]
+  CA --> DAO["Dialog_AssignStandOwners"]
 ```
 
 ### `Source/ShiftChange/`
@@ -369,7 +370,11 @@ flowchart LR
 | `JobDriver_SwapAtStand.cs` | Moves apparel, one direction at a time. Sets the forced flag on the way in, clears it on the way out. |
 | `SwapPlan.cs` | The single answer to "what would this swap move". Every wearability predicate lives here. |
 | `CompShiftStand.cs` | Per-stand work types and the checkout ledger. Static registry of on-shift stands. |
-| `CompAssignableToPawn_ShiftStand.cs` | Ownership. Narrows candidates to pawns capable of the stand's work. |
+| `CompAssignableToPawn_ShiftStand.cs` | Ownership. Narrows candidates to pawns capable of the stand's work, and swaps the vanilla assign window for ours. |
+| `Dialog_AssignStandOwners.cs` | The owner list. Replaces `Dialog_AssignBuildingOwner` for stands only — multi-select, a gender column and a gender filter, none of which the vanilla window exposes a seam for. |
+| `Interop_OutfitStandsPlus.cs` | Reflection bridge to Outfit Stands Plus. Silent-fail; absent mod means an inert file. |
+| `Patch_ForeignOwnerGizmos.cs` | Hides the other mod's Set owner control on stands declared ours, so a stand never shows two. |
+| `Patch_AllowRemovingToggle.cs` | Holds the stand's "Allow removing items" off while it is in service. |
 | `Patch_ChangeBackGizmo.cs` | "Change back" command on a pawn in uniform, plus the room-exit latch. |
 | `Patch_OptimizeApparelOnShift.cs` | Pauses the vanilla wardrobe optimizer while a pawn is checked out. |
 | `Patch_UnclaimStands.cs` | Releases stands when vanilla unclaims beds and thrones. Holds the reaper both it and the banish patch call. |
@@ -382,11 +387,16 @@ flowchart LR
 | `HarmonyInit.cs` | Patch bootstrap. |
 | `Patch_AllowRemovingTooltip.cs` | Appends the Shift Change truth to the stand's "Allow removing items" tooltip. UI only. |
 | `DebugTools_Fixtures.cs` | Fixture primitives — make a thing, a pawn, a garment. **Always compiled**, because the harness builds its fixtures from these in Release. |
-| `DebugTools_LifecycleHarness.cs` | The test suite. Thirteen cases driving real engine entry points — see [TESTING.md](TESTING.md). Body always compiled; its `[DebugAction]` is `SCENES` only. |
+| `DebugTools_LifecycleHarness.cs` | The test suite. Twenty-two cases driving real engine entry points — see [TESTING.md](TESTING.md). Body always compiled; its `[DebugAction]` is `SCENES` only. |
+| `DebugTools_SaveRoundTrip.cs` | The three save/load cases. Separate file because they replace `Current.Game` and must run last. |
 | `Patch_HarnessAutoRun.cs` | Runs the harness and quits, when launched with `-shiftchange-harness`. Inert without the flag. Always compiled — this is the release gate. |
 | `DebugTools_Menu.cs` | `SCENES` only. The mod's entire debug-menu surface: one "Dev tools…" submenu. Absent in Release, so the category never renders. |
 | `DebugTools_DemoStage.cs` | `SCENES` only. The demo stage. Test fixture and film set. Clears 13×16 before building. |
 | `DebugTools_PreviewStage.cs` | `SCENES` only. The title-card stage, sized to crop to Workshop cards. Clears 32×10 before building. |
+| `DebugTools_PoolStage.cs` | `SCENES` only. The pool fixture for the recreation arm, plus **Drain recreation** for forcing a joy roll. |
+| `DebugTools_RecRoomStage.cs` | `SCENES` only. The black-tie games room: eight guests, eight stands, four joyKinds. Unlocks the research tree so the set can be redressed by hand. |
+| `DebugTools_ExportScene.cs` | `SCENES` only. Turns a hand-dressed room into the C# that rebuilds it. Pure inspection — reads the map, writes a file. |
+| `DebugTools_Explain.cs` | `SCENES` only. Reports why a pawn is or is not taking recreation, one gate at a time. |
 | `HotReloadVisibility.cs` | Debug only. `InternalsVisibleTo` grants for the reload twins. |
 | `EcrWatchdog.cs` | Debug only. Polls for rebuilds, because Mono's `FileSystemWatcher` never fires on macOS. |
 | `Patch_ModeBadge.cs` | Debug only. The on-screen live/lab badge. |

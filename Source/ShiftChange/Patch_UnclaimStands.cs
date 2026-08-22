@@ -74,7 +74,7 @@ namespace ShiftChange
                         for (int j = stands.Count - 1; j >= 0; j--)
                         {
                             // Exact type first, any assignable as fallback —
-                            // the same order AssignedOwner reads with, and
+                            // the same order AssignedOwners reads with, and
                             // for the same reason (see its comment). The
                             // fallback WRITE is deliberate: if a foreign comp
                             // is what our reservation logic reads, a corpse

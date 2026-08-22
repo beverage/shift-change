@@ -90,6 +90,35 @@ fi
 dotnet build "$REPO/Source/ShiftChange/ShiftChange.csproj" -c Release >/dev/null \
   || die "Release build failed — fix that first"
 
+# THE BUILD IS NOT THE THING THE GAME LOADS.
+#
+# -savedatafolder isolates Config, Saves and Prefs, but NOT the mod itself:
+# the game reads Mods/ShiftChange out of the app bundle, and whatever that
+# resolves to is what gets tested. Three ways it has pointed somewhere else:
+# a release-staging COPY left in place (twice, and a green run silently
+# asserted against pre-fix bits), and a git worktree, where the build lands in
+# one checkout while the symlink still names another.
+#
+# Without this check the failure is a PASS, which is the worst shape a test
+# result can take. Compare canonical paths and refuse.
+MODS_ENTRY="$APP/Mods/ShiftChange"
+[ -e "$MODS_ENTRY" ] || die "no Mods/ShiftChange entry — the game cannot load this mod at all"
+realpath_of() { python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1"; }
+ENTRY_REAL="$(realpath_of "$MODS_ENTRY")"
+REPO_REAL="$(realpath_of "$REPO")"
+if [ "$ENTRY_REAL" != "$REPO_REAL" ]
+then
+  die "the game would NOT load the build this script just made.
+
+       built:  $REPO_REAL
+       loads:  $ENTRY_REAL
+
+       Point Mods/ShiftChange at the checkout under test and run again. If the
+       entry is a real directory rather than a symlink, it is release-staging
+       residue — park it, do not delete it, and restore the symlink."
+fi
+printf 'load path: %s\n' "$ENTRY_REAL"
+
 rm -rf "$TESTDATA"
 mkdir -p "$TESTDATA/Config"
 
