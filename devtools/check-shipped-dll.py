@@ -61,6 +61,8 @@ FORBIDDEN_TYPES = [
     "DebugTools_PoolStage",
     "DebugTools_Menu",
     "DebugTools_Explain",
+    "DebugTools_RecRoomStage",
+    "DebugTools_ExportScene",
 ]
 
 # The release gate. Patch_HarnessAutoRun is a type name (UTF-8);
