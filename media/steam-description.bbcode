@@ -1,6 +1,6 @@
 [h1]Shift Change[/h1]
 
-[b]Requires the Odyssey expansion[/b] — the outfit stand this mod builds on is Odyssey content, so without it nothing happens at all. Harmony is also required.
+[b]Requires the Odyssey expansion[/b] — the outfit stand this mod builds on is Odyssey content, so without it nothing happens. Harmony is also required.
 
 Colonists change into the right clothes for the room they are going to — to work in, or to enjoy themselves in — and back out again afterwards.
 
@@ -8,7 +8,7 @@ Colonists change into the right clothes for the room they are going to — to wo
 
 Put a vanilla outfit stand in a room and put an outfit on it. Each stand dresses for one of two things.
 
-[b]Work.[/b] A colonist taking on [b]automatic[/b] work of that room's kind — doctoring in the hospital, researching or synthesizing drugs in the lab, cooking in the kitchen — changes into the stand's outfit before starting, and changes back when their work takes them elsewhere.
+[b]Work.[/b] A colonist taking on [b]automatic[/b] work of that room's kind — doctoring in the hospital, researching in the lab, cooking in the kitchen — changes into the stand's outfit before starting, and back when their work takes them elsewhere.
 
 [b]Recreation.[/b] The same machinery, for a colonist arriving to enjoy themselves. A frame of billiards, a hand of poker, an hour at the harp. A robe for the sauna, black tie for the games room.
 
@@ -16,104 +16,74 @@ Their own clothes wait in the stand either way, and come back exactly as they we
 
 [h2]How to use it[/h2]
 
-That is the whole setup. Two optional controls per stand:
+Three optional controls per stand:
 
 [list]
-[*][b]Shared (set owners)[/b] restricts a stand to the colonists you list — name one and it is their personal kit, name several and it serves that group and nobody outside it. Left unassigned, a stand is shared by whoever is free to use it, like beds, so a kitchen needs one stand per cook working [i]at once[/i], not one per cook.
-[*][b]The stand's switch[/b] — labelled with what it currently dresses for ("Shift stand: doctoring", "Shift stand: recreation", "Not used for shift changes") — opens the checklist for rooms the game reads oddly, rooms that do two jobs, places it does not score as recreation at all, or a decorative stand you do not want used. The dialog also names what the game currently reads the room as, which explains the surprises: a crib in a hospital, for instance, makes the room a barracks as far as the game is concerned.
-[*][b]Change the whole outfit[/b], in that same dialog and off by default, is the difference between a lab coat worn over ordinary clothes and a sauna robe worn instead of them. Ticked, the colonist undresses completely and wears only what the stand holds — losing whatever their own clothes were providing, warmth included, which is worth a thought before putting a robe rack in a cold biome. A stand holding nothing they can wear still will not undress them.
+[*][b]Shared (set owners)[/b] restricts a stand to the colonists you list — one for a personal kit, several to serve a group and nobody outside it. Left unassigned it is shared, like a bed, so a kitchen needs one stand per cook working [i]at once[/i], not one per cook.
+[*][b]The stand's switch[/b] — labelled with what it currently dresses for ("Shift stand: doctoring", "Not used for shift changes") — opens the checklist for rooms the game reads oddly, rooms that do two jobs, or a decorative stand you do not want used. It also names what the game reads the room as, which explains the surprises: a crib turns a hospital into a barracks.
+[*][b]Change the whole outfit[/b], off by default, is the difference between a lab coat worn over ordinary clothes and a sauna robe worn instead of them. Ticked, the colonist wears only what the stand holds and loses whatever their own clothes were providing — warmth included, worth a thought before a robe rack in a cold biome.
 [/list]
 
-[b]The stand's Allow removing items toggle holds itself off while the stand is in service.[/b] Shift changes never need it, and turning it on hands the stand's contents to every colonist's outfit optimizer — which may take the uniform and wear it as everyday clothes, and assigning an owner does not prevent that. A stand already switched on stays switchable, so there is always a way back. To let haulers empty a stand, set it to [b]Not used for shift changes[/b] first — the toggle unlocks with it.
-
-A stand that is dressing anyone says so in its inspect pane: what work it dresses for, who owns or is currently wearing it, and whether it is empty.
+[b]The stand's Allow removing items toggle holds itself off while the stand is in service[/b], because turning it on exposes the contents to every colonist's outfit optimizer, which may wear the uniform as everyday clothes. Set the stand to [b]Not used for shift changes[/b] to unlock it.
 
 [h2]The rules it follows[/h2]
 
 Deliberately narrow, so it never fights you:
 
 [list]
-[*][b]Automatic only[/b], for work and recreation alike. Ordering a doctor to tend someone right now never sends them across the base to change first, and a colonist already in uniform keeps it on for a direct order.
-[*][b]Emergencies are never delayed[/b], and nothing happens while the map is under threat.
+[*][b]Automatic only[/b], for work and recreation alike. A direct order is never delayed by a wardrobe trip.
+[*][b]Emergencies are never delayed[/b], and nothing happens under threat.
 [*][b]Personal kit stays personal.[/b] A stand with owners serves only them, and nobody takes clothes out of a stand somebody else is using.
 [*]Passing through a room changes nothing — only doing the room's work does.
-[*][b]A meal break gets them out of uniform first[/b], wherever the food is stored — unless it is already in their hands or their pack; that they just eat. Otherwise a cook carries a meal across the base in whites to reach a chair, which is the walk this mod exists to prevent.
-[*]If a stand frees up while someone is already working in its room out of uniform, they step over and change — unless they are mid-treatment on a patient.
-[*]A [b]Change back[/b] button appears on any colonist currently in a uniform, for when you want them out of it now.
+[*][b]A meal break gets them out of uniform first[/b], wherever the food is stored — unless it is already in hand; that they just eat.
+[*]If a stand frees up while someone is working in its room out of uniform, they step over and change — unless they are mid-treatment on a patient.
+[*]A [b]Change back[/b] button appears on any colonist in a uniform, for when you want them out of it now.
 [/list]
 
-Rooms are read from their role, so hospitals, laboratories, kitchens, workshops, barns and rec rooms all work out of the box. The checklist covers everything else.
-
-One setting: [b]Unassigned stands are shared[/b], on by default. Turn it off and only stands with an explicit owner list ever dress anyone.
+Rooms are read from their role, so hospitals, laboratories, kitchens, workshops, barns and rec rooms all work out of the box. The checklist covers everything else. One mod setting: [b]Unassigned stands are shared[/b], on by default.
 
 [h2]Dressing for recreation[/h2]
 
 [img]https://i.imgur.com/QgM2QRr.gif[/img]
 
-Tick [b]Recreation — any joy activity in this room[/b] and the stand dresses whoever comes to that room to enjoy themselves. Everything downstream is the same: change on the way in, change back on the way out, own clothes waiting in the stand.
+Tick [b]Recreation — any joy activity in this room[/b] and the stand dresses whoever comes to that room to enjoy themselves. One switch covers all of it, because the room is the selector. Recreation and work types are mutually exclusive on a stand — one outfit serves one purpose — so a room that does both wants two stands.
 
-One switch covers all of it, because the room is the selector. A robe stand dresses for the sauna by standing in the sauna. RimWorld's joy kinds are no help — a single kind spans prayer, stargazing, building snowmen and visiting a grave — so a list of activities would only offer you categories your rooms do not have.
+Only a room scoring as a rec room turns it on by itself. A throne room, a dining room with a chess table in it, and a pool usually do not — set those by hand, once.
 
-Recreation and work types are mutually exclusive on a stand. A stand holds one outfit, and one outfit serves one purpose. Tick recreation and the work checklist goes away; tick any work type and recreation drops. A room that does both wants two stands.
-
-[b]Gendered clothing wants an owner list.[/b] A stand serves anyone who can wear [i]something[/i] on it. Fine for a lab coat, a trap for a gown: put a prestige robe, a ladies hat and a formal shirt on a shared stand, and a man will take the robe and leave the hat. Owner lists exist for this — [b]All / Men / Women[/b] filter tabs, an [b]Assign all[/b] button, and a stand becomes the women's stand in two clicks, four colonists or forty.
-
-A stand configures itself from the room here exactly as it does for work: a hospital gives it doctoring, a kitchen gives it cooking. Only a room scoring as a rec room turns recreation on by itself, though, and plenty of places people obviously go to enjoy themselves do not. A throne room scores as a throne room. A dining room with a chess table in the corner is still a dining room. A pool usually scores as nothing at all. Set those by hand, once, and they behave like any other recreation stand.
+[b]Gendered clothing wants an owner list.[/b] A stand serves anyone who can wear [i]something[/i] on it. Fine for a lab coat, a trap for a gown: put a prestige robe, a ladies hat and a formal shirt on a shared stand, and a man will take the robe and leave the hat. Owner lists exist for this — [b]All / Men / Women[/b] tabs, an [b]Assign all[/b] button, and a stand becomes the women's stand in two clicks.
 
 Four things it will not do:
 
 [list]
-[*][b]Drinking and drug-taking do not count.[/b] Fetching a beer is the same job in a bar or a corridor, so nothing dresses anyone for it. Sitting down to socialise at a table or a counter [i]is[/i] caught, and the drink comes along.
-[*][b]Reading is left alone[/b], because a colonist picks their reading spot after setting off — the only room known at the start is wherever the book happens to sit.
-[*][b]Outdoors is excluded, for now.[/b] Every outdoor cell belongs to one enormous room, so a stand in open ground would dress colonists for every walk on the map. A walled but roofless yard is its own room and still counts. Serving open ground needs a boundary of its own, and that is planned.
-[*][b]Nobody is pulled out of bed[/b] — vanilla gives patients recreation they can take lying down precisely so they stay put.
+[*][b]Drinking and drug-taking do not count[/b] — fetching a beer is the same job in a bar or a corridor. Sitting down to socialise at a table [i]is[/i] caught, drink and all.
+[*][b]Reading is left alone[/b], because a colonist picks their reading spot after setting off.
+[*][b]Outdoors is excluded, for now.[/b] Every outdoor cell belongs to one enormous room, so a stand in open ground would dress colonists for every walk on the map. A walled but roofless yard is its own room and still counts. Open ground needs its own boundary, and that is planned.
+[*][b]Nobody is pulled out of bed[/b] — vanilla gives patients recreation they can take lying down, so they stay put.
 [/list]
-
-A drink from the rec room's own stock does not end the visit either. The meal-break rule above is a work-room rule; a rec room stocks its own bar.
 
 [h2]What to put on the stand[/h2]
 
-[b]Not required, and not a dependency[/b] — but worth knowing before you install. Vanilla has no scrubs, no lab coat and no chef's whites, so in a pure vanilla game there is very little to actually dress anyone [i]in[/i]. Vanilla Apparel Expanded adds exactly those, and they are what every screenshot here uses.
-
-[url=https://steamcommunity.com/sharedfiles/filedetails/?id=1814987817]Vanilla Apparel Expanded[/url] by Oskar Potocki, Trunken and Sarg.
-
-Any apparel mod works. That one is simply the closest fit, and this mod is not affiliated with the Vanilla Expanded team in any way.
+Vanilla has no scrubs, no lab coat and no chef's whites, so there is very little to actually dress anyone [i]in[/i]. Any apparel mod fixes that; [url=https://steamcommunity.com/sharedfiles/filedetails/?id=1814987817]Vanilla Apparel Expanded[/url] adds exactly those three and is what every screenshot here uses. Not affiliated with the Vanilla Expanded team.
 
 [h2]Mod compatibility[/h2]
 
-[url=https://steamcommunity.com/workshop/filedetails/?id=3545172389]Outfit Stands Plus[/url] works alongside this mod, in either load order — tested with both. Its mechanized and mending stands are full shift stands (shift changes run at their boosted swap speeds, and the mending stand repairs a borrower's parked clothes while they work), and each stand shows exactly one Set owner control: this mod's while the stand is in service, theirs when the stand is set to Not used for shift changes. Its wardrobe features, its allow adding items toggle and its research are all untouched.
+[url=https://steamcommunity.com/workshop/filedetails/?id=3545172389]Outfit Stands Plus[/url] works alongside this mod in either load order. Its mechanized and mending stands are full shift stands, and each stand shows exactly one Set owner control — this mod's while in service, theirs when set to Not used for shift changes.
 
-One of its behaviours can look like a fault here: it switches off its own allow adding items after a manual swap, which quietly stops haulers restocking that stand until it is switched back on.
-
-[url=https://steamcommunity.com/sharedfiles/filedetails/?id=3717051546]Gerrymon's Hotspring Expanded[/url] needs no setup. Its private and public pool rooms are named in the room table, so a stand in one turns itself on for recreation the same way a hospital turns one on for doctoring.
-
-[url=https://steamcommunity.com/sharedfiles/filedetails/?id=2205980094]Standalone Hot Spring[/url] works too, and for the general reason rather than a special case: its bathing job carries a joy kind, which is the whole of what the trigger looks for. Any modded recreation that does the same is caught. Its room does not score as a pool, though, so that stand takes the switch by hand.
+[url=https://steamcommunity.com/sharedfiles/filedetails/?id=3717051546]Gerrymon's Hotspring Expanded[/url] needs no setup: its pool rooms turn a stand on for recreation by themselves. [url=https://steamcommunity.com/sharedfiles/filedetails/?id=2205980094]Standalone Hot Spring[/url] works too, for the general reason — any modded recreation carrying a joy kind is caught — but its room takes the switch by hand.
 
 [h2]Save safety[/h2]
 
-Add it to an existing save freely — your existing outfit stands gain the new controls on load, and nothing needs rebuilding. Removing it is also safe: stands revert to ordinary vanilla furniture, and a colonist who was mid-shift simply keeps the uniform ([b]Clear forced apparel[/b] on the Assign tab un-forces it) with their own clothes waiting in the stand.
+Add it to an existing save freely; nothing needs rebuilding. Removing it is safe too: stands revert to ordinary furniture, and a colonist mid-shift keeps the uniform ([b]Clear forced apparel[/b] on the Assign tab un-forces it) with their own clothes waiting in the stand.
 
-[h2]Where the art comes from[/h2]
+[h2]Source, and testing[/h2]
 
-No clothing, no buildings, no textures. The mod adds behaviour to a building the game already draws, and its icons come from vanilla's own UI.
+An automated suite runs inside RimWorld itself before every release, covering the cases that are hard to undo — a gravship flight, a colonist dying or being banished mid-shift. That does not make it bug-free; it means the specific ways this could lose your colonists' clothes fail loudly in testing instead of quietly in your save.
 
-The gifs and gallery images are screenshots and screen recordings of RimWorld running this mod, cropped and composited with ImageMagick and ffmpeg. The sets were built by debug fixtures that ship in the repository. The code and defs are written with AI assistance; no diffusion model or image pipeline is involved anywhere.
-
-[h2]It is tested[/h2]
-
-Behaviour is covered by an automated suite that runs inside RimWorld itself. The cases that matter most are the ones that are hard to undo — a gravship flight, a colonist dying or being banished while wearing a stand's outfit — and they run before every release.
-
-That does not make it bug-free. It means the specific ways this could lose your colonists' clothes fail loudly in testing instead of quietly in your save. The suite is in the repository, it runs with one command, and the notes say plainly what it does not cover.
-
-[h2]Source[/h2]
-
-MIT licensed, and the repository includes the technical design notes and the test suite, so none of it has to be taken on trust.
+MIT licensed, with the design notes and the suite in the repository. No clothing, no buildings, no textures — it adds behaviour to a building the game already draws. Written with AI assistance; no generated art anywhere.
 
 [url=https://github.com/beverage/shift-change]github.com/beverage/shift-change[/url]
 
-[h2]Credit[/h2]
-
-[url=https://github.com/aedbia/AutomaticSwapForStand]Automatic Swap Outfit[/url] by aedbia (MIT) covers adjacent ground — automatic swapping at an outfit stand, triggered by allowed-area boundaries. Shift Change is an independent implementation with a different trigger (the room and its work type) and per-stand ownership, but that mod is why several dead ends were cheap to avoid.
+[url=https://github.com/aedbia/AutomaticSwapForStand]Automatic Swap Outfit[/url] by aedbia (MIT) covers adjacent ground, triggered by allowed-area boundaries. Shift Change is an independent implementation, but that mod is why several dead ends were cheap to avoid.
 
 [hr][/hr]
 
