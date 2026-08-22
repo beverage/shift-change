@@ -19,11 +19,18 @@
 #
 # USAGE
 #
+#   devtools/publish-workshop.sh            # stage + install, the safe default
 #   devtools/publish-workshop.sh stage      # build + assemble dist/ShiftChange
 #   devtools/publish-workshop.sh install    # swap it into Mods/, dev link aside
 #   devtools/publish-workshop.sh restore    # dev link back, recover the item id
 #
-# The normal run is stage -> install -> upload in game -> restore.
+# The normal run is (no argument) -> upload in game -> restore.
+#
+# STAGING ALONE CHANGES NOTHING ABOUT WHAT THE GAME UPLOADS. `stage` only fills
+# dist/; until `install` has replaced the dev symlink, the uploader still
+# publishes the whole repository through it — 61 MB of .git, dist/ and media/,
+# which is what shipped twice on 2026-08-22. That is why the bare invocation
+# now does both, and why `stage` says so on its way out.
 #
 set -euo pipefail
 
@@ -82,6 +89,11 @@ cmd_stage() {
   du -sh "$DIST"
   printf '\ncontents:\n'
   ls -1 "$DIST"
+
+  if [ -L "$LIVE" ]; then
+    printf '\n!! STAGED ONLY. %s is still the dev symlink, so an upload now\n' "$LIVE"
+    printf '!! would publish the whole repository. Run: %s install\n' "$0"
+  fi
 }
 
 cmd_install() {
@@ -103,8 +115,21 @@ cmd_install() {
   fi
 
   cp -R "$DIST" "$LIVE"
-  printf 'installed the staged copy at %s\n' "$LIVE"
-  du -sh "$LIVE"
+
+  # The confirmation Steam never gives you. The uploader shows no manifest, no
+  # size and no file list before publishing — SetItemContent takes the folder
+  # verbatim and PrepareForWorkshopUpload() is an empty method — so this is the
+  # only chance to see what is about to go out.
+  printf '\n=== this is what the game will upload ===\n'
+  printf 'from:      %s\n' "$LIVE"
+  if [ -f "$LIVE/About/PublishedFileId.txt" ]; then
+    printf 'item id:   %s (updates the existing item)\n' "$(cat "$LIVE/About/PublishedFileId.txt")"
+  else
+    printf 'item id:   NONE — this will CREATE a second Workshop listing\n'
+  fi
+  printf 'size:      %s\n' "$(du -sh "$LIVE" | cut -f1)"
+  printf 'top level: %s\n' "$(ls -1 "$LIVE" | tr '\n' ' ')"
+  printf '=========================================\n'
   cat <<'EOF'
 
 Now, in game (launch fresh — Development mode must be ON in Options, or the
@@ -199,9 +224,10 @@ cmd_restore() {
   printf 'dev symlink in place\n'
 }
 
-case "${1:-stage}" in
+case "${1:-publish}" in
+  publish) cmd_stage; cmd_install ;;
   stage)   cmd_stage ;;
   install) cmd_install ;;
   restore) cmd_restore ;;
-  *)       die "unknown command: $1 (stage | install | restore)" ;;
+  *)       die "unknown command: $1 (publish | stage | install | restore)" ;;
 esac
