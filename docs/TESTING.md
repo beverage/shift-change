@@ -31,6 +31,13 @@ game to run every case and quit itself, prints the report, exits non-zero on any
 failure. By hand: dev mode → **Shift Change** → **Run lifecycle harness**, then
 click a clear 7×7 area.
 
+**Keep the window focused.** RimWorld is throttled hard in the background, and
+a run that loses focus can take many times longer than a focused one — long
+enough that a frozen log reads as a hang rather than a stall. A run that appears
+stuck at engine startup is usually starved, not broken; the script allows 1200 s
+before it gives up. It also means any duration measured from a backgrounded run
+is meaningless, so time a run only when the window kept focus throughout.
+
 **The minimal list is for iterating; `--full` is what a release is signed off
 on.** `--full` copies whatever mod list is active on the machine running it, so
 it is only ever as good as that list — it is not a compatibility matrix, and it

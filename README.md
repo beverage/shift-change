@@ -261,7 +261,8 @@ neither method finds the other's.
 
 **The behaviour is tested, and you can run the tests.**
 `devtools/run-harness.sh` runs a suite inside RimWorld itself, against the real
-engine rather than mocks, in about twenty seconds. Cases arrive from four
+engine rather than mocks, in about thirty-five seconds — game launch, mod
+load and quit included. Cases arrive from four
 places: a bug that happened, a claim this page makes, an engine behaviour worth
 pinning down before an update moves it, and a feature that shipped with its own.
 The standing rule is that anything which goes wrong leaves a case behind that
