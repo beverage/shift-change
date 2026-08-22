@@ -31,26 +31,35 @@
   </loadAfter>
   <description>REQUIRES ODYSSEY (for the outfit stand) AND HARMONY.
 
-Colonists change into the right clothes for the room they work in, and back out again afterwards.
+Colonists change into the right clothes for the room they are going to — to work in, or to enjoy themselves in — and back out again afterwards.
 
-Put a vanilla outfit stand in a work room and put a work outfit on it. When a colonist takes on automatic work of that room's kind — doctoring in the hospital, researching or synthesizing drugs in the lab, cooking in the kitchen — they change into the stand's outfit before starting, and change back when their work takes them elsewhere. Their own clothes wait in the stand and come back exactly as they were, force-worn markers included.
+Put a vanilla outfit stand in a room and put an outfit on it. Each stand dresses for one of two things.
 
-Rooms are read from their role, so hospitals, laboratories, kitchens, workshops and barns all work with no setup at all.
+Work. A colonist taking on automatic work of that room's kind — doctoring in the hospital, researching in the lab, cooking in the kitchen — changes into the stand's outfit before starting, and back when their work takes them elsewhere.
 
-That is the whole setup. Two optional controls per stand:
-- Shared (set owner) reserves a stand for one colonist. Left unassigned, a stand is shared by whoever is free to use it, like beds — so a kitchen needs one stand per cook working at once, not one per cook.
-- The work-type switch, labelled with what the stand currently dresses for, opens a checklist for rooms the game reads oddly, rooms that do two jobs, or a decorative stand you do not want used at all. Its dialog names what the game currently reads the room as.
+Recreation. The same machinery, for a colonist arriving to enjoy themselves. A frame of billiards, a hand of poker, an hour at the harp. A robe for the sauna, black tie for the games room.
 
-Leave the stand's Allow removing items toggle off, which is its default. Colonists stock the stand either way and shift changes ignore the setting entirely, so nothing here needs it on — while turning it on lets any colonist's outfit optimizer take the uniform and wear it as everyday clothes.
+Their own clothes wait in the stand either way, and come back exactly as they were, force-worn markers included.
+
+Rooms are read from their role, so hospitals, laboratories, kitchens, workshops, barns and rec rooms all work with no setup at all.
+
+Three optional controls per stand:
+- Shared (set owners) restricts a stand to the colonists you list — one for a personal kit, several to serve a group and nobody outside it. Left unassigned it is shared, like a bed, so a kitchen needs one stand per cook working at once, not one per cook. All / Men / Women tabs and an Assign all button make a stand the women's stand in two clicks, which matters for gendered clothing: a stand serves anyone who can wear something on it, so a shared stand holding a prestige robe and a ladies hat will put a man in the robe and leave the hat.
+- The stand's switch, labelled with what it currently dresses for, opens the checklist for rooms the game reads oddly, rooms that do two jobs, or a decorative stand you do not want used at all. It also names what the game reads the room as, which explains the surprises: a crib turns a hospital into a barracks. Recreation and work types are mutually exclusive — one outfit serves one purpose — so a room that does both wants two stands.
+- Change the whole outfit, off by default, is the difference between a lab coat worn over ordinary clothes and a sauna robe worn instead of them. Ticked, the colonist wears only what the stand holds, and loses whatever their own clothes were providing — warmth included, worth a thought before a robe rack in a cold biome.
+
+The stand's Allow removing items toggle holds itself off while the stand is in service, because turning it on exposes the contents to every colonist's outfit optimizer, which may wear the uniform as everyday clothes. Set the stand to Not used for shift changes to unlock it.
 
 Deliberately narrow, so it never fights you:
-- Automatic work only. Ordering a doctor to tend someone right now never sends them across the base to change first, and a colonist already in uniform keeps it on for a direct order.
+- Automatic only, for work and recreation alike. A direct order is never delayed by a wardrobe trip, and a colonist already in uniform keeps it on.
 - Emergencies are never delayed, and nothing happens while the map is under threat.
-- Nobody takes clothes out of a stand somebody else is using.
+- Personal kit stays personal. A stand with owners serves only them, and nobody takes clothes out of a stand somebody else is using.
 - Passing through a room changes nothing — only doing the room's work does.
 - A meal break gets them out of uniform first, unless the food is already in their hands or their pack.
 - If a stand frees up while someone is already working in its room out of uniform, they step over and change — unless they are mid-treatment on a patient.
 - A Change back button appears on any colonist currently in a uniform, for when you want them out of it now.
+
+Four things recreation will not do: drinking and drug-taking do not count, because fetching a beer is the same job in a bar or a corridor; reading is left alone, because a colonist picks their reading spot after setting off; outdoors is excluded for now, since every outdoor cell belongs to one enormous room, though a walled but roofless yard is its own room and still counts; and nobody is pulled out of bed, because vanilla gives patients recreation they can take lying down.
 
 One setting: Unassigned stands are shared, on by default.
 
