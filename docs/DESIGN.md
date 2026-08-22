@@ -449,8 +449,9 @@ null — so without a guard, a rec-toggled stand in open ground would serve
 every walk, skygaze and snowman on the entire map. The arm (and the mid-job
 catch-up's joy twin) refuses rooms that touch the map edge. A walled but
 roofless yard is its own non-edge room and stays eligible on purpose;
-open-ground service belongs to a future fence-enclosure mode, done
-deliberately or not at all. Two more deliberate refusals: a pawn lying in
+open-ground service belongs to a future mode that supplies its own
+boundary — a player-drawn zone, or a radius around the stand — done
+deliberately or not at all. The guard is the interim, not the verdict. Two more deliberate refusals: a pawn lying in
 bed is never diverted — vanilla issues in-bed joy precisely so patients stay
 put — and a rec shift's drink from the SAME room does not trigger the
 sit-down-break undress: a rec room stocks its own drinks, and the meal

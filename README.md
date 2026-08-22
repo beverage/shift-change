@@ -4,15 +4,24 @@
 > stand this mod builds on is Odyssey content, so without it the mod does
 > nothing at all.
 
-A RimWorld mod. Colonists change into the right clothes for the room they work
-in, and back out again afterwards — using the vanilla outfit stand.
+A RimWorld mod. Colonists change into the right clothes for the room they are
+going to — to work in, or to enjoy themselves in — and back out again
+afterwards, using the vanilla outfit stand.
 
-Put an outfit stand in a work room and put an outfit on it. When a colonist
-takes on **automatic** work of that room's kind — doctoring in the hospital,
-researching or synthesizing drugs in the lab, cooking in the kitchen — they
-change into the stand's outfit before starting, and change back when their
-work takes them elsewhere. Their own clothes wait in the stand, and come back
-exactly as they were, force-worn markers included.
+Put an outfit stand in a room and put an outfit on it. Each stand dresses for
+one of two things:
+
+**Work.** A colonist taking on **automatic** work of that room's kind —
+doctoring in the hospital, researching or synthesizing drugs in the lab,
+cooking in the kitchen — changes into the stand's outfit before starting, and
+changes back when their work takes them elsewhere.
+
+**Recreation.** The same machinery, for a colonist arriving to enjoy
+themselves. A frame of billiards, a hand of poker, an hour at the harp. A robe
+for the sauna, black tie for the games room.
+
+Their own clothes wait in the stand either way, and come back exactly as they
+were, force-worn markers included.
 
 ![A doctor, researcher and cook changing into work clothes and back again](media/demo.gif)
 
@@ -22,30 +31,32 @@ borrower's civvies while they are on shift. Sped up 3–6×.*
 
 ## How to use it
 
-1. **Build a vanilla outfit stand** (Odyssey) in a work room — hospital,
-   laboratory, kitchen, workshop or barn — and put a work outfit on it.
+1. **Build a vanilla outfit stand** (Odyssey) in the room — hospital,
+   laboratory, kitchen, workshop, barn, rec room — and put an outfit on it.
 2. That's it, for the common case. The stand reads its room and dresses
-   whoever comes to work there.
+   whoever comes to work or to relax there.
 3. Optional, per stand:
-   - **Shared (set owner)** reserves the stand for one colonist — their
-     personal kit, off-limits to everyone else. Left unassigned, the stand is
-     **shared**: any capable colonist may use whichever stand is free, like
-     beds. A kitchen needs one stand per cook *working at once*, not one per
-     cook.
-   - **The work-type switch** — labelled with what the stand currently
-     dresses for ("Shift stand: doctoring", "Not used for shift changes") —
-     opens a checklist when the room's reading isn't what you want: a
-     multi-purpose room, a room the game scores oddly, or a stand you don't
-     want used at all. The dialog names what the game currently reads the
-     room as, which explains the surprises — a crib in a hospital, for
-     instance, makes the room a barracks as far as the game is concerned,
-     and the stand goes idle until the checklist says otherwise.
+   - **Shared (set owners)** restricts the stand to the colonists you list.
+     Name one and it is their personal kit, off-limits to everyone else; name
+     several and it serves that group and nobody outside it. Left unassigned,
+     the stand is **shared**: any capable colonist may use whichever stand is
+     free, like beds. A kitchen needs one stand per cook *working at once*,
+     not one per cook.
+   - **The stand's switch** — labelled with what it currently dresses for
+     ("Shift stand: doctoring", "Shift stand: recreation", "Not used for
+     shift changes") — opens the checklist when the room's reading isn't what
+     you want: a multi-purpose room, a room the game scores oddly, a place
+     the game doesn't score as recreation at all, or a stand you don't want
+     used. The dialog names what the game currently reads the room as, which
+     explains the surprises — a crib in a hospital, for instance, makes the
+     room a barracks as far as the game is concerned, and the stand goes idle
+     until the checklist says otherwise.
 
 **"Change the whole outfit" is off by default, and belongs to the rack rather
 than the room.** Normally the kit goes on over whatever it doesn't conflict
 with, so a lab coat sits over ordinary clothes. Tick this and the colonist
 undresses completely and wears only what the stand holds — right for a sauna
-robe or a swimsuit, wrong for a lab coat. It costs the equip time of every
+robe, wrong for a lab coat. It costs the equip time of every
 garment in both directions, and everything their own clothes were providing
 comes off with them — warmth, armor, any bonuses those garments carried. They
 have exactly what the stand holds and nothing more, which is worth a thought
@@ -61,24 +72,87 @@ already switched on stays switchable, so there is always a way back. To
 decommission a stand and let haulers empty it, set "Not used for shift
 changes" first — the toggle unlocks with it.
 
-A stand that is dressing anyone says so in its inspect pane: what work it
-dresses for, who owns or is currently wearing it, and whether it's empty. A
-stand in a room with no work role says nothing at all, and behaves like
-ordinary furniture.
+A stand that is dressing anyone says so in its inspect pane: what it dresses
+for, who owns or is currently wearing it, and whether it's empty. A stand in a
+room with no role says nothing at all, and behaves like ordinary furniture.
+
+## Dressing for recreation
+
+Tick **Recreation — any joy activity in this room** on a stand and it dresses
+whoever comes to that room to enjoy themselves. Everything downstream is the
+same: change on the way in, change back on the way out, own clothes waiting in
+the stand.
+
+![Eight guests arrive in work clothes, change at the stands, and settle in to play in evening dress](media/demo-recroom.gif)
+
+One switch covers all of it, because the room is the selector. A robe stand
+dresses for the sauna by standing in the sauna. RimWorld's joy kinds are no
+help — a single kind spans prayer, stargazing, building snowmen and visiting a
+grave — so a list of activities would only offer you categories your rooms do
+not have.
+
+Recreation and work types are mutually exclusive on a stand. A stand holds one
+outfit, and one outfit serves one purpose. Tick recreation and the work
+checklist goes away; tick any work type and recreation drops. A room that does
+both wants two stands.
+
+**Gendered clothing wants an owner list.** A stand serves anyone who can wear
+*something* on it. Fine for a lab coat, a trap for a gown: put a prestige robe,
+a ladies hat and a formal shirt on a shared stand, and a man will take the robe
+and leave the hat. Of Royalty's formal wear the vest and top hat are male, the
+ladies hat is female, and the robe and formal shirt are neither.
+
+Owner lists exist for this. **All / Men / Women** filter tabs, an **Assign all**
+button, and a stand becomes the women's stand in two clicks — four colonists or
+forty. Whoever is on the list is who it serves.
+
+A stand configures itself from the room here exactly as it does for work: a
+hospital gives it doctoring, a kitchen gives it cooking. Only a room scoring as
+a rec room turns recreation on by itself, though, and plenty of places people
+obviously go to enjoy themselves do not. A throne room scores as a throne room.
+A dining room with a chess table in the corner is still a dining room. A room
+doing two jobs resolves to whichever one wins, and a pool usually scores as
+nothing at all, since swimming happens on terrain rather than furniture. Set
+those by hand, once, and they behave like any other recreation stand.
+
+This is also where **Change the whole outfit** earns its keep. A lab coat goes
+over ordinary clothes; a sauna robe does not.
+
+### What it deliberately will not do
+
+- **Drinking and drug-taking are invisible to it.** Fetching a beer runs the
+  same job whether it ends at a bar or in a corridor, and nothing in that job
+  says recreation, so nothing dresses anyone for it. Sitting down to socialise
+  at a table or a counter *is* caught, and the drink comes along.
+- **Reading is left alone.** A colonist picks their reading spot after setting
+  off. The only room known at the start is wherever the book sits on a shelf,
+  and dressing them for the library because that is where the novel lives would
+  be the wrong room.
+- **Outdoors is excluded, for now.** Every outdoor cell on the map belongs to
+  one enormous room, so a recreation stand in open ground would dress
+  colonists for every walk and every bit of stargazing anywhere on the map. A
+  walled but roofless yard is its own room and still counts. Serving open
+  ground needs a boundary of its own — a zone, or a radius around the stand.
+  That is planned.
+- **Nobody is pulled out of bed.** Vanilla hands patients recreation they can
+  take lying down precisely so they stay put.
+- **A drink from the rec room's own stock does not end the visit.** The
+  meal-break rule below is a work-room rule — a rec room stocks its own bar.
 
 ## The rules it follows
 
 Deliberately narrow, so it never fights you:
 
-- **Automatic work only.** Right-click orders execute immediately, in both
-  directions — a doctor ordered to tend *right now* goes straight there, and
-  a pawn in uniform given a direct order keeps it on and returns it later.
+- **Automatic only**, for work and recreation alike. Right-click orders
+  execute immediately, in both directions — a doctor ordered to tend *right
+  now* goes straight there, and a pawn in uniform given a direct order keeps
+  it on and returns it later.
 - **Emergencies are never delayed.** A colonist bleeding out is not kept
   waiting for a wardrobe trip.
 - **Nothing happens while the map is under threat.**
-- **Personal kit stays personal.** Nobody takes clothes out of a stand
-  someone else is using; whoever checked a uniform out is whom it goes back
-  to.
+- **Personal kit stays personal.** A stand with owners serves only them,
+  nobody takes clothes out of a stand someone else is using, and whoever
+  checked a uniform out is whom it goes back to.
 - Passing through a room changes nothing — only doing the room's work does.
 - **A meal break gets them out of uniform first**, wherever the food is
   stored. The exception is food already in their hands or their pack: that
@@ -92,7 +166,7 @@ Deliberately narrow, so it never fights you:
   on their own while the map is under threat.
 
 One mod setting: **"Unassigned stands are shared"** (default on). Turn it off
-and only stands with an explicit owner ever dress anyone.
+and only stands with an explicit owner list ever dress anyone.
 
 ## Requirements
 
@@ -121,10 +195,16 @@ back on; and its right-click "Return to stand", used on a colonist who is
 mid-shift, moves clothes the shift system was tracking — nothing is lost,
 and the next change-back sorts it out, but the walk is wasted.
 
-**Pick Up And Haul** users may see a burst of red "could not reserve"
-messages when several freshly built stands are stocked at once. That is its
-batch hauling racing itself over the new containers — cosmetic, the items
-arrive, and it stops once the stands are full.
+**[Gerrymon's Hotspring Expanded](https://steamcommunity.com/sharedfiles/filedetails/?id=3717051546)**
+needs no setup. Its private and public pool rooms are named in the room table,
+so a stand in one turns itself on for recreation the same way a hospital turns
+one on for doctoring.
+
+**[Standalone Hot Spring](https://steamcommunity.com/sharedfiles/filedetails/?id=2205980094)**
+works too, and for the general reason rather than a special case: its bathing
+job carries a joy kind, which is the whole of what the trigger looks for. Any
+modded recreation that does the same is caught. Its room does not score as a
+pool, though, so that stand takes the switch by hand.
 
 **An apparel mod is worth having.** Not required and not a dependency, but
 vanilla has no scrubs, no lab coat and no chef's whites, so in a pure vanilla
@@ -156,32 +236,38 @@ This mod is built with AI assistance and it is worth being precise about where.
 [Claude Code](https://claude.com/claude-code). The repository is MIT-licensed
 and contains all of it, so none of this has to be taken on trust.
 
-**There is no generated art, because there is no art.** The mod ships no
-textures and no apparel of any kind — no diffusion model, no image pipeline. The
-only PNG in the mod folder is the Workshop preview, a screenshot of the game. It
-adds behaviour to a building the base game already draws, and its icons come
-from vanilla's own UI atlas. That was a deliberate scoping choice before it was
-anything else, and it happens to remove the question entirely.
+**All the art here is captured in game.** The mod itself ships no textures and
+no apparel of any kind. It adds behaviour to a building the base game already
+draws, its icons come from vanilla's own UI atlas, and the only image inside the
+mod folder is the Workshop preview — a screenshot.
+
+Everything else is a screenshot or a screen recording of RimWorld running this
+mod, cropped and composited with ImageMagick and ffmpeg. The sets were built by
+the debug fixtures in `Source/`, so they rebuild on demand, and
+[media/README.md](media/README.md) records the crops, ramps and timings that
+produced each one. No diffusion model and no image pipeline are involved
+anywhere.
 
 **The engine claims are checkable.** Every assertion in
 [docs/DESIGN.md](docs/DESIGN.md) about how RimWorld behaves cites the decompiled
 assembly by file and line, at a stated game version.
 
 **Some of it was found in play, and some of it was not.** The reservation carry,
-the forced-flag capture, the optimizer pause and the recolor guard are fixes for
-things that went wrong in a live colony. But an adversarial review of the whole
-codebase later found three release blockers that days of play had not — one of
-them had been running unnoticed on the demo film set — and those were caught by
-reading the engine, not by playing. Both kinds of bug are real. Neither method
-catches the other's.
+the forced-flag capture, the optimizer pause and the recolor guard are all fixes
+for things that went wrong in a live colony. Others never surfaced that way and
+were caught by reading the decompiled engine instead — including one that had
+been running unnoticed on the demo film set for days. Both kinds are real, and
+neither method finds the other's.
 
 **The behaviour is tested, and you can run the tests.**
 `devtools/run-harness.sh` runs a suite inside RimWorld itself, against the real
-engine rather than mocks, in about twenty seconds. Every bug found in that review
-now has a case that fails without its fix, and the rules listed further up this
-page are asserted against the code rather than only written down. It does not
-cover everything — [docs/TESTING.md](docs/TESTING.md) says plainly what it does
-not, and play observation is still required.
+engine rather than mocks, in about twenty seconds. Cases arrive from four
+places: a bug that happened, a claim this page makes, an engine behaviour worth
+pinning down before an update moves it, and a feature that shipped with its own.
+The standing rule is that anything which goes wrong leaves a case behind that
+fails without its fix. It does not cover everything —
+[docs/TESTING.md](docs/TESTING.md) says plainly what it does not, and play
+observation is still required.
 
 ## For modders
 

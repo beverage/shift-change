@@ -31,6 +31,46 @@ walk to dinner. Fast where nothing is being demonstrated, slow where it is.
 `--autocrop` strips the black pillarboxing OBS leaves when the canvas does not
 exactly match the captured region (16 px each side on this take).
 
+## demo-recroom.gif
+
+The black-tie rec room demo. It lives in two places on purpose: this copy is
+what the repository README embeds, and `https://i.imgur.com/QgM2QRr.gif` is the
+mirror the Steam description embeds, because a Workshop page cannot reference a
+repository path. Neither reaches subscribers — the allowlist at the top of this
+file excludes `media/` from both the release zip and the Workshop upload.
+
+**Its recipe is here because the last one's was not** — see the section below
+for what that cost.
+
+| | |
+|---|---|
+| master | `~/Movies/2026-08-22 11-53-35.mov` (1920x1080, 30 fps, 26.0 s) |
+| output | 480x446, 193 frames, 9.7 s, 2.87 MB |
+
+```bash
+devtools/footage.sh gif "<master>.mov" --autocrop --ramp 3:8:1.5,8:15:3,15:21:1.5
+```
+
+**Both walking segments run at the same speed, and that is the point.** The
+arrival and the mingle are the same action — pawns moving at normal speed — so
+a ramp that compressed one and not the other made locomotion visibly change
+between the opening and the close. Only the wardrobe trip in the middle is
+sped up, at 3x, which is the rate `demo.gif` uses for its changes; the two
+gifs read as a set because of it.
+
+**`--autocrop` is correct here and was wrong on the pool footage**, which is
+worth knowing before reaching for it. It detects the black pillarboxing OBS
+leaves when the canvas does not match the captured region — this take has some
+(`1162:1080:378:0`), the pool take had none, and on that one autocrop was being
+asked to find a room edge it had no way to see. Check it against a still before
+committing to a whole gif.
+
+**Do not trim the bottom margin.** It reads as dead grass in a mid-clip still,
+but at t=3 it holds all eight pawns lined up outside the door — the entire
+before-state of a before/after gif. The frame is already tight on every side:
+roughly 20 source px from the room's outer wall on the top and sides, and about
+11 display px below the pawn name labels.
+
 ## demo-recreation.gif — deliberately not in this repository
 
 A recreation gif (480×390, 255 frames, 8.3 MB) was cut for this feature and

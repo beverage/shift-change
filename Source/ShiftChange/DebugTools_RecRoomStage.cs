@@ -78,9 +78,17 @@ namespace ShiftChange
 
         internal const float HeatPush = 3000f;
 
-        // Black tie, and two frocks. Dyed rather than styled, because the style
+        // Black tie, and four frocks. Dyed rather than styled, because the style
         // pack is not a dependency of anything here.
-        internal static readonly Color BlackTie = new Color(0.13f, 0.13f, 0.16f);
+        //
+        // BlackTie sits at 22% lightness rather than the 13% it started on.
+        // Apparel tint MULTIPLIES the texture, so the surviving tonal range is
+        // proportional to the tint's own luminance: measured off a capture, the
+        // vest at 13% kept a 43-level spread against the scarlet robe's 167,
+        // and its shadow tones had merged with the pawn outline. 22% roughly
+        // doubles that and still reads as black against marble, which sits
+        // around 65-70%.
+        internal static readonly Color BlackTie = new Color(0.22f, 0.22f, 0.27f);
         internal static readonly Color DressWhite = new Color(0.95f, 0.94f, 0.92f);
         internal static readonly Color Scarlet = new Color(0.72f, 0.09f, 0.15f);
         internal static readonly Color Gold = new Color(0.85f, 0.68f, 0.24f);
@@ -225,6 +233,45 @@ namespace ShiftChange
                           "BlocksMarble", rx, rz, Rot4.North);
                 }
             }
+
+            Doormats(map, origin);
+        }
+
+        /// <summary>
+        /// A doormat ON the door tile, facing out. Guests arrive across open
+        /// ground in evening dress and track soil onto the marble all the way
+        /// to the billiards table; the mat takes the carried filth at the
+        /// threshold.
+        ///
+        /// <para><b>It shares the door's cell, which is what the def is built
+        /// for.</b> <c>isEdifice false</c> and <c>clearBuildingArea false</c>
+        /// are exactly the flags that let a building sit in an occupied cell,
+        /// and nothing in <c>GenSpawn.SpawningWipes</c> fires for a Standable
+        /// non-edifice against a door. The threshold is also the best cell
+        /// available for the job: the mat acts only on
+        /// <c>IsHashIntervalTick(10)</c>, and a pawn waiting for a door to open
+        /// dwells there longer than it would crossing open ground.</para>
+        ///
+        /// <para><b>Rotation is cosmetic to the cleaning and load-bearing to
+        /// the look.</b> <c>LT.Building_DoorMat.Tick</c> iterates
+        /// <c>this.OccupiedRect()</c> and calls <c>HavePawnsDropFilth</c> on
+        /// any pawn standing on its OWN cells, so the cell cleans however the
+        /// mat is turned. But the art occupies only the upper ~60% of its 64x64
+        /// texture, and <c>Graphic_Single</c> with <c>rotatable true</c> and no
+        /// <c>drawRotated false</c> spins with the building — so rotation
+        /// decides which EDGE of the cell the mat hugs. <c>South</c> puts it on
+        /// the outward half of the threshold, where a guest wipes their feet
+        /// before stepping in; <c>North</c> would tuck it inside the room and
+        /// leave the approach bare.</para>
+        ///
+        /// <para>Mod content (<c>dracoix.doormat.r12a</c>), so silently absent
+        /// on a lighter modlist — the same rule the rest of this set follows.
+        /// The plain mat is the stuffable one, so it takes a material; the
+        /// coloured variants are fixed-cost cloth and would take null.</para>
+        /// </summary>
+        internal static void Doormats(Map map, IntVec3 origin)
+        {
+            Spawn(map, origin, "LT_DoorMatLeather", "Cloth", DoorX, 0, Rot4.South);
         }
 
         /// <summary>
@@ -444,9 +491,17 @@ namespace ShiftChange
 
         /// <summary>
         /// A guest: own clothes on, every work priority off so nothing competes
-        /// with joy, needs topped up except joy, and their own stand assigned —
-        /// the gendered sets mean a guest sent to the wrong stand would find
-        /// nothing wearable, which reads as the mod failing.
+        /// with joy, needs topped up except joy, and their own stand assigned.
+        ///
+        /// <para>The assignment is what keeps the set coherent, and the failure
+        /// it prevents is not "finds nothing to wear" — it is worse than that.
+        /// A stand serves anyone who can wear SOMETHING on it
+        /// (<c>SwapPlan.WouldDress</c>), and each garment is then filtered on
+        /// its own. Only three of the five pieces are gender-locked — the vest
+        /// and top hat to Male, the ladies hat to Female — so a man claiming a
+        /// shared women's stand would wear the formal shirt AND the prestige
+        /// robe, and skip only the hat. Assigned stands are exclusive
+        /// (<c>CompShiftStand.CanBeClaimedBy</c>), which is the fix.</para>
         /// </summary>
         internal static void Patron(Map map, IntVec3 cell, Gender gender, string nick,
                                     Building_OutfitStand stand)
