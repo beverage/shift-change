@@ -98,21 +98,48 @@ cards backwards.
 
 Workshop gallery images. `card-chef`, `card-doc`, `card-lab` and
 `card-recreation` are 640×360 scene shots; `card-blacktie` is a 1482×587
-three-panel sequence; `card-controls` and `card-tooltip` are 1536×864 and show
-UI instead.
+three-panel sequence; `card-controls` (2000×900) and `card-tooltip` (1536×864)
+show UI instead.
 
-`card-controls` is a composite of the SAME dialog in its two modes — work on
-the left (automatic, resolved to doctoring from the room, with the work grid
-populated) and recreation on the right (grid hidden, exclusivity note showing).
-It replaced a version pairing the work grid with the owner-assign list; the
-assign list showed three pawns and taught nothing the rest of the gallery did
-not already say. Composited at NATIVE resolution on the cards' own background
-(`#262b30`), vertically centred, so neither panel is resampled:
+`card-controls` is 2000×900 and carries three panels: the SAME work-types
+dialog in its two modes — work on the left (automatic, resolved to doctoring
+from the room, grid populated) and recreation in the middle (grid hidden,
+exclusivity note showing) — then the owner list on the right.
 
+The owner list had been cut from an earlier version of this card, when it was
+a bare assign list of three pawns that taught nothing. It earned its place back
+once it grew the gender column, the filter tabs and Assign all, which are the
+answer to gendered apparel and cannot be shown any other way.
+
+**Composited at NATIVE resolution** on the cards' own background (`#262b30`),
+each panel vertically centred, so nothing is resampled. That is why the card is
+wider than the others: 525 + 525 + 699 = 1749 px of panel before margins, which
+will not fit the 1536 the two-panel version used, and scaling a panel down to
+make it fit would cost the text its sharpness.
+
+**Crop each panel to its own window border, not to the capture.** Every RimWorld
+window draws a 2 px border at luminance 95, and a screengrab carries 3–6 px of
+game world outside it — which reads as a coloured leak against the flat
+background once composited. Both work-types panels come out at exactly 525 px
+wide when cropped to the border, which is the check that the crop landed on the
+same feature in each.
+
+```bash
+# panels, cropped to their own window borders
+magick work.png    -crop 525x780+3+4  +repage p-work.png
+magick rec.png     -crop 525x795+5+6  +repage p-rec.png
+magick owners.png  -crop 699x699+6+10 +repage p-owners.png
+
+magick -size 2000x900 xc:"srgb(38,43,48)" \
+  p-work.png   -geometry +50+60   -composite \
+  p-rec.png    -geometry +650+52  -composite \
+  p-owners.png -geometry +1250+100 -composite \
+  -strip -define png:compression-level=9 cards/card-controls.png
 ```
-ffmpeg -f lavfi -i color=c=0x262b30:s=1536x864 -i work.png -i recreation.png \
-  -filter_complex "[0][1]overlay=157:38[a];[a][2]overlay=845:30" -frames:v 1 card-controls.png
-```
+
+The offsets are per-capture; re-measure them for a new take. The owner panel is
+square (699×699) because the dialog's `InitialSize` is 560×560 and this machine
+renders the UI at about 1.25×.
 
 ### The scene cards' treatment
 
