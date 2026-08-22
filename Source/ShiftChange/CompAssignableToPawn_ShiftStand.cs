@@ -197,6 +197,17 @@ namespace ShiftChange
                 {
                     command.hotKey = null;
                 }
+                // Swap the WINDOW, keep the base's label, icon and
+                // description. Vanilla's dialog closes itself after one
+                // assignment (gated on MaxAssignedPawnsCount == 1) and its row
+                // drawers are private, so neither multi-select nor a gender
+                // column is reachable from outside it. Replacing the action is
+                // the whole intervention — no patch on a vanilla window, so no
+                // other assignable building in the load order changes.
+                if (gizmo is Command_Action assign)
+                {
+                    assign.action = () => Find.WindowStack.Add(new Dialog_AssignStandOwners(this));
+                }
                 yield return gizmo;
             }
         }
@@ -239,9 +250,13 @@ namespace ShiftChange
         protected override string GetAssignmentGizmoLabel()
         {
             List<Pawn> assigned = AssignedPawnsForReading;
-            if (assigned.Count > 0)
+            if (assigned.Count == 1)
             {
                 return "ShiftChange.OwnerGizmoLabel".Translate(assigned[0].LabelShort);
+            }
+            if (assigned.Count > 1)
+            {
+                return "ShiftChange.OwnerGizmoLabelMany".Translate(assigned.Count);
             }
             // With pooling off an unassigned stand is not "shared", it is
             // simply unowned — vanilla's own "Set owner" says that best.

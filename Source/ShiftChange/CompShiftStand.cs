@@ -166,7 +166,7 @@ namespace ShiftChange
         /// stand. Distinct from <see cref="Borrower"/>: assignment is the
         /// player's standing intent, borrowing is who is wearing it now.
         /// </summary>
-        public Pawn AssignedOwner
+        public List<Pawn> AssignedOwners
         {
             get
             {
@@ -180,26 +180,52 @@ namespace ShiftChange
                 // still gets owner semantics from it.
                 CompAssignableToPawn comp = parent.TryGetComp<CompAssignableToPawn_ShiftStand>()
                     ?? parent.TryGetComp<CompAssignableToPawn>();
-                List<Pawn> assigned = comp?.AssignedPawnsForReading;
-                return assigned != null && assigned.Count > 0 ? assigned[0] : null;
+                return comp?.AssignedPawnsForReading ?? NoOwners;
             }
         }
 
-        public bool IsPool => AssignedOwner == null;
+        internal static readonly List<Pawn> NoOwners = new List<Pawn>();
+
+        public bool IsAssignedTo(Pawn pawn) => AssignedOwners.Contains(pawn);
+
+        /// <summary>
+        /// Owner names for the inspect pane, capped. Bulk assignment is the
+        /// point of the owner list — "Assign all" on a colony of forty is two
+        /// clicks — so the unbounded version of this line was not a corner
+        /// case, it was the feature working as intended printing forty short
+        /// names into a pane sized for three.
+        /// </summary>
+        internal static string OwnerNames(List<Pawn> owners)
+        {
+            const int shown = 3;
+            if (owners.Count <= shown)
+            {
+                return owners.Select(p => p.LabelShort).ToCommaList();
+            }
+            string head = owners.Take(shown).Select(p => p.LabelShort).ToCommaList();
+            return "ShiftChange.InspectOwnersOverflow".Translate(head, owners.Count - shown);
+        }
+
+        public bool IsPool => AssignedOwners.Count == 0;
 
         /// <summary>
         /// Unassigned means pool: any pawn may take it — unless the player
         /// turned pooling off in mod settings, in which case an unassigned
-        /// stand is inert and only explicit assignment participates. Assigned
-        /// means reserved, and nobody else gets a look in — that is what
-        /// keeps a surgeon's tailored kit off a passing hauler.
+        /// stand is inert and only explicit assignment participates. One or
+        /// more owners means the stand serves that set and nobody outside it,
+        /// which is what keeps a surgeon's tailored kit off a passing hauler
+        /// and a gown off the wrong colonist.
+        ///
+        /// Note the consequence at the edges: lose every owner — death,
+        /// banishment, the reaper — and the list empties, so the stand falls
+        /// back to being a pool stand rather than staying inert.
         /// </summary>
         public bool CanBeClaimedBy(Pawn pawn)
         {
-            Pawn owner = AssignedOwner;
-            if (owner != null)
+            List<Pawn> owners = AssignedOwners;
+            if (owners.Count > 0)
             {
-                return owner == pawn;
+                return owners.Contains(pawn);
             }
             return ShiftChangeMod.PoolingEnabled;
         }
@@ -789,9 +815,11 @@ namespace ShiftChange
             // Say who owns or holds it here as well as on the gizmo: the base
             // comp reports ownership nowhere, and a stand that looks unassigned
             // is indistinguishable from one that simply never fires.
-            Pawn owner = AssignedOwner;
-            line += "\n" + (owner != null
-                ? "ShiftChange.InspectOwner".Translate(owner.LabelShort)
+            List<Pawn> owners = AssignedOwners;
+            line += "\n" + (owners.Count == 1
+                ? "ShiftChange.InspectOwner".Translate(owners[0].LabelShort)
+                : owners.Count > 1
+                ? "ShiftChange.InspectOwners".Translate(owners.Count, OwnerNames(owners))
                 : (ShiftChangeMod.PoolingEnabled
                     ? "ShiftChange.InspectPool".Translate()
                     // Keep the UI honest: with pooling off, "shared" would be

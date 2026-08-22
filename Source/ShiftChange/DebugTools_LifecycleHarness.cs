@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using LudeonTK;
 using RimWorld;
@@ -172,6 +173,10 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing), DriverRoundTrip);
             Case(map, pad, "work and recreation are mutually exclusive on a stand",
                  (m, p) => Stage(m, p, StageKit.Displacing), WorkAndRecreationAreExclusive);
+            Case(map, pad, "an owner list restricts the stand to its owners",
+                 (m, p) => Stage(m, p, StageKit.Displacing), OwnerListRestricts);
+            Case(map, pad, "the owner dialog's gender filter offers the right candidates",
+                 (m, p) => Stage(m, p, StageKit.Displacing), OwnerFilterOffersTheRightPawns);
             Case(map, pad, "a joy job in the stand's room dresses",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  JoyJobInTheRoomDresses);
@@ -611,6 +616,122 @@ namespace ShiftChange
         /// dialog then cannot render honestly (it hides the work grid while
         /// recreation is on).</para>
         /// </summary>
+        /// <summary>
+        /// Ownership is a SET. The single-owner model this replaced would pass
+        /// the first two assertions and fail every one after them, which is the
+        /// point of the case: the danger in going from one owner to many is
+        /// that a reader somewhere still asks "is THE owner this pawn" and
+        /// silently answers no for everyone but the first.
+        /// </summary>
+        internal static bool OwnerListRestricts(Fixture fix)
+        {
+            CompAssignableToPawn assignable =
+                fix.Stand.TryGetComp<CompAssignableToPawn_ShiftStand>();
+            if (assignable == null)
+            {
+                return Expect(false, "the stand carries our assignable comp");
+            }
+
+            Pawn a = fix.Pawn;
+            Pawn b = SpawnExtra(fix, Gender.Female, "OwnerB");
+            Pawn c = SpawnExtra(fix, Gender.Male, "Outsider");
+
+            bool ok = Expect(fix.Comp.IsPool, "no owners: the stand is a pool stand")
+                    & Expect(fix.Comp.CanBeClaimedBy(a) && fix.Comp.CanBeClaimedBy(c),
+                             "and anyone capable may claim it");
+
+            assignable.TryAssignPawn(a);
+            ok &= Expect(!fix.Comp.IsPool, "one owner: no longer a pool stand")
+                & Expect(fix.Comp.IsAssignedTo(a), "the owner is assigned")
+                & Expect(fix.Comp.CanBeClaimedBy(a), "the owner may claim it")
+                & Expect(!fix.Comp.CanBeClaimedBy(c), "and nobody else may");
+
+            assignable.TryAssignPawn(b);
+            ok &= Expect(fix.Comp.AssignedOwners.Count == 2, "two owners are both held")
+                & Expect(fix.Comp.CanBeClaimedBy(a), "the FIRST owner may still claim it")
+                // The one that a single-owner reader gets wrong.
+                & Expect(fix.Comp.CanBeClaimedBy(b), "the SECOND owner may claim it too")
+                & Expect(!fix.Comp.CanBeClaimedBy(c), "and an outsider still may not");
+
+            assignable.TryUnassignPawn(a);
+            ok &= Expect(!fix.Comp.CanBeClaimedBy(a), "removing an owner revokes that one")
+                & Expect(fix.Comp.CanBeClaimedBy(b), "and leaves the other intact");
+
+            assignable.TryUnassignPawn(b);
+            return ok
+                & Expect(fix.Comp.IsPool, "removing the last owner returns it to the pool")
+                & Expect(fix.Comp.CanBeClaimedBy(c), "and an outsider may claim it again");
+        }
+
+        /// <summary>
+        /// The dialog's candidate list. Two claims worth pinning: the filter
+        /// narrows by gender, and it never hides a pawn who is already an
+        /// owner — a filter that hid the owner you wanted to remove would be a
+        /// trap rather than a shortcut.
+        /// </summary>
+        internal static bool OwnerFilterOffersTheRightPawns(Fixture fix)
+        {
+            CompAssignableToPawn assignable =
+                fix.Stand.TryGetComp<CompAssignableToPawn_ShiftStand>();
+            if (assignable == null)
+            {
+                return Expect(false, "the stand carries our assignable comp");
+            }
+
+            Pawn man = SpawnExtra(fix, Gender.Male, "FilterM");
+            Pawn woman = SpawnExtra(fix, Gender.Female, "FilterF");
+
+            Dialog_AssignStandOwners dialog = new Dialog_AssignStandOwners(assignable);
+
+            dialog.filter = Dialog_AssignStandOwners.Filter.All;
+            List<Pawn> all = dialog.Candidates();
+            bool ok = Expect(all.Contains(man) && all.Contains(woman),
+                             "All: both colonists are offered");
+
+            dialog.filter = Dialog_AssignStandOwners.Filter.Male;
+            List<Pawn> males = dialog.Candidates();
+            ok &= Expect(males.Contains(man), "Men: the man is offered")
+                & Expect(!males.Contains(woman), "and the woman is not")
+                & Expect(males.All(p => p.gender == Gender.Male),
+                         "and nothing else in the colony slipped through");
+
+            dialog.filter = Dialog_AssignStandOwners.Filter.Female;
+            List<Pawn> females = dialog.Candidates();
+            ok &= Expect(females.Contains(woman), "Women: the woman is offered")
+                & Expect(!females.Contains(man), "and the man is not");
+
+            // An assigned pawn leaves the CANDIDATE list — they are drawn in
+            // the assigned section above it instead, whatever the filter says.
+            assignable.TryAssignPawn(woman);
+            dialog.filter = Dialog_AssignStandOwners.Filter.All;
+            ok &= Expect(!dialog.Candidates().Contains(woman),
+                         "an owner is no longer offered as a candidate")
+                & Expect(assignable.AssignedPawnsForReading.Contains(woman),
+                         "because they are an owner now");
+
+            dialog.filter = Dialog_AssignStandOwners.Filter.Male;
+            ok &= Expect(assignable.AssignedPawnsForReading.Contains(woman),
+                         "and a filter that excludes her does not hide her ownership");
+
+            assignable.TryUnassignPawn(woman);
+            return ok;
+        }
+
+        /// <summary>
+        /// A spare colonist on the pad, registered for teardown. Bare of work
+        /// types on purpose: the assignable comp offers every colonist when the
+        /// stand has resolved none, which is what these cases want to test.
+        /// </summary>
+        internal static Pawn SpawnExtra(Fixture fix, Gender gender, string nick)
+        {
+            Pawn pawn = DebugTools_Fixtures.AveragePawn(gender, nick);
+            pawn.workSettings?.EnableAndInitialize();
+            GenSpawn.Spawn(pawn, fix.Stand.Position + new IntVec3(2, 0, fix.Extras.Count + 1),
+                           fix.Map, Rot4.North);
+            fix.Extras.Add(pawn);
+            return pawn;
+        }
+
         internal static bool WorkAndRecreationAreExclusive(Fixture fix)
         {
             WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");

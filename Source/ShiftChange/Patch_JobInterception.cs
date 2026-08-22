@@ -1006,7 +1006,7 @@ namespace ShiftChange
                         continue;
                     }
 
-                    bool personal = comp.AssignedOwner == pawn;
+                    bool personal = comp.IsAssignedTo(pawn);
                     int distance = pawn.Position.DistanceToSquared(thing.Position);
 
                     if (best == null
