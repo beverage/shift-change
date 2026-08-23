@@ -164,7 +164,11 @@ namespace ShiftChange
 
             Case(map, pad, "gravship flight keeps the ledger", GravshipFlight);
             Case(map, pad, "gravship flight without the borrower releases it", GravshipFlightLeftBehind);
-            Case(map, pad, "plain despawn (deconstruct, minify) releases the ledger", MinifyReleases);
+            Case(map, pad, "teardown (deconstruct, burn) releases the ledger", TeardownReleases);
+            Case(map, pad, "reinstalling mid-shift keeps the ledger and the return trip",
+                 ReinstallKeepsTheLedger);
+            Case(map, pad, "reinstalling a stand keeps its owner, mode and flag",
+                 ReinstallKeepsConfiguration);
             Case(map, pad, "borrower death reaps the ledger", DeathReaps);
             Case(map, pad, "borrower banishment reaps the ledger", BanishmentReaps);
             Case(map, pad, "repeated faults disable interception, a load re-arms it", FaultLatchRecovers);
@@ -309,17 +313,25 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Deconstruct, burn down or minify into a box. Unlike the flight the
-        /// stand really is gone, so the ledger cannot be honoured and the
-        /// forced flags must come off.
+        /// Deconstruct or burn down. Unlike the flight the stand really is
+        /// gone, and unlike a minify it DROPS its container on the way out
+        /// (<c>Building_OutfitStand.cs:392</c>), so the civvies are already on
+        /// the floor, the ledger cannot be honoured, and the forced flags must
+        /// come off.
+        ///
+        /// <para>Uses <c>Deconstruct</c> rather than <c>Vanish</c>, and the
+        /// distinction is the whole point: <c>Vanish</c> is the minify, which
+        /// keeps its contents and now keeps its ledger with them. Testing the
+        /// release path through <c>Vanish</c> asserted the opposite of what
+        /// ships.</para>
         /// </summary>
-        internal static bool MinifyReleases(Fixture fix)
+        internal static bool TeardownReleases(Fixture fix)
         {
             Apparel uniform = fix.Comp.IssuedUniformForReading.Count > 0
                 ? fix.Comp.IssuedUniformForReading[0]
                 : null;
 
-            fix.Stand.DeSpawn(DestroyMode.Vanish);
+            fix.Stand.DeSpawn(DestroyMode.Deconstruct);
 
             bool ok = Expect(!fix.Comp.OnShift, "ledger released")
                     & Expect(fix.Comp.Borrower == null, "borrower cleared")
@@ -331,6 +343,164 @@ namespace ShiftChange
                              "uniform no longer force-worn");
             }
             return ok;
+        }
+
+        /// <summary>
+        /// The case this whole branch exists for, reported from play
+        /// 2026-08-23: move a stand while somebody has its uniform out, and
+        /// they must still be able to hand it back afterwards.
+        ///
+        /// <para>A minify is a <c>Vanish</c>, which KEEPS the container
+        /// (<c>Building_OutfitStand.cs:390-397</c>), so the borrower's civvies
+        /// travel inside the box. The ledger has to travel with them or the
+        /// stand lands reading those civvies as its own kit — the pawn is
+        /// stuck in the uniform and their own clothes become stand stock.
+        /// Releasing here shipped once and did exactly that; ejecting the
+        /// civvies to the floor instead shipped once too and was the same
+        /// permanent swap with the clothes underfoot.</para>
+        ///
+        /// <para>The forced flag is the one thing that must NOT survive the
+        /// boxed window, so it is asserted OFF while boxed and ON again on
+        /// landing.</para>
+        /// </summary>
+        internal static bool ReinstallKeepsTheLedger(Fixture fix)
+        {
+            Apparel uniform = fix.Comp.IssuedUniformForReading.Count > 0
+                ? fix.Comp.IssuedUniformForReading[0]
+                : null;
+            List<Apparel> parked = new List<Apparel>(fix.Comp.StoredOwnerApparelForReading);
+            if (uniform == null || parked.Count == 0)
+            {
+                return Expect(false, "the fixture is mid-shift with clothes parked");
+            }
+
+            Map map = fix.Map;
+            IntVec3 to = new IntVec3(fix.Stand.Position.x, 0, fix.Stand.Position.z + 2);
+            Rot4 rot = fix.Stand.Rotation;
+
+            MinifiedThing box = fix.Stand.MakeMinified();
+            if (box == null)
+            {
+                return Expect(false, "the stand minified");
+            }
+            bool ok = Expect(fix.Comp.OnShift, "the ledger rode into the box")
+                    & Expect(fix.Comp.Borrower == fix.Pawn, "and still names the borrower");
+            for (int i = 0; i < parked.Count; i++)
+            {
+                ok &= Expect(fix.Stand.HeldItems.Contains(parked[i]),
+                             parked[i].def.defName + " travelled with the stand");
+            }
+            if (fix.Pawn.outfits != null)
+            {
+                ok &= Expect(!fix.Pawn.outfits.forcedHandler.IsForced(uniform),
+                             "the uniform is NOT pinned while the stand is boxed");
+            }
+
+            box.InnerThing = null;
+            box.Destroy();
+            GenSpawn.Spawn(fix.Stand, to, map, rot);
+
+            ok &= Expect(fix.Stand.Spawned, "the stand is back on the map")
+                & Expect(fix.Comp.OnShift, "the ledger survived the move")
+                & Expect(fix.Comp.Borrower == fix.Pawn, "the borrower survived it")
+                & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == fix.Comp,
+                         "the registry points back at the stand — Change back works")
+                & Expect(fix.Comp.StoredOwnerApparelForReading.Count == parked.Count,
+                         "every parked garment is still in the ledger");
+            if (fix.Pawn.outfits != null)
+            {
+                ok &= Expect(fix.Pawn.outfits.forcedHandler.IsForced(uniform),
+                             "and the uniform is force-worn again on landing");
+            }
+
+            // The proof that matters: the return trip actually runs and the
+            // pawn gets their own clothes back. Everything above is state; this
+            // is the behaviour the report was about.
+            fix.Pawn.Position = fix.Stand.InteractionCell;
+            if (!RunSwap(fix))
+            {
+                return ok & Expect(false, "the return leg ran to completion");
+            }
+            ok &= Expect(!fix.Comp.OnShift, "the uniform went back into the stand");
+            for (int i = 0; i < parked.Count; i++)
+            {
+                ok &= Expect(fix.Pawn.apparel.WornApparel.Contains(parked[i]),
+                             parked[i].def.defName + " is back on the pawn");
+            }
+            return ok & Expect(fix.Stand.HeldItems.Contains(uniform),
+                               "and the uniform is back on the stand");
+        }
+
+        /// <summary>
+        /// Relocating a stand — the Reinstall designator — is a minify and a
+        /// respawn of the SAME thing, so everything the player configured has
+        /// to be on the other side of it.
+        ///
+        /// <para>Owners are the half that was actually broken: the base comp
+        /// parks them on despawn and offers them back on spawn, but only past
+        /// <c>CanSetUninstallAssignedPawn</c>, whose base answer is
+        /// <c>false</c> (<c>CompAssignableToPawn.cs:214,233-236</c>) — and it
+        /// clears the parked list either way, so a move silently unowned the
+        /// stand. The mode and flag halves ride on comp scribing and
+        /// <c>PostSpawnSetup</c> and are asserted here as regression cover,
+        /// not because they were failing.</para>
+        ///
+        /// <para>Minifies through <c>MakeMinified</c> rather than a bare
+        /// <c>DeSpawn</c>, because the wrap is what the real path does and it
+        /// is the step that would notice a stand left holding a live
+        /// reference. The re-spawn is <c>Blueprint_Install.MakeSolidThing</c>'s
+        /// shape: drop the inner thing out of the box, spawn it, bin the
+        /// box.</para>
+        /// </summary>
+        internal static bool ReinstallKeepsConfiguration(Fixture fix)
+        {
+            CompAssignableToPawn assignable =
+                fix.Stand.TryGetComp<CompAssignableToPawn_ShiftStand>();
+            if (assignable == null)
+            {
+                return Expect(false, "the stand carries our assignable comp");
+            }
+
+            AccessTools.FieldRef<Building_OutfitStand, bool> flag =
+                Patch_AllowRemovingToggle.AllowRemovingItemsRef;
+            WorkTypeDef work = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            if (flag == null || work == null)
+            {
+                return Expect(false, "allowRemovingItems and the Doctor work type both resolve");
+            }
+
+            assignable.TryAssignPawn(fix.Pawn);
+            fix.Comp.ToggleWork(work);
+            fix.Comp.SetFullChange(true);
+            // Staged LAST: ToggleWork is an entry into service and clears it.
+            // Setting it before would assert nothing about the landing.
+            flag(fix.Stand) = true;
+
+            Map map = fix.Map;
+            IntVec3 from = fix.Stand.Position;
+            IntVec3 to = new IntVec3(from.x, 0, from.z + 2);
+            Rot4 rot = fix.Stand.Rotation;
+
+            MinifiedThing box = fix.Stand.MakeMinified();
+            if (box == null)
+            {
+                return Expect(false, "the stand minified");
+            }
+            bool ok = Expect(!fix.Stand.Spawned, "the stand is off the map while boxed");
+
+            box.InnerThing = null;
+            box.Destroy();
+            GenSpawn.Spawn(fix.Stand, to, map, rot);
+
+            return ok
+                 & Expect(fix.Stand.Spawned, "the stand is back on the map")
+                 & Expect(fix.Stand.Position == to, "and in its new cell")
+                 & Expect(assignable.AssignedPawnsForReading.Contains(fix.Pawn),
+                          "the owner survived the move")
+                 & Expect(fix.Comp.WorkTypes.Contains(work),
+                          "the custom work set survived the move")
+                 & Expect(fix.Comp.FullChange, "the full-change flag survived the move")
+                 & Expect(!flag(fix.Stand), "the removal flag is held off on landing");
         }
 
         /// <summary>

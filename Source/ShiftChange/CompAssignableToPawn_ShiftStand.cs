@@ -166,6 +166,39 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// Give the owners back when the stand is set down again.
+        ///
+        /// <para>The base comp already does the hard half: any despawn that is
+        /// not <c>WillReplace</c> parks <c>assignedPawns</c> in
+        /// <c>uninstalledAssignedPawns</c> (<c>CompAssignableToPawn.cs:197-206</c>),
+        /// and the next spawn offers each of them back — but only to comps
+        /// that say yes HERE, and the base's answer is a flat <c>false</c>
+        /// (<c>:233-236</c>). It then CLEARS the parked list either way
+        /// (<c>:219</c>). Beds and thrones are the only two types in the
+        /// engine that override this, so every other assignable building
+        /// silently loses its owners to a reinstall, and so did we: minifying
+        /// is an ordinary despawn (<c>MinifyUtility.MakeMinified:15</c>), so
+        /// moving a stand three tiles left unowned it.</para>
+        ///
+        /// <para>Deliberately NOT gated on <see cref="AssigningCandidates"/>.
+        /// That list narrows to pawns capable of the stand's work, and the
+        /// work is read from the ROOM the stand is standing in — which
+        /// mid-relocation is wherever the player just put it. Re-validating
+        /// against it would quietly drop the owner of a doctoring stand the
+        /// moment it was set down in a kitchen. Assignment is the player's
+        /// standing intent; moving the furniture is not a change of intent.
+        /// Shape otherwise follows <c>CompAssignableToPawn_Throne:30-38</c>.</para>
+        /// </summary>
+        protected override bool CanSetUninstallAssignedPawn(Pawn pawn)
+        {
+            if (pawn == null || AssignedAnything(pawn) || !(bool)CanAssignTo(pawn))
+            {
+                return false;
+            }
+            return pawn.IsColonist;
+        }
+
+        /// <summary>
         /// Vanilla's label is always "Set owner" — the base comp never reports
         /// who owns the thing, anywhere. Beds only appear to, because
         /// <c>Building_Bed.GetInspectString</c> writes the owner itself. On a

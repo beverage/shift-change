@@ -506,15 +506,24 @@ namespace ShiftChange
             // from ownership was only ever right by coincidence — reassign a
             // stand while its uniform is out and the return trip would have
             // pointed at the wrong pawn.
-            if (OnShift && !StillOurs(borrower))
+            if (OnShift && (borrower == null || borrower.Dead || !StillOurs(borrower)))
             {
-                // Nobody left to honour the ledger. Two ways in: a save from
-                // before pooling (borrower null), or a borrower who left the
+                // Nobody left to honour the ledger. Three ways in: a save from
+                // before pooling (borrower null), a borrower who DIED while
+                // this stand sat in a box, or a borrower who left the
                 // colony without reaching Pawn_Ownership.UnclaimAll —
                 // banishment, which Patch_BanishStands now catches eagerly.
                 // This branch is the repair path for saves that predate that
                 // patch, and the backstop for any other faction-loss route we
                 // do not hook.
+                //
+                // The death clause is load-bearing since the ledger started
+                // riding along inside a minified box: both reapers find their
+                // stands by sweeping listerThings
+                // (Patch_UnclaimStands.ReapStandsFor, StandsBorrowedBy), and a
+                // boxed stand is on no map's lister, so a borrower who dies
+                // mid-haul reaches us only here. Dead, not spawnedness — see
+                // StillOurs for why that axis is wrong on this method.
                 //
                 // ReleaseBorrower rather than clearing the lists by hand: it
                 // takes the FORCED flags off too, and a banished pawn is alive
@@ -547,6 +556,18 @@ namespace ShiftChange
                 else
                 {
                     OnShiftStands[borrower] = this;
+                    if (!respawningAfterLoad)
+                    {
+                        // Set back down, not loaded. PostDeSpawn took the
+                        // forced flags off so a box that never came back could
+                        // not pin anyone; the box DID come back, so put them
+                        // on again and the shift resumes exactly as it stood.
+                        //
+                        // Load-gated deliberately: on a load the flags are the
+                        // pawn's own scribed state, and re-forcing there would
+                        // overrule a player who cleared one by hand mid-shift.
+                        ForceIssued(borrower);
+                    }
                 }
             }
         }
@@ -573,10 +594,41 @@ namespace ShiftChange
                 // case (CompAssignableToPawn.cs:199).
                 return;
             }
-            // Deconstructed, burnt down, or minified into a box — either way
-            // the stand is out of the borrower's reach and the ledger cannot
-            // be honoured. Dropping the registry entry alone was not enough:
-            // it left the uniform FORCE-WORN, and forced is what makes the
+            if (mode == DestroyMode.Vanish)
+            {
+                // Minified into a box — uninstalled, or the middle of a
+                // Reinstall. The stand is coming back, and critically its
+                // CONTENTS come with it: Vanish keeps them exactly as
+                // WillReplace does (Building_OutfitStand.cs:390-397), and
+                // minifying is a Vanish (MinifyUtility.MakeMinified:15).
+                //
+                // So the ledger rides along too. The alternative shipped
+                // once and was wrong in play: releasing here left the
+                // borrower's civvies inside the box with nothing saying whose
+                // they were, so the stand landed reading them as its own kit
+                // and the pawn could never hand the uniform back. Ejecting
+                // them to the floor first was no better — same permanent
+                // swap, clothes underfoot instead of in a crate. Contents
+                // kept means ledger kept; that is the same rule the
+                // WillReplace branch above already follows, and this is
+                // simply the other mode that obeys it.
+                //
+                // The one thing that must NOT ride along is the FORCED flag.
+                // A box can be sold, burnt or left in a stockpile forever,
+                // and a pawn pinned into a force-worn uniform has no route
+                // out (see ReleaseBorrower). Unforced, the worst case is that
+                // the optimizer swaps the uniform off while the stand is in
+                // transit, which PlanUndress already tolerates — it returns
+                // only what the pawn still wears. PostSpawnSetup puts the
+                // flags back on landing.
+                UnforceIssued(borrower);
+                return;
+            }
+            // Deconstructed or burnt down. These DROP the container
+            // (Building_OutfitStand.cs:392), so the civvies are already on the
+            // floor and the stand is genuinely gone — the ledger cannot be
+            // honoured. Dropping the registry entry alone was not enough: it
+            // left the uniform FORCE-WORN, and forced is what makes the
             // uniform stick. See ReleaseBorrower for why that is a trap with
             // no way out.
             ReleaseBorrower();
@@ -635,6 +687,31 @@ namespace ShiftChange
                     && holder.apparel.WornApparel.Contains(apparel))
                 {
                     holder.outfits?.forcedHandler?.SetForced(apparel, forced: false);
+                }
+            }
+        }
+
+        /// <summary>
+        /// The mirror of <see cref="UnforceIssued"/>, for the one case that
+        /// takes the flags off without ending the shift: a stand minified into
+        /// a box and set back down again. Only garments the holder is STILL
+        /// wearing are re-forced — the optimizer is free to have swapped one
+        /// away while the stand was in transit, and that is precisely the
+        /// escape hatch the unforcing exists to leave open.
+        /// </summary>
+        internal void ForceIssued(Pawn holder)
+        {
+            if (holder == null)
+            {
+                return;
+            }
+            for (int i = 0; i < issuedUniform.Count; i++)
+            {
+                Apparel apparel = issuedUniform[i];
+                if (apparel != null && holder.apparel != null
+                    && holder.apparel.WornApparel.Contains(apparel))
+                {
+                    holder.outfits?.forcedHandler?.SetForced(apparel, forced: true);
                 }
             }
         }
