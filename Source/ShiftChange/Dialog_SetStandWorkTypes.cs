@@ -210,7 +210,7 @@ namespace ShiftChange
                 // in or adjacent to a hospital zeroes its Hospital score
                 // outright (RoomRoleWorker_Hospital.GetScore) — and this
                 // label is where they can at least see WHICH role won.
-                autoLabel += " — " + (roomRole != null
+                autoLabel += "; " + (roomRole != null
                     ? (string)"ShiftChange.RoomReadsAs".Translate(roomRole.label)
                     : (string)"ShiftChange.NoRoomRole".Translate());
             }
