@@ -147,6 +147,18 @@ namespace ShiftChange
             int issuedCount = issued.Count;
             string forcedLoadID = stored[0].GetUniqueLoadID();
 
+            // The invariant's migration half: a stand saved EXPOSED must come
+            // back clean. Refusing the toggle's OFF->ON transition never
+            // emptied the stands already sitting in ON, and this is the leg
+            // that proves they get swept. Staged here rather than in its own
+            // case because this is the only case that already pays for a
+            // save/load cycle, and the sweep runs in PostSpawnSetup, which
+            // only a real load exercises.
+            if (Patch_AllowRemovingToggle.AllowRemovingItemsRef != null)
+            {
+                Patch_AllowRemovingToggle.AllowRemovingItemsRef(fix.Stand) = true;
+            }
+
             if (!TrySave(SaveName, out string savePath))
             {
                 return false;
@@ -210,7 +222,14 @@ namespace ShiftChange
                 & DebugTools_LifecycleHarness.Expect(
                     ledger.storedForcedApparel.Any(a => a != null
                         && a.GetUniqueLoadID() == forcedLoadID),
-                    "the force-worn flag came back on the same garment");
+                    "the force-worn flag came back on the same garment")
+                & DebugTools_LifecycleHarness.Expect(
+                    !ledger.IsExcluded,
+                    "the loaded stand is in service (control for the sweep below)")
+                & DebugTools_LifecycleHarness.Expect(
+                    Patch_AllowRemovingToggle.AllowRemovingItemsRef != null
+                        && !Patch_AllowRemovingToggle.AllowRemovingItemsRef(loaded),
+                    "and a stand saved with the removal flag ON came back with it off");
         }
 
         // ------------------------------------------------------------ leg 2

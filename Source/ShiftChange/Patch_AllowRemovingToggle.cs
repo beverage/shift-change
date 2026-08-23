@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using HarmonyLib;
 using RimWorld;
 using Verse;
@@ -39,6 +40,13 @@ namespace ShiftChange
     /// on the DECLARATION, not on resolved work types: a declared stand in
     /// a roleless room is "ours, currently idle", and its uniform deserves
     /// the same protection.</para>
+    ///
+    /// <para><b>But refusing the transition never emptied the state, so an
+    /// invariant holds it instead.</b> Refusing new entries was only ever
+    /// half the job; the other half is
+    /// <see cref="CompShiftStand.EnforceRemovalFlag"/>, which forces the flag
+    /// off on spawn and at every entry into service, and
+    /// <see cref="EnforceOffInService"/> below, which does the write.</para>
     ///
     /// <para><b>Text is APPENDED to vanilla's, not substituted for it.</b>
     /// Vanilla's half stays correct and stays translated in every language
@@ -86,6 +94,68 @@ namespace ShiftChange
                     }
                 }
                 yield return gizmo;
+            }
+        }
+
+        /// <summary>
+        /// Write access to the vanilla toggle field. Null if Ludeon ever
+        /// renames it, in which case the sweep below quietly does nothing —
+        /// the same graceful failure the label match already has.
+        /// </summary>
+        internal static readonly AccessTools.FieldRef<Building_OutfitStand, bool> AllowRemovingItemsRef
+            = ResolveAllowRemovingItems();
+
+        internal static AccessTools.FieldRef<Building_OutfitStand, bool> ResolveAllowRemovingItems()
+        {
+            FieldInfo field = AccessTools.DeclaredField(typeof(Building_OutfitStand), "allowRemovingItems");
+            return field == null
+                ? null
+                : AccessTools.FieldRefAccess<Building_OutfitStand, bool>(field);
+        }
+
+        /// <summary>
+        /// Turns the toggle off on a stand that is in service. The caller owns
+        /// the "is it in service" test — see
+        /// <see cref="CompShiftStand.EnforceRemovalFlag"/>, which is the only
+        /// thing that should call this.
+        ///
+        /// <para>The asymmetric disable refuses new entries to the ON state but
+        /// never empties it, and nothing in this mod clears the flag — our
+        /// swaps run through <see cref="JobDriver_SwapAtStand"/>, which never
+        /// calls vanilla's <c>SetAllowHauling</c>. Vanilla clears it only on a
+        /// player-ORDERED swap (<c>Building_OutfitStand.cs:573,857</c>), so a
+        /// stand driven purely automatically — the normal case here — stays
+        /// exposed forever.</para>
+        ///
+        /// <para>Two populations sit in that state, and neither is visible:
+        /// saves predating the disable, and anyone who took the documented
+        /// "set it to Not used for shift changes to unlock it" round trip and
+        /// then put the stand back in service. The inspect pane says nothing
+        /// about the flag and an ON toggle looks like any other, so the player
+        /// cannot audit it by eye.</para>
+        ///
+        /// <para>Overriding an explicit click is the deliberate cost (principal,
+        /// 2026-08-23): OFF is the documented configuration for a stand in
+        /// service, and the published description already promises the toggle
+        /// "holds itself off while the stand is in service". This makes that
+        /// sentence true instead of aspirational.</para>
+        ///
+        /// <para>A bare field write, NOT vanilla's <c>SetAllowHauling</c>: that
+        /// setter also recalculates <c>listerHaulables</c>, and driving a
+        /// storage recalculation from inside <c>Map.FinalizeLoading</c> is a
+        /// fine way to break a load. <c>ListerHaulables.HaulSourcesCheckTick</c>
+        /// re-derives every haul source on a rolling basis anyway, so the
+        /// cached list converges on its own within a tick or two.</para>
+        /// </summary>
+        internal static void EnforceOffInService(Building_OutfitStand stand)
+        {
+            if (stand == null || AllowRemovingItemsRef == null)
+            {
+                return;
+            }
+            if (AllowRemovingItemsRef(stand))
+            {
+                AllowRemovingItemsRef(stand) = false;
             }
         }
     }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using HarmonyLib;
 using LudeonTK;
 using RimWorld;
 using UnityEngine;
@@ -173,6 +174,8 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing), DriverRoundTrip);
             Case(map, pad, "work and recreation are mutually exclusive on a stand",
                  (m, p) => Stage(m, p, StageKit.Displacing), WorkAndRecreationAreExclusive);
+            Case(map, pad, "the removal flag is held off while a stand is in service",
+                 RemovalFlagHeldOffInService);
             Case(map, pad, "an owner list restricts the stand to its owners",
                  (m, p) => Stage(m, p, StageKit.Displacing), OwnerListRestricts);
             Case(map, pad, "the owner dialog's gender filter offers the right candidates",
@@ -197,7 +200,7 @@ namespace ShiftChange
             // they have run. They register through the fixture-less overload
             // for the same reason — Teardown would clear a pad on the disposed
             // map. See DebugTools_SaveRoundTrip.
-            Case("a save/load round trip keeps the owner, the ledger and the forced flags",
+            Case("a save/load round trip keeps the owner and the ledger, and sweeps the removal flag",
                  () => DebugTools_SaveRoundTrip.RoundTrip(map, pad));
             Case("a legacy-key save migrates its owner and re-saves prefixed",
                  DebugTools_SaveRoundTrip.LegacyMigration);
@@ -730,6 +733,65 @@ namespace ShiftChange
                            fix.Map, Rot4.North);
             fix.Extras.Add(pawn);
             return pawn;
+        }
+
+        /// <summary>
+        /// The invariant the contents protection rests on: while a stand is in
+        /// service, vanilla's <c>allowRemovingItems</c> is off.
+        ///
+        /// <para>Driven through EVERY entry into service, not just a load,
+        /// because the documented way to reach the flag is to exclude the
+        /// stand, flip it, and put the stand back — and that last step is what
+        /// used to leave a live window. An excluded stand is the control: it
+        /// is ordinary vanilla furniture and the player owns its flag.</para>
+        ///
+        /// <para>The last two assertions are the tripwire for
+        /// <see cref="CompShiftStand.EnforceRemovalFlag"/>'s claim that no
+        /// Harmony patch on <c>ApparelSourceEnabled</c> is needed. They pin the
+        /// engine fact the claim rests on — that the optimizer's gate IS this
+        /// field (<c>Building_OutfitStand.cs:104</c>). If Ludeon ever decouples
+        /// them these fail, and the patch goes back on the table.</para>
+        /// </summary>
+        internal static bool RemovalFlagHeldOffInService(Fixture fix)
+        {
+            AccessTools.FieldRef<Building_OutfitStand, bool> flag =
+                Patch_AllowRemovingToggle.AllowRemovingItemsRef;
+            if (flag == null)
+            {
+                // Not a stale test — the whole guard rides on this field, so a
+                // rename means the protection is silently gone.
+                return Expect(false, "allowRemovingItems still resolves");
+            }
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            if (doctor == null)
+            {
+                return Expect(false, "the Doctor work type resolves");
+            }
+
+            fix.Comp.SetExcluded();
+            flag(fix.Stand) = true;
+            bool ok = Expect(flag(fix.Stand),
+                             "an excluded stand keeps the flag the player set (control)");
+
+            fix.Comp.SetAutomatic();
+            ok &= Expect(!flag(fix.Stand), "going automatic clears it");
+
+            fix.Comp.SetExcluded();
+            flag(fix.Stand) = true;
+            fix.Comp.ToggleWork(doctor);
+            ok &= Expect(!flag(fix.Stand), "declaring a work type clears it");
+
+            fix.Comp.SetExcluded();
+            flag(fix.Stand) = true;
+            fix.Comp.ToggleRecreation();
+            ok &= Expect(!flag(fix.Stand), "declaring recreation clears it")
+                & Expect(!fix.Comp.IsExcluded, "and the stand really is in service (control)");
+
+            return ok
+                & Expect(!((IApparelSource)fix.Stand).ApparelSourceEnabled,
+                         "so the optimizer's gate is shut by construction")
+                & Expect(!((IHaulSource)fix.Stand).HaulSourceEnabled,
+                         "and the stand is not a haul source while in service");
         }
 
         internal static bool WorkAndRecreationAreExclusive(Fixture fix)

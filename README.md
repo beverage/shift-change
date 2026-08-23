@@ -64,13 +64,15 @@ before putting a robe rack in a cold biome. A stand holding nothing they can
 wear still won't undress them; there is no configuration in which a colonist
 strips for a shift and gets nothing back.
 
-**"Allow removing items" holds itself off while a stand is in service.**
+**"Allow removing items" is held off while a stand is in service.**
 Shift changes never need it, and turning it on hands the stand's contents to
 every colonist's outfit optimizer, which may take the uniform and wear it as
-everyday clothes, and assigning an owner does not prevent that. A stand
-already switched on stays switchable, so there is always a way back. To
-decommission a stand and let haulers empty it, set "Not used for shift
-changes" first; the toggle unlocks with it.
+everyday clothes, and assigning an owner does not prevent that. The stand
+clears it on load and again whenever it goes back into service, so a stand
+switched on while it was set aside does not stay that way. To take one garment
+back, use the eject button beside it in the Contents tab, which drops it next
+to the stand. To decommission a stand and let haulers empty it, set "Not used
+for shift changes" first; the toggle unlocks with it and stays unlocked.
 
 A stand that is dressing anyone says so in its inspect pane: what it dresses
 for, who owns or is currently wearing it, and whether it's empty. A stand in a

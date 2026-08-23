@@ -63,9 +63,9 @@
        &lt;color&gt; — but NOT &lt;u&gt;, which is TextMeshPro only and would
        render as literal tag text. #E5E54C is vanilla's own caution yellow
        (Royalty's precept descriptions use it for "Gameplay effect:"). -->
-  <ShiftChange.AllowRemovingDesc>&lt;color=#E5E54C&gt;&lt;b&gt;Shift Change: leave this off.&lt;/b&gt;&lt;/color&gt;\n\nColonists stock the stand either way, and changing into its outfit ignores this setting completely, so shift changes work with it off.\n\nTurning it on exposes the stand's contents to every colonist's outfit optimizer, which may simply take the uniform and wear it as everyday clothes.</ShiftChange.AllowRemovingDesc>
+  <ShiftChange.AllowRemovingDesc>&lt;color=#E5E54C&gt;&lt;b&gt;Shift Change: kept off while this stand is in service.&lt;/b&gt;&lt;/color&gt;\n\nColonists stock the stand either way, and changing into its outfit ignores this setting completely, so shift changes work with it off.\n\nTurning it on exposes the stand's contents to every colonist's outfit optimizer, which may simply take the uniform and wear it as everyday clothes.</ShiftChange.AllowRemovingDesc>
 
-  <ShiftChange.AllowRemovingDisabled>In service for shift changes, which keeps this off: turned on, the stand's contents are exposed to every colonist's outfit optimizer, and an assigned owner does not protect them.\n\nTo let haulers empty the stand, set it to 'Not used for shift changes' first.</ShiftChange.AllowRemovingDisabled>
+  <ShiftChange.AllowRemovingDisabled>In service for shift changes, which keeps this off: turned on, the stand's contents are exposed to every colonist's outfit optimizer, and an assigned owner does not protect them.\n\nTo take a garment back, use the eject button in the Contents tab. To let haulers empty the stand, set it to 'Not used for shift changes' first.</ShiftChange.AllowRemovingDisabled>
 
   <ShiftChange.Faulted>Shift Change hit repeated errors and has stopped changing colonists for this game. Outfit stands still work as ordinary furniture. Loading a save will start it again; the details are in the dev log.</ShiftChange.Faulted>
 

@@ -48,7 +48,7 @@ Three optional controls per stand:
 - The stand's switch, labelled with what it currently dresses for, opens the checklist for rooms the game reads oddly, rooms that do two jobs, or a decorative stand you do not want used at all. It also names what the game reads the room as, which explains the surprises: a crib turns a hospital into a barracks. Recreation and work types are mutually exclusive (one outfit serves one purpose), so a room that does both wants two stands.
 - Change the whole outfit, off by default, is the difference between a lab coat worn over ordinary clothes and a sauna robe worn instead of them. Ticked, the colonist wears only what the stand holds, and loses whatever their own clothes were providing, warmth included. That is worth a thought before a robe rack in a cold biome.
 
-The stand's Allow removing items toggle holds itself off while the stand is in service, because turning it on exposes the contents to every colonist's outfit optimizer, which may wear the uniform as everyday clothes. Set the stand to Not used for shift changes to unlock it.
+The stand's Allow removing items toggle is held off while the stand is in service, because turning it on exposes the contents to every colonist's outfit optimizer, which may wear the uniform as everyday clothes. To take a garment back, use the eject button in the stand's Contents tab. To retire a stand and let haulers empty it, set it to Not used for shift changes, which frees the toggle.
 
 Deliberately narrow, so it never fights you:
 - Automatic only, for work and recreation alike. A direct order is never delayed by a wardrobe trip, and a colonist already in uniform keeps it on.

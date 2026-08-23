@@ -65,16 +65,26 @@ to stop, and `--alongside` is the deliberate opt-in.
 
 ## What the cases assert
 
-Twenty-two cases, in six kinds.
+Twenty-three cases, in six kinds.
 
 **Regression cases** guard a bug that happened. A stand whose stock shares no
 apparel layer with what the pawn wears once donated its uniform permanently and
 emptied itself forever; a gravship flight released every ledger aboard and
 inverted uniform and civvies; banishment never reached the reaper because
 `PawnBanishUtility.Banish` never reaches `UnclaimAll`; a single exception
-disabled interception for the whole process; and the freed-stand announcement
+disabled interception for the whole process; the freed-stand announcement
 fired before the tracker released the pawn's reservation, so the mid-job
-catch-up could never fire at all. Each has a case that fails without its fix.
+catch-up could never fire at all; and a stand that reached service with
+vanilla's removal flag already on stayed open to every colonist's optimizer,
+because refusing the toggle's transition never emptied the state behind it.
+Each has a case that fails without its fix.
+
+That last one carries a second job. Its closing assertions read
+`ApparelSourceEnabled` and `HaulSourceEnabled` off the stand directly, pinning
+the engine fact that both are the same field. The decision not to patch the
+optimizer's gate rests on that being true, so if Ludeon ever decouples them the
+case fails and names the decision that needs revisiting, instead of the
+protection quietly evaporating.
 
 **Driver cases** prove the ledger is built correctly in the first place. They
 stage an undressed pawn and run `JobDriver_SwapAtStand` for real through the
@@ -111,7 +121,9 @@ wanted to remove would be a trap.
 
 **Round-trip cases** save the game, load it back through the engine's own
 synchronous loader, and assert on what came out. There are three: a plain trip
-that carries the owner, the ledger and the forced flags; a legacy-key save that
+that carries the owner, the ledger and the forced flags, and that also stages
+the removal flag ON before saving to prove the load sweeps it back off; a
+legacy-key save that
 must migrate its owner and then re-save under the prefixed key; and a stand
 carrying a foreign `CompAssignableToPawn`, whose owner must survive untouched
 while ours stays empty.

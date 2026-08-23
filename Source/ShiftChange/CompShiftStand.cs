@@ -342,6 +342,7 @@ namespace ShiftChange
             excluded = false;
             recreationOverride = false;
             workTypeOverrides?.Clear();
+            EnforceRemovalFlag();
         }
 
         public void SetExcluded()
@@ -349,6 +350,37 @@ namespace ShiftChange
             excluded = true;
             recreationOverride = false;
             workTypeOverrides?.Clear();
+        }
+
+        /// <summary>
+        /// Holds the one invariant the mod's contents protection rests on:
+        /// while a stand is in service, vanilla's "Allow removing items" flag
+        /// is off.
+        ///
+        /// <para>Called on spawn and from EVERY entry into service, which is
+        /// what makes this an invariant rather than a load-time migration. The
+        /// documented way to reach the flag is to set a stand to "Not used for
+        /// shift changes", flip it, and put the stand back — and that last step
+        /// always lands in one of the three callers, so the window that round
+        /// trip used to leave open is closed.</para>
+        ///
+        /// <para>Hold this and <c>IApparelSource.ApparelSourceEnabled</c> is
+        /// false by construction, because it IS this flag
+        /// (<c>Building_OutfitStand.cs:104</c>) and
+        /// <c>JobGiver_OptimizeApparel:149</c> is its only reader in the whole
+        /// engine. That is why no Harmony patch on that property is needed:
+        /// the protection falls out of the invariant. Do not add one without
+        /// first breaking this.</para>
+        ///
+        /// <para>Leaving service is deliberately untouched. An excluded stand
+        /// is ordinary vanilla furniture and the player owns its flag.</para>
+        /// </summary>
+        internal void EnforceRemovalFlag()
+        {
+            if (!excluded)
+            {
+                Patch_AllowRemovingToggle.EnforceOffInService(Stand);
+            }
         }
 
         /// <summary>
@@ -382,6 +414,7 @@ namespace ShiftChange
             {
                 SetExcluded();
             }
+            EnforceRemovalFlag();
         }
 
         /// <summary>
@@ -405,6 +438,7 @@ namespace ShiftChange
             {
                 SetExcluded();
             }
+            EnforceRemovalFlag();
         }
 
         /// <summary>
@@ -462,6 +496,11 @@ namespace ShiftChange
         {
             base.PostSpawnSetup(respawningAfterLoad);
             SessionGuard.Ensure();
+
+            // Unconditional, not load-only: this also covers a stand
+            // reinstalled from a minified box. A fresh build defaults to the
+            // flag off, so the ordinary case is a no-op.
+            EnforceRemovalFlag();
 
             // Rebuild from the BORROWER, not the assigned owner. Inferring it
             // from ownership was only ever right by coincidence — reassign a

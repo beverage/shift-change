@@ -534,7 +534,7 @@ finished mods — and these are not harmless entries. Each stage builder is a
 footprint, destroying every building and item in it and vanishing any pawn
 standing there — gear and all, no corpse, no letter — and then leaves permanent
 player-faction colonists, owned buildings and rewritten terrain behind. The
-harness clears its 7×7 pad twenty-two times per run.
+harness clears its 7×7 pad once for every staged case, every run.
 
 The two real arguments in the old rationale both survive, and neither ever
 required *menu presence*:

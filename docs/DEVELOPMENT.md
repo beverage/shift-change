@@ -385,9 +385,8 @@ flowchart LR
 | `ShiftChangeDefOf.cs` | Def references. |
 | `SessionGuard.cs` | Clears session-scoped statics when the loaded game changes. Route any new static through it. |
 | `HarmonyInit.cs` | Patch bootstrap. |
-| `Patch_AllowRemovingTooltip.cs` | Appends the Shift Change truth to the stand's "Allow removing items" tooltip. UI only. |
 | `DebugTools_Fixtures.cs` | Fixture primitives — make a thing, a pawn, a garment. **Always compiled**, because the harness builds its fixtures from these in Release. |
-| `DebugTools_LifecycleHarness.cs` | The test suite. Twenty-two cases driving real engine entry points — see [TESTING.md](TESTING.md). Body always compiled; its `[DebugAction]` is `SCENES` only. |
+| `DebugTools_LifecycleHarness.cs` | The test suite. Twenty-three cases driving real engine entry points — see [TESTING.md](TESTING.md). Body always compiled; its `[DebugAction]` is `SCENES` only. |
 | `DebugTools_SaveRoundTrip.cs` | The three save/load cases. Separate file because they replace `Current.Game` and must run last. |
 | `Patch_HarnessAutoRun.cs` | Runs the harness and quits, when launched with `-shiftchange-harness`. Inert without the flag. Always compiled — this is the release gate. |
 | `DebugTools_Menu.cs` | `SCENES` only. The mod's entire debug-menu surface: one "Dev tools…" submenu. Absent in Release, so the category never renders. |
