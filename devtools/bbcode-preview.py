@@ -22,6 +22,13 @@ import os
 import re
 import sys
 
+#: Steam truncates a Workshop item description at this many characters, with
+#: no warning, mid-word, on the live page. Counted as PLAIN characters: the
+#: v1.2.3 description was cut at file offset 8000 exactly (2026-08-24), so
+#: newlines count once, not as CRLF. Change notes are a separate, larger
+#: budget and never come close, so this check simply never fires on them.
+DESCRIPTION_LIMIT = 8000
+
 #: Tags that carry no closing partner. Steam's list item is the only one in
 #: the subset we use — `[*]` runs until the next item or the end of the list.
 UNPAIRED = {"*"}
@@ -163,10 +170,18 @@ def main():
                                  body=render(text)))
 
     placeholders = len(re.findall(r"REPLACE-WITH-[A-Z-]+", text))
+    over_limit = len(text) > DESCRIPTION_LIMIT
     print(f"wrote {dest}")
     print(f"  {len(TAG.findall(text))} tags, {len(problems)} problems, "
           f"{placeholders} placeholders left")
-    return 1 if problems else 0
+    print(f"  {len(text)} chars, "
+          f"{abs(DESCRIPTION_LIMIT - len(text))} "
+          f"{'OVER' if over_limit else 'under'} the {DESCRIPTION_LIMIT} limit")
+    if over_limit:
+        print(f"error: Steam truncates the description at {DESCRIPTION_LIMIT} "
+              f"characters, silently and mid-word. Cut "
+              f"{len(text) - DESCRIPTION_LIMIT} characters.", file=sys.stderr)
+    return 1 if (problems or over_limit) else 0
 
 
 if __name__ == "__main__":
