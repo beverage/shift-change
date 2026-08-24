@@ -74,6 +74,17 @@ back, use the eject button beside it in the Contents tab, which drops it next
 to the stand. To decommission a stand and let haulers empty it, set "Not used
 for shift changes" first; the toggle unlocks with it and stays unlocked.
 
+**"Keep contents out of trade" is on by default.** Traders will otherwise buy
+anything sitting on an outfit stand: the uniform, and the owner's own clothes
+parked there while they're on shift. That's vanilla behaviour, it reaches both
+caravans at the gate and ships in orbit, and nothing else about the stand
+prevents it. "Allow removing items" doesn't cover trade, and neither does an
+assigned owner. With this on, the stand's contents never reach a trade window,
+and nothing else changes: colonists still stock it, shift changes still work,
+and you can still load the kit into a caravan yourself. Turn it off for a stand
+you keep as a shop shelf; a stand set to "Not used for shift changes" is
+tradeable either way.
+
 A stand that is dressing anyone says so in its inspect pane: what it dresses
 for, who owns or is currently wearing it, and whether it's empty. A stand in a
 room with no role says nothing at all, and behaves like ordinary furniture.
