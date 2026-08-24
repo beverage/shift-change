@@ -178,7 +178,7 @@ order, which follows patch order, decides nothing.
 | Vanilla provides | Detail |
 |---|---|
 | Apparel storage with filters | storage-group support, contents displayed on the stand model |
-| `allowRemovingItems`, default false | one flag driving both `IHaulSource.HaulSourceEnabled` and `IApparelSource.ApparelSourceEnabled` (`:102-104`). This default is what stops haulers carting uniforms to stockpiles and stops `JobGiver_OptimizeApparel` raiding the stand |
+| `allowRemovingItems`, default false | one flag driving both `IHaulSource.HaulSourceEnabled` and `IApparelSource.ApparelSourceEnabled` (`:102-104`). This default is what stops haulers carting uniforms to stockpiles and stops `JobGiver_OptimizeApparel` raiding the stand. It does not reach traders — see [Withholding from trade](#withholding-from-trade) |
 | One outfit of capacity, structurally | `HasRoomForApparelOfDef` (`:332-342`) is not a count limit but a conflict check, refusing anything that cannot be worn together with what is already there |
 | Eviction | `TryDropThingsToMakeRoomForThingOfDef` (`:344-364`) drops conflicting contents on the floor nearby |
 
@@ -335,6 +335,61 @@ pre-pause sessions resume after load and the driver dyes whatever its queue name
 wherever it sits. Its `TryMakePreToilReservations` is failed — the vanilla-routine
 way to cancel — when the pawn is on shift or any queued garment is parked in a
 stand.
+
+## Withholding from trade
+
+Vanilla lists a stand's contents to traders by two routes, and neither is gated
+by anything a player would recognise as a lock.
+
+| Trader | Route |
+|---|---|
+| Orbital ship | `TradeUtility.AllLaunchableThingsForTrade` special-cases `Building_OutfitStand` and yields its `HeldItems` (`TradeUtility.cs:123`) |
+| Visiting caravan | `Pawn_TraderTracker.ColonyThingsWillingToBuy` walks `AllColonistBuildingsOfType<IHaulSource>()` and yields everything each one directly holds (`Pawn_TraderTracker.cs:123-134`) |
+
+`TradeDeal.InSellablePosition` then whitelists `ParentHolder is
+Building_OutfitStand`, so the unspawned held items sail through the position
+check (`TradeDeal.cs:85`). What ends up on the trader's list is the uniform in
+active rotation and, if anyone is on shift, their own clothes parked beside it.
+
+**`allowRemovingItems` is not in this story at all**, which is worth saying out
+loud, because the section above spends a page on that flag. The caravan lister
+keys on **type**: a stand whose `HaulSourceEnabled` is false is enumerated
+anyway, and `Patch_AllowRemovingToggle`'s enforcement — which does hold the
+optimizer off — buys nothing here. A player who read the removal toggle's
+tooltip, saw "the stand's contents are exposed", turned it off and concluded
+the stand was shut would be wrong.
+
+**One postfix on `TradeUtility.PlayerSellableNow` covers both routes.**
+`TradeDeal.AddAllTradeables` re-tests every candidate through it and drops the
+item on false (`TradeDeal.cs:46-50`) before it can become a `Tradeable` — not
+greyed out, absent. Patching the choke rather than the two collectors also picks
+up gift mode, which shares the deal. Every caller of that method in the engine
+is trade-side, so nothing outside a trade window notices; the def-level
+`EverPlayerSellable` that `StatWorker` and `Dialog_SellableItems` use is a
+different method and is untouched.
+
+Deliberately narrow: it withholds the kit from traders and does nothing else.
+Caravan packing, hauling, raider theft and the optimizer all run through other
+code, and a player who wants to sell a uniform unticks the box.
+
+**On by default, and old saves adopt it.** The exposure is invisible from the
+inspect pane, so a player cannot audit it by eye and will not go looking for a
+switch they do not know they need — the same reasoning that made the removal
+flag self-enforcing rather than merely documented. `Scribe_Values` writes
+nothing when a value matches its default and hands the default back when the
+node is absent (`Scribe_Values.cs:70-78,88`), so a save predating the flag loads
+protected, and the only thing ever written is a deliberate opt-out.
+
+Keyed on the **declaration**, like the removal-flag disable. `BlocksTrade` is
+`!excluded && withholdFromTrade`, so a stand set to "Not used for shift changes"
+is tradeable whatever the flag says — and the dialog's `ModeOnly` return already
+hides the row for exactly those stands. One condition, not two that can drift
+apart.
+
+The failure mode is vanilla. A postfix on a public static that does nothing
+unless it finds our comp: if Ludeon moves the method, the patch fails to apply,
+Harmony logs it, and stands go back to being tradeable, which is where they
+started.
 
 ## Change back
 
@@ -507,6 +562,11 @@ was not designed; it fell out of reading what vanilla declares about its own job
   Deliberately not a `GameComponent`: a component writes its class name into every
   save, costing players a one-time load error after uninstalling. The guard has
   zero save footprint.
+- **One scribed flag defaults to `true`.** `withholdFromTrade` is the only comp
+  field whose default is not the zero value, and that is what carries the trade
+  protection into saves that predate it: an absent node means on. The cost is
+  the mirror image — an opt-out is the only state that gets written, so a stand
+  deliberately left tradeable is the one relying on its node to survive.
 - **Uninstalling is clean by construction.** Saved state is comp fields inside
   vanilla buildings' nodes, skipped silently when unrecognized, plus vanilla's own
   forced-apparel flags. Removing the mod reverts every stand to plain vanilla

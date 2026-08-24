@@ -106,6 +106,29 @@ dialog in its two modes — work on the left (automatic, resolved to doctoring
 from the room, grid populated) and recreation in the middle (grid hidden,
 exclusivity note showing) — then the owner list on the right.
 
+**Re-shot 2026-08-24**, when the work-types dialog gained "Keep contents out
+of trade" under "Change the whole outfit", inside its separator.
+`HeaderAllowance` went 226 → 252 and the work panel grew by exactly that one
+`RowHeight`, 780 → 813 px, which is 26 logical px at this machine's 1.25× UI
+scale. Widths did not move, so the horizontal offsets carried over untouched.
+
+**Both work-types panels are now the same height, and that is correct rather
+than lucky.** `FitToMode` sizes the window from `InitialSize.y`, which branches
+on `ModeOnly` — the excluded stand — and not on recreation, so the two modes
+have always been the same window. The previous take had them at 780 and 795,
+which means the old recreation crop was 15 px loose. Width cross-checks the
+crop; height never did, and that is what the gap cost. Worth a glance at both
+numbers on the next take, not just the 525.
+
+**The owner panel was not re-captured.** Its dialog did not change — the only
+commit touching that path since the last card is the reinstall fix, which adds
+`CanSetUninstallAssignedPawn` and draws nothing — so it was recovered from the
+previous card instead. That composite was at native resolution, so what comes
+back out is pixel-identical to the original capture rather than a re-encode of
+something scaled. Confirm a recovery landed by sampling the crop's corners and
+edge midpoints: all should read `srgb(87,97,110)`, the window border, with no
+`srgb(38,43,48)` card background leaking in.
+
 The owner list had been cut from an earlier version of this card, when it was
 a bare assign list of three pawns that taught nothing. It earned its place back
 once it grew the gender column, the filter tabs and Assign all, which are the
@@ -125,19 +148,24 @@ wide when cropped to the border, which is the check that the crop landed on the
 same feature in each.
 
 ```bash
-# panels, cropped to their own window borders
-magick work.png    -crop 525x780+3+4  +repage p-work.png
-magick rec.png     -crop 525x795+5+6  +repage p-rec.png
-magick owners.png  -crop 699x699+6+10 +repage p-owners.png
+# panels, cropped to their own window borders (2026-08-24 take)
+magick work.png -crop 525x813+6+6 +repage p-work.png
+magick rec.png  -crop 525x813+4+8 +repage p-rec.png
+
+# owners recovered from the PREVIOUS card, not re-captured. Must run before
+# the composite below, which overwrites the file it reads from.
+magick cards/card-controls.png -crop 699x699+1250+100 +repage p-owners.png
 
 magick -size 2000x900 xc:"srgb(38,43,48)" \
-  p-work.png   -geometry +50+60   -composite \
-  p-rec.png    -geometry +650+52  -composite \
+  p-work.png   -geometry +50+43   -composite \
+  p-rec.png    -geometry +650+43  -composite \
   p-owners.png -geometry +1250+100 -composite \
   -strip -define png:compression-level=9 cards/card-controls.png
 ```
 
-The offsets are per-capture; re-measure them for a new take. The owner panel is
+The crop offsets are per-capture; re-measure them for a new take. The vertical
+composite offsets are not free parameters — every panel is centred, so each is
+`(900 - height) / 2`, which is where +43 and +100 come from. The owner panel is
 square (699×699) because the dialog's `InitialSize` is 560×560 and this machine
 renders the UI at about 1.25×.
 

@@ -172,6 +172,12 @@ green log out of a suite that checks nothing.
   about a mod that was not installed.
 - **UI.** No case draws a gizmo, opens the work-type dialog, or reads an inspect
   string.
+- **Trade.** No case opens a trade session or builds a `TradeDeal`, so the
+  withhold-from-trade postfix is verified in play only. A moved
+  `PlayerSellableNow` is at least loud, since Harmony reports a target it cannot
+  find on startup — but nothing pins the two collectors that reach stand
+  contents in the first place, so a route quietly rerouted around the deal would
+  take the protection with it and say nothing.
 - **Pooling on and off, the optimizer pause, the recolor guard, `SwapPlan`'s
   rollback, the change-back latch, the retry cooldown.** No cases yet.
 
