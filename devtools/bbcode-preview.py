@@ -41,6 +41,18 @@ PAIRED = {
     "list", "olist", "url", "img", "quote", "code", "spoiler", "noparse", "hr",
 }
 
+#: Tags the renderer still understands but Steam will not accept, mapped to the
+#: reason. Kept renderable so old files still preview, reported as an error so a
+#: new one cannot ship with them. Steam's tag support is not a fixed contract:
+#: every entry here published successfully at some point and stopped.
+REJECTED = {
+    "hr": ("Steam's description editor refuses to SAVE a page containing it, "
+           "with only a generic 'there was a problem trying to save' error and "
+           "no indication which tag is at fault (observed 2026-08-24, item "
+           "3783456242, persistent over hours). The same tag published fine at "
+           "v1.1.0 through v1.2.2, so this changed on Steam's side"),
+}
+
 TAG = re.compile(r"\[(/?)([a-zA-Z*]+)(?:=([^\]]*))?\]")
 
 
@@ -53,6 +65,10 @@ def validate(text):
         name = name.lower()
         line = text.count("\n", 0, match.start()) + 1
 
+        if name in REJECTED and not closing:
+            problems.append(f"line {line}: [{name}] — {REJECTED[name]}")
+            # Fall through: still balance-check it, so removing the opener
+            # later does not produce a phantom "closes nothing".
         if name in UNPAIRED:
             continue
         if name not in PAIRED:
