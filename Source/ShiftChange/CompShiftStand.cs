@@ -106,6 +106,40 @@ namespace ShiftChange
         internal bool fullChange;
 
         /// <summary>
+        /// Keep this stand's contents out of trade windows.
+        ///
+        /// <para><b>Vanilla offers them, and the removal flag is no defence.</b>
+        /// <c>TradeUtility.AllLaunchableThingsForTrade</c> carries an explicit
+        /// <c>Building_OutfitStand</c> branch that yields <c>HeldItems</c>
+        /// (<c>TradeUtility.cs:123</c>) for orbital ships, and
+        /// <c>Pawn_TraderTracker.ColonyThingsWillingToBuy</c> walks
+        /// <c>AllColonistBuildingsOfType&lt;IHaulSource&gt;()</c> and yields
+        /// everything they directly hold (<c>Pawn_TraderTracker.cs:123-134</c>)
+        /// for visiting caravans. That second one enumerates by TYPE, so
+        /// <c>HaulSourceEnabled</c> — the one thing <c>allowRemovingItems</c>
+        /// actually gates — is never consulted, and
+        /// <see cref="Patch_AllowRemovingToggle"/>'s enforcement buys nothing
+        /// here. <c>TradeDeal.InSellablePosition</c> then whitelists
+        /// <c>ParentHolder is Building_OutfitStand</c> so the unspawned held
+        /// items sail through the position check (<c>TradeDeal.cs:85</c>). The
+        /// result is a uniform in active rotation — and the owner's own clothes
+        /// parked beside it — listed for sale to the next trader who walks in.</para>
+        ///
+        /// <para><b>Defaults ON, and saves that predate it adopt it.</b> A stand
+        /// in service holds kit the colony is using, so the safe state is the
+        /// default state; that is the same call as
+        /// <see cref="EnforceRemovalFlag"/>, and for the same reason — the
+        /// exposure is invisible from the inspect pane, so a player cannot
+        /// audit it by eye and will not go looking for a switch they do not
+        /// know they need.</para>
+        ///
+        /// <para>Read through <see cref="BlocksTrade"/>, never directly: that
+        /// property folds in <see cref="excluded"/>, because a stand declared
+        /// not-ours is untouched vanilla no matter what this flag says.</para>
+        /// </summary>
+        internal bool withholdFromTrade = true;
+
+        /// <summary>
         /// Stands that currently have a uniform out on a pawn, so the return
         /// trip can be found without sweeping the map. Keyed by BORROWER and
         /// rebuilt on load, since <see cref="PostSpawnSetup"/> runs for every
@@ -329,6 +363,23 @@ namespace ShiftChange
         {
             fullChange = on;
         }
+
+        public bool WithholdFromTrade => withholdFromTrade;
+
+        public void SetWithholdFromTrade(bool on)
+        {
+            withholdFromTrade = on;
+        }
+
+        /// <summary>
+        /// The question <see cref="Patch_WithholdFromTrade"/> asks. Keyed on the
+        /// DECLARATION rather than on resolved work types, exactly like the
+        /// removal-flag disable: a declared stand sitting in a roleless room is
+        /// "ours, currently idle" and its uniform deserves the same cover,
+        /// while an excluded stand is somebody's display piece and stays
+        /// vanilla — flag or no flag.
+        /// </summary>
+        public bool BlocksTrade => !excluded && withholdFromTrade;
 
         // Both threads narrowed "automatic": recreation is an explicit override
         // like a custom work set, while fullChange is NOT — it is a property of
@@ -762,6 +813,13 @@ namespace ShiftChange
             }
             Scribe_Values.Look(ref excluded, "excluded", defaultValue: false);
             Scribe_Values.Look(ref fullChange, "fullChange", defaultValue: false);
+            // defaultValue: true is what carries the protection into saves
+            // that predate it. ScribeExtractor.ValueFromNode hands back the
+            // default when the node is absent (Scribe_Values.cs:88), and the
+            // saver omits the node whenever the value MATCHES the default
+            // (:70-78) — so the only thing ever written here is a deliberate
+            // opt-out, and a save round trip never manufactures one.
+            Scribe_Values.Look(ref withholdFromTrade, "withholdFromTrade", defaultValue: true);
 
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
@@ -950,6 +1008,17 @@ namespace ShiftChange
             if (fullChange && !excluded)
             {
                 line += "\n" + "ShiftChange.InspectFullChange".Translate();
+            }
+
+            // Only the OFF state earns a line, and it earns one because it is
+            // the state that loses clothes. Same idiom as the full-change line
+            // above — report the setting that DIFFERS from the default, since
+            // "protected" stamped on every stand in the colony is noise, and
+            // noise is what the player learns to stop reading. Excluded stands
+            // returned above, so this is already an in-service stand.
+            if (!withholdFromTrade)
+            {
+                line += "\n" + "ShiftChange.InspectTradeable".Translate();
             }
 
             if (OnShift && borrower != null)

@@ -47,9 +47,11 @@ namespace ShiftChange
         /// <para>160 was title + radios + explainer. The full-change row and
         /// the recreation row each cost a row plus its separator, and both
         /// landed in the same merge — hence 226 rather than either branch's
-        /// own figure.</para>
+        /// own figure. The withhold-from-trade row added one bare
+        /// <see cref="RowHeight"/> on top of that: it shares full change's
+        /// separator instead of taking one of its own.</para>
         /// </summary>
-        internal const float HeaderAllowance = 226f;
+        internal const float HeaderAllowance = 252f;
         internal const float MinWindowWidth = 420f;
 
         /// <summary>
@@ -277,6 +279,20 @@ namespace ShiftChange
                 comp.SetFullChange(full);
             }
             TooltipHandler.TipRegion(fullRect, "ShiftChange.FullChangeDesc".Translate());
+
+            // Directly under full change and inside its separator, because both
+            // are properties of what the rack HOLDS rather than of which work it
+            // serves. The ModeOnly return above hides the row for an excluded
+            // stand, which is also exactly where CompShiftStand.BlocksTrade
+            // stops applying — one condition, not two that can drift apart.
+            bool withhold = comp.WithholdFromTrade;
+            Rect tradeRect = listing.GetRect(RowHeight);
+            Widgets.CheckboxLabeled(tradeRect, "ShiftChange.WithholdFromTrade".Translate(), ref withhold);
+            if (withhold != comp.WithholdFromTrade)
+            {
+                comp.SetWithholdFromTrade(withhold);
+            }
+            TooltipHandler.TipRegion(tradeRect, "ShiftChange.WithholdFromTradeDesc".Translate());
 
             listing.GapLine();
             listing.Label("ShiftChange.WorkTypesExplainer".Translate());

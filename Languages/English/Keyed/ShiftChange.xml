@@ -38,6 +38,9 @@
   <ShiftChange.FullChange>Change the whole outfit</ShiftChange.FullChange>
   <ShiftChange.FullChangeDesc>Normally a pawn keeps whatever this stand's kit does not conflict with, so the uniform goes on over their own clothes.\n\nWith this on they undress completely and wear only what the stand holds. That is right for a sauna robe, and slower in both directions, since every garment is taken off and put back on.\n\nEverything their own clothes were providing comes off with them: warmth, armor, any bonuses those garments carried. They have exactly what the stand holds and nothing more.</ShiftChange.FullChangeDesc>
   <ShiftChange.InspectFullChange>Changes the whole outfit</ShiftChange.InspectFullChange>
+  <ShiftChange.WithholdFromTrade>Keep contents out of trade</ShiftChange.WithholdFromTrade>
+  <ShiftChange.WithholdFromTradeDesc>Traders will buy anything sitting on an outfit stand: the uniform, and the owner's own clothes parked there while they are on shift. Nothing about the stand marks it off limits. 'Allow removing items' does not cover trade, and neither does an assigned owner.\n\nWith this on, this stand's contents never reach a trade window, whether the trader is a caravan at the gate or a ship in orbit. Nothing else changes: colonists still stock the stand, shift changes still work, and you can still load the kit into a caravan yourself.\n\nTurn it off for a stand you keep as a shop shelf.</ShiftChange.WithholdFromTradeDesc>
+  <ShiftChange.InspectTradeable>Contents can be sold to traders</ShiftChange.InspectTradeable>
   <ShiftChange.WorkTypeAuto>Automatic (from the room)</ShiftChange.WorkTypeAuto>
   <ShiftChange.WorkTypeNone>Not used for shift changes</ShiftChange.WorkTypeNone>
   <ShiftChange.RoomReadsAs>the game reads this room as: {0}</ShiftChange.RoomReadsAs>
