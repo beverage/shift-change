@@ -24,7 +24,13 @@ mod. CI rejects it, but only after you have pushed, so run this too:
 
 ```bash
 python3 devtools/check-shipped-dll.py
+python3 devtools/check-invariants.py
 ```
+
+The second one is not about the dll and applies to **every** commit, docs and
+media included: among other things it rejects a private tracker id appearing in
+any tracked file. It runs in CI on every push, so skipping it locally only moves
+the failure to a place where fixing it costs a second commit.
 
 **Three configurations: `Debug` and `Media` define `SCENES`, `Release` does
 not.** Anything that builds a scene — the demo and preview stages, the

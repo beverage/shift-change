@@ -4,6 +4,19 @@
 # Build artifact of devtools/bbcode-preview.py, written beside its source.
 _bbcode-preview.html
 
+# Card pipeline intermediates, all rebuilt from tracked inputs:
+#   media/cards/parts/    cut from cards/card-*.png and cards/src/ by card-crops.sh
+#   media/cards/_export/  one page per card, written by card-mockup.py --export
+#   media/_*.html         local previews of the page and of single sections
+# The finished PNGs in media/cards/ ARE tracked, and have to be: the Steam
+# description reaches them by raw.githubusercontent URL, so they exist on main
+# or the store page renders broken images.
+media/cards/parts/
+media/cards/_export/
+media/_card-mockup.html
+media/_card-section.html
+media/_page.html
+
 # Editor state
 .vscode/
 
