@@ -227,11 +227,12 @@ adds exactly those three and is what all the footage here uses.
 
 **[Apparel Painter](https://steamcommunity.com/sharedfiles/filedetails/?id=3792795811)
 is the companion piece**, from the same author, and was built for exactly the
-uniform walls this mod creates: fine-grained painting of the apparel already
+wardrobe walls this mod creates: fine-grained painting of the apparel already
 on the stands, one garment or a whole stand at once, with live preview on the
-map and a per-item reset back to the natural material colour. Colour-code each
-room's kit and a glance tells you who dresses for what. It has no dependencies
-of its own, and it reaches stand contents, which designator painters cannot.
+map and a per-item reset back to the natural material colour. It earns its
+keep on the recreation side, where the outfit is the point: black tie in one
+matched palette, sauna robes in the house colour. Bulk repainting tools treat
+a stand as one blob; this is the fine brush.
 
 ## Save safety
 
