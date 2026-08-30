@@ -231,8 +231,8 @@ wardrobe walls this mod creates: fine-grained painting of the apparel already
 on the stands, one garment or a whole stand at once, with live preview on the
 map and a per-item reset back to the natural material colour. It earns its
 keep on the recreation side, where the outfit is the point: black tie in one
-matched palette, sauna robes in the house colour. Bulk repainting tools treat
-a stand as one blob; this is the fine brush.
+matched palette, sauna robes in the house colour. Bulk repainting tools
+cannot see inside a stand; this is the fine brush, one garment at a time.
 
 ## Save safety
 
