@@ -225,6 +225,14 @@ game there is very little to actually dress anyone *in*. Any apparel mod fixes
 that; [Vanilla Apparel Expanded](https://steamcommunity.com/sharedfiles/filedetails/?id=1814987817)
 adds exactly those three and is what all the footage here uses.
 
+**[Apparel Painter](https://steamcommunity.com/sharedfiles/filedetails/?id=3792795811)
+is the companion piece**, from the same author, and was built for exactly the
+uniform walls this mod creates: fine-grained painting of the apparel already
+on the stands, one garment or a whole stand at once, with live preview on the
+map and a per-item reset back to the natural material colour. Colour-code each
+room's kit and a glance tells you who dresses for what. It has no dependencies
+of its own, and it reaches stand contents, which designator painters cannot.
+
 ## Save safety
 
 Add it to an existing save freely: your existing outfit stands gain the new
