@@ -10,15 +10,23 @@ namespace ShiftChange
     /// The abort button: a gizmo on any colonist currently in a stand's
     /// uniform that cancels their orders and sends them to change back.
     ///
-    /// It exists because of the danger gate. During a raid the automatic
-    /// return trip is suppressed on purpose
-    /// (<see cref="Patch_JobInterception"/>'s
-    /// <c>DangerRating != StoryDanger.None</c> check), which is right —
-    /// nobody should stroll to a wardrobe mid-firefight — but it also means
-    /// a pawn caught in whites at the wrong moment has no way out except the
-    /// player finding the right stand and issuing a manual order. The stand
-    /// is exactly what the player should not have to hunt for, since the
-    /// ledger already knows it.
+    /// It exists because the automatic return trip is a PULL, not a push: it
+    /// fires at a job boundary, when the pawn's own next job takes them out
+    /// of the room. A pawn caught in whites the moment a raid lands is not at
+    /// a job boundary and may not reach one for hours — sleep is the longest
+    /// job in the game — so without this button their way out is the player
+    /// finding the right stand and issuing a manual order. The stand is
+    /// exactly what the player should not have to hunt for, since the ledger
+    /// already knows it.
+    ///
+    /// <b>The danger gate no longer suppresses the return</b> (principal,
+    /// 2026-08-31). It once gated both arms, which is why this button was
+    /// originally described as existing *because of* it; now it gates
+    /// dressing only (<see cref="Patch_JobInterception"/>), so a pawn left to
+    /// themselves does change back during a raid — at their own next job
+    /// boundary, on their own errand. That narrows this button's job to what
+    /// it was always best at: changing back NOW, on the player's timing
+    /// rather than the think tree's.
     ///
     /// <b>Deliberately not automatic.</b> No auto-change on raid, and
     /// nothing here reacts to drafting: a player may well want a pawn

@@ -514,16 +514,6 @@ namespace ShiftChange
             // leaving.
             UpdateChangeBackLatch(pawn);
 
-            // No changing while the map is under threat. Vanilla has no
-            // precedent to copy here: JobGiver_OptimizeApparel carries no
-            // danger check at all, because think-tree position does the work
-            // for it (Humanlike.xml:302-306) — and we sit downstream of the
-            // think tree, so the gate has to be ours.
-            if (map.dangerWatcher.DangerRating != StoryDanger.None)
-            {
-                return false;
-            }
-
             // Never divert a direct order or an emergency response — in
             // EITHER direction. A right-click order means "now", and
             // emergency work givers (DoctorTendEmergency) exist precisely
@@ -620,6 +610,34 @@ namespace ShiftChange
                     return false;
                 }
                 return Insert(pawn, tracker, onShift, job, tag, "return");
+            }
+
+            // No DRESSING while the map is under threat. Vanilla has no
+            // precedent to copy here: JobGiver_OptimizeApparel carries no
+            // danger check at all, because think-tree position does the work
+            // for it (Humanlike.xml:302-306) — and we sit downstream of the
+            // think tree, so the gate has to be ours.
+            //
+            // One-directional, and BELOW the return trip on purpose
+            // (principal, 2026-08-31). It used to sit above and mute BOTH
+            // arms, which made a raid a freeze rather than a pause: every
+            // borrower stayed in costume for the duration, and since nothing
+            // fires on the way back to None, anyone whose next job was a long
+            // one wore it well past the all-clear. Found in play — four
+            // colonists spent a raid in evening dress with their flak vests
+            // and helmets parked in a fullChange rec stand, and the gate
+            // meant to protect them was the reason they could not go and get
+            // them. Changing IN is a detour nobody should take mid-firefight;
+            // changing BACK is a pawn moving toward their own gear, and one
+            // left to themselves may finish that trip. Deliberately NOT a
+            // push: nothing here reacts to danger STARTING, so a raid never
+            // yanks anyone to a wardrobe (principal, 2026-08-31). Player-
+            // driven pawns are untouched in either direction — drafted pawns
+            // returned far above, and playerForced/emergency jobs never
+            // divert at all.
+            if (map.dangerWatcher.DangerRating != StoryDanger.None)
+            {
+                return false;
             }
 
             WorkTypeDef work = job.workGiverDef?.workType;
