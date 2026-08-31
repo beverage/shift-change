@@ -324,8 +324,8 @@ CARDS = [
             {
                 "body": "**Shift Change** dresses a colonist for the room they walk "
                         "into: scrubs in the hospital, whites in the kitchen, a robe for "
-                        "the sauna. In practice that means a wall of six or eight "
-                        "stands, and every garment on it arrives in whatever colour its "
+                        "the sauna. In practice that means a wall of stands, and every "
+                        "garment on it arrives in whatever colour its "
                         "material happened to be.",
             },
             {
