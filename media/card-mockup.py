@@ -273,8 +273,10 @@ CARDS = [
              "body": "No. Only automatic work triggers a change, so a direct order is "
                      "never delayed by a wardrobe trip."},
             {"q": "What happens in an emergency?",
-             "body": "Nothing changes at all while the map is under threat, and "
-                     "firefighting or a rescue is never held up."},
+             "body": "Nobody changes into a uniform while the map is under threat, "
+                     "and firefighting or a rescue is never held up. A colonist "
+                     "already in one still changes back, which on a full-change "
+                     "stand is how they get back to their armour."},
             {"q": "Can another colonist take the uniform?",
              "body": "Not from a stand with owners; that one serves only the colonists "
                      "you list. Nobody takes clothes out of a stand somebody else is "

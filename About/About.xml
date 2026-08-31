@@ -53,7 +53,7 @@ The stand's Allow removing items toggle is held off while the stand is in servic
 
 Deliberately narrow, so it never fights you:
 - Automatic only, for work and recreation alike. A direct order is never delayed by a wardrobe trip, and a colonist already in uniform keeps it on.
-- Emergencies are never delayed, and nothing happens while the map is under threat.
+- Emergencies are never delayed. While the map is under threat nobody changes into a uniform, but a colonist already wearing one still changes back out of it.
 - Personal kit stays personal. A stand with owners serves only them, and nobody takes clothes out of a stand somebody else is using.
 - Passing through a room changes nothing; only doing the room's work does.
 - A meal break gets them out of uniform first, unless the food is already in their hands or their pack.

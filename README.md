@@ -162,7 +162,11 @@ Deliberately narrow, so it never fights you:
   it on and returns it later.
 - **Emergencies are never delayed.** A colonist bleeding out is not kept
   waiting for a wardrobe trip.
-- **Nothing happens while the map is under threat.**
+- **Nobody changes into a uniform while the map is under threat.** A colonist
+  already wearing one still changes back out of it, on their own next job.
+  Getting dressed is a trip nobody should make in a firefight; getting changed
+  back is a colonist heading toward their own gear, which on a stand set to
+  change the whole outfit is where their armour is.
 - **Personal kit stays personal.** A stand with owners serves only them,
   nobody takes clothes out of a stand someone else is using, and whoever
   checked a uniform out is whom it goes back to.
@@ -174,9 +178,10 @@ Deliberately narrow, so it never fights you:
 - If a stand frees up while someone is already working in its room out of
   uniform, they'll step over and change, unless they're mid-treatment on a
   patient.
-- **Change back** appears on any colonist currently in a uniform, for when
-  you want them out of it now: a raid, say, since they will not change back
-  on their own while the map is under threat.
+- **Change back** appears on any colonist currently in a uniform, for when you
+  want them out of it now rather than at their next job. They will get there on
+  their own, raid or no raid, but "on their own next job" can be a long time if
+  the job they just started was sleep.
 
 One mod setting: **"Unassigned stands are shared"** (default on). Turn it off
 and only stands with an explicit owner list ever dress anyone.

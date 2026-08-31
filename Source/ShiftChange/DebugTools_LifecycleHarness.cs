@@ -195,6 +195,10 @@ namespace ShiftChange
                  PromisesHold);
             Case(map, pad, "a meal break gets them out of uniform first",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), MealBreakChangesOut);
+            Case(map, pad, "under threat they may not change in, but may change back",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 DangerGateIsOneDirectional);
             Case(map, pad, "a freed stand catches up a colonist working bare",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
@@ -1168,6 +1172,192 @@ namespace ShiftChange
             Job job = JobMaker.MakeJob(JobDefOf.Ingest, food);
             job.count = 1;
             return job;
+        }
+
+        /// <summary>
+        /// The danger gate is ONE-DIRECTIONAL. Under threat a pawn may not
+        /// change INTO a uniform, but a pawn already wearing one still changes
+        /// back.
+        ///
+        /// The regression this guards is the shipped one (2026-08-31, found in
+        /// play): the gate sat above BOTH arms, so a raid froze every borrower
+        /// in costume instead of pausing them, and since nothing fires on the
+        /// way back to <c>None</c>, anyone whose next job was a long one wore
+        /// it well past the all-clear. Four colonists spent a raid in evening
+        /// dress with their flak vests parked in a full-change stand.
+        ///
+        /// Both halves are asserted against the SAME threat, because the bug
+        /// was not either arm in isolation — it was that one gate answered for
+        /// both. A test that only proved dressing is blocked would have passed
+        /// on the broken build.
+        ///
+        /// The return leg is triggered by a meal break rather than by geometry:
+        /// for a work stand an ingest job whose food is not already on the pawn
+        /// diverts wherever the food sits (the sit-down-break rule), so the
+        /// case needs no second room and cannot drift when the pad moves.
+        ///
+        /// <para><b>No hostile is on the map while the colonist is ticked.</b>
+        /// The threat never acts on its own — the harness ticks fixture pawns
+        /// one at a time and never the map — but <see cref="RunSwap"/> ticks
+        /// the COLONIST, and a colonist reacts to a hostile three tiles away.
+        /// The first version staged one threat for the whole case and the swap
+        /// died with <c>InterruptForced</c> at toil 1 while the pawn stood on
+        /// the interaction cell: the think tree had overridden the job
+        /// mid-run. Intermittently, which is worse than never — it passed
+        /// once and failed the release preflight. So the threat is staged
+        /// twice, around the driver run, and cleared before anything ticks.
+        /// That also models the report more honestly: the colonists were
+        /// dressed BEFORE the raid landed.</para>
+        /// </summary>
+        internal static bool DangerGateIsOneDirectional(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+            ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
+            if (doctor == null || tend == null || mealDef == null)
+            {
+                return Expect(false, "the doctor and meal defs resolve");
+            }
+            fix.Comp.ToggleWork(doctor);
+
+            ForceDangerRecheck(fix.Map);
+            bool ok = Expect(fix.Map.dangerWatcher.DangerRating == StoryDanger.None,
+                             "the map starts calm (control)")
+                    & Expect(Diverts(fix, WorkJob(fix, tend)),
+                             "and an automatic work job dresses while calm (control)");
+
+            // The half that stays gated. Diverts() never ticks the pawn, so a
+            // hostile standing in the room cannot disturb it.
+            Pawn threat = Threat(fix);
+            if (threat == null)
+            {
+                return Expect(false, "a hostile could be staged");
+            }
+            ok &= Expect(fix.Map.dangerWatcher.DangerRating != StoryDanger.None,
+                         "a live hostile raises the danger rating")
+                & Expect(!Diverts(fix, WorkJob(fix, tend)),
+                         "under threat, an automatic work job does NOT dress");
+            ClearThreat(fix, threat);
+
+            // Dressed through the DRIVER rather than the trigger, since the
+            // trigger is what the assertion above just proved is shut — and on
+            // a map with no hostile on it, because this is the only part of
+            // the case that ticks the colonist.
+            ok &= Expect(RunSwap(fix), "dressed for the shift on a calm map")
+                & Expect(fix.Comp.OnShift, "and is on shift (control)");
+            if (!fix.Comp.OnShift)
+            {
+                return false;
+            }
+
+            // The half the one-directional gate opened.
+            threat = Threat(fix);
+            if (threat == null)
+            {
+                return Expect(false, "a hostile could be staged for the return leg");
+            }
+            Thing meal = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef),
+                                        fix.Pawn.Position, fix.Map);
+            ok &= Expect(fix.Map.dangerWatcher.DangerRating != StoryDanger.None,
+                         "the threat is back for the return leg")
+                & Expect(Diverts(fix, IngestJob(meal)),
+                         "but a meal break STILL gets them out of uniform under threat");
+            ClearThreat(fix, threat);
+
+            ok &= Expect(fix.Map.dangerWatcher.DangerRating == StoryDanger.None,
+                         "and the map reads calm again once the threat is gone");
+            return ok;
+        }
+
+        /// <summary>
+        /// Remove a staged threat and drop the cache stamp with it, so the map
+        /// reads calm again NOW rather than 101 ticks from now that never
+        /// arrive. Hands the next case a calm map — the freed-stand case
+        /// asserts on that by name, so a stale non-None left behind here fails
+        /// a case that has nothing wrong with it.
+        /// </summary>
+        internal static void ClearThreat(Fixture fix, Pawn threat)
+        {
+            if (threat != null && !threat.Destroyed)
+            {
+                threat.Destroy();
+            }
+            ForceDangerRecheck(fix.Map);
+        }
+
+        /// <summary>
+        /// A live hostile on the map, which is all <c>StoryDanger</c> is:
+        /// <c>DangerWatcher</c> sums <c>kindDef.combatPower</c> over the
+        /// attack-target cache.
+        ///
+        /// It is never ticked. The harness ticks fixture pawns one at a time
+        /// and never the map, so this one stands inert beside the pad and
+        /// cannot fight, flee or path — which is what makes a raider safe to
+        /// park next to the colonist whose job we are about to drive.
+        ///
+        /// Unfogged deliberately: <c>IsActiveThreatToPlayer</c> refuses a
+        /// fogged target (<c>canBeFogged</c> defaults false), and a quicktest
+        /// map is fogged everywhere the starting pawns have not walked.
+        ///
+        /// <para><b>Insects, not pirates.</b> The first version of this asked
+        /// for <c>Faction.OfPirates</c> and failed on staging rather than on
+        /// behaviour (harness run, 2026-08-31): pirates are generated into a
+        /// world by worldgen and the quicktest world has none, so the faction
+        /// came back null. <c>OfInsects</c> is a permanent faction present in
+        /// every world, permanently hostile, and a Megascarab carries no
+        /// <c>CompCanBeDormant</c> — so it reads awake and counts toward the
+        /// rating. (<c>IsActiveThreatToPlayer</c>'s <c>ignoreHives</c> flag
+        /// excludes hives, not the insects themselves.) The fallbacks exist so
+        /// a world missing one permanent faction still stages a threat rather
+        /// than reporting a behavioural failure that never ran.</para>
+        /// </summary>
+        internal static Pawn Threat(Fixture fix)
+        {
+            Faction hostile = Faction.OfInsects;
+            PawnKindDef kind = PawnKindDefOf.Megascarab;
+            if (hostile == null || kind == null)
+            {
+                hostile = Faction.OfMechanoids;
+                kind = PawnKindDefOf.Mech_Scyther;
+            }
+            if (hostile == null || kind == null)
+            {
+                hostile = Faction.OfPirates;
+                kind = PawnKindDefOf.Pirate;
+            }
+            if (hostile == null || kind == null)
+            {
+                return null;
+            }
+            IntVec3 cell = fix.Stand.Position + new IntVec3(3, 0, 3);
+            if (!cell.InBounds(fix.Map))
+            {
+                cell = fix.Pawn.Position;
+            }
+            Pawn threat = PawnGenerator.GeneratePawn(kind, hostile);
+            GenSpawn.Spawn(threat, cell, fix.Map, Rot4.North);
+            fix.Map.fogGrid.Unfog(threat.Position);
+            // Swept by Teardown as a backstop if an assertion below throws;
+            // the case destroys it itself on the ordinary path, and Teardown
+            // skips anything already destroyed.
+            fix.Extras.Add(threat);
+            ForceDangerRecheck(fix.Map);
+            return threat;
+        }
+
+        /// <summary>
+        /// Drop <c>DangerWatcher</c>'s cache stamp so the next read recomputes.
+        ///
+        /// The rating is cached for 101 ticks, and the harness runs from a
+        /// <c>Game.FinalizeInit</c> postfix — before the game loop — so
+        /// <c>TicksGame</c> never advances while a case runs. Without this a
+        /// spawned hostile sits behind a stale <c>None</c> forever, and the
+        /// case would pass by asserting nothing.
+        /// </summary>
+        internal static void ForceDangerRecheck(Map map)
+        {
+            AccessTools.Field(typeof(DangerWatcher), "lastUpdateTick")
+                       ?.SetValue(map.dangerWatcher, -10000);
         }
 
         /// <summary>

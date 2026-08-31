@@ -140,13 +140,27 @@ The prefix declines to act when:
 | Gate | Why |
 |---|---|
 | drafted, downed, or in a mental state | being told where to be, or not themselves |
-| map danger ≠ None | no vanilla precedent to copy. `JobGiver_OptimizeApparel` has no danger check; vanilla gets apparel-change safety from think-tree position (`Humanlike.xml:302-306`), and this hook sits downstream of the think tree |
+| map danger ≠ None | **dressing only** — see below. No vanilla precedent to copy: `JobGiver_OptimizeApparel` has no danger check; vanilla gets apparel-change safety from think-tree position (`Humanlike.xml:302-306`), and this hook sits downstream of the think tree |
 | `job.playerForced` | direct orders execute immediately, in both directions. A pawn in uniform given a forced order keeps it on and returns it later |
 | `workGiverDef.emergency` | emergency givers exist because something cannot wait (`DoctorTendEmergency`). A bleeding pawn must not wait for a wardrobe trip |
 
 The forced and emergency exemptions originally gated only the dressing path.
 Play showed the return trip could delay an emergency identically, so both were
 hoisted above each direction.
+
+The danger gate went the other way, and for the same reason: read the
+directions separately. It sat above both arms, which made a raid a freeze
+rather than a pause — every borrower stayed in costume for its duration, and
+since nothing fires on the way back to `None`, anyone whose next job was a long
+one wore it well past the all-clear. Found in play: four colonists spent a raid
+in evening dress with their flak vests and helmets parked in a full-change
+recreation stand, and the gate meant to protect them was the reason they could
+not go and get them. It now sits **below the return trip and above both dress
+arms**, so it means "no changing in" rather than "no changing". Changing in is
+a detour nobody should take mid-firefight; changing back is a pawn moving
+toward their own gear. Nothing reacts to danger *starting* — a raid never yanks
+anyone to a wardrobe. `TryDressMidJob` keeps its own copy of the check
+unchanged, being a dress path already.
 
 ### Meal breaks
 
@@ -398,9 +412,18 @@ currently in a stand's uniform. It cancels queued orders and issues the swap
 through vanilla's `TryTakeOrderedJob`, so it behaves like any right-click order
 and a tend still finishes first.
 
-It exists because of the danger gate. The automatic return trip is suppressed
-while the map is under threat, which is correct, but leaves a pawn stuck in
-whites with no way back except hunting for the stand the ledger already knows.
+It exists because the automatic return trip is a **pull, not a push**: it fires
+at a job boundary, when the pawn's own next job takes them out of the room. A
+pawn who wants out of whites *now* may not reach a boundary for hours, since
+sleep is the longest job in the game, and without this their only way back is
+the player hunting for the stand the ledger already knows.
+
+The danger gate no longer suppresses that return trip, and this section used to
+say it did. The gate is one-directional: it stops a pawn changing *into* a
+uniform while the map is under threat, and leaves changing *back* alone. It
+once gated both, which froze every borrower in costume for the duration of a
+raid and well past it, and on a full-change stand that meant their armour sat
+in the wardrobe they were not allowed to walk to.
 
 A press sets a **room-exit latch**: that pawn will not dress again *in that room*
 until they have left it. Positional rather than a countdown, because it is the
