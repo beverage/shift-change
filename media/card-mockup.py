@@ -121,12 +121,20 @@ ASSET = {
 }
 
 #: Cards deliberately absent from this mod's page, and so never rasterised into
-#: cards/ by --export, but kept renderable so they can be argued with.
-#: Card_Modes describes stand behaviour that does not exist yet; cards/ is a
-#: public repo served over raw githubusercontent, and a player who opened that
-#: URL could not tell it from what shipped. Listed rather than merely absent so
-#: a card that falls out of ORDER by accident is still reported.
-DRAFT = {"Card_Modes"}
+#: cards/ by --export. Two different reasons, both of which want the card kept
+#: renderable so it can be argued with:
+#:
+#:   Card_Modes       describes stand behaviour that does not exist yet. cards/
+#:                    is a public repo served over raw githubusercontent, and a
+#:                    player who opened that URL could not tell it from shipped.
+#:   Card_PairsWith   is for Apparel Painter's store page, not this one. It is
+#:                    drafted here only because the generator is here; when that
+#:                    mod's page is built the card moves with it, and it must not
+#:                    land in this mod's cards/ in the meantime.
+#:
+#: Listed rather than merely absent so a card that falls out of ORDER by accident
+#: is still reported.
+DRAFT = {"Card_Modes", "Card_PairsWith"}
 
 BANNERS = [
     ("Banner_WhatItDoes", "What it does"),
@@ -138,6 +146,9 @@ BANNERS = [
     # questions, and questions have a home now.
     ("Banner_FAQ", "Questions"),
     ("Banner_Source", "Source, testing and credits"),
+    # Not on this page. Drafted here because the generator is here; it belongs
+    # on Apparel Painter's, pointing back at this mod. See DRAFT below.
+    ("Banner_PairsWith", "Pairs with"),
 ]
 
 #: HOMELESS COPY, kept so it cannot be lost. The gendered-clothing warning was
@@ -301,6 +312,31 @@ CARDS = [
         ],
     },
     {
+        # FOR APPAREL PAINTER'S PAGE, not this one. The pairing is not "also by
+        # the same author": Shift Change is what produces the wall of stands that
+        # makes per-item painting worth having, so the card names the reader's
+        # situation rather than the relationship between two mods.
+        "id": "Card_PairsWith",
+        "kind": "pairing",
+        "title": "Uniform walls",
+        "lede": "",
+        "entries": [
+            {
+                "body": "**Shift Change** dresses a colonist for the room they walk "
+                        "into: scrubs in the hospital, whites in the kitchen, a robe for "
+                        "the sauna. In practice that means a wall of six or eight "
+                        "stands, and every garment on it arrives in whatever colour its "
+                        "material happened to be.",
+            },
+            {
+                "body": "Painting them one at a time is what makes that wall readable "
+                        "across a room, and it is the case this mod was built for. The "
+                        "alternative is dressing a colonist, pausing, and hand-editing "
+                        "each garment in a character editor.",
+            },
+        ],
+    },
+    {
         "id": "Card_Modes",
         "kind": "modes",
         "title": "Where a stand reaches",
@@ -382,6 +418,7 @@ body {
 .card[data-kind="recreation"] .k { background: #b08fc4; }
 .card[data-kind="limits"]     .k { background: #c48a6a; }
 .card[data-kind="modes"]      .k { background: #b0a06f; }
+.card[data-kind="pairing"]    .k { background: #8fa9c4; }
 
 .lede { padding: 12px 16px 0; color: var(--dim); font-size: 13.5px; font-style: italic; }
 .card[data-kind="modes"] .lede { color: var(--accent); font-style: normal; font-size: 12.5px; letter-spacing: .4px; }
