@@ -306,11 +306,13 @@ namespace ShiftChange
         {
             CompShiftStand comp = parent.TryGetComp<CompShiftStand>();
             // The inert test must match CompInspectStringExtra's: a
-            // recreation-only stand has ZERO work types by design (the
-            // rec-only guard in CompShiftStand.WorkTypes), and calling the
-            // feature's flagship state "no work type yet" contradicted the
-            // inspect pane on the same stand (review, 2026-08-15).
-            if (comp == null || (comp.WorkTypes.Count == 0 && !comp.HandlesRecreation()))
+            // recreation-only or sleep-only stand has ZERO work types by
+            // design (the trigger-only guard in CompShiftStand.WorkTypes), and
+            // calling the feature's flagship state "no work type yet"
+            // contradicted the inspect pane on the same stand (review,
+            // 2026-08-15). Every trigger added here has to be added there too.
+            if (comp == null || (comp.WorkTypes.Count == 0
+                                 && !comp.HandlesRecreation() && !comp.HandlesRest()))
             {
                 return "ShiftChange.AssignDescNoWork".Translate();
             }

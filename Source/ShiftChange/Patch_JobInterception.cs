@@ -355,7 +355,15 @@ namespace ShiftChange
                     // The dress arm's two guards apply here too: never pull a
                     // pawn out of bed, and never treat the map-spanning
                     // outdoor room as this stand's room.
-                    && !pawn.InBed() && !room.TouchesMapEdge;
+                    && !OnABed(pawn) && !room.TouchesMapEdge;
+                // NO SLEEP ARM HERE, and it is not an omission. Catch-up
+                // interrupts a pawn already doing the thing the freed stand
+                // dresses for, and the sleep equivalent is a colonist asleep
+                // in bed — who is excluded twice over before the arms are even
+                // consulted: LayDown sets casualInterruptible false, which the
+                // job filter above rejects, and the InBed guard would reject
+                // them again. Waking someone to put pyjamas on is the one
+                // catch-up nobody wants.
                 if (!forWork && !forRecreation)
                 {
                     continue;
@@ -556,6 +564,30 @@ namespace ShiftChange
                 {
                     return false;
                 }
+                // NEVER PULL A PAWN OUT OF BED TO CHANGE BACK — but "out of
+                // bed" has to mean the job would take them out of it, not
+                // merely that they are in one. The dress arms have said this
+                // from the start; the return trip never needed to, because
+                // before sleepwear an on-shift pawn in a bed was not a state
+                // the mod could produce. It is now the ordinary one, all
+                // night, every night, and a sleeper is not idle at a job
+                // boundary: vanilla hands out in-bed joy (JobGiver_GetJoyInBed)
+                // and JobInBedUtility.KeepLyingDown re-queues LayDown, each
+                // arriving here as a fresh job whose room can resolve outside
+                // the bedroom. Without a guard, one of them walks the sleeper
+                // to a wardrobe at three in the morning.
+                //
+                // The first version of this was plain pawn.InBed(), which is
+                // false at exactly those boundaries and true at the wake-up —
+                // so it suppressed the change-back at the one moment the pawn
+                // was standing beside their own stand, and every colonist did
+                // the first job of the day in sleepwear before walking back.
+                // See OnABed for why. StaysInBed asks the question that was
+                // meant all along.
+                if (StaysInBed(pawn, job))
+                {
+                    return false;
+                }
                 // Eating cannot use the room test below, because an ingest
                 // job's targetA is the FOOD, while the place the eating
                 // happens — the dining chair — is chosen DURING the job by
@@ -681,6 +713,103 @@ namespace ShiftChange
                 return Insert(pawn, tracker, stand, job, tag, "dress");
             }
 
+            // The SLEEP arm, the third trigger class. Disjoint from
+            // the other two by construction: a lay-down job carries no
+            // joyKind so it can never be a recreation job, and the
+            // workGiverDef test below is what keeps MEDICAL bed rest on the
+            // work arm where it already lives. The room resolver at the top
+            // hands rest jobs the A-first TargetCell, which is right — a
+            // lay-down job's targetA IS the bed the pawn will occupy, the
+            // cleanest target any arm gets.
+            if (IsRestJob(job))
+            {
+                // MEDICAL BED REST IS NOT SLEEPWEAR, and THE TAG is what says
+                // so. All three patient WorkGivers — PatientGoToBedRecuperate,
+                // ...Treatment and ...EmergencyTreatment — carry
+                // <tagToGive>RestingForMedicalReasons</tagToGive>, and
+                // Pawn_JobTracker hands ThinkResult.Tag straight to StartJob,
+                // so every route vanilla has into medical rest arrives here
+                // wearing it.
+                //
+                // The workGiverDef limb is REDUNDANT, kept as a conservative
+                // catch for a modded WorkGiverDef with a null workType. It
+                // cannot fire for anything vanilla, and the reasoning it used
+                // to carry was simply wrong (verification pass, 2026-09-03):
+                // all three patient WorkGivers are NonScanJob overrides and
+                // JobGiver_Work stamps workGiverDef only on its scanner paths,
+                // so a medical LayDown reaches us with workGiverDef NULL — the
+                // work arm never sees it and the two arms were never in
+                // danger of fighting over it. Structurally it is dead twice
+                // over: the work arm above consumes and returns from every job
+                // whose workGiverDef.workType is non-null, so this limb is
+                // only reached once that expression is already null.
+                //
+                // WHAT IS DELIBERATELY NOT HERE: HealthAIUtility.ShouldSeekMedicalRest.
+                // It was added as a third limb to cover
+                // JobInBedUtility.KeepLyingDown, which re-queues a bare
+                // LayDown carrying neither marker — and it was wrong twice
+                // over. The re-queue is already covered: all four
+                // KeepLyingDown registrations are on in-bed drivers, so the
+                // enqueued job is dequeued with the pawn still standing on the
+                // bed cell and the OnABed guard below rejects it. And the
+                // predicate is far broader than the markers it backstopped —
+                // true for any tended healing injury or non-immune disease —
+                // so the only behaviour it uniquely changed was to kill
+                // ordinary bedtime for every wounded or ill colonist,
+                // silently, for the whole recovery. Do not re-add it: a health
+                // predicate cannot tell "going to bed because hurt" from
+                // "going to bed because it is night".
+                if (job.workGiverDef != null || tag == JobTag.RestingForMedicalReasons)
+                {
+                    return false;
+                }
+                // Never pull a pawn OUT of bed to dress for bed. Past the
+                // obvious, this is what stops the mid-sleep re-trigger: a
+                // sleeper who stirs into LayDownAwake, or whose in-bed job
+                // re-queues LayDown, starts a fresh lay-down job in the same
+                // bed, and each one would otherwise be a fresh dressing
+                // opportunity. OnABed rather than pawn.InBed() because at that
+                // boundary curJob is null and InBed() answers false — see
+                // OnABed.
+                if (OnABed(pawn))
+                {
+                    return false;
+                }
+                if (!target.IsValid)
+                {
+                    return false;
+                }
+                Room bedRoom = target.GetRoom(map);
+                // The recreation arm's outdoor guard, needed for the same
+                // reason: an outdoor cell resolves the one map-spanning,
+                // edge-touching room rather than null, so a sleep stand in
+                // open ground would serve every bedroll on the map.
+                if (bedRoom == null || bedRoom.TouchesMapEdge)
+                {
+                    return false;
+                }
+                if (IsLatchedIn(pawn, bedRoom))
+                {
+                    if (Verbose)
+                    {
+                        Log.Message($"[ShiftChange] {pawn.LabelShort} stays changed out — " +
+                                    "not left the room since the change-back order");
+                    }
+                    return false;
+                }
+                CompShiftStand restStand = FindAvailableStand(bedRoom, pawn, null, StandTrigger.Rest);
+                if (restStand == null)
+                {
+                    if (Verbose)
+                    {
+                        Log.Message($"[ShiftChange] no free sleep stand in {bedRoom.Role?.defName ?? "unroled"} " +
+                                    $"room for {pawn.LabelShort} ({job.def.defName})");
+                    }
+                    return false;
+                }
+                return Insert(pawn, tracker, restStand, job, tag, "dress-rest");
+            }
+
             // The RECREATION arm. Joy jobs carry no workGiverDef, so
             // the two arms are disjoint by construction, and every shared
             // gate above — danger, player-forced, the latch sample, the
@@ -694,8 +823,11 @@ namespace ShiftChange
             // Vanilla hands joy to pawns lying in bed precisely so they stay
             // there (JobGiver_GetJoyInBed, CanDoDuringMedicalRest) — in-bed
             // TV or prayer must never pull a patient out of a sickbed to
-            // visit a wardrobe (review, 2026-08-15).
-            if (pawn.InBed())
+            // visit a wardrobe (review, 2026-08-15). OnABed rather than
+            // pawn.InBed() for the timing reason documented on OnABed: the
+            // original read false at precisely the job boundaries this is
+            // meant to catch.
+            if (OnABed(pawn))
             {
                 return false;
             }
@@ -726,7 +858,7 @@ namespace ShiftChange
                 }
                 return false;
             }
-            CompShiftStand recStand = FindAvailableStand(joyRoom, pawn, null, recreation: true);
+            CompShiftStand recStand = FindAvailableStand(joyRoom, pawn, null, StandTrigger.Recreation);
             if (recStand == null)
             {
                 if (Verbose)
@@ -928,6 +1060,135 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// A sleep job the room trigger can honestly serve: a lay-down job
+        /// whose target is an actual BED.
+        ///
+        /// <para>The bed test is doing more than it looks. It is what excludes
+        /// <c>Wait_Asleep</c> — ground sleep, same <see cref="JobDriver_LayDown"/>
+        /// driver, no bed and usually no valid target at all — along with mech
+        /// dormancy and Odyssey's deactivation, both of which subclass the same
+        /// driver. It is also the reason this arm needs none of the late-room
+        /// caution the joy classes need: a bed does not move, and targetA is
+        /// already pointing at it when StartJob runs.</para>
+        ///
+        /// <para>By driver class rather than by JobDef, matching
+        /// <see cref="IsIngestJob"/>, so a modded sleep job that reuses
+        /// vanilla's driver is covered. One that does not is not — the same
+        /// known limit the reading exclusion carries, and the same shape of
+        /// fix if a report ever arrives.</para>
+        /// </summary>
+        internal static bool IsRestJob(Job job)
+        {
+            Type driver = job.def?.driverClass;
+            return driver != null
+                   && typeof(JobDriver_LayDown).IsAssignableFrom(driver)
+                   && job.targetA.Thing is Building_Bed;
+        }
+
+        /// <summary>
+        /// Is this pawn physically on a bed right now?
+        ///
+        /// <para><b>Not <c>pawn.InBed()</c>, and the difference is the whole
+        /// point.</b> <c>RestUtility.CurrentBed</c> bails on
+        /// <c>p.CurJob == null</c> (<c>RestUtility.cs:505</c>), and
+        /// <c>Pawn_JobTracker.CleanupCurrentJob</c> nulls <c>curJob</c> BEFORE
+        /// <c>EndCurrentJob</c> reaches <c>TryFindAndStartJob</c>
+        /// (<c>:501</c>) — so at an ordinary job boundary <c>InBed()</c> reads
+        /// FALSE for a colonist lying in their own bed. It reads true only
+        /// when a job starts while <c>curJob</c> is still live, which is
+        /// <c>Toils_LayDown</c>'s <c>CheckForJobOverride()</c> every 211 ticks
+        /// (<c>Toils_LayDown.cs:74</c>) — the WAKE-UP. Every guard here was
+        /// written meaning "they are asleep, leave them alone" and got the
+        /// exact opposite: silent at 3am, loud at breakfast (adversarial
+        /// review, 2026-09-03).</para>
+        ///
+        /// <para>Position answers the question <c>curJob</c> cannot. A pawn
+        /// merely walking across a bed tile also passes, which is why the
+        /// return trip pairs this with <see cref="StaysInBed"/> rather than
+        /// using it alone.</para>
+        /// </summary>
+        internal static bool OnABed(Pawn pawn)
+        {
+            Map map = pawn.MapHeld;
+            if (!pawn.Spawned || map == null)
+            {
+                return false;
+            }
+            List<Thing> here = pawn.Position.GetThingList(map);
+            for (int i = 0; i < here.Count; i++)
+            {
+                if (here[i] is Building_Bed)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// The pawn is on a bed AND this incoming job is one they can do
+        /// without getting off it.
+        ///
+        /// <para><c>Job.CanBeginNow(pawn, whileLyingDown: true)</c> defers to
+        /// <c>JobDriver.CanBeginNowWhileLyingDown()</c>, which returns false on
+        /// the base class (<c>JobDriver.cs:303-306</c>) and is overridden by
+        /// exactly seven drivers in 1.6: LayDown, Lovin, WatchBuilding,
+        /// RelaxAlone, Reign, Breastfeed and Deathrest. That is the line the
+        /// return trip needs — staying in bed means stay dressed, getting up
+        /// means change back, and the change-back then happens while the pawn
+        /// is still beside their own stand rather than a job later from
+        /// wherever they walked to.</para>
+        ///
+        /// <para><b>The override list is incomplete, which is why the second
+        /// test exists.</b> <c>JobDriver_Meditate</c> is NOT among the seven,
+        /// so in-bed meditation — which vanilla issues from inside its own
+        /// must-keep-lying-down branch — reads as "getting up"; nor is
+        /// <c>JobDriver_Ingest</c>, so eating in bed reads the same way. A job
+        /// whose own target IS the bed the pawn is lying on is staying, whatever
+        /// its driver forgot to say, so <see cref="TargetsBedUnder"/> catches
+        /// both without a hardcoded driver list that the next DLC invalidates.
+        /// (Eating still reaches the ingest branch further down, which has its
+        /// own deliberate policy; this only stops the return trip firing first.)</para>
+        ///
+        /// <para>It caches a driver on the job (<c>Job.GetCachedDriver</c>),
+        /// which is what vanilla's own callers do and what <see cref="Insert"/>
+        /// already does for its reservation dry run. <c>StartJob</c> builds the
+        /// real driver with <c>MakeDriver</c>, never the cached one, and pooled
+        /// jobs are <c>Clear()</c>ed before reuse, so the throwaway cannot leak
+        /// into a live job. A throwing driver constructor is caught by the
+        /// prefix's fail-open handler. Short-circuited behind
+        /// <see cref="OnABed"/>, so nothing is constructed at the ordinary job
+        /// boundary where the pawn is nowhere near a bed.</para>
+        /// </summary>
+        internal static bool StaysInBed(Pawn pawn, Job job)
+        {
+            return OnABed(pawn)
+                   && (job.CanBeginNow(pawn, whileLyingDown: true) || TargetsBedUnder(pawn, job));
+        }
+
+        /// <summary>
+        /// This job's own target is the bed the pawn is lying on — so whatever
+        /// its driver claims, doing it does not mean getting up.
+        ///
+        /// <para>Both A and B, because the in-bed job givers disagree about
+        /// which they use: <c>JobGiver_MeditateInBed</c> puts the pawn's cell in
+        /// A and the bed in B, while the lay-down family puts the bed in A.
+        /// <c>OccupiedRect</c> rather than <c>Position</c> so a double bed's
+        /// second slot counts.</para>
+        /// </summary>
+        internal static bool TargetsBedUnder(Pawn pawn, Job job)
+        {
+            IntVec3 at = pawn.Position;
+            Building_Bed a = job.targetA.Thing as Building_Bed;
+            if (a != null && a.Spawned && a.OccupiedRect().Contains(at))
+            {
+                return true;
+            }
+            Building_Bed b = job.targetB.Thing as Building_Bed;
+            return b != null && b.Spawned && b.OccupiedRect().Contains(at);
+        }
+
+        /// <summary>
         /// Where a recreation job happens: <c>targetB</c> FIRST, then the
         /// work-style fallback. For the sit-and-play classes B is the cell
         /// the pawn occupies while the joy ticks — the chair at the chess
@@ -979,8 +1240,35 @@ namespace ShiftChange
         /// No free stand simply means no swap. Never queue for one: this is a
         /// nicety and must not become a bottleneck on the work itself.
         /// </summary>
+        /// <summary>
+        /// Which of the three triggers a stand is being asked to serve. One
+        /// value rather than a row of bools, because "recreation and sleep
+        /// both true" is not a state any caller is allowed to hold — the
+        /// exclusivity rule lives on the comp, and this keeps the selector
+        /// from being the place it could be broken.
+        /// </summary>
+        internal enum StandTrigger
+        {
+            Work,
+            Recreation,
+            Rest,
+        }
+
+        internal static bool Handles(CompShiftStand comp, StandTrigger trigger, WorkTypeDef work)
+        {
+            switch (trigger)
+            {
+                case StandTrigger.Recreation:
+                    return comp.HandlesRecreation();
+                case StandTrigger.Rest:
+                    return comp.HandlesRest();
+                default:
+                    return comp.HandlesWork(work);
+            }
+        }
+
         internal static CompShiftStand FindAvailableStand(Room room, Pawn pawn, WorkTypeDef work,
-            bool recreation = false)
+            StandTrigger trigger = StandTrigger.Work)
         {
             CompShiftStand best = null;
             bool bestIsPersonal = false;
@@ -993,7 +1281,7 @@ namespace ShiftChange
                 {
                     CompShiftStand comp = thing.TryGetComp<CompShiftStand>();
                     if (comp == null || comp.OnShift
-                        || !(recreation ? comp.HandlesRecreation() : comp.HandlesWork(work))
+                        || !Handles(comp, trigger, work)
                         || !comp.CanBeClaimedBy(pawn))
                     {
                         continue;

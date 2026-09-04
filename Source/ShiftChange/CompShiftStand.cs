@@ -79,6 +79,35 @@ namespace ShiftChange
         internal bool recreationOverride;
 
         /// <summary>
+        /// Player override for the SLEEP trigger, the third class beside work
+        /// and recreation. Exactly the same shape as
+        /// <see cref="recreationOverride"/> and mutually exclusive with both
+        /// of the others — one stand, one outfit, one purpose — so true
+        /// implies an empty work set and no recreation. Absent from old saves
+        /// and defaults false, so every pre-sleep state loads unchanged.
+        /// </summary>
+        internal bool restOverride;
+
+        /// <summary>
+        /// This stand hands nothing OUT: the pawn parks the garments its
+        /// storage filter accepts and keeps everything else on. The
+        /// power-armour-before-bed case (principal, 2026-09-02).
+        ///
+        /// <para><b>Only meaningful on a sleep stand</b>, and
+        /// <see cref="DepositOnly"/> enforces that rather than trusting the
+        /// dialog to hide the row. Undressing into a rack is a coherent
+        /// action but "not one any pawn should reach by deciding to go do some
+        /// hauling" (SwapPlan.cs) — the sleep trigger is what makes it safe,
+        /// so a stand switched back to work must not carry the flag with
+        /// it.</para>
+        ///
+        /// <para>Stored raw and gated on read, not cleared on a mode switch,
+        /// so a player who flips a stand to work and back finds their setting
+        /// where they left it.</para>
+        /// </summary>
+        internal bool depositOnly;
+
+        /// <summary>
         /// Opt-out. A decorative or storage stand standing in a roled room would
         /// otherwise join that room's pool, which is a surprise nobody asked
         /// for.
@@ -150,7 +179,25 @@ namespace ShiftChange
 
         public Building_OutfitStand Stand => parent as Building_OutfitStand;
 
-        public bool OnShift => issuedUniform.Count > 0;
+        /// <summary>
+        /// This stand has something out on a pawn, so the return trip has
+        /// work to do.
+        ///
+        /// <para>EITHER half of the ledger counts, not just the issued one. A
+        /// deposit-only stand issues nothing at all — the whole point — and
+        /// keying this on <see cref="issuedUniform"/> alone would leave it
+        /// unclaimed: no borrower, no entry in <see cref="OnShiftStands"/>, no
+        /// return trip, and a colonist's power armour locked in a rack that
+        /// still advertised itself as free to the next pawn.</para>
+        ///
+        /// <para>Widening it is safe for every pre-existing state because the
+        /// combination it newly admits — nothing issued, something stored —
+        /// could not be recorded before: <c>DoTransfer</c> re-dresses the pawn
+        /// and returns without calling <see cref="NotifyDressed"/> whenever a
+        /// dress trip issues nothing. Deposit-only is the first path that
+        /// reaches it deliberately.</para>
+        /// </summary>
+        public bool OnShift => issuedUniform.Count > 0 || storedOwnerApparel.Count > 0;
 
         public Pawn Borrower => borrower;
 
@@ -310,11 +357,12 @@ namespace ShiftChange
                 {
                     return workTypeOverrides;
                 }
-                // A recreation-only custom set: the override bool alone marks
-                // custom mode (see the field), and its work half is genuinely
-                // empty — falling through to the room's defaults here would
-                // resurrect work types the player just narrowed away.
-                if (recreationOverride)
+                // A recreation-only or sleep-only custom set: the override
+                // bool alone marks custom mode (see the fields), and its work
+                // half is genuinely empty — falling through to the room's
+                // defaults here would resurrect work types the player just
+                // narrowed away.
+                if (recreationOverride || restOverride)
                 {
                     return NoWork;
                 }
@@ -344,7 +392,7 @@ namespace ShiftChange
             {
                 return false;
             }
-            if ((workTypeOverrides != null && workTypeOverrides.Count > 0) || recreationOverride)
+            if (HasCustomSet)
             {
                 return recreationOverride;
             }
@@ -353,6 +401,66 @@ namespace ShiftChange
                 return false;
             }
             return RoomWorkTypes.RecreationForRole(parent.GetRoom()?.Role);
+        }
+
+        /// <summary>
+        /// Whether this stand dresses for SLEEP — the third trigger, resolved
+        /// exactly like <see cref="HandlesRecreation"/>: excluded wins, a
+        /// custom set answers from its own bool, and automatic asks the room's
+        /// role, so a stand in a bedroom lights up the way a kitchen stand
+        /// does for cooking.
+        /// </summary>
+        public bool HandlesRest()
+        {
+            if (excluded)
+            {
+                return false;
+            }
+            if (HasCustomSet)
+            {
+                return restOverride;
+            }
+            if (!parent.Spawned)
+            {
+                return false;
+            }
+            return RoomWorkTypes.RestForRole(parent.GetRoom()?.Role);
+        }
+
+        /// <summary>
+        /// The stand is in CUSTOM mode: the player has picked its triggers
+        /// explicitly, so no half of it falls back to the room's defaults. Any
+        /// one of the three trigger stores being non-empty says so, and the
+        /// exclusivity rule means at most one ever is.
+        /// </summary>
+        internal bool HasCustomSet =>
+            (workTypeOverrides != null && workTypeOverrides.Count > 0)
+            || recreationOverride || restOverride;
+
+        /// <summary>
+        /// The player has EXPLICITLY put this stand on the recreation or sleep
+        /// trigger, as opposed to the room's role having done it for them.
+        ///
+        /// <para>The dialog needs the distinction: it hides the work grid while
+        /// a trigger is on, and hiding it on an AUTOMATIC stand left a bedroom
+        /// stand with no reachable path to a work type at all — the grid was
+        /// hidden, unticking the Sleeping row fell through to excluded, and
+        /// clicking Automatic put the room's default straight back (adversarial
+        /// review, 2026-09-03). An automatic stand's trigger is a suggestion
+        /// from the room and must stay overridable in one click.</para>
+        /// </summary>
+        public bool IsTriggerOverridden => !excluded && (recreationOverride || restOverride);
+
+        /// <summary>
+        /// Deposit-only is a property of a SLEEP stand and of nothing else —
+        /// see <see cref="depositOnly"/> for why the gate lives on the read
+        /// rather than on the write.
+        /// </summary>
+        public bool DepositOnly => depositOnly && HandlesRest();
+
+        public void SetDepositOnly(bool on)
+        {
+            depositOnly = on;
         }
 
         public bool IsExcluded => excluded;
@@ -381,17 +489,19 @@ namespace ShiftChange
         /// </summary>
         public bool BlocksTrade => !excluded && withholdFromTrade;
 
-        // Both threads narrowed "automatic": recreation is an explicit override
-        // like a custom work set, while fullChange is NOT — it is a property of
-        // the rack's contents, orthogonal to which trigger the stand answers to,
-        // so an automatic stand with a full-change robe on it is still automatic.
-        public bool IsAutomatic => !excluded && !recreationOverride
-            && (workTypeOverrides == null || workTypeOverrides.Count == 0);
+        // Both threads narrowed "automatic": recreation and sleep are explicit
+        // overrides like a custom work set, while fullChange is NOT — it is a
+        // property of the rack's contents, orthogonal to which trigger the
+        // stand answers to, so an automatic stand with a full-change robe on it
+        // is still automatic. Deposit-only is the same kind of thing as
+        // fullChange and stays out of this test for the same reason.
+        public bool IsAutomatic => !excluded && !HasCustomSet;
 
         public void SetAutomatic()
         {
             excluded = false;
             recreationOverride = false;
+            restOverride = false;
             workTypeOverrides?.Clear();
             EnforceRemovalFlag();
         }
@@ -400,6 +510,7 @@ namespace ShiftChange
         {
             excluded = true;
             recreationOverride = false;
+            restOverride = false;
             workTypeOverrides?.Clear();
         }
 
@@ -457,6 +568,7 @@ namespace ShiftChange
             workTypeOverrides.Clear();
             workTypeOverrides.AddRange(effective);
             recreationOverride = false;
+            restOverride = false;
             if (!workTypeOverrides.Remove(work))
             {
                 workTypeOverrides.Add(work);
@@ -469,14 +581,14 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Flips the recreation trigger. Recreation and work types are
-        /// MUTUALLY EXCLUSIVE on a stand (principal, 2026-08-16): the stand
-        /// holds one outfit, and one outfit serves one purpose — so turning
-        /// recreation on clears the work half outright rather than riding
-        /// beside it, and turning it off falls back to excluded (nothing
-        /// selected IS the excluded state under another name). No seeding
-        /// either way: there is nothing to preserve across an exclusive
-        /// switch.
+        /// Flips the recreation trigger. Work types, recreation and sleep are
+        /// MUTUALLY EXCLUSIVE on a stand (principal, 2026-08-16, extended to
+        /// the third trigger 2026-09-02): the stand holds one outfit, and one
+        /// outfit serves one purpose — so turning recreation on clears the
+        /// other two outright rather than riding beside them, and turning it
+        /// off falls back to excluded (nothing selected IS the excluded state
+        /// under another name). No seeding either way: there is nothing to
+        /// preserve across an exclusive switch.
         /// </summary>
         public void ToggleRecreation()
         {
@@ -484,8 +596,34 @@ namespace ShiftChange
             excluded = false;
             workTypeOverrides = workTypeOverrides ?? new List<WorkTypeDef>();
             workTypeOverrides.Clear();
+            restOverride = false;
             recreationOverride = !current;
             if (!recreationOverride)
+            {
+                SetExcluded();
+            }
+            EnforceRemovalFlag();
+        }
+
+        /// <summary>
+        /// Flips the sleep trigger, the exact mirror of
+        /// <see cref="ToggleRecreation"/> and bound by the same exclusivity.
+        ///
+        /// <para><see cref="depositOnly"/> is deliberately NOT cleared here.
+        /// It is a property of the rack rather than of the trigger — the same
+        /// standing as <see cref="fullChange"/> — and clearing it would lose
+        /// the player's setting every time they toggled the row off and on to
+        /// see what it did.</para>
+        /// </summary>
+        public void ToggleRest()
+        {
+            bool current = HandlesRest();
+            excluded = false;
+            workTypeOverrides = workTypeOverrides ?? new List<WorkTypeDef>();
+            workTypeOverrides.Clear();
+            recreationOverride = false;
+            restOverride = !current;
+            if (!restOverride)
             {
                 SetExcluded();
             }
@@ -501,7 +639,8 @@ namespace ShiftChange
         {
             List<WorkTypeDef> works = WorkTypes;
             bool recreation = HandlesRecreation();
-            if (works.Count == 0 && !recreation)
+            bool rest = HandlesRest();
+            if (works.Count == 0 && !recreation && !rest)
             {
                 return "ShiftChange.None".Translate();
             }
@@ -513,6 +652,10 @@ namespace ShiftChange
             if (recreation)
             {
                 labels.Add("ShiftChange.Recreation".Translate().RawText);
+            }
+            if (rest)
+            {
+                labels.Add("ShiftChange.Rest".Translate().RawText);
             }
             return labels.ToCommaList();
         }
@@ -805,6 +948,8 @@ namespace ShiftChange
             Scribe_References.Look(ref borrower, "borrower");
             Scribe_Collections.Look(ref workTypeOverrides, "workTypeOverrides", LookMode.Def);
             Scribe_Values.Look(ref recreationOverride, "recreation", defaultValue: false);
+            Scribe_Values.Look(ref restOverride, "rest", defaultValue: false);
+            Scribe_Values.Look(ref depositOnly, "depositOnly", defaultValue: false);
             if (Scribe.mode == LoadSaveMode.LoadingVars)
             {
                 // Read-only: saves from before the set redesign carried a
@@ -859,15 +1004,21 @@ namespace ShiftChange
             {
                 storedForcedApparel.AddRange(storedForced);
             }
-            if (issuedUniform.Count > 0)
+            // OnShift, not issuedUniform: a deposit-only trip issues nothing
+            // and still has to claim the stand, or nothing ever hands the
+            // stored garments back. Everything else is unchanged — a trip that
+            // moved nothing in EITHER direction leaves both lists empty and
+            // still does not claim.
+            if (OnShift)
             {
                 borrower = pawn;
                 OnShiftStands[pawn] = this;
             }
             else
             {
-                // Nothing was actually issued (empty stand, nothing wearable).
-                // Do not claim the stand for a swap that did not happen.
+                // Nothing moved at all (empty stand, nothing wearable, nothing
+                // the filter would take). Do not claim the stand for a swap
+                // that did not happen.
                 borrower = null;
             }
         }
@@ -979,7 +1130,7 @@ namespace ShiftChange
             {
                 return "ShiftChange.InspectExcluded".Translate();
             }
-            if (WorkTypes.Count == 0 && !HandlesRecreation())
+            if (WorkTypes.Count == 0 && !HandlesRecreation() && !HandlesRest())
             {
                 return null;
             }
@@ -1024,6 +1175,16 @@ namespace ShiftChange
             if (OnShift && borrower != null)
             {
                 line += "\n" + "ShiftChange.InspectOnShift".Translate(borrower.LabelShort);
+            }
+            else if (DepositOnly)
+            {
+                // NOT the empty line. An empty deposit-only stand is the
+                // normal, correct, fully-working state — it hands nothing out
+                // — so "nothing to change into" would report the feature as a
+                // fault. Say what it does instead, since the storage filter
+                // is the setting that makes it work and the one a player who
+                // sees nothing happen needs pointing at.
+                line += "\n" + "ShiftChange.InspectDepositOnly".Translate();
             }
             else if (!HasWearable)
             {
