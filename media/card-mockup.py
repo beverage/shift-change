@@ -41,7 +41,12 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FONT = os.environ.get("FONT", os.path.expanduser("~/Downloads/RimWordFont.ttf"))
+
+#: Beside this script, not in ~/Downloads. The font used to be defaulted out of
+#: a downloads folder, which is a place things get cleared out of — and it meant
+#: every card tool had to be pointed back at it by hand. It is a media asset, so
+#: it lives with the media. FONT still overrides.
+FONT = os.environ.get("FONT", os.path.join(HERE, "RimWordFont.ttf"))
 OUT = os.path.join(HERE, "_card-mockup.html")
 
 #: Steam renders a description image at up to ~640 px before scaling it down.

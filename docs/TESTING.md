@@ -65,7 +65,7 @@ to stop, and `--alongside` is the deliberate opt-in.
 
 ## What the cases assert
 
-Twenty-three cases, in six kinds.
+Twenty-nine cases, in seven kinds.
 
 **Regression cases** guard a bug that happened. A stand whose stock shares no
 apparel layer with what the pawn wears once donated its uniform permanently and
@@ -108,6 +108,29 @@ side. One drives a real joy job in a stand's room and asserts the swap. A third
 asserts that recreation and work types clear each other on the same stand,
 because the exclusivity is what makes the dual-purpose stand unreachable from
 the UI rather than merely discouraged.
+
+**Sleep cases** cover the third arm, and lean heavily on negatives because
+ordinary sleep and MEDICAL bed rest share one driver class and one JobDef. One
+asserts the classifier and the room table against the def database — that
+`Wait_Asleep` still runs the same driver as `LayDown`, which is why the
+classifier demands a bed; that `PatientBedRest` is still a visible WorkTypeDef
+whose giver still reports it, which is what keeps the two controls from merging;
+and that Bedroom dresses for sleep while a rec room does not, so the three role
+tables stay disjoint. The other drives the arm for real: a bed is spawned into
+the pad, and the case asserts the stand picks up sleep from the room's role
+rather than declaring it — because a single unowned humanlike bed scores the
+room as a Bedroom at 100000, so calling `ToggleRest()` here would turn the
+trigger OFF and fall through to excluded. It then walks every refusal (ground
+sleep, both medical routes, player-forced), the mid-sleep re-trigger, and the
+WAKE-UP end to end: an on-shift pawn on a bed must have the change-back
+inserted BEFORE a job that leaves the room, and must not for one that keeps
+them in it.
+
+A third covers **deposit only** — that a freshly built stand's filter accepts
+ordinary apparel out of the box (the fact the whole safety story rests on), that
+a narrowed filter parks exactly what it names and issues nothing, that the trip
+claims the stand so a return exists, that the parked gear comes back, and that a
+deposit which would leave a colonist in nothing but a shield belt is refused.
 
 **Ownership cases** guard the owner list, which went from one pawn to a set.
 One walks a stand through pool, one owner, two owners and back, asserting who
@@ -180,6 +203,16 @@ green log out of a suite that checks nothing.
   take the protection with it and say nothing.
 - **Pooling on and off, the optimizer pause, the recolor guard, `SwapPlan`'s
   rollback, the change-back latch, the retry cooldown.** No cases yet.
+- **A revert of `StaysInBed` to `pawn.InBed()`** — the specific defect the
+  wake-up case was written for. The fixture reaches "on a bed" by assigning
+  `Position`, never by running a lay-down driver, so posture stays `NotLaying`
+  and `InBed()` is false there for a second reason as well; a reverted guard
+  would not fire in the harness either, and the case would still pass. Catching
+  it needs a ticked lay-down job with a live driver, which these cases avoid
+  because 1.6 pathing is async. The case does assert the two predicates'
+  disagreeing answers side by side, so the trap is visible in the report to a
+  reader even though it cannot fail for a runner. This is the clearest example
+  on the page of a green assertion that is narrower than it looks.
 
 A green run is a floor, not a certificate. Play observation is still required,
 and the mod's own history is the argument for saying so: days of play found
