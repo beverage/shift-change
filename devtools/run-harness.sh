@@ -47,6 +47,34 @@ PROC="RimWorld by Ludeon Studios"
 # than the game.
 TIMEOUT=1200
 
+# How long to allow for the game to reach RIMWORLD'S OWN startup, as opposed to
+# finishing the run. Separate from TIMEOUT because the two failures are nothing
+# alike, and conflating them cost a 20-minute wait to learn a fact that was
+# available after sixty seconds (2026-09-04).
+#
+# The stall is entirely characteristic: Unity's preamble completes, the log
+# stops around line 49 in the PhysX/asset-unload block, and the process sits
+# near 0% CPU forever. It never recovers on its own, so waiting out TIMEOUT
+# learns nothing that the first minute did not already say.
+#
+# WHAT WE GREP FOR, AND TWO WRONG ANSWERS BEFORE THIS ONE.
+#
+# Not the version banner: `RimWorld 1.6.4871 rev597` IS printed before the
+# stall (line 21 of a stalled log), so it looks like startup and is not.
+#
+# Not `Loaded assemblies` either, though it sits at line 68 of the principal's
+# own log and looks perfect there. THAT LINE IS PRINTED BY A MOD, not by
+# RimWorld — it does not exist on the four-mod minimal list, so it reported a
+# PASSING run as a stall the first time it ran (2026-09-04). Picking a marker
+# off a heavily-modded log and calling it native is the trap; the control has
+# to be a log from the mod list the check will actually run against.
+#
+# `with mods:` is Verse's own, from both "Initializing new game with mods:" and
+# "Loading game from file … with mods:", so it covers the -quicktest path and
+# the save-load cases alike, on any mod list. Verified present in a minimal-list
+# log AND the full-list one, and absent from every stalled log.
+STARTUP_GRACE=120
+
 # Harmony, Core, Odyssey (the outfit stand is Odyssey content) and us. Vanilla
 # Apparel Expanded is deliberately absent: the fixture falls back to vanilla
 # apparel, displaces two garments instead of one, and drops the VEF Core
@@ -145,6 +173,44 @@ else
   printf 'mod list: minimal (%s mods, isolated)\n' "${#MINIMAL_MODS[@]}"
 fi
 
+# SEED Prefs.xml, AND THE REASON IS THE STALL.
+#
+# A fresh -savedatafolder has no Prefs.xml, so the test instance starts on
+# RimWorld's DEFAULTS — and the default is fullscreen. On macOS that instance
+# then asks for a fullscreen space it cannot have, logs
+#
+#   setPresentationOptions called with NSApplicationPresentationFullScreen
+#   when there is no visible fullscreen window; this call will be ignored
+#
+# and is left with no compositing window at all. LongEventHandler advances the
+# loading screen off the main-thread update, so a window that never composites
+# never progresses: the log stops around line 50 and the process sits near 0%
+# CPU until something kills it.
+#
+# THIS IS NOT A PROVEN FIX, and the first version of this comment claimed it
+# was. Seeding windowed prefs was followed by one clean pass and then, on the
+# very next run, an identical stall (2026-09-04, 1 for 2). The pass also came
+# straight after an attempt where the window was being fronted by hand, so
+# focus was never controlled for and the two explanations remain tangled. It is
+# kept because windowed-and-muted is the right shape for a throwaway test
+# instance regardless, and because it plausibly removes one failure mode — not
+# because the stall is understood. See the tracker item for the live state.
+#
+# Written into the throwaway folder
+# that is rm -rf'd at the top of every run; the real Prefs.xml is never read or
+# touched. Only the keys that matter are set — RimWorld fills in every absent
+# field with its own default.
+{
+  printf '<?xml version="1.0" encoding="utf-8"?>\n<PrefsData>\n'
+  printf '  <screenWidth>1280</screenWidth>\n'
+  printf '  <screenHeight>720</screenHeight>\n'
+  printf '  <fullscreen>False</fullscreen>\n'
+  printf '  <volumeMaster>0</volumeMaster>\n'
+  printf '</PrefsData>\n'
+} > "$TESTDATA/Config/Prefs.xml"
+xmllint --noout "$TESTDATA/Config/Prefs.xml" || die "generated Prefs.xml is not well-formed"
+printf 'display: windowed 1280x720 (fullscreen stalls a second instance)\n'
+
 printf 'save data: %s\n' "$TESTDATA"
 printf 'launching…\n'
 
@@ -160,10 +226,38 @@ printf 'pid: %s\n' "$GAME_PID"
 # Only ever this pid. If the run times out we stop OUR instance and leave every
 # other one alone.
 elapsed=0
+started=0
 until [ "$elapsed" -ge "$TIMEOUT" ]
 do
   sleep 5
   elapsed=$((elapsed + 5))
+
+  if [ "$started" -eq 0 ] && grep -q "with mods:" "$LOG" 2>/dev/null
+  then
+    started=1
+    printf 'reached RimWorld startup after ~%ss\n' "$elapsed"
+  fi
+
+  # Short-circuit the stall. Bail here rather than at TIMEOUT: a game that has
+  # not reached its own startup by now is blocked, not slow, and no stalled run
+  # has ever recovered.
+  if [ "$started" -eq 0 ] && [ "$elapsed" -ge "$STARTUP_GRACE" ]
+  then
+    kill "$GAME_PID" 2>/dev/null || true
+    die "stalled before RimWorld started (no startup within ${STARTUP_GRACE}s).
+
+       This is NOT a mod-wiring problem. Unity's preamble finished and the game
+       stopped before loading any assembly, which is what happens when its
+       window never comes to the front — the loading screen advances off the
+       main-thread update, so a window that is not compositing never progresses.
+
+       Bring the new RimWorld window to the front and run again. Note that
+       --alongside cannot do this for you: the instance already running owns the
+       foreground.
+
+       Log: $LOG"
+  fi
+
   kill -0 "$GAME_PID" 2>/dev/null || break
 done
 
@@ -175,8 +269,16 @@ fi
 printf 'game exited after ~%ss\n\n' "$elapsed"
 
 [ -f "$LOG" ] || die "no log at $LOG — did -logfile take?"
+
+# TWO FAILURES, TWO MESSAGES. These were one line until 2026-09-04, and it
+# blamed mod wiring for a stall that happens before any mod is loaded — which
+# misdirected an entire debugging session. The log already knows which happened.
+grep -q "with mods:" "$LOG" \
+  || die "the game exited without ever reaching RimWorld's own startup — the
+       fullscreen stall, not a wiring problem. See $LOG"
 grep -q "harness auto-run" "$LOG" \
-  || die "the harness never ran — is -shiftchange-harness still wired up? See $LOG"
+  || die "the game started but the harness never ran — is -shiftchange-harness
+       still wired up? See $LOG"
 
 sed -n '/\[ShiftChange\] lifecycle harness/,/harness auto-run/p' "$LOG"
 
