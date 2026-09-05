@@ -60,6 +60,15 @@ TIMEOUT=1200
 # near 0% CPU forever. It never recovers on its own, so waiting out TIMEOUT
 # learns nothing that the first minute did not already say.
 #
+# SO THE TEST IS "HAS THE LOG STOPPED GROWING", NOT "HAS IT REACHED A MARKER".
+# This was elapsed-only until 2026-09-05, and it killed a perfectly healthy
+# --full run at 120s: a large mod list takes minutes to reach `with mods:`,
+# and that run was 761 lines deep and still printing mod banners when the
+# guard shot it. The marker measures MOD-LIST SIZE as much as health, which is
+# exactly what a release gate runs against. A frozen log is the signal; a
+# growing one is a slow load and must be allowed to finish. STARTUP_GRACE is
+# now a floor before the question is asked at all, not a deadline.
+#
 # WHAT WE GREP FOR, AND TWO WRONG ANSWERS BEFORE THIS ONE.
 #
 # Not the version banner: `RimWorld 1.6.4871 rev597` IS printed before the
@@ -77,6 +86,11 @@ TIMEOUT=1200
 # the save-load cases alike, on any mod list. Verified present in a minimal-list
 # log AND the full-list one, and absent from every stalled log.
 STARTUP_GRACE=120
+
+# How long the log must be COMPLETELY SILENT, past that floor, before the run
+# is called stalled. A loading game writes constantly; the stall writes nothing
+# ever again.
+STALL_QUIET=60
 
 # Harmony, Core, Odyssey (the outfit stand is Odyssey content) and us. Vanilla
 # Apparel Expanded is deliberately absent: the fixture falls back to vanilla
@@ -230,10 +244,23 @@ printf 'pid: %s\n' "$GAME_PID"
 # other one alone.
 elapsed=0
 started=0
+logsize=0
+quiet=0
 until [ "$elapsed" -ge "$TIMEOUT" ]
 do
   sleep 5
   elapsed=$((elapsed + 5))
+
+  # Growth, sampled every tick. A load that is progressing writes on every one
+  # of these; the stall writes on none.
+  size=$(wc -c < "$LOG" 2>/dev/null || printf 0)
+  if [ "$size" -gt "$logsize" ]
+  then
+    logsize=$size
+    quiet=0
+  else
+    quiet=$((quiet + 5))
+  fi
 
   if [ "$started" -eq 0 ] && grep -q "with mods:" "$LOG" 2>/dev/null
   then
@@ -241,13 +268,13 @@ do
     printf 'reached RimWorld startup after ~%ss\n' "$elapsed"
   fi
 
-  # Short-circuit the stall. Bail here rather than at TIMEOUT: a game that has
-  # not reached its own startup by now is blocked, not slow, and no stalled run
-  # has ever recovered.
-  if [ "$started" -eq 0 ] && [ "$elapsed" -ge "$STARTUP_GRACE" ]
+  # Short-circuit the stall. Bail here rather than at TIMEOUT: a game whose log
+  # has gone silent before its own startup is blocked, not slow, and no stalled
+  # run has ever recovered. Both conditions are required — see STARTUP_GRACE.
+  if [ "$started" -eq 0 ] && [ "$elapsed" -ge "$STARTUP_GRACE" ] && [ "$quiet" -ge "$STALL_QUIET" ]
   then
     kill "$GAME_PID" 2>/dev/null || true
-    die "stalled before RimWorld started (no startup within ${STARTUP_GRACE}s).
+    die "stalled before RimWorld started (log silent ${quiet}s, ${elapsed}s in).
 
        This is NOT a mod-wiring problem. Unity's preamble finished and the game
        stopped before loading any assembly, which is what happens when its
