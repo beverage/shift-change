@@ -48,9 +48,9 @@ FADE_H = 90
 # TYPESET when the font is available, LIFT when it is not.
 #
 # RimWordFont.ttf lives in THIS repo at media/, beside the cards it sets. It
-# briefly lived in the constellation root instead, which meant every tool had
-# to reach outside its own checkout to find it — and the path that did so was
-# an absolute one carrying a home directory, in a public repository. A
+# briefly lived outside this repository instead, which meant every tool had to
+# reach out of its own checkout to find it — and the line that did so was an
+# absolute path carrying a home directory, in a public repository. A
 # repo-relative asset needs no path at all.
 #
 # At -pointsize 44 it renders a 390x38 ink box, matching the 389x37 measured off

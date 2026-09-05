@@ -199,7 +199,7 @@ namespace ShiftChange
         ///
         /// <para><b>The filter is the whole control surface</b>, deliberately.
         /// The case this exists for is "park the power armour before bed"
-        /// (principal, 2026-09-02), and "which garments" is a question vanilla
+        /// (decided 2026-09-02), and "which garments" is a question vanilla
         /// already asks on every outfit stand, with a UI the player knows. A
         /// second mod-side list would be the same question asked twice, and
         /// the two would drift.</para>

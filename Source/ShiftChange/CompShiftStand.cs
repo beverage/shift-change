@@ -54,7 +54,7 @@ namespace ShiftChange
 
         /// <summary>
         /// Player override — a SET, because rooms host families of work
-        /// (principal, 2026-08-08). Empty means "infer from the room's role".
+        /// (decided 2026-08-08). Empty means "infer from the room's role".
         /// </summary>
         internal List<WorkTypeDef> workTypeOverrides = new List<WorkTypeDef>();
 
@@ -66,7 +66,7 @@ namespace ShiftChange
 
         /// <summary>
         /// Player override for the RECREATION trigger. MUTUALLY
-        /// EXCLUSIVE with <see cref="workTypeOverrides"/> (principal,
+        /// EXCLUSIVE with <see cref="workTypeOverrides"/> (decided
         /// 2026-08-16: one stand, one outfit, one purpose) — the toggles
         /// enforce it, so true implies the work set is empty. True is itself
         /// what marks that works-empty custom set as custom rather than
@@ -91,7 +91,7 @@ namespace ShiftChange
         /// <summary>
         /// This stand hands nothing OUT: the pawn parks the garments its
         /// storage filter accepts and keeps everything else on. The
-        /// power-armour-before-bed case (principal, 2026-09-02).
+        /// power-armour-before-bed case (decided 2026-09-02).
         ///
         /// <para><b>Only meaningful on a sleep stand</b>, and
         /// <see cref="DepositOnly"/> enforces that rather than trusting the
@@ -551,7 +551,7 @@ namespace ShiftChange
         /// custom set from the room's defaults first, toggling while excluded
         /// starts a fresh set, and emptying the custom set collapses back to
         /// excluded so the states stay canonical. Work and recreation are
-        /// mutually exclusive (principal, 2026-08-16), so touching any work
+        /// mutually exclusive (decided 2026-08-16), so touching any work
         /// type also drops the recreation trigger — the dialog hides this
         /// list while recreation is on, so reaching here from a rec stand is
         /// a deliberate switch, not a surprise.
@@ -582,7 +582,7 @@ namespace ShiftChange
 
         /// <summary>
         /// Flips the recreation trigger. Work types, recreation and sleep are
-        /// MUTUALLY EXCLUSIVE on a stand (principal, 2026-08-16, extended to
+        /// MUTUALLY EXCLUSIVE on a stand (decided 2026-08-16, extended to
         /// the third trigger 2026-09-02): the stand holds one outfit, and one
         /// outfit serves one purpose — so turning recreation on clears the
         /// other two outright rather than riding beside them, and turning it
@@ -1210,7 +1210,7 @@ namespace ShiftChange
             // beside another outfit-stand mod, whose owner control it shows
             // — so its face carries the state instead of a static caption.
             //
-            // ONE work type on the face, "(+N)" for the rest (principal,
+            // ONE work type on the face, "(+N)" for the rest (decided
             // 2026-08-18): a workshop's four gerunds overflow a gizmo label
             // into unreadability, and future set-bearing stands (recreation)
             // only grow the list. The full set stays on the hover desc and

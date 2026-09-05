@@ -9,7 +9,7 @@ namespace ShiftChange
     /// dresses for by default.
     ///
     /// A set, not a single work type, because rooms host families of work and
-    /// pretending otherwise was a design flaw (principal, 2026-08-08): a
+    /// pretending otherwise was a design flaw (decided 2026-08-08): a
     /// Workshop runs crafting, tailoring, smithing and art; a Laboratory runs
     /// research AND drug synthesis — which arrives as Crafting work
     /// (`DoBillsProduceDrugs` is `workType Crafting`, fixed to the DrugLab,
@@ -123,7 +123,7 @@ namespace ShiftChange
                     {
                         RoomRoleDef role = DefDatabase<RoomRoleDef>.GetNamedSilentFail(roleName);
                         // DISJOINTNESS IS LOAD-BEARING: automatic-mode
-                        // exclusivity (work XOR recreation, principal
+                        // exclusivity (work XOR recreation, decided
                         // 2026-08-16) holds only because no role appears in
                         // BOTH tables — the toggles enforce it for custom
                         // mode, but automatic mode answers straight from

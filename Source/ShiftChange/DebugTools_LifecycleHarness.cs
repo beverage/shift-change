@@ -791,7 +791,7 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Work and recreation are MUTUALLY EXCLUSIVE on one stand (principal,
+        /// Work and recreation are MUTUALLY EXCLUSIVE on one stand (decided
         /// 2026-08-16): it holds one outfit, and one outfit serves one purpose.
         ///
         /// <para>Asserted in both directions, because the rule is enforced by
@@ -1514,7 +1514,7 @@ namespace ShiftChange
         ///
         /// All three descriptions used to say "eating in a room changes
         /// nothing". The code has always said the opposite, deliberately
-        /// (principal, 2026-08-08): a meal is a sit-down break, so the uniform
+        /// (decided 2026-08-08): a meal is a sit-down break, so the uniform
         /// comes off first wherever the food is stored, because otherwise a
         /// cook carries a meal across the base in whites to reach a chair —
         /// the exact walk this mod exists to prevent. The single exception is

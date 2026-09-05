@@ -224,7 +224,7 @@ namespace ShiftChange
                 // (CompAssignableToPawn.cs:176) — harmless on beds and
                 // thrones, but the outfit stand is a STORAGE building, and N
                 // is copy-settings there (StorageSettingsClipboard.cs:40).
-                // House rule (principal, 2026-08-08): on anything with
+                // House rule (decided 2026-08-08): on anything with
                 // copyable settings, never bind over N, J, F or O.
                 if (gizmo is Command command)
                 {

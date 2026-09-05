@@ -146,7 +146,7 @@ deliberate exception documented above, not the house style.)
 briefly at 38 px top against 17 at the sides, on the theory that RimWorld draws
 a wall's upper face and shadow above its geometric edge and a bigger top would
 therefore read as even. It does not — at 2× it is plainly heavier than the
-bottom, and the principal called it immediately. Set all four from the same
+bottom, and it was spotted immediately in review. Set all four from the same
 number.
 
 Solve the margins rather than guessing them. For a building `BW` px wide and a
@@ -277,8 +277,8 @@ documented box exactly.
 
 **It lives here, at `media/RimWordFont.ttf`.** It used to live nowhere, which
 this file warned about and which meant a title could only be lifted off a card
-that already carried it. It then briefly lived in the constellation root, which
-was worse in a different way: every tool had to reach outside its own checkout,
+that already carried it. It then briefly lived outside this repository, which
+was worse in a different way: every tool had to reach out of its own checkout,
 and the line that did so was an absolute path carrying a home directory, in a
 public repository. Media assets belong beside the media that uses them. Set
 `RIMWORD_FONT` to override.

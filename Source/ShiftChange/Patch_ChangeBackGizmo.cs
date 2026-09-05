@@ -19,7 +19,7 @@ namespace ShiftChange
     /// exactly what the player should not have to hunt for, since the ledger
     /// already knows it.
     ///
-    /// <b>The danger gate no longer suppresses the return</b> (principal,
+    /// <b>The danger gate no longer suppresses the return</b> (decided
     /// 2026-08-31). It once gated both arms, which is why this button was
     /// originally described as existing *because of* it; now it gates
     /// dressing only (<see cref="Patch_JobInterception"/>), so a pawn left to

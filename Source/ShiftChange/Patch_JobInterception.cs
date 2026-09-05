@@ -51,7 +51,7 @@ namespace ShiftChange
         /// adding hooks: ask "does this ACT on its own, or protect something
         /// already in progress?"
         /// </summary>
-        // These five TweakValues SHIP, deliberately (principal, 2026-08-17),
+        // These five TweakValues SHIP, deliberately (decided 2026-08-17),
         // and the sweep of the debug menu explicitly does not extend to
         // them. They were gated behind SCENES for one afternoon on the
         // reasoning that the Tweak values window is "the same player-facing
@@ -182,7 +182,7 @@ namespace ShiftChange
         /// else, and drafting drops it outright.
         ///
         /// It is positional rather than a countdown because the thing that
-        /// must not cycle is the CHANGING, not the work (principal,
+        /// must not cycle is the CHANGING, not the work (decided
         /// 2026-08-09): counting jobs either spends the block on an
         /// unrelated errand — leaving the next room job free to re-dress
         /// them a second after the player pulled them out — or holds it
@@ -599,7 +599,7 @@ namespace ShiftChange
                 // near the kitchen, so a cook's meal reads as "in the room"
                 // — and they then carry it across the base to a chair in
                 // uniform, the exact walk this mod exists to prevent.
-                // Policy (principal, 2026-08-08): food already on the pawn
+                // Policy (decided 2026-08-08): food already on the pawn
                 // means eat as-is; anything else is a sit-down break —
                 // change out first, wherever the meal happens to be stored.
                 if (IsIngestJob(job))
@@ -609,7 +609,7 @@ namespace ShiftChange
                         return false;
                     }
                     // The sit-down-break policy above is a WORK-room rule
-                    // (principal, 2026-08-08) and stays exactly as set. A
+                    // (decided 2026-08-08) and stays exactly as set. A
                     // recreation stand's room is different: it stores its own
                     // drinks on purpose, and stripping the robe to fetch a
                     // beer from the poolside shelf wrapped every drink taken
@@ -651,7 +651,7 @@ namespace ShiftChange
             // think tree, so the gate has to be ours.
             //
             // One-directional, and BELOW the return trip on purpose
-            // (principal, 2026-08-31). It used to sit above and mute BOTH
+            // (decided 2026-08-31). It used to sit above and mute BOTH
             // arms, which made a raid a freeze rather than a pause: every
             // borrower stayed in costume for the duration, and since nothing
             // fires on the way back to None, anyone whose next job was a long
@@ -663,7 +663,7 @@ namespace ShiftChange
             // changing BACK is a pawn moving toward their own gear, and one
             // left to themselves may finish that trip. Deliberately NOT a
             // push: nothing here reacts to danger STARTING, so a raid never
-            // yanks anyone to a wardrobe (principal, 2026-08-31). Player-
+            // yanks anyone to a wardrobe (decided 2026-08-31). Player-
             // driven pawns are untouched in either direction — drafted pawns
             // returned far above, and playerForced/emergency jobs never
             // divert at all.

@@ -11,7 +11,7 @@ namespace ShiftChange
     /// because a stand covers a SET of work: a workshop runs crafting,
     /// tailoring, smithing and art; a lab runs research and drug synthesis
     /// (which is Crafting work). A float menu of single choices could not say
-    /// that (principal, 2026-08-08).
+    /// that (decided 2026-08-08).
     ///
     /// Sized to the MODLIST, not to vanilla (same day): heavily modded games
     /// carry 40+ work types, so the window derives its column count from the
@@ -397,7 +397,7 @@ namespace ShiftChange
             }
             listing.Gap(4f);
 
-            // All three triggers are mutually exclusive (principal,
+            // All three triggers are mutually exclusive (decided
             // 2026-08-16: one stand, one outfit, one purpose) — while
             // recreation or sleep is on the work grid is HIDDEN rather than
             // greyed: an interactable-looking list that would silently untick

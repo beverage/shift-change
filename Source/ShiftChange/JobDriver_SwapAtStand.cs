@@ -132,7 +132,7 @@ namespace ShiftChange
         // vanilla stops a stand swap removing it — JobGiver_OptimizeApparel
         // only scores requirements (×25/×10) and vanilla's own stand driver
         // checks the much narrower IsLocked. We deliberately do not guard it
-        // (principal's call, 2026-08-07). Blocking could only ever mean
+        // (decided 2026-08-07). Blocking could only ever mean
         // refusing the uniform, since the guard's lever is "don't remove the
         // robe" — so a titled pawn would silently never change, which is worse
         // than the mood hit. Nor do we warn: assigning this pawn to this stand

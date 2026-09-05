@@ -30,8 +30,11 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP="/Users/alexbeverage/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app"
-LIVE_CONFIG="/Users/alexbeverage/Library/Application Support/RimWorld/Config/ModsConfig.xml"
+# Derived from $HOME, never written out. These were absolute paths carrying a
+# home directory, in a public repository — and they made the scripts run on
+# exactly one machine. Override either for a non-default Steam library.
+APP="${RIMWORLD_APP:-$HOME/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app}"
+LIVE_CONFIG="${RIMWORLD_CONFIG:-$HOME/Library/Application Support/RimWorld/Config/ModsConfig.xml}"
 TESTDATA="$REPO/dist/testdata"
 LOG="$TESTDATA/Player.log"
 PROC="RimWorld by Ludeon Studios"
@@ -62,8 +65,8 @@ TIMEOUT=1200
 # Not the version banner: `RimWorld 1.6.4871 rev597` IS printed before the
 # stall (line 21 of a stalled log), so it looks like startup and is not.
 #
-# Not `Loaded assemblies` either, though it sits at line 68 of the principal's
-# own log and looks perfect there. THAT LINE IS PRINTED BY A MOD, not by
+# Not `Loaded assemblies` either, though it sits at line 68 of a large
+# modlist's log and looks perfect there. THAT LINE IS PRINTED BY A MOD, not by
 # RimWorld — it does not exist on the four-mod minimal list, so it reported a
 # PASSING run as a stall the first time it ran (2026-09-04). Picking a marker
 # off a heavily-modded log and calling it native is the trap; the control has
