@@ -373,8 +373,33 @@ namespace ShiftChange
                 return false;
             }
 
-            CompProperties_AssignableToPawn foreignProps = new CompProperties_AssignableToPawn();
-            standDef.comps.Add(foreignProps);
+            // REUSE A FOREIGN ASSIGNABLE WHEN THE MOD LIST ALREADY SUPPLIES ONE.
+            //
+            // Adding one unconditionally makes TWO wherever a mod has already
+            // put one on this def, and Outfit Stands Plus does exactly that:
+            // its CompAssignableToPawn_OutfitStandsPlusBase derives from
+            // CompAssignableToPawn without overriding PostExposeData, so it
+            // scribes the generic assignedPawns / uninstalledAssignedPawns
+            // keys — and so does the plain one added here. The load then logs
+            // "Tried to register the same list of load IDs twice" and this
+            // case fails its own contest assertions.
+            //
+            // That failure is a FALSE POSITIVE: the duplication is between two
+            // FOREIGN comps, neither of them ours, because the finder below
+            // excludes only our subclass and cannot tell the comp it added
+            // from one a mod supplied. It is invisible on the four-mod minimal
+            // list, which carries no foreign assignable, and so it only ever
+            // appeared on the release gate.
+            CompProperties present = standDef.comps.FirstOrDefault(
+                cp => cp != null && cp.compClass != null
+                      && typeof(CompAssignableToPawn).IsAssignableFrom(cp.compClass)
+                      && !typeof(CompAssignableToPawn_ShiftStand).IsAssignableFrom(cp.compClass));
+            CompProperties_AssignableToPawn foreignProps = null;
+            if (present == null)
+            {
+                foreignProps = new CompProperties_AssignableToPawn();
+                standDef.comps.Add(foreignProps);
+            }
             try
             {
                 DebugTools_LifecycleHarness.Fixture fix =
@@ -387,9 +412,11 @@ namespace ShiftChange
                     return false;
                 }
 
-                CompAssignableToPawn foreign = fix.Stand.AllComps
+                List<CompAssignableToPawn> foreigners = fix.Stand.AllComps
                     .OfType<CompAssignableToPawn>()
-                    .FirstOrDefault(c => !(c is CompAssignableToPawn_ShiftStand));
+                    .Where(c => !(c is CompAssignableToPawn_ShiftStand))
+                    .ToList();
+                CompAssignableToPawn foreign = foreigners.FirstOrDefault();
                 CompAssignableToPawn_ShiftStand ours =
                     fix.Stand.TryGetComp<CompAssignableToPawn_ShiftStand>();
                 if (foreign == null || ours == null)
@@ -403,9 +430,18 @@ namespace ShiftChange
                 string ownerLoadID = fix.Pawn.GetUniqueLoadID();
                 IntVec3 standCell = fix.Stand.Position;
 
+                // Loud rather than silent: the case is "ours against theirs",
+                // and a second foreign comp turns it into "theirs against
+                // theirs" while still going through the motions. Asserted so a
+                // mod list that grows another one says so, instead of quietly
+                // reshaping what is under test.
                 bool ok = DebugTools_LifecycleHarness.Expect(
-                    ours.AssignedPawnsForReading.Count == 0,
-                    "our comp starts empty — the foreign owner is not ours (control)");
+                        foreigners.Count == 1,
+                        "exactly one foreign assignable, so the contest under test "
+                        + "is ours against theirs")
+                    & DebugTools_LifecycleHarness.Expect(
+                        ours.AssignedPawnsForReading.Count == 0,
+                        "our comp starts empty — the foreign owner is not ours (control)");
 
                 if (!TrySave(ForeignSaveName, out string savePath))
                 {
@@ -459,10 +495,16 @@ namespace ShiftChange
             }
             finally
             {
-                // Revert the def. This case runs last and the process exits
-                // shortly after, but a def edit outliving its case would
-                // silently change what any later case tests.
-                standDef.comps.Remove(foreignProps);
+                // Revert the def, and ONLY what this case actually added.
+                // This case runs last and the process exits shortly after, but
+                // a def edit outliving its case would silently change what any
+                // later case tests — and on a list that supplied its own
+                // foreign assignable nothing was added here at all, so this
+                // must not reach for somebody else's comp.
+                if (foreignProps != null)
+                {
+                    standDef.comps.Remove(foreignProps);
+                }
             }
         }
 
