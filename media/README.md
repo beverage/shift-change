@@ -94,86 +94,166 @@ Write the `footage.sh` invocation down at the time. That is the same lesson the
 scene cards' treatment section below had to learn by measuring three finished
 cards backwards.
 
-## cards/
+## demo-sleep.gif
 
-Workshop gallery images. `card-chef`, `card-doc`, `card-lab` and
-`card-recreation` are 640×360 scene shots; `card-blacktie` is a 1482×587
-three-panel sequence; `card-controls` (2000×900) and `card-tooltip` (1536×864)
-show UI instead.
+The sleep comparison: two 5×5 bedrooms off one corridor, both soldiers in
+prestige cataphract, both turning in. West (Vane) DEPOSITS her armour into an
+empty rack and sleeps in the base layer; east (Roan) SWAPS his for a duster and
+helmet. Filmed on the sleep stage (dev mode → Shift Change → Dev tools… → Build
+sleep stage).
 
-`card-controls` is 2000×900 and carries three panels: the SAME work-types
-dialog in its two modes — work on the left (automatic, resolved to doctoring
-from the room, grid populated) and recreation in the middle (grid hidden,
-exclusivity note showing) — then the owner list on the right.
+**The recipe is here because it is the first thing this file asks for twice.**
 
-**Re-shot 2026-08-24**, when the work-types dialog gained "Keep contents out
-of trade" under "Change the whole outfit", inside its separator.
-`HeaderAllowance` went 226 → 252 and the work panel grew by exactly that one
-`RowHeight`, 780 → 813 px, which is 26 logical px at this machine's 1.25× UI
-scale. Widths did not move, so the horizontal offsets carried over untouched.
-
-**Both work-types panels are now the same height, and that is correct rather
-than lucky.** `FitToMode` sizes the window from `InitialSize.y`, which branches
-on `ModeOnly` — the excluded stand — and not on recreation, so the two modes
-have always been the same window. The previous take had them at 780 and 795,
-which means the old recreation crop was 15 px loose. Width cross-checks the
-crop; height never did, and that is what the gap cost. Worth a glance at both
-numbers on the next take, not just the 525.
-
-**The owner panel was not re-captured.** Its dialog did not change — the only
-commit touching that path since the last card is the reinstall fix, which adds
-`CanSetUninstallAssignedPawn` and draws nothing — so it was recovered from the
-previous card instead. That composite was at native resolution, so what comes
-back out is pixel-identical to the original capture rather than a re-encode of
-something scaled. Confirm a recovery landed by sampling the crop's corners and
-edge midpoints: all should read `srgb(87,97,110)`, the window border, with no
-`srgb(38,43,48)` card background leaking in.
-
-The owner list had been cut from an earlier version of this card, when it was
-a bare assign list of three pawns that taught nothing. It earned its place back
-once it grew the gender column, the filter tabs and Assign all, which are the
-answer to gendered apparel and cannot be shown any other way.
-
-**Composited at NATIVE resolution** on the cards' own background (`#262b30`),
-each panel vertically centred, so nothing is resampled. That is why the card is
-wider than the others: 525 + 525 + 699 = 1749 px of panel before margins, which
-will not fit the 1536 the two-panel version used, and scaling a panel down to
-make it fit would cost the text its sharpness.
-
-**Crop each panel to its own window border, not to the capture.** Every RimWorld
-window draws a 2 px border at luminance 95, and a screengrab carries 3–6 px of
-game world outside it — which reads as a coloured leak against the flat
-background once composited. Both work-types panels come out at exactly 525 px
-wide when cropped to the border, which is the check that the crop landed on the
-same feature in each.
+| | |
+|---|---|
+| master | `~/Movies/2026-09-04 17-19-16.mov` (1920×1080, 30 fps, 39.8 s) |
+| output | 480×378, 235 frames, 11.8 s, 1.1 MB |
 
 ```bash
-# panels, cropped to their own window borders (2026-08-24 take)
-magick work.png -crop 525x813+6+6 +repage p-work.png
-magick rec.png  -crop 525x813+4+8 +repage p-rec.png
-
-# owners recovered from the PREVIOUS card, not re-captured. Must run before
-# the composite below, which overwrites the file it reads from.
-magick cards/card-controls.png -crop 699x699+1250+100 +repage p-owners.png
-
-magick -size 2000x900 xc:"srgb(38,43,48)" \
-  p-work.png   -geometry +50+43   -composite \
-  p-rec.png    -geometry +650+43  -composite \
-  p-owners.png -geometry +1250+100 -composite \
-  -strip -define png:compression-level=9 cards/card-controls.png
+devtools/footage.sh probe "<master>.mov"
+devtools/footage.sh gif "<master>.mov" \
+  --crop 822:647:995:172 --ramp 5:8:1,8:30:8,30:36:1
 ```
 
-The crop offsets are per-capture; re-measure them for a new take. The vertical
-composite offsets are not free parameters — every panel is centred, so each is
-`(900 - height) / 2`, which is where +43 and +100 come from. The owner panel is
-square (699×699) because the dialog's `InitialSize` is 560×560 and this machine
-renders the UI at about 1.25×.
+**Reshot 2026-09-04** with carpeted floors, a grass surround and a daytime sky,
+replacing a night take on bare wood. Two things came out of that beyond looks:
+the flat carpet costs **a third of the file size** the plank floor did (1.1 MB
+against 3.0 at identical dimensions and settings — dithering has far less to
+chew on), and the pawns read against a dark floor in a way they did not against
+brown planks.
+
+**MEASURE THE BUILDING'S BOX BEFORE CHOOSING A CROP.** In this master it is
+**x 1012–1800, y 189–802** — 788×613 source px, ~61 px per map cell for a 13×10
+structure. The previous take framed it at x 816–1642, y 268–905, so **a reshoot
+moves the box and every crop number with it**; none of them carry over. Three
+cuts were wrong on the first master before it was measured rather than
+estimated from a contact sheet: one tight to the wall on every side, and one
+whose right margin was 40 px against the left's 16 while the bottom edge was
+actually *clipping* 21 px off the building — which reads as "no bottom border"
+rather than as a crop error. The recipe:
+
+```bash
+ffmpeg -y -ss 20 -i "<master>.mov" -frames:v 1 full.png
+# then stamp a labelled 50px grid in SOURCE coords and read the edges off it
+```
+
+Allowance is ~10 px on ALL FOUR SIDES at 480 wide, which is `demo.gif`'s (L10
+R11 T7 B10, measured off its first frame) and what makes the two read as one
+set. (`demo-recroom.gif` measures L6 R7 T5 **B83** — that bottom is the
+deliberate exception documented above, not the house style.)
+
+**Equal means equal; do not talk yourself into a larger top.** This cut shipped
+briefly at 38 px top against 17 at the sides, on the theory that RimWorld draws
+a wall's upper face and shadow above its geometric edge and a bigger top would
+therefore read as even. It does not — at 2× it is plainly heavier than the
+bottom, and it was spotted immediately in review. Set all four from the same
+number.
+
+Solve the margins rather than guessing them. For a building `BW` px wide and a
+480 px output, a side margin of `m` source px lands at `m × 480 / (BW + 2m)`
+output px, so **`m = BW / 46`** gives the ~10 px house allowance at any zoom.
+Here `BW` is 788, so `m` is 17 on every side. Check the top against the colonist
+bar before committing — the portrait names sit at y≈124 in this master, and a
+generous top allowance reaches them.
+
+Do not use `--autocrop` here. There is no pillarboxing for it to find, so it
+would be hunting a room edge it cannot see — the trap the pool footage hit.
+
+**Judge margins against a contrasting matte, never with a colour threshold.**
+A detector keyed on "ground is greener or brighter than the wall" works on
+`demo.gif`'s daylit grass and fails completely on this scene's dark night dirt,
+reporting L0 R1 T0 B1 on a frame that plainly had margin. One line settles it:
+`magick still.png -bordercolor "#c02020" -border 10 matte.png`.
+
+**The ramp is 1× / 8× / 1×, and the slow bookends are the content.** Seconds
+5–8 hold both soldiers arriving in the corridor in full armour, and 30–36 hold
+both asleep with the armour visibly parked on the racks. The 8× middle is the
+walk and the two changes — the mechanism, which does not need to be watched at
+speed. The first five seconds are dropped: they are the stage settling.
+
+**Known weakness, stated so a re-shoot does not chase it.** Once both are in
+bed the two modes look alike — armour on both racks, a sleeper in both beds —
+because Roan's duster is hidden under the blanket. The deposit/swap difference
+is only legible in the middle beat where both stand changed beside their
+stands, and that is exactly the stretch the 8× compresses. A version that
+holds ~18–22 s at 1× would show the distinction better at the cost of a longer
+gif; this cut favours the bookends instead.
+
+## cards/
+
+Workshop gallery images. `card-chef`, `card-doc`, `card-lab`, `card-recreation`
+and `card-sleep` are 640×360 scene shots; `card-blacktie` is a 1482×587
+three-panel sequence; `card-controls` (1700×800) and `card-tooltip` (1536×864)
+show UI instead.
+
+`card-controls` is 1700×800 and carries three panels: the SAME work-types
+dialog in its two modes — work on the left (automatic, resolved to doctoring
+from the room, grid populated) and recreation in the middle (grid hidden,
+exclusivity note showing) — then the owner list on the right. Both dialog
+panels show the **Sleeping** row, which is how the card advertises that a rest
+configuration exists without spending a fourth panel on it; `card-sleep`
+immediately precedes it in the gallery and shows the feature itself.
+
+**Shot and composited by script since 2026-09-04** — the second fully
+automated asset, after `card-sleep`:
+
+```bash
+devtools/run-scene.sh --media --bridge
+devtools/bridge/shoot-controls-card.py 5176 shiftchange-scene-bridge
+```
+
+It boots a clean colony, builds the demo stage, selects the hospital stand,
+opens its work-types dialog, captures, ticks Recreation, captures the SAME
+window again, then opens the owner list and captures that. No crops to measure
+and no offsets to carry forward.
+
+**`clipTargetId` is what retired the hand-cropping.** `take_screenshot` clips to
+a window's own rect, so the 3-6 px of game world a screengrab carries outside
+the border simply never appears. The old recipe's per-capture crop offsets
+(`525x813+6+6`, `525x813+4+8`) existed only to remove it, and had to be
+re-measured every take.
+
+**Driving one stand through both modes is what keeps the two panels equal.**
+`FitToMode` sizes that window from `InitialSize.y`, which branches on
+`ModeOnly` and not on recreation — so the same stand in two modes is the same
+window, and the script asserts the two heights match rather than trusting it.
+A mismatch means the captures came from different stands: a bedroom stand's
+auto label wraps to two lines and grows the window by 12 px, which is exactly
+what a hand-assembled attempt from mixed screengrabs produced.
+
+**One instance means one UI scale, by construction.** Panels captured at 1.0x
+and 1.25x cannot be composited — cropped to their borders the same dialog is
+420 px wide at one and 525 at the other, and the owner dialog 560 against 699.
+The old card was 1.25x throughout; this one is 1.0x throughout. Never mix.
+
+The canvas is derived, not fixed: `sum(widths) + gap x (n+1)` by
+`max(height) + 2 x margin`, at gap 75 and margin 60. The old 2000x900 was sized
+for 1.25x panels and leaves 600 px of dead background at 1.0x. Vertical offsets
+are still `(height - panel) / 2` — every panel is centred.
+
+**Start from a fresh colony, and WAIT for the menu.** The demo stage spawns
+four staff on every build and they accumulate; a second run in one instance put
+Chef, Doc, Lab and Patient in the owner list twice and read "Assign all 11".
+`go_to_main_menu` returns `{"status": "queued"}` and schedules the transition,
+so calling `start_debug_game_ready` straight after finds the OLD game still
+loaded, reports it playable and starts nothing. Poll `get_ui_state` for
+`inEntryScene` first. Pass `--keep-game` to skip the reset.
+
+**Two more bridge traps this card paid for.** `close_window` with no argument
+closes the TOPMOST window, which is nearly always a `Verse.ImmediateWindow`
+tooltip — a loop that calls it bare closes tooltips forever while the dialog
+underneath goes on absorbing map clicks, and selection then fails as "nothing
+selected", which reads like a stage build failure. Close by `windowType`. And
+`click_cell` injects at the screen position a cell maps to, so a cell outside
+the camera's `viewRect` cannot be clicked at all — frame it first.
+
 
 ### The scene cards' treatment
 
-`card-chef`, `card-doc`, `card-lab` and `card-recreation` are before/after
-pairs, and the recipe was not recorded when the first three were made — these
-numbers were measured back off `card-chef` on 2026-08-21:
+`card-chef`, `card-doc`, `card-lab`, `card-recreation` and `card-sleep` are
+before/after pairs, and the recipe was not recorded when the first three were
+made — these numbers were measured back off `card-chef` on 2026-08-21, and
+`card-sleep` is the first to be cut from them by script rather than by hand:
 
 | | |
 |---|---|
@@ -192,9 +272,16 @@ which is what fixes the crop's vertical offset.
 
 **The typeface is `RimWordFont.ttf` at `-pointsize 44`**, which renders a
 390×38 ink box against the 389×37 measured off `card-chef` — i.e. it is the
-original setting. The font does not live in this repo; keep a copy wherever the
-cards get made, because without it the title cannot be re-typeset, only lifted
-from an existing card.
+original setting. Confirmed 2026-09-04 by re-typesetting: 390×38, the
+documented box exactly.
+
+**It lives here, at `media/RimWordFont.ttf`.** It used to live nowhere, which
+this file warned about and which meant a title could only be lifted off a card
+that already carried it. It then briefly lived outside this repository, which
+was worse in a different way: every tool had to reach out of its own checkout,
+and the line that did so was an absolute path carrying a home directory, in a
+public repository. Media assets belong beside the media that uses them. Set
+`RIMWORD_FONT` to override.
 
 ```bash
 magick -size 640x360 xc:black before.png -geometry +0+0 -composite \
@@ -209,6 +296,49 @@ Fallback if the font is ever missing: the top band is essentially black behind
 the letters, so `-crop 640x90+0+0 -level 25%,100%` on an existing card isolates
 the lettering, and screen-compositing that reproduces it exactly at the same
 position. That only copies what is already there — it cannot set new text.
+
+### card-sleep — the first fully automated card
+
+The only card in the set that is not an OBS capture. `devtools/bridge/` drives
+the game over RimBridgeServer: build the stage, settle, capture the before
+panel, play a measured interval, capture the after panel, composite. One
+command, no hands, and the framing is not a crop found by eye — it is the
+stage's own block geometry.
+
+```bash
+devtools/run-scene.sh --media --bridge          # port 5176, fixed token
+devtools/bridge/shoot-sleep-card.py 5176 shiftchange-scene-bridge --survey
+devtools/bridge/shoot-sleep-card.py 5176 shiftchange-scene-bridge --after 2000
+```
+
+| | |
+|---|---|
+| stage | Dev tools… → Build sleep card stage, at map cell (120, 120) |
+| capture | `screenshot_cell_rect` on the 8×9 block, `rootSize` 12 → 480×540 |
+| moments | before at t=0, after at 2000 ms of Ultrafast play |
+
+**Survey before committing.** The after-moment is the one free parameter and
+cannot be derived — it depends on how long the pawn takes to roll the rest job,
+walk in and finish the swap. `--survey` plays once and captures a ladder, so
+one stage build yields every candidate instead of one guess per build.
+
+**Settle 15 ticks before t=0.** The stage writes its roof during the build but
+the glow grid catches up over the following ticks, so a capture at tick 1 shows
+the room still taking DAYLIGHT and every later frame shows it torch-lit and
+darker. The first survey had exactly that — panel one a stop brighter than
+panel two, which cannot composite as a pair.
+
+**Watch for a wanderer.** A quicktest map has its own colonists, and one walked
+into the t1500 frame of the survey trailing a speech bubble. Nothing stops it;
+check the chosen frame before compositing rather than trusting the ladder.
+
+**The after moment is the pawn ASLEEP, not the pawn standing changed.** Both
+exist — the swap finishes around t800 and the bed is reached by t1500 — and the
+standing frame shows the new clothes more plainly. It was still the wrong
+choice: pawn and stand are two similar silhouettes against the same wall and
+only the name label separates them, while the in-bed frame has the armour
+visibly parked on the rack doing the narrating. The work cards show a colonist
+DOING the work in the uniform; the sleep equivalent is being asleep.
 
 ### card-blacktie — the three-beat card
 

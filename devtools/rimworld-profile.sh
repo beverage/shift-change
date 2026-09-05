@@ -32,7 +32,10 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONFIG="/Users/alexbeverage/Library/Application Support/RimWorld/Config/ModsConfig.xml"
+# Derived from $HOME, never written out — see run-harness.sh. Override either
+# for a non-default Steam library.
+APP="${RIMWORLD_APP:-$HOME/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app}"
+CONFIG="${RIMWORLD_CONFIG:-$HOME/Library/Application Support/RimWorld/Config/ModsConfig.xml}"
 STORE="$REPO/devtools/profiles"
 PRESWAP="$STORE/.pre-swap.xml"
 
@@ -115,7 +118,7 @@ cmd_minimal() {
   xmllint --noout "$CONFIG.tmp" || die "generated config is not well-formed; left $CONFIG untouched"
   mv "$CONFIG.tmp" "$CONFIG"
   printf 'swapped to the minimal profile (%s mods)\n' "${#MINIMAL_MODS[@]}"
-  printf 'launch: open "/Users/alexbeverage/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app" --args -quicktest\n'
+  printf 'launch: open "%s" --args -quicktest\n' "$APP"
 }
 
 cmd_restore() {

@@ -6,7 +6,7 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// The on-screen answer to "which testing mode am I in?" (principal,
+    /// The on-screen answer to "which testing mode am I in?" (decided
     /// 2026-08-08). Debug builds draw a small badge top-right, under
     /// vanilla's dev-mode indicator:
     ///

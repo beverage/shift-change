@@ -41,7 +41,12 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FONT = os.environ.get("FONT", os.path.expanduser("~/Downloads/RimWordFont.ttf"))
+
+#: Beside this script, not in ~/Downloads. The font used to be defaulted out of
+#: a downloads folder, which is a place things get cleared out of — and it meant
+#: every card tool had to be pointed back at it by hand. It is a media asset, so
+#: it lives with the media. FONT still overrides.
+FONT = os.environ.get("FONT", os.path.join(HERE, "RimWordFont.ttf"))
 OUT = os.path.join(HERE, "_card-mockup.html")
 
 #: Steam renders a description image at up to ~640 px before scaling it down.
@@ -227,12 +232,13 @@ CARDS = [
             {
                 "shot": "cards/parts/sec-activities.png",
                 "lead": "What sets it off",
-                "body": "every work type in your game, plus recreation. Left on "
-                        "**Automatic** the stand follows the room and this list only "
-                        "reports what that resolved to. Tick them yourself for rooms that "
-                        "don't fit what the game thinks they are, like multi-purpose rooms.  " 
-                        "Recreation, and work types are **mutually exclusive**,  with one "
-                        "outfit serving one purpose.",
+                "body": "every work type in your game, plus recreation and sleeping. "
+                        "Left on **Automatic** the stand follows the room and this list "
+                        "only reports what that resolved to. Tick them yourself for rooms "
+                        "that don't fit what the game thinks they are, like multi-purpose "
+                        "rooms. Work types, recreation and sleeping are **mutually "
+                        "exclusive**, so ticking one clears the others: one outfit serves "
+                        "one purpose.",
             },
             {
                 "shot": "cards/parts/dlg-owners.png",

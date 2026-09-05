@@ -9,7 +9,7 @@ going to, whether they are there to work or to enjoy themselves, and back out
 again afterwards, using the vanilla outfit stand.
 
 Put an outfit stand in a room and put an outfit on it. Each stand dresses for
-one of two things:
+one of three things:
 
 **Work.** A colonist taking on **automatic** work of that room's kind
 (doctoring in the hospital, researching or synthesizing drugs in the lab,
@@ -20,7 +20,11 @@ changes back when their work takes them elsewhere.
 themselves. A frame of billiards, a hand of poker, an hour at the harp. A robe
 for the sauna, black tie for the games room.
 
-Their own clothes wait in the stand either way, and come back exactly as they
+**Rest.** And for turning in: a colonist changes into whatever the bedroom
+stand holds, or simply parks their power armour on one that holds nothing, and
+collects it again in the morning.
+
+Their own clothes wait in the stand every time, and come back exactly as they
 were, force-worn markers included.
 
 ![A doctor, researcher and cook changing into work clothes and back again](media/demo.gif)
@@ -151,6 +155,43 @@ over ordinary clothes; a sauna robe does not.
   take lying down precisely so they stay put.
 - **A drink from the rec room's own stock does not end the visit.** The
   meal-break rule below is a work-room rule, and a rec room stocks its own bar.
+
+## Dressing for sleep
+
+Tick **Sleeping: going to bed in this room** and the stand dresses whoever
+turns in there. A stand in a bedroom does it by itself, because the room's own
+role is enough — pyjamas on a rack beside the bed is the whole setup.
+
+![Two soldiers in prestige cataphract turn in; one parks her armour on an empty rack, the other swaps his for a duster and helmet](media/demo-sleep.gif)
+
+*Two bedrooms off one corridor. On the left the stand holds nothing and simply
+takes the armour in; on the right it holds a light kit and does a swap. Both
+collect their gear again in the morning. Sped up 8× through the walk and the
+changes.*
+
+A stand with an outfit on it swaps, exactly as it does for work. **Deposit
+only, issue no outfit** does the other half: the stand hands out nothing and
+takes in whatever its storage filter accepts, so a marine parks their power
+armour by the bed and sleeps in what was underneath.
+
+**The storage filter is the control on a deposit-only stand**, and it wants
+narrowing. A newly built stand already accepts nearly all clothing, so set it
+to the pieces you actually want parked — armour and helmet, say — and leave the
+rest out.
+
+It will not send anyone to bed naked. If what the filter would take leaves a
+colonist without basic clothing, the stand is skipped for that colonist
+entirely. A soldier who wears nothing under their armour therefore needs
+something underneath before a deposit-only stand will do anything for them.
+
+**"Resting in bed" in the work list is not this.** That is vanilla's own work
+type, for a colonist recovering from injury or illness, and it behaves like any
+other work type. Ordinary sleep is the **Sleeping** row. Tick the work type for
+a hospital gown; tick Sleeping for pyjamas.
+
+Bedrooms turn this on by themselves. Barracks deliberately do not — ten
+colonists cycling one pyjama stand at lights-out is churn rather than charm, so
+a shared sleeping room takes the switch by hand.
 
 ## The rules it follows
 

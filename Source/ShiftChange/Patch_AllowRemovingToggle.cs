@@ -134,7 +134,7 @@ namespace ShiftChange
         /// about the flag and an ON toggle looks like any other, so the player
         /// cannot audit it by eye.</para>
         ///
-        /// <para>Overriding an explicit click is the deliberate cost (principal,
+        /// <para>Overriding an explicit click is the deliberate cost (decided
         /// 2026-08-23): OFF is the documented configuration for a stand in
         /// service, and the published description already promises the toggle
         /// "holds itself off while the stand is in service". This makes that

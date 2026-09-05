@@ -11,7 +11,7 @@ namespace ShiftChange
     /// because a stand covers a SET of work: a workshop runs crafting,
     /// tailoring, smithing and art; a lab runs research and drug synthesis
     /// (which is Crafting work). A float menu of single choices could not say
-    /// that (principal, 2026-08-08).
+    /// that (decided 2026-08-08).
     ///
     /// Sized to the MODLIST, not to vanilla (same day): heavily modded games
     /// carry 40+ work types, so the window derives its column count from the
@@ -49,9 +49,18 @@ namespace ShiftChange
         /// landed in the same merge — hence 226 rather than either branch's
         /// own figure. The withhold-from-trade row added one bare
         /// <see cref="RowHeight"/> on top of that: it shares full change's
-        /// separator instead of taking one of its own.</para>
+        /// separator instead of taking one of its own. The sleep row and its
+        /// gap took it to 282.</para>
+        ///
+        /// <para>This is the MAXIMUM, not the exact figure for every state.
+        /// The deposit-only row and the hidden full-change row that goes with
+        /// it are both inside the trigger-exclusive branch, which draws no
+        /// work grid at all — so they spend slack the grid has already given
+        /// up. Over-reserving costs whitespace at the bottom of one layout;
+        /// under-reserving clips a control, which is why the const tracks the
+        /// tallest arrangement rather than the common one.</para>
         /// </summary>
-        internal const float HeaderAllowance = 252f;
+        internal const float HeaderAllowance = 282f;
         internal const float MinWindowWidth = 420f;
 
         /// <summary>
@@ -145,6 +154,44 @@ namespace ShiftChange
         /// </summary>
         internal bool ModeOnly => comp.IsExcluded;
 
+        /// <summary>
+        /// Height for the two rows that only some stands draw: the
+        /// deposit-only checkbox on a sleep stand, and the note explaining
+        /// that an AUTOMATIC stand's trigger came from the room.
+        ///
+        /// <para>Computed rather than folded into
+        /// <see cref="HeaderAllowance"/> because both are conditional and the
+        /// constant is spent on every stand in the colony — reserving 60px
+        /// unconditionally would put a band of dead space under the work grid
+        /// of every ordinary workshop stand. <see cref="FitToMode"/> re-reads
+        /// this every frame, so a row appearing the moment its box is ticked
+        /// grows the window on the same frame.</para>
+        /// </summary>
+        internal float TriggerRowsAllowance
+        {
+            get
+            {
+                if (ModeOnly)
+                {
+                    return 0f;
+                }
+                float extra = 0f;
+                if (comp.HandlesRest())
+                {
+                    extra += RowHeight + 4f;
+                }
+                if (!comp.IsTriggerOverridden && (comp.HandlesRecreation() || comp.HandlesRest()))
+                {
+                    // TWO rows, not one. The note is drawn with
+                    // Listing_Standard.Label, which wraps, and the English
+                    // string takes two lines at the clamped minimum width — a
+                    // single RowHeight here let it overrun the grid.
+                    extra += RowHeight * 2f + 4f;
+                }
+                return extra;
+            }
+        }
+
         public override Vector2 InitialSize
         {
             get
@@ -154,7 +201,9 @@ namespace ShiftChange
                 width = Mathf.Clamp(width, MinWindowWidth, UI.screenWidth * 0.9f);
 
                 float height = WindowMargin * 2f + CloseButSize.y + 10f + autoLabelOverflow
-                    + (ModeOnly ? ModeOnlyAllowance : HeaderAllowance + rowsPerColumn * RowHeight);
+                    + (ModeOnly
+                        ? ModeOnlyAllowance
+                        : HeaderAllowance + TriggerRowsAllowance + rowsPerColumn * RowHeight);
                 height = Mathf.Min(height, UI.screenHeight * 0.85f);
 
                 return new Vector2(width, height);
@@ -199,6 +248,10 @@ namespace ShiftChange
             if (RoomWorkTypes.RecreationForRole(roomRole))
             {
                 autoParts.Add("ShiftChange.Recreation".Translate().RawText);
+            }
+            if (RoomWorkTypes.RestForRole(roomRole))
+            {
+                autoParts.Add("ShiftChange.Rest".Translate().RawText);
             }
             string autoLabel = "ShiftChange.WorkTypeAuto".Translate();
             autoLabel += ": " + (autoParts.Count > 0
@@ -271,14 +324,27 @@ namespace ShiftChange
             // Full change is a property of what the rack HOLDS, not of which
             // work it serves, so it sits outside the mode radios rather than
             // becoming a fourth mode.
+            // DISABLED under deposit-only, not hidden. A deposit-only stand
+            // issues no outfit, so SwapPlan's deposit branch returns before the
+            // full-change pass can run and the setting genuinely does nothing —
+            // but hiding the row moved every row below it by 26px on the frame
+            // the box was ticked, which put the Sleeping checkbox under the
+            // cursor mid-double-click. ToggleRest on an already-on trigger
+            // falls through to SetExcluded, so one stray click turned the stand
+            // off entirely and collapsed the window (adversarial review,
+            // 2026-09-03). A greyed row states the same fact and cannot move
+            // anything.
             bool full = comp.FullChange;
+            bool fullInert = comp.DepositOnly;
             Rect fullRect = listing.GetRect(RowHeight);
-            Widgets.CheckboxLabeled(fullRect, "ShiftChange.FullChange".Translate(), ref full);
-            if (full != comp.FullChange)
+            Widgets.CheckboxLabeled(fullRect, "ShiftChange.FullChange".Translate(), ref full, fullInert);
+            if (!fullInert && full != comp.FullChange)
             {
                 comp.SetFullChange(full);
             }
-            TooltipHandler.TipRegion(fullRect, "ShiftChange.FullChangeDesc".Translate());
+            TooltipHandler.TipRegion(fullRect, fullInert
+                ? "ShiftChange.FullChangeDepositNote".Translate()
+                : "ShiftChange.FullChangeDesc".Translate());
 
             // Directly under full change and inside its separator, because both
             // are properties of what the rack HOLDS rather than of which work it
@@ -311,25 +377,92 @@ namespace ShiftChange
             {
                 comp.ToggleRecreation();
             }
+
+            // Sleep is the third trigger and takes the same shape for the same
+            // reason: the room is the selector, so one row covers going to bed
+            // however the pawn got there.
+            //
+            // Medical bed rest is deliberately NOT this row. It is a real
+            // WorkTypeDef — vanilla's PatientBedRest, whose gerund label reads
+            // "resting in bed" — and it stays down in the grid, so a hospital
+            // stand and a pyjama stand remain separately configurable and
+            // neither one silently claims the other's jobs.
+            bool restOn = comp.HandlesRest();
+            bool restWas = restOn;
+            Widgets.CheckboxLabeled(listing.GetRect(RowHeight),
+                "ShiftChange.RestRow".Translate(), ref restOn);
+            if (restOn != restWas)
+            {
+                comp.ToggleRest();
+            }
             listing.Gap(4f);
 
-            // Recreation and work types are mutually exclusive (principal,
+            // All three triggers are mutually exclusive (decided
             // 2026-08-16: one stand, one outfit, one purpose) — while
-            // recreation is on the work grid is HIDDEN rather than greyed:
-            // an interactable-looking list that would silently untick
-            // recreation is a trap; an absent one is a statement. Re-queried
-            // after the toggle above so the grid vanishes the same frame the
+            // recreation or sleep is on the work grid is HIDDEN rather than
+            // greyed: an interactable-looking list that would silently untick
+            // the trigger is a trap; an absent one is a statement. Re-queried
+            // after the toggles above so the grid vanishes the same frame a
             // box is ticked.
-            if (comp.HandlesRecreation())
+            // The deposit-only row belongs to whichever stand currently serves
+            // sleep, automatic or explicit. Only under sleep, because this is
+            // the only trigger where parking gear without taking any on is a
+            // coherent thing to want — the same reason
+            // CompShiftStand.DepositOnly gates itself on HandlesRest rather
+            // than trusting this row to be its only writer.
+            if (comp.HandlesRest())
+            {
+                bool deposit = comp.DepositOnly;
+                Rect depositRect = listing.GetRect(RowHeight);
+                Widgets.CheckboxLabeled(depositRect,
+                    "ShiftChange.DepositOnly".Translate(), ref deposit);
+                if (deposit != comp.DepositOnly)
+                {
+                    comp.SetDepositOnly(deposit);
+                }
+                TooltipHandler.TipRegion(depositRect, "ShiftChange.DepositOnlyDesc".Translate());
+                listing.Gap(4f);
+            }
+
+            // The grid is hidden only when the player EXPLICITLY chose a
+            // trigger. It used to be hidden whenever one was active, and since
+            // a stand in a bedroom picks up sleep from the room's role, that
+            // left every bedroom stand with no reachable path to a work type:
+            // grid hidden, unticking Sleeping fell through to SetExcluded and
+            // collapsed the window, and Automatic put the room's default back
+            // (adversarial review, 2026-09-03). An automatic stand's trigger is
+            // the room's suggestion, and ticking a work type is how a player
+            // overrides it — ToggleWork clears the other half, so the exclusive
+            // switch still happens, it is just reachable now.
+            if (comp.IsTriggerOverridden)
             {
                 GUI.color = Color.gray;
-                listing.Label("ShiftChange.RecreationExclusiveNote".Translate());
+                listing.Label(comp.HandlesRest()
+                    ? "ShiftChange.RestExclusiveNote".Translate()
+                    : "ShiftChange.RecreationExclusiveNote".Translate());
                 GUI.color = Color.white;
                 listing.End();
                 return;
             }
+            // The from-room note is drawn BELOW the grid, not above it. Ticking
+            // a work type overrides the room's trigger, which correctly makes
+            // both this note and the deposit-only row vanish — and above the
+            // grid that shortened the header by ~80px on the next frame, moving
+            // every cell up three rows under a cursor that was mid-click. Below
+            // it, the note can appear and disappear without the grid ever
+            // moving. The deposit row cannot go here: it is a control for the
+            // trigger rows it sits under, so it keeps its place and its 30px
+            // of movement.
+            bool roomTrigger = comp.HandlesRecreation() || comp.HandlesRest();
 
-            Rect outRect = listing.GetRect(content.height - listing.CurHeight);
+            // Reserve the note's own height before the grid claims what is
+            // left, or drawing it after EndScrollView would run off the bottom.
+            // Measured, not assumed: the string wraps to two lines at this
+            // dialog's clamped minimum width.
+            float noteHeight = roomTrigger
+                ? Text.CalcHeight("ShiftChange.TriggerFromRoomNote".Translate(), content.width) + 4f
+                : 0f;
+            Rect outRect = listing.GetRect(content.height - listing.CurHeight - noteHeight);
             Rect viewRect = new Rect(0f, 0f,
                 columns * cellWidth + (columns - 1) * ColumnGutter,
                 rowsPerColumn * RowHeight);
@@ -357,6 +490,13 @@ namespace ShiftChange
                 }
             }
             Widgets.EndScrollView();
+
+            if (roomTrigger)
+            {
+                GUI.color = Color.gray;
+                listing.Label("ShiftChange.TriggerFromRoomNote".Translate());
+                GUI.color = Color.white;
+            }
 
             listing.End();
         }

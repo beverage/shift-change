@@ -232,6 +232,57 @@ def check_private_tracking_refs():
                          % (rel(path), number, match.group(0)))
 
 
+# ------------------------------------------------------------- home-dir paths
+
+# An absolute home path in a tracked file does two bad things at once: it names
+# the author in a PUBLIC repository, and it pins the script to exactly one
+# machine. Both were true here — run-harness, run-scene, publish-workshop and
+# rimworld-profile all carried `/Users/<name>/Library/...`, and a media tool
+# reached out to a downloads folder for a font.
+#
+# `$HOME`, `~` and `os.path.expanduser` are all fine and deliberately NOT
+# matched: they are the portable forms this check exists to push people toward.
+# Only a literal absolute home directory is rejected. Linux and macOS shapes
+# both, so a contributor on either produces the same failure.
+HOME_PATH = re.compile(r"/(?:Users|home)/[A-Za-z0-9._-]+/")
+
+# Vocabulary from the private working notes that means nothing to a reader of
+# this repository. "principal" was the worst of it — 26 comments cited decisions
+# as "(principal, DATE)", which names an internal role rather than saying the
+# useful part, that the choice was deliberate and when. "(decided DATE)" carries
+# the same weight to someone who has never seen the tracker.
+INTERNAL_VOCAB = re.compile(r"\bprincipals?\b", re.IGNORECASE)
+
+
+def check_home_paths():
+    for base, dirs, names in os.walk(ROOT):
+        dirs[:] = [d for d in dirs if d not in TRACKING_SKIP_DIRS]
+        for name in names:
+            if name in TRACKING_SKIP_FILES or not name.endswith(TRACKING_EXTS):
+                continue
+            path = os.path.join(base, name)
+            try:
+                text = open(path, encoding="utf-8").read()
+            except (UnicodeDecodeError, OSError):
+                continue
+            for number, line in enumerate(text.splitlines(), 1):
+                match = INTERNAL_VOCAB.search(line)
+                if match:
+                    fail("internal-vocab",
+                         "%s:%d says %s — that is private working vocabulary. Say "
+                         "what a stranger needs instead: '(decided YYYY-MM-DD)' "
+                         "for a deliberate choice."
+                         % (rel(path), number, match.group(0)))
+                match = HOME_PATH.search(line)
+                if match:
+                    fail("home-path",
+                         "%s:%d hardcodes %s — this repository is public, and the "
+                         "path pins the script to one machine. Use $HOME, ~ or "
+                         "os.path.expanduser, with an env override where the "
+                         "location can differ."
+                         % (rel(path), number, match.group(0)))
+
+
 # ----------------------------------------------------------------- patch roots
 
 # ModContentPack.LoadPatches discards EVERY operation in a file whose root is
@@ -261,6 +312,7 @@ def main():
     check_preview()
     check_patch_roots()
     check_private_tracking_refs()
+    check_home_paths()
 
     for note in notes:
         print("note: %s" % note)

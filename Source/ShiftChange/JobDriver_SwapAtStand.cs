@@ -132,7 +132,7 @@ namespace ShiftChange
         // vanilla stops a stand swap removing it — JobGiver_OptimizeApparel
         // only scores requirements (×25/×10) and vanilla's own stand driver
         // checks the much narrower IsLocked. We deliberately do not guard it
-        // (principal's call, 2026-08-07). Blocking could only ever mean
+        // (decided 2026-08-07). Blocking could only ever mean
         // refusing the uniform, since the guard's lever is "don't remove the
         // robe" — so a titled pawn would silently never change, which is worse
         // than the mood hit. Nor do we warn: assigning this pawn to this stand
@@ -213,7 +213,27 @@ namespace ShiftChange
             // So the test is what is underneath, not what the ledger says.
             // Give up only when the uniform is all the pawn has on.
             toWear.RemoveAll(a => a == null || a.ParentHolder != stand || !SwapPlan.CanWear(pawn, a));
-            if (toWear.Count == 0 && (!undressing || !WearingAnythingBesides(toStore)))
+            // A DEPOSIT-ONLY stand hands nothing out by design, so an empty
+            // incoming set is not evidence that anything went wrong — it
+            // belongs on the same side of this test as the return trip. Both
+            // then answer the one question that actually matters here: will
+            // the pawn still be dressed when this is over.
+            //
+            // DEPOSIT-ONLY ASKS THAT QUESTION THE STRICT WAY. WearingAnythingBesides
+            // is a garment count, which is fine where it has always been used —
+            // the return trip's last-resort recovery, where the alternative is
+            // donating the uniform permanently. On the deposit path it is the
+            // arrival re-check for a plan SwapPlan built with WouldBeNude, and
+            // a comment here used to claim the two tested the same thing. They
+            // did not: a pawn who lost their shirt and trousers during the walk
+            // would pass the count on a shield belt alone and be stripped by
+            // the very check meant to stop it (verification pass, 2026-09-03).
+            // One predicate, one answer, on both sides of the walk.
+            bool stillDressed = comp.DepositOnly
+                ? !SwapPlan.WouldBeNude(pawn, toStore)
+                : WearingAnythingBesides(toStore);
+            bool issuesNothingByDesign = undressing || comp.DepositOnly;
+            if (toWear.Count == 0 && (!issuesNothingByDesign || !stillDressed))
             {
                 NothingToWear(comp);
                 return;
@@ -307,7 +327,13 @@ namespace ShiftChange
             // Anything that genuinely cannot go back on goes into the stand
             // rather than nowhere; that is still a garment the player can
             // retrieve, which an unheld one is not.
-            if (!undressing && issued.Count == 0 && stored.Count > 0)
+            // Deposit-only is exempt: issuing nothing is the whole point, and
+            // this recovery would put the armour straight back on the pawn it
+            // was just taken off, every night, forever. The invariant it
+            // protects still holds there by a different route — BuildDeposit
+            // refuses a plan that would strip the pawn bare, and the guard
+            // above re-checks the same thing on arrival.
+            if (!undressing && !comp.DepositOnly && issued.Count == 0 && stored.Count > 0)
             {
                 foreach (Apparel apparel in stored)
                 {

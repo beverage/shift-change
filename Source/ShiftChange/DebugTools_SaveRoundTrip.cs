@@ -90,6 +90,22 @@ namespace ShiftChange
         internal const string FailedTake = "Could not get load IDs list";
 
         /// <summary>
+        /// Logged by <c>Verse.Map</c> when <c>FinalizeLoading</c> throws. That
+        /// pass is what SPAWNS a loaded map's contents, so an abort leaves a
+        /// map with nothing in it and every stand lookup below returns null.
+        ///
+        /// <para>The three round-trip cases used to call that "no stand after
+        /// loading", which names a symptom three layers downstream of the
+        /// cause and reads as a bug in our own scribing. It cost about an hour
+        /// on the v1.2.3 release gate and cost it again on the v1.3.0 one.
+        /// Vehicle Framework is the case in hand: it keys a static
+        /// map-component cache by map index and never clears it between
+        /// in-process loads, so the harness's second and third loads collide
+        /// on key 0. Nothing of ours is anywhere on that stack.</para>
+        /// </summary>
+        internal const string FinalizeAbort = "Error in Map.FinalizeLoading()";
+
+        /// <summary>
         /// Six assertions in this file test for absence — no unconsumed
         /// load-ids, no duplicate registration, no failed take. A scanner that
         /// never matches anything satisfies all six, so one leg logs this
@@ -190,9 +206,7 @@ namespace ShiftChange
             Building_OutfitStand loaded = FindStand(standCell);
             if (loaded == null)
             {
-                DebugTools_LifecycleHarness.Report.AppendLine(
-                    "      no stand at " + standCell + " after loading — cannot assert");
-                return false;
+                return ok & MissingStand("no stand at " + standCell + " after loading");
             }
 
             CompShiftStand ledger = loaded.TryGetComp<CompShiftStand>();
@@ -282,9 +296,7 @@ namespace ShiftChange
             Building_OutfitStand loaded = FindStandAnywhere();
             if (loaded == null)
             {
-                DebugTools_LifecycleHarness.Report.AppendLine(
-                    "      no stand on the migrated map — cannot assert");
-                return false;
+                return ok & MissingStand("no stand on the migrated map");
             }
             CompAssignableToPawn_ShiftStand assign =
                 loaded.TryGetComp<CompAssignableToPawn_ShiftStand>();
@@ -361,8 +373,33 @@ namespace ShiftChange
                 return false;
             }
 
-            CompProperties_AssignableToPawn foreignProps = new CompProperties_AssignableToPawn();
-            standDef.comps.Add(foreignProps);
+            // REUSE A FOREIGN ASSIGNABLE WHEN THE MOD LIST ALREADY SUPPLIES ONE.
+            //
+            // Adding one unconditionally makes TWO wherever a mod has already
+            // put one on this def, and Outfit Stands Plus does exactly that:
+            // its CompAssignableToPawn_OutfitStandsPlusBase derives from
+            // CompAssignableToPawn without overriding PostExposeData, so it
+            // scribes the generic assignedPawns / uninstalledAssignedPawns
+            // keys — and so does the plain one added here. The load then logs
+            // "Tried to register the same list of load IDs twice" and this
+            // case fails its own contest assertions.
+            //
+            // That failure is a FALSE POSITIVE: the duplication is between two
+            // FOREIGN comps, neither of them ours, because the finder below
+            // excludes only our subclass and cannot tell the comp it added
+            // from one a mod supplied. It is invisible on the four-mod minimal
+            // list, which carries no foreign assignable, and so it only ever
+            // appeared on the release gate.
+            CompProperties present = standDef.comps.FirstOrDefault(
+                cp => cp != null && cp.compClass != null
+                      && typeof(CompAssignableToPawn).IsAssignableFrom(cp.compClass)
+                      && !typeof(CompAssignableToPawn_ShiftStand).IsAssignableFrom(cp.compClass));
+            CompProperties_AssignableToPawn foreignProps = null;
+            if (present == null)
+            {
+                foreignProps = new CompProperties_AssignableToPawn();
+                standDef.comps.Add(foreignProps);
+            }
             try
             {
                 DebugTools_LifecycleHarness.Fixture fix =
@@ -375,9 +412,11 @@ namespace ShiftChange
                     return false;
                 }
 
-                CompAssignableToPawn foreign = fix.Stand.AllComps
+                List<CompAssignableToPawn> foreigners = fix.Stand.AllComps
                     .OfType<CompAssignableToPawn>()
-                    .FirstOrDefault(c => !(c is CompAssignableToPawn_ShiftStand));
+                    .Where(c => !(c is CompAssignableToPawn_ShiftStand))
+                    .ToList();
+                CompAssignableToPawn foreign = foreigners.FirstOrDefault();
                 CompAssignableToPawn_ShiftStand ours =
                     fix.Stand.TryGetComp<CompAssignableToPawn_ShiftStand>();
                 if (foreign == null || ours == null)
@@ -391,9 +430,18 @@ namespace ShiftChange
                 string ownerLoadID = fix.Pawn.GetUniqueLoadID();
                 IntVec3 standCell = fix.Stand.Position;
 
+                // Loud rather than silent: the case is "ours against theirs",
+                // and a second foreign comp turns it into "theirs against
+                // theirs" while still going through the motions. Asserted so a
+                // mod list that grows another one says so, instead of quietly
+                // reshaping what is under test.
                 bool ok = DebugTools_LifecycleHarness.Expect(
-                    ours.AssignedPawnsForReading.Count == 0,
-                    "our comp starts empty — the foreign owner is not ours (control)");
+                        foreigners.Count == 1,
+                        "exactly one foreign assignable, so the contest under test "
+                        + "is ours against theirs")
+                    & DebugTools_LifecycleHarness.Expect(
+                        ours.AssignedPawnsForReading.Count == 0,
+                        "our comp starts empty — the foreign owner is not ours (control)");
 
                 if (!TrySave(ForeignSaveName, out string savePath))
                 {
@@ -422,9 +470,7 @@ namespace ShiftChange
                 Building_OutfitStand loaded = FindStand(standCell) ?? FindStandAnywhere();
                 if (loaded == null)
                 {
-                    DebugTools_LifecycleHarness.Report.AppendLine(
-                        "      no stand after the contested load — cannot assert");
-                    return false;
+                    return ok & MissingStand("no stand after the contested load");
                 }
                 CompAssignableToPawn loadedForeign = loaded.AllComps
                     .OfType<CompAssignableToPawn>()
@@ -449,10 +495,16 @@ namespace ShiftChange
             }
             finally
             {
-                // Revert the def. This case runs last and the process exits
-                // shortly after, but a def edit outliving its case would
-                // silently change what any later case tests.
-                standDef.comps.Remove(foreignProps);
+                // Revert the def, and ONLY what this case actually added.
+                // This case runs last and the process exits shortly after, but
+                // a def edit outliving its case would silently change what any
+                // later case tests — and on a list that supplied its own
+                // foreign assignable nothing was added here at all, so this
+                // must not reach for somebody else's comp.
+                if (foreignProps != null)
+                {
+                    standDef.comps.Remove(foreignProps);
+                }
             }
         }
 
@@ -593,6 +645,71 @@ namespace ShiftChange
         /// earlier leg's warning fails the later legs too. These strings appear
         /// only when a load went wrong.</para>
         /// </summary>
+        /// <summary>
+        /// The stand is gone after a load. Decide whether that is OUR failure
+        /// or the environment's, and say which.
+        ///
+        /// <para>A known gap rather than a failure when
+        /// <see cref="FinalizeAbort"/> is in the log: the load never reached
+        /// the pass that spawns things, so the case tested nothing and proved
+        /// nothing. Calling that FAIL blames our scribing for a third-party
+        /// static cache, and the tally then reads as three broken behaviours
+        /// when none of them were exercised at all.</para>
+        ///
+        /// <para>It excuses NOTHING ELSE. Every caller ands its own running
+        /// result in, so assertions that already failed earlier in the case
+        /// still fail it; and with no abort logged the stand is missing for a
+        /// reason nobody understands, which stays a failure and should.</para>
+        /// </summary>
+        internal static bool MissingStand(string where)
+        {
+            string culprit = FinalizeAbortCulprit();
+            if (culprit == null)
+            {
+                DebugTools_LifecycleHarness.Report.AppendLine(
+                    "      " + where + " — cannot assert");
+                return false;
+            }
+            return DebugTools_LifecycleHarness.ExpectKnownGap(
+                false, where,
+                "Map.FinalizeLoading aborted in " + culprit
+                + ", so the map spawned nothing. Not ours: a third-party static "
+                + "cache that is not cleared between in-process loads");
+        }
+
+        /// <summary>
+        /// The first mod frame inside the FinalizeLoading abort, or null when
+        /// no abort was logged. Named rather than merely counted so the reader
+        /// learns whose cache broke the load without opening Player.log, which
+        /// is the whole point of the probe.
+        /// </summary>
+        internal static string FinalizeAbortCulprit()
+        {
+            foreach (LogMessage message in Log.Messages)
+            {
+                if (message.text == null || !message.text.Contains(FinalizeAbort))
+                {
+                    continue;
+                }
+                foreach (string line in message.text.Split('\n'))
+                {
+                    int at = line.IndexOf("at ", StringComparison.Ordinal);
+                    // A stack frame carrying a Mods path is a mod's own code.
+                    // Engine and mscorlib frames are compiled without one, so
+                    // this skips them without needing a namespace blocklist.
+                    if (at < 0 || line.IndexOf("Mods", StringComparison.Ordinal) < 0)
+                    {
+                        continue;
+                    }
+                    string frame = line.Substring(at + 3);
+                    int cut = frame.IndexOf(" [0x", StringComparison.Ordinal);
+                    return cut > 0 ? frame.Substring(0, cut).Trim() : frame.Trim();
+                }
+                return "a frame the harness could not name";
+            }
+            return null;
+        }
+
         internal static bool Logged(string needle)
         {
             foreach (LogMessage message in Log.Messages)

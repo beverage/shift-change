@@ -9,7 +9,7 @@ namespace ShiftChange
     /// dresses for by default.
     ///
     /// A set, not a single work type, because rooms host families of work and
-    /// pretending otherwise was a design flaw (principal, 2026-08-08): a
+    /// pretending otherwise was a design flaw (decided 2026-08-08): a
     /// Workshop runs crafting, tailoring, smithing and art; a Laboratory runs
     /// research AND drug synthesis — which arrives as Crafting work
     /// (`DoBillsProduceDrugs` is `workType Crafting`, fixed to the DrugLab,
@@ -123,7 +123,7 @@ namespace ShiftChange
                     {
                         RoomRoleDef role = DefDatabase<RoomRoleDef>.GetNamedSilentFail(roleName);
                         // DISJOINTNESS IS LOAD-BEARING: automatic-mode
-                        // exclusivity (work XOR recreation, principal
+                        // exclusivity (work XOR recreation, decided
                         // 2026-08-16) holds only because no role appears in
                         // BOTH tables — the toggles enforce it for custom
                         // mode, but automatic mode answers straight from
@@ -145,6 +145,65 @@ namespace ShiftChange
         public static bool RecreationForRole(RoomRoleDef role)
         {
             return role != null && ResolvedRecreation.Contains(role);
+        }
+
+        /// <summary>
+        /// Role defNames whose rooms dress for SLEEP by default — the third
+        /// trigger's parallel of <see cref="Defaults"/> and
+        /// <see cref="RecreationRoles"/>.
+        ///
+        /// <para>Bedroom only. <c>Barracks</c> is deliberately absent: it
+        /// would make a shared pool stand the default for every colonist
+        /// sleeping in the room, and a barracks of ten cycling through one
+        /// pyjama stand at lights-out is churn rather than charm. Called out
+        /// as a deliberate design-time choice rather than an oversight: a
+        /// player who wants it ticks the row by hand, which is one click and
+        /// states the intent.</para>
+        ///
+        /// <para>Prison roles are absent for the same reason they are absent
+        /// everywhere else here — the interception's faction gate never
+        /// reaches a prisoner, so a row would be decoration.</para>
+        /// </summary>
+        internal static readonly string[] RestRoles =
+        {
+            "Bedroom",
+        };
+
+        internal static HashSet<RoomRoleDef> resolvedRest;
+
+        internal static HashSet<RoomRoleDef> ResolvedRest
+        {
+            get
+            {
+                if (resolvedRest == null)
+                {
+                    resolvedRest = new HashSet<RoomRoleDef>();
+                    foreach (string roleName in RestRoles)
+                    {
+                        RoomRoleDef role = DefDatabase<RoomRoleDef>.GetNamedSilentFail(roleName);
+                        // Same load-bearing disjointness as the recreation
+                        // table, now three-way: automatic mode answers
+                        // straight from these tables, so a role appearing in
+                        // two of them would resurrect the dual-purpose stand
+                        // the exclusivity rule exists to prevent. Work wins,
+                        // then recreation, then rest — the order matters only
+                        // because a collision must resolve the same way every
+                        // time, and today none exists.
+                        if (role != null && !Resolved.ContainsKey(role)
+                            && !ResolvedRecreation.Contains(role))
+                        {
+                            resolvedRest.Add(role);
+                        }
+                    }
+                }
+                return resolvedRest;
+            }
+        }
+
+        /// <summary>Whether a room of this role dresses for sleep by default.</summary>
+        public static bool RestForRole(RoomRoleDef role)
+        {
+            return role != null && ResolvedRest.Contains(role);
         }
     }
 }

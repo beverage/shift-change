@@ -17,7 +17,13 @@ STRIP=${2:?changing-wall strip}
 AFTER=${3:?after shot}
 
 OUT=${OUT:-cards/card-blacktie.png}
-FONT=${FONT:-$HOME/Downloads/RimWordFont.ttf}
+
+# Beside this script, not in ~/Downloads. The font used to be defaulted out of a
+# downloads folder, which is a place things get cleared out of — and it meant
+# every card tool had to be pointed back at it by hand. It is a media asset, so
+# it lives with the media. FONT still overrides.
+HERE=$(dirname "$0")
+FONT=${FONT:-$HERE/RimWordFont.ttf}
 BG="#262b30"
 
 W=${TMPDIR:-/tmp}/card-triptych

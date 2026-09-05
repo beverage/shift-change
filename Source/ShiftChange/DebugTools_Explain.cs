@@ -245,7 +245,7 @@ namespace ShiftChange
             else
             {
                 CompShiftStand stand = Patch_JobInterception.FindAvailableStand(
-                    room, pawn, null, recreation: true);
+                    room, pawn, null, Patch_JobInterception.StandTrigger.Recreation);
                 if (stand == null)
                 {
                     report.AppendLine("  stand: none in this room is free AND set to recreation.");
@@ -256,6 +256,8 @@ namespace ShiftChange
                         {
                             report.Append("    ").Append(thing.LabelShort)
                                   .Append(": recreation=").Append(any.HandlesRecreation())
+                                  .Append(", rest=").Append(any.HandlesRest())
+                                  .Append(", depositOnly=").Append(any.DepositOnly)
                                   .Append(", excluded=").Append(any.IsExcluded)
                                   .Append(", onShift=").Append(any.OnShift)
                                   .Append(", hasWearable=").AppendLine(any.HasWearable.ToString());

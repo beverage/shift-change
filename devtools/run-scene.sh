@@ -36,8 +36,10 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP="/Users/alexbeverage/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app"
-LIVE_CONFIG="/Users/alexbeverage/Library/Application Support/RimWorld/Config/ModsConfig.xml"
+# Derived from $HOME, never written out — see run-harness.sh. Override either
+# for a non-default Steam library.
+APP="${RIMWORLD_APP:-$HOME/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app}"
+LIVE_CONFIG="${RIMWORLD_CONFIG:-$HOME/Library/Application Support/RimWorld/Config/ModsConfig.xml}"
 SCENEDATA="$REPO/dist/scenedata"
 LOG="$SCENEDATA/Player.log"
 PROC="RimWorld by Ludeon Studios"
@@ -51,6 +53,7 @@ MINIMAL_MODS=(
 
 FULL=0
 ALONGSIDE=0
+BRIDGE=0
 CONFIG=Debug
 for arg in "$@"
 do
@@ -58,11 +61,24 @@ do
     --full) FULL=1 ;;
     --alongside) ALONGSIDE=1 ;;
     --media) CONFIG=Media ;;
-    *) printf 'unknown option: %s (--full | --alongside | --media)\n' "$arg" >&2; exit 2 ;;
+    --bridge) BRIDGE=1 ;;
+    *) printf 'unknown option: %s (--full | --alongside | --media | --bridge)\n' "$arg" >&2; exit 2 ;;
   esac
 done
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
+
+# --bridge appends the RimBridgeServer FORK (mrbeverage.rimbridgeserverfork),
+# which carries the input tools the released bridge lacks. It builds the scene
+# list, so it cannot ride a copied live one.
+if [ "$BRIDGE" = "1" ] && [ "$FULL" = "1" ]
+then
+  die "--bridge builds the scene list; it cannot ride the copied live list"
+fi
+if [ "$BRIDGE" = "1" ]
+then
+  MINIMAL_MODS+=(mrbeverage.rimbridgeserverfork)
+fi
 
 if pgrep -x "$PROC" >/dev/null && [ "$ALONGSIDE" = "0" ]
 then
@@ -110,14 +126,37 @@ fi
 # debug stages live behind it), keep simulating while the live game has
 # focus, and stay silent beside it. Field names are PrefsData's own
 # (PrefsData.cs:10,68,108); anything omitted takes its default.
+#
+# WINDOWED AT A FIXED SIZE, and that is a capture requirement rather than a
+# preference. screenshot_cell_rect crops to cell bounds, so a captured cell's
+# pixel size is screenHeight / (2 * rootSize) — fullscreen on whatever display
+# is attached makes every shoot's output dimensions a property of the monitor,
+# and a card re-shot on a different screen would not composite against the
+# numbers written down for the last one. Pin it and the arithmetic is stable.
+# (Windowed also sidesteps the fullscreen-transition mess that stalls a second
+# instance; see run-harness.sh.)
 {
   printf '<?xml version="1.0" encoding="utf-8"?>\n'
   printf '<PrefsData>\n'
   printf '  <devMode>True</devMode>\n'
   printf '  <runInBackground>True</runInBackground>\n'
   printf '  <volumeMaster>0</volumeMaster>\n'
+  printf '  <screenWidth>1920</screenWidth>\n'
+  printf '  <screenHeight>1080</screenHeight>\n'
+  printf '  <fullscreen>False</fullscreen>\n'
   printf '</PrefsData>\n'
 } > "$SCENEDATA/Config/Prefs.xml"
+
+# The GABS env handshake, read by Lib.GAB.GabpServerBuilder, FORCES the port
+# per instance. It has to: the bridge's standalone default is 5174 and a live
+# game carrying the bridge already owns it, and apparel-painter's scene bridge
+# took 5175 — so this one is 5176. A fixed token beats scraping the log for a
+# fresh one, and nothing here is reachable off-host.
+if [ "$BRIDGE" = "1" ]
+then
+  export GABP_SERVER_PORT=5176
+  export GABP_TOKEN=shiftchange-scene-bridge
+fi
 
 printf 'save data: %s\n' "$SCENEDATA"
 printf 'launching…\n'
@@ -137,4 +176,10 @@ fi
 
 printf 'pid: %s (leave it to the player; this script does not manage it)\n' "$GAME_PID"
 printf 'log: %s\n' "$LOG"
-printf 'in-game: enable nothing — dev mode is pre-seeded. Debug actions → Shift Change → Build pool room stage.\n'
+if [ "$BRIDGE" = "1" ]
+then
+  printf 'bridge: 127.0.0.1:%s  token %s\n' "$GABP_SERVER_PORT" "$GABP_TOKEN"
+  printf 'bridge: devtools/bridge/gabp.py %s %s   # lists the tool surface\n' \
+    "$GABP_SERVER_PORT" "$GABP_TOKEN"
+fi
+printf 'in-game: enable nothing — dev mode is pre-seeded. Debug actions → Shift Change → Dev tools…\n'

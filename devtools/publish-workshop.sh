@@ -36,7 +36,9 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST="$REPO/dist/ShiftChange"
-MODS="/Users/alexbeverage/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app/Mods"
+# Derived from $HOME, never written out — see run-harness.sh. Override
+# RIMWORLD_APP for a non-default Steam library.
+MODS="${RIMWORLD_APP:-$HOME/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app}/Mods"
 LIVE="$MODS/ShiftChange"
 
 # Exactly the set in .github/workflows/ci.yml's "Assemble mod folder" step:

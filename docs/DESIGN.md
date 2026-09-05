@@ -553,6 +553,119 @@ exemption could touch a work shift — unreachable from the UI by
 construction. A stand with neither half selected is the excluded state
 under another name, so the canonical states survive intact.
 
+## The sleep branch
+
+Work jobs name their purpose through `workGiverDef.workType` and joy jobs
+through `JobDef.joyKind`; going to bed names nothing at all. Sleep is
+need-driven — `JobGiver_GetRest` hands out a bare `JobDefOf.LayDown` straight
+from the think tree — so the third arm keys on the only two facts the job
+carries: a driver class assignable to `JobDriver_LayDown`, and a
+`Building_Bed` at targetA.
+
+The bed test is not belt-and-braces. `Wait_Asleep` — sleeping on the ground —
+runs the same driver, as do mech dormancy and Odyssey's deactivation, and
+requiring a bed excludes all three without naming classes a DLC can add to. It
+is also why this arm needs none of the late-room caution the joy classes need:
+a bed does not move, and targetA already points at it when StartJob runs, so
+the room resolver is the work arm's A-first `TargetCell`, untouched.
+
+**Medical bed rest belongs to the work arm, and the TAG is what says so.**
+Vanilla ships a `PatientBedRest` WorkTypeDef whose gerund label reads "resting
+in bed", already tickable in the stand dialog — so one `JobDefOf.LayDown` must
+reach exactly one of the two controls. The separator is
+`JobTag.RestingForMedicalReasons`: all three patient WorkGivers carry
+`tagToGive`, and `Pawn_JobTracker` passes `ThinkResult.Tag` straight into
+StartJob. It is emphatically **not** `workGiverDef`, though the first version
+of this arm claimed exactly that — those WorkGivers are `NonScanJob` overrides
+and `JobGiver_Work` stamps `workGiverDef` only on its scanner paths, so a
+medical lay-down arrives with it null. The `workGiverDef` limb survives as a
+conservative catch for a modded giver with a null workType, and is dead for
+everything vanilla ships.
+
+A third limb was tried and removed the same day.
+`HealthAIUtility.ShouldSeekMedicalRest` looked like the backstop for
+`JobInBedUtility.KeepLyingDown`, which re-queues a bare LayDown carrying
+neither marker — but that re-queue is already covered (all four registrations
+are on in-bed drivers, so the job is dequeued with the pawn still standing on
+the bed cell), and the predicate is true for any tended healing injury or
+non-immune disease. Its only unique effect was to kill ordinary bedtime for
+every wounded colonist, silently, for a whole recovery. A health predicate
+cannot tell "going to bed because hurt" from "going to bed because it is
+night".
+
+**`pawn.InBed()` is unusable in a StartJob prefix, and every guard here learned
+it the hard way.** `RestUtility.CurrentBed` bails on `CurJob == null`, and
+`Pawn_JobTracker.CleanupCurrentJob` nulls `curJob` before `TryFindAndStartJob`
+— so at an ordinary job boundary it answers FALSE for a colonist lying in
+their own bed. It answers true at exactly one moment: a job started while
+`curJob` is still live, which is `Toils_LayDown`'s `CheckForJobOverride()`
+every 211 ticks — the wake-up. Guards written to mean "they are asleep, leave
+them alone" therefore did the precise opposite: silent at three in the
+morning, loud at breakfast, suppressing the change-back at the one boundary
+where the pawn was standing beside their own stand, and sending them out to do
+the first job of the day in sleepwear before walking back to change. Position
+answers what `curJob` cannot, so the arms ask `OnABed` — is there a
+`Building_Bed` on this pawn's cell.
+
+The return trip needs the finer question, because "in bed" is not "staying in
+bed". `StaysInBed` pairs `OnABed` with
+`Job.CanBeginNow(pawn, whileLyingDown: true)`, which defers to
+`JobDriver.CanBeginNowWhileLyingDown()` — false on the base class, overridden
+by exactly seven drivers in 1.6: LayDown, Lovin, WatchBuilding, RelaxAlone,
+Reign, Breastfeed and Deathrest. Staying in bed means stay dressed; getting up
+means change back, while the pawn is still beside the stand. That list is
+incomplete, and knowingly so — `JobDriver_Meditate` is not on it and neither is
+`JobDriver_Ingest`, so vanilla's own in-bed meditation and in-bed meals read as
+"getting up" — so a job whose own target IS the bed under the pawn counts as
+staying too. A target test rather than a hardcoded driver list, because the
+next DLC invalidates a list.
+
+**Deposit only** is the sleep trigger's own mode, and the trigger is what makes
+it safe. Such a stand hands nothing out and simply takes in what its storage
+filter accepts: the pawn parks their armour and keeps the rest on. `SwapPlan`
+had called this coherent but unreachable — "not one any pawn should reach by
+deciding to go do some hauling; it would need its own trigger" — and sleep is
+that trigger, which is why `DepositOnly` gates itself on `HandlesRest()` rather
+than trusting the dialog to be its only writer.
+
+The filter is the whole control surface, deliberately: `Building_OutfitStand`
+is an `IStoreSettingsParent`, and "which garments" is a question vanilla
+already asks through a UI players know. **It is a filter to NARROW, not one to
+fill in.** `OutfitStandBase` ships `defaultStorageSettings` allowing the whole
+Apparel category minus ApparelUtility and Weapons, so a stand straight off the
+build menu already accepts nearly everything worn. Safety therefore rests
+entirely on `SwapPlan.WouldBeNude` — a transcription of
+`Pawn_ApparelTracker.PsychologicallyNude` evaluated against the apparel that
+would REMAIN. If the deposit would leave the colonist naked the stand declines
+outright for that colonist. Vanilla's own standard rather than a stricter one,
+because requiring both torso and legs covered would refuse a man in trousers
+and armour that vanilla is perfectly happy with, and a rule that blocks the
+feature's main use case is not a safety rule. This counted GARMENTS until an
+adversarial pass caught it: a shield belt is ApparelUtility, precisely what the
+default filter excludes, so it survived the deposit and licensed stripping
+everything that actually covered the pawn.
+
+A deposit-only trip issues nothing, which the ledger had to learn. `OnShift`
+was `issuedUniform.Count > 0` and now counts either half, because a stand
+holding a colonist's armour with no borrower recorded against it is armour
+nothing ever hands back. The widening is safe for every older save: the state
+it newly admits — nothing issued, something stored — could not previously be
+recorded at all, since `DoTransfer` re-dresses the pawn and returns before
+writing a ledger whenever a dress trip issues nothing.
+
+Automatic stands light up in **Bedroom** rooms. Barracks is deliberately
+absent: it would make a shared pool stand the default for everyone sleeping in
+the room, and ten pawns cycling one pyjama stand at lights-out is churn rather
+than charm — a player who wants it ticks the row. Prison roles are absent
+because the faction gate never reaches a prisoner, so a row would be
+decoration. The three role tables stay disjoint by construction, and the three
+triggers are mutually exclusive on a stand for the reason the recreation branch
+already gives. One wrinkle the third trigger forced: the work grid is hidden
+only when the player has EXPLICITLY chosen a trigger, not when the room's role
+supplied one. Hiding it on any active trigger left a bedroom stand with no
+reachable path to a work type at all — grid hidden, unticking Sleeping fell
+through to excluded, and Automatic put the room's default straight back.
+
 ## The mid-job catch-up
 
 With two workstations and two stands, a pawn can start working bare because both

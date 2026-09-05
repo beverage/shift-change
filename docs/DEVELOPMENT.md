@@ -177,10 +177,10 @@ Behaviour is verified in game, on a clean Release restart. Two tools help.
 **The demo stage** is the general fixture — a colony in one click, where a swap
 can be watched end to end.
 
-**The lifecycle harness** covers what the demo stage cannot: thirteen cases that
-drive the engine's own entry points and assert where the ledger landed. What it
-covers, what it deliberately does not, the rules it follows and the two engine
-traps it had to pay for are all in [TESTING.md](TESTING.md).
+**The lifecycle harness** covers what the demo stage cannot: twenty-nine cases
+that drive the engine's own entry points and assert where the ledger landed.
+What it covers, what it deliberately does not, the rules it follows and the two
+engine traps it had to pay for are all in [TESTING.md](TESTING.md).
 
 ```bash
 devtools/run-harness.sh              # a four-mod list — the iteration loop
@@ -201,13 +201,34 @@ failure. Measured 2026-08-14, launch to process exit:
 Those are one machine's numbers; `--full` scales with whatever list is active,
 since almost all of it is RimWorld's own load time.
 
-**A run that takes many minutes is almost certainly suspended, not slow.**
-RimWorld's loading screen stops making progress when its window is swiped away
-or otherwise backgrounded, and the run resumes when it comes forward again —
-which is why the timeout below is generous and why a four-mod run has been
-observed at 715 s. Before investigating a "performance regression", check
-whether the window was in front for the whole run. The harness itself executes
-in a single frame and cannot account for minutes.
+**The window has to be in front, and this is the script's main operational
+hazard.** RimWorld's loading screen advances off the main-thread update, so an
+instance whose window never composites never progresses: the log stops around
+line 49, in Unity's preamble, before a single mod or def loads, and the process
+sits near 0% CPU forever. It does not recover on its own. Bring the new window
+to the front as it appears and the run proceeds normally.
+
+A stall is no longer a long wait. `STARTUP_GRACE` (120 s) kills a run that has
+not reached RimWorld's own startup and says so in those words, instead of the
+old behaviour — twenty minutes, then a message blaming `-shiftchange-harness`
+for something that happens before any mod is loaded. The startup probe greps for
+`with mods:`, which is Verse's own output from both "Initializing new game with
+mods:" and "Loading game from file … with mods:". **Do not "improve" that to
+something that looks more precise.** The version banner is printed *before* the
+stall, so it matches a hung run; and `Loaded assemblies` — which looks perfect
+in a heavily modded Player.log — is printed by a mod, is absent on the four-mod
+list, and reported a passing run as a stall the first time it was tried.
+
+`--alongside` cannot help here: the instance already running owns the
+foreground, and three consecutive attempts stalled. Two things were tried and
+are not the cause — a second instance existing (a clean run with nothing else
+open stalls identically) and the test instance defaulting to fullscreen (seeding
+windowed prefs did not fix it, though the script now seeds them anyway, since
+windowed and muted is right for a throwaway instance regardless).
+
+Before investigating a "performance regression", check whether the window was in
+front. The harness itself executes in a single frame and cannot account for
+minutes.
 
 **The four-mod list is for iterating; `--full` is what a release is signed off
 on.** This mod patches a vanilla building other mods also touch, so the small
