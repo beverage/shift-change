@@ -183,7 +183,7 @@ gif; this cut favours the bookends instead.
 
 Workshop gallery images. `card-chef`, `card-doc`, `card-lab`, `card-recreation`
 and `card-sleep` are 640×360 scene shots; `card-blacktie` is a 1482×587
-three-panel sequence; `card-controls` (2000×900) and `card-tooltip` (1536×864)
+three-panel sequence; `card-controls` (1700×800) and `card-tooltip` (1536×864)
 show UI instead.
 
 `card-controls` is 1700×800 and carries three panels: the SAME work-types

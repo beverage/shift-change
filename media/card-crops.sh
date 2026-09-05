@@ -3,9 +3,9 @@
 # Cuts the raw game captures in media/cards/ into the pieces the description
 # cards use. Run from media/, or set SRC/TIP/OUT to absolute paths.
 #
-# WHY THIS EXISTS: card-controls.png is a 2000x900 contact sheet of three
+# WHY THIS EXISTS: card-controls.png is a 1700x800 contact sheet of three
 # dialogs. Steam renders a description image at 640, so the sheet arrives on the
-# page at 32% and every label in it is unreadable. Each dialog is only ~520 px
+# page at 38% and every label in it is unreadable. Each dialog is only ~418 px
 # wide on its own, which a 640 card shows at essentially 1:1 — so the fix is not
 # a bigger capture, it is one dialog per image.
 #
@@ -19,7 +19,7 @@
 # A crop is either a SLICE OF A PANEL or a WHOLE WIDGET, and they are bordered
 # differently:
 #
-#   Panel slice  -> crop strictly INSIDE the game's 2 px frame, carrying no
+#   Panel slice  -> crop strictly INSIDE the game's own frame, carrying no
 #                   game chrome at all. The card's CSS draws the only border.
 #   Whole widget -> keep the game frame, because on a gizmo or a tooltip the
 #                   frame IS the widget and cutting it makes a button stop
@@ -34,20 +34,29 @@
 # in exact alignment on the card instead of stepping in and out by a few pixels.
 #
 # ---------------------------------------------------------------------------
-# MEASURED GEOMETRY — card-controls.png, 2000x900
+# MEASURED GEOMETRY — card-controls.png, 1700x800
 # ---------------------------------------------------------------------------
 # Measured, not eyeballed: `magick SRC -crop 36x1+44+400 +repage txt:-` and
 # friends, reading the runs off the pixel dump. Re-measure if it is re-shot.
 #
-#   backdrop  #262B30      frame  #57616E (exactly 2 px)    interior  #15181B
+# RE-MEASURED 2026-09-05, and every number below moved. shoot-controls-card.py
+# derives the canvas from the panels and shoots at 1.0x UI scale, where the
+# hand-assembled sheet was 1.25x on a fixed 2000x900 canvas. Panels are 0.8x
+# their old size, the game frame is 1 px rather than 2, and the interior reads
+# #15191D rather than #15181B. Nothing carried over; do not part-patch these
+# against a sheet shot the other way.
 #
-#   panel            frame x        frame y        INTERIOR
-#   1 work types     50,573         43,854         x 52 w 521   y 45 h 809
-#   2 recreation     650,1173       43,854         x 652 w 521  y 45 h 809
-#   3 owners         1250,1948      100,797        x 1252 w 696 y 102 h 695
+#   backdrop  #262B30      frame  1 px      interior  #15191D
+#
+#   panel            frame x      frame y      INTERIOR
+#   1 work types     75,494       60,739       x 76 w 418    y 61 h 678
+#   2 recreation     570,989      60,739       x 571 w 418   y 61 h 678
+#   3 owners         1065,1624    120,679      x 1066 w 558  y 121 h 558
 #
 # The two Work types panels are the same window captured twice, hence the
 # identical y and width; only x differs.
+#
+# The work-types panel's two section rules land at y 171 and y 235.
 set -eu
 
 SRC=${SRC:-cards/card-controls.png}
@@ -56,8 +65,8 @@ SRCD=${SRCD:-cards/src}
 OUT=${OUT:-cards/parts}
 mkdir -p "$OUT"
 
-P1_X=52 ; P2_X=652 ; P3_X=1252
-PW=521  ; P3_W=696
+P1_X=76 ; P2_X=571 ; P3_X=1066
+PW=418  ; P3_W=558
 
 # Generated directory: wipe it, so a renamed or retired part cannot linger and
 # go on being referenced by a card that should have stopped using it.
@@ -70,27 +79,32 @@ rm -f "$OUT"/*.png
 # which was already on the card as its own strip — 725 px of card spent saying
 # a thing twice. Cut at the rules instead and the same content costs 632.
 #
-#   y 100  type        Automatic (from the room) / Not used for shift changes
-#   y 192  flags       Change the whole outfit / Keep contents out of trade
-#   y 266  activities  the ticked-activities blurb, Recreation, the work list
+#   y 105  type        Automatic (from the room) / Not used for shift changes
+#   y 178  flags       Change the whole outfit / Keep contents out of trade
+#   y 237  activities  the ticked-activities blurb, Recreation, Sleeping, and
+#                      the work list
 #
 # Full interior width on all three, so they stack in exact alignment.
-magick "$SRC" -crop ${PW}x74+${P1_X}+100  +repage "$OUT/sec-type.png"
-magick "$SRC" -crop ${PW}x64+${P1_X}+192  +repage "$OUT/sec-flags.png"
-magick "$SRC" -crop ${PW}x494+${P1_X}+266 +repage "$OUT/sec-activities.png"
+magick "$SRC" -crop ${PW}x59+${P1_X}+105  +repage "$OUT/sec-type.png"
+magick "$SRC" -crop ${PW}x52+${P1_X}+178  +repage "$OUT/sec-flags.png"
+magick "$SRC" -crop ${PW}x423+${P1_X}+237 +repage "$OUT/sec-activities.png"
 
 # ---- whole dialogs ------------------------------------------------------
 # Each stops below its last meaningful row rather than at the panel's bottom
 # frame: both carry 400+ px of empty panel below their content, and on a 640
 # card every wasted pixel is spent shrinking the text. The Close button carries
 # no information either.
-magick "$SRC" -crop ${PW}x360+${P2_X}+45   +repage "$OUT/dlg-recreation.png"
-magick "$SRC" -crop ${P3_W}x268+${P3_X}+102 +repage "$OUT/dlg-owners.png"
+magick "$SRC" -crop ${PW}x322+${P2_X}+61   +repage "$OUT/dlg-recreation.png"
+magick "$SRC" -crop ${P3_W}x277+${P3_X}+121 +repage "$OUT/dlg-owners.png"
 
 # The recreation row carries its greyed note, which is the informative half —
 # it is the game saying work types no longer apply. Both note lines or neither;
 # a strip that clips the second one mid-sentence reads as a mistake.
-magick "$SRC" -crop ${PW}x104+${P2_X}+320 +repage "$OUT/row-recreation.png"
+#
+# The Sleeping row now sits BETWEEN the two and is inside the strip whether it
+# is wanted or not: rows and note are one block in the dialog, and cutting the
+# middle out would be a doctored screenshot. The strip covers all three.
+magick "$SRC" -crop ${PW}x103+${P2_X}+280 +repage "$OUT/row-recreation.png"
 
 # ---- the Allow removing items tooltip -----------------------------------
 # Text only, and only the first half of it. The tooltip runs on for two more

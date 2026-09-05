@@ -232,12 +232,13 @@ CARDS = [
             {
                 "shot": "cards/parts/sec-activities.png",
                 "lead": "What sets it off",
-                "body": "every work type in your game, plus recreation. Left on "
-                        "**Automatic** the stand follows the room and this list only "
-                        "reports what that resolved to. Tick them yourself for rooms that "
-                        "don't fit what the game thinks they are, like multi-purpose rooms.  " 
-                        "Recreation, and work types are **mutually exclusive**,  with one "
-                        "outfit serving one purpose.",
+                "body": "every work type in your game, plus recreation and sleeping. "
+                        "Left on **Automatic** the stand follows the room and this list "
+                        "only reports what that resolved to. Tick them yourself for rooms "
+                        "that don't fit what the game thinks they are, like multi-purpose "
+                        "rooms. Work types, recreation and sleeping are **mutually "
+                        "exclusive**, so ticking one clears the others: one outfit serves "
+                        "one purpose.",
             },
             {
                 "shot": "cards/parts/dlg-owners.png",
