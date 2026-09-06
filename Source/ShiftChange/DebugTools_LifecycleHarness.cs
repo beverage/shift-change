@@ -195,6 +195,15 @@ namespace ShiftChange
                  DepositOnlyParksAndReturns);
             Case(map, pad, "full change swaps the whole outfit and gives it all back",
                  (m, p) => Stage(m, p, StageKit.Displacing), FullChangeSwapsEverything);
+            Case(map, pad, "full change refuses to strip a colonist bare",
+                 (m, p) => Stage(m, p, StageKit.Displacing),
+                 FullChangeRefusesToStripThemBare);
+            Case(map, pad, "a legs-only stand leaves a man decent (control for the pair)",
+                 (m, p) => Stage(m, p, StageKit.Displacing, gender: Gender.Male),
+                 LegsOnlyStandLeavesAManDecent);
+            Case(map, pad, "and the same stand strips a woman, with nothing said",
+                 (m, p) => Stage(m, p, StageKit.Displacing, gender: Gender.Female),
+                 LegsOnlyStandStripsAWoman);
             Case(map, pad, "the rules the description promises hold",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
@@ -734,6 +743,202 @@ namespace ShiftChange
             return ok
                 & Expect(!SwapPlan.WouldDress(fix.Pawn, fix.Stand),
                          "an empty stand still refuses, full change or not");
+        }
+
+        /// <summary>
+        /// Full change must not strip a colonist bare. Today it does.
+        ///
+        /// <para>The deposit path refuses a plan that would leave the pawn
+        /// psychologically nude (<see cref="SwapPlan.WouldBeNude"/>,
+        /// <c>SwapPlan.cs:278</c>). The DRESS path never asks: the driver
+        /// consults a decency predicate only inside
+        /// <c>if (toWear.Count == 0 ...)</c>
+        /// (<c>JobDriver_SwapAtStand.cs:233</c>), so the moment a stand issues
+        /// anything at all the question stops being asked — and full change is
+        /// precisely the flag that then takes everything else off.</para>
+        ///
+        /// <para><b>The garment is deliberately the one the deposit-only case
+        /// already uses for its utility-layer trap.</b> A shield belt covers
+        /// <c>Waist</c>, and neither <c>Torso</c> nor <c>Legs</c>, so it cannot
+        /// dress anybody. <see cref="DepositOnlyParksAndReturns"/> asserts that
+        /// a stand must REFUSE to leave a colonist in it. This case asserts
+        /// what happens when the same colonist is walked across the room and
+        /// put into it on purpose. Same mod, same garment, opposite answers —
+        /// which is what makes this a bug rather than a preference.</para>
+        ///
+        /// <para>The verdict comes from vanilla's own
+        /// <c>Pawn_ApparelTracker.PsychologicallyNude</c>, read off a real
+        /// spawned pawn, rather than from our transcription of it. The
+        /// transcription is asserted separately as a control; if the two ever
+        /// disagree it is ours that is wrong, and this case says so first.</para>
+        ///
+        /// <para><b>Scored as a KNOWN GAP, not as a failure, while this is
+        /// unfixed.</b> The two defect assertions are written the way they
+        /// should read once the fix lands, so the harness announces itself the
+        /// day it starts passing instead of staying quiet. Everything else here
+        /// is an ordinary Expect and passes today — including the tail, which
+        /// exists to bound the blast radius: this costs a mood debuff, not
+        /// anybody's gear.</para>
+        /// </summary>
+        internal static bool FullChangeRefusesToStripThemBare(Fixture fix)
+        {
+            List<Apparel> before = new List<Apparel>(fix.Pawn.apparel.WornApparel);
+            if (before.Count < 3)
+            {
+                return Expect(false, "fixture is wearing shirt, trousers and a parka");
+            }
+
+            // Clear the duster the fixture stocks and leave exactly one garment
+            // on the stand — one covering no group the decency test counts. It
+            // covers Waist; "covers nothing" is the loose phrasing that put the
+            // wrong premise into SwapPlan.cs:266-270 in the first place.
+            ClearStand(fix.Stand);
+            if (!StockOne(fix.Stand, "Apparel_ShieldBelt"))
+            {
+                return Expect(false, "a shield belt can be stocked for this case");
+            }
+
+            bool ok = Expect(fix.Stand.HeldItems.Count == 1,
+                             "the stand holds one garment, covering neither torso nor legs (control)")
+                & Expect(!fix.Pawn.apparel.PsychologicallyNude,
+                         "the colonist starts out dressed, by vanilla's reckoning (control)")
+                & Expect(SwapPlan.WouldBeNude(fix.Pawn, before),
+                         "and losing all three would read as nude to us too (control)");
+
+            fix.Comp.SetFullChange(true);
+
+            List<Apparel> wear = new List<Apparel>();
+            List<Apparel> store = new List<Apparel>();
+            bool planned = SwapPlan.BuildDress(fix.Pawn, fix.Stand, wear, store);
+            ok &= Expect(planned && wear.Count == 1,
+                         "the stand issues the belt, so toWear is non-empty — which is the "
+                         + "condition that switches the decency question off");
+
+            // THE DEFECT, stated as it should read after the fix.
+            ok &= ExpectKnownGap(!SwapPlan.WouldBeNude(fix.Pawn, store),
+                                 "the plan it builds leaves them dressed",
+                                 "the dress path runs no decency check once toWear is "
+                                 + "non-empty, so full change plans to take everything");
+
+            ok &= Expect(RunSwap(fix), "dress leg ran to completion");
+            ok &= ExpectKnownGap(!fix.Pawn.apparel.PsychologicallyNude,
+                                 "and the colonist is still dressed afterwards",
+                                 "vanilla's own PsychologicallyNude disagrees");
+
+            // Blast radius. These pass today and are the reason this is a mood
+            // bug rather than a destructive one: the ledger has everything and
+            // the return trip is unaffected.
+            ok &= Expect(fix.Comp.StoredOwnerApparelForReading.Count == before.Count,
+                         "all " + before.Count + " of their own garments are in the ledger, "
+                         + "so the cost is the Naked thought and not the gear");
+
+            fix.Comp.SetFullChange(false);
+            ok &= Expect(RunSwap(fix), "return leg ran to completion");
+
+            int returned = 0;
+            for (int i = 0; i < before.Count; i++)
+            {
+                if (fix.Pawn.apparel.WornApparel.Contains(before[i]))
+                {
+                    returned++;
+                }
+            }
+            return ok
+                & Expect(returned == before.Count, "and every garment came back on")
+                & Expect(!fix.Pawn.apparel.PsychologicallyNude,
+                         "leaving them dressed again");
+        }
+
+        /// <summary>
+        /// A stand holding trousers and nothing else, worn by a man. He ends up
+        /// in trousers, which vanilla is perfectly happy with — so the swap is
+        /// legitimate and this case PASSES.
+        ///
+        /// <para><b>Its whole job is to be the control for
+        /// <see cref="LegsOnlyStandStripsAWoman"/>.</b> Identical stand,
+        /// identical flag, identical plan; only the colonist differs. Without
+        /// this half the pair proves nothing — a case that goes red for
+        /// everybody says the feature is broken, not that the rule is
+        /// asymmetric.</para>
+        ///
+        /// <para>It also guards the thing most likely to rot: if the gender
+        /// parameter on <see cref="Stage"/> ever stops taking effect, both
+        /// halves quietly become the same test and the pair keeps passing while
+        /// asserting half of what it claims. Hence the explicit gender
+        /// assertion.</para>
+        /// </summary>
+        internal static bool LegsOnlyStandLeavesAManDecent(Fixture fix)
+        {
+            ClearStand(fix.Stand);
+            if (!StockOne(fix.Stand, "Apparel_Pants"))
+            {
+                return Expect(false, "trousers can be stocked");
+            }
+
+            bool ok = Expect(fix.Pawn.gender == Gender.Male,
+                             "the fixture colonist is a man (control — the pair turns on this)")
+                & Expect(!fix.Pawn.apparel.PsychologicallyNude,
+                         "who starts out dressed (control)");
+
+            fix.Comp.SetFullChange(true);
+            ok &= Expect(RunSwap(fix), "dress leg ran to completion");
+
+            return ok
+                & Expect(fix.Pawn.apparel.WornApparel.Count == 1,
+                         "he is wearing the stand's trousers and nothing else")
+                & Expect(!fix.Pawn.apparel.PsychologicallyNude,
+                         "and vanilla calls that dressed, so the swap was legitimate");
+        }
+
+        /// <summary>
+        /// The same stand, the same trousers, the same flag — a woman. Vanilla
+        /// calls her nude, because her rule wants a covered torso as well
+        /// (<c>Pawn_ApparelTracker.PsychologicallyNude:218-222</c>: a man
+        /// returns <c>!hasPants</c>, a woman with trousers on returns
+        /// <c>!hasShirt</c>).
+        ///
+        /// <para><b>This is the configuration a male-only fixture certifies as
+        /// safe.</b> The shield-belt case in
+        /// <see cref="FullChangeRefusesToStripThemBare"/> strips everybody, so
+        /// it would have been found eventually. This one strips half the
+        /// colony and passes every test written against the other half, which
+        /// is exactly the shape that reaches players — and it is a plain
+        /// stand configuration, not a contrived one: trousers on a work stand,
+        /// full change on, no top stocked.</para>
+        ///
+        /// <para>Scored as a known gap alongside the shield-belt case, and
+        /// phrased for the day the fix lands.</para>
+        /// </summary>
+        internal static bool LegsOnlyStandStripsAWoman(Fixture fix)
+        {
+            ClearStand(fix.Stand);
+            if (!StockOne(fix.Stand, "Apparel_Pants"))
+            {
+                return Expect(false, "trousers can be stocked");
+            }
+
+            bool ok = Expect(fix.Pawn.gender == Gender.Female,
+                             "the fixture colonist is a woman (control — the pair turns on this)")
+                & Expect(!fix.Pawn.apparel.PsychologicallyNude,
+                         "who starts out dressed (control)");
+
+            fix.Comp.SetFullChange(true);
+            ok &= Expect(RunSwap(fix), "dress leg ran to completion");
+            ok &= Expect(fix.Pawn.apparel.WornApparel.Count == 1,
+                         "she is wearing the stand's trousers and nothing else — the same "
+                         + "outcome the man got");
+
+            ok &= ExpectKnownGap(!fix.Pawn.apparel.PsychologicallyNude,
+                                 "and is left decent, as he was",
+                                 "vanilla wants a covered torso for her, so the identical "
+                                 + "stand strips her and says nothing");
+
+            // Same tail as the shield-belt case: recoverable, not destructive.
+            fix.Comp.SetFullChange(false);
+            ok &= Expect(RunSwap(fix), "return leg ran to completion");
+            return ok
+                & Expect(!fix.Pawn.apparel.PsychologicallyNude,
+                         "and the return trip puts her back in her own clothes");
         }
 
         /// <summary>
@@ -2176,7 +2381,8 @@ namespace ShiftChange
         }
 
         internal static Fixture Stage(Map map, CellRect pad, StageKit kit,
-                                      bool enclose = false, WorkTypeDef capableOf = null)
+                                      bool enclose = false, WorkTypeDef capableOf = null,
+                                      Gender gender = Gender.Male)
         {
             GenDebug.ClearArea(pad, map);
             ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
@@ -2197,7 +2403,13 @@ namespace ShiftChange
                 return null;
             }
 
-            Pawn pawn = DebugTools_Fixtures.AveragePawn(Gender.Male, "Test", capableOf);
+            // Gender is a parameter because vanilla's decency rule is ASYMMETRIC
+            // (Pawn_ApparelTracker.PsychologicallyNude:214-222): a man is nude on
+            // missing trousers alone, a woman on missing trousers OR a bare torso.
+            // A male-only fixture therefore certifies as safe a whole class of
+            // stand configurations that strip a woman. Default stays Male so every
+            // case written before 2026-09-06 is untouched.
+            Pawn pawn = DebugTools_Fixtures.AveragePawn(gender, "Test", capableOf);
             pawn.apparel?.DestroyAll();
             if (capableOf != null)
             {
@@ -2231,6 +2443,24 @@ namespace ShiftChange
                 return null;
             }
             return new Fixture { Map = map, Stand = stand, Pawn = pawn, Comp = comp, StoredCount = 0 };
+        }
+
+        /// <summary>
+        /// Strip a fixture stand back to empty, so a case can state exactly what
+        /// it holds instead of working around the duster <see cref="Stage"/>
+        /// stocks.
+        /// </summary>
+        internal static void ClearStand(Building_OutfitStand stand)
+        {
+            while (stand.HeldItems.Count > 0)
+            {
+                Thing held = stand.HeldItems[0];
+                if (!stand.RemoveApparel(held as Apparel))
+                {
+                    break;
+                }
+                held.Destroy();
+            }
         }
 
         internal static bool StockOne(Building_OutfitStand stand, string defName)
