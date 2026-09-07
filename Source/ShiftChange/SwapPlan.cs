@@ -450,6 +450,20 @@ namespace ShiftChange
             {
                 return true;
             }
+            // The global override. This guard can contradict a deliberate
+            // configuration, and for a colony built around nudity it would do
+            // so constantly, so it is defeatable outright.
+            if (!ShiftChangeMod.DecencyEnabled)
+            {
+                return true;
+            }
+            // And the per-pawn exemption, which is the common case: one nudist
+            // in an otherwise ordinary colony should not cost the whole
+            // setting.
+            if (PrefersNudity(pawn))
+            {
+                return true;
+            }
             if (!WouldBeNude(pawn, toStore, toWear))
             {
                 return true;
@@ -495,6 +509,48 @@ namespace ShiftChange
             }
 
             return !WouldBeNude(pawn, toStore, toWear);
+        }
+
+        /// <summary>
+        /// Is being undressed what this colonist actually wants?
+        ///
+        /// <para><b>Vanilla asks this in exactly one place and we copy it.</b>
+        /// <c>JobGiver_PrisonerGetDressed:15</c> declines to clothe a prisoner
+        /// when <c>CanGetThought(pawn, ClothedNudist, checkIfNullified: true)</c>
+        /// holds — the trait test plus nullification, in one call. That is the
+        /// engine's own answer to "should I put clothes on this pawn", so it is
+        /// the answer used here rather than a hand-rolled trait check.</para>
+        ///
+        /// <para><b>The Ideology half is separate, because the trait test does
+        /// not reach it.</b> A pawn with no Nudist trait in a nudism ideoligion
+        /// gets no <c>ClothedNudist</c> thought; the precepts carry it instead.
+        /// <c>IdeoPrefersNudityForGender</c> is gender-aware, and so is the
+        /// rule it exempts them from — a moral code where the men go bare and
+        /// the women do not is expressible in vanilla, and this reads it per
+        /// pawn rather than per colony.</para>
+        ///
+        /// <para>Vanilla's prisoner check also requires the pawn be warm enough.
+        /// That clause is deliberately NOT copied: it exists because the colony
+        /// is responsible for a prisoner who cannot dress themselves, whereas
+        /// this path is a player who configured a stand on purpose. Holding a
+        /// coat back on a mandatory-nudity colonist to keep them warm would
+        /// trade a temperature problem for a mood one they cannot escape.</para>
+        /// </summary>
+        internal static bool PrefersNudity(Pawn pawn)
+        {
+            if (pawn == null)
+            {
+                return false;
+            }
+            if (pawn.story?.traits != null
+                && ThoughtUtility.CanGetThought(pawn, ThoughtDefOf.ClothedNudist,
+                                                checkIfNullified: true))
+            {
+                return true;
+            }
+            return ModsConfig.IdeologyActive
+                   && pawn.Ideo != null
+                   && pawn.Ideo.IdeoPrefersNudityForGender(pawn.gender);
         }
 
         /// <summary>

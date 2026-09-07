@@ -74,6 +74,12 @@ can hold a shirt back for one colonist and not for another. A stand holding
 nothing they can wear still won't undress them; there is no configuration in
 which a colonist strips for a shift and gets nothing back.
 
+**Nudists are exempt, and so are nudist ideoligions.** For them being dressed
+is the penalty, so nothing is held back and the stand does what it was set to
+do. If you want that for the whole colony rather than for the colonists the
+game already marks, **Keep colonists decent** in the mod settings turns the
+whole thing off.
+
 **"Allow removing items" is held off while a stand is in service.**
 Shift changes never need it, and turning it on hands the stand's contents to
 every colonist's outfit optimizer, which may take the uniform and wear it as

@@ -676,6 +676,30 @@ candidate can be kept.
 psychologically nude is left alone: the swap is not the cause, and refusing
 there would stop a stand dressing the pawn who most needs it.
 
+**Nudity is sometimes the intent, and the guard has to know that.** For a
+Nudist, `ClothedNudist` is a mood PENALTY: holding garments back would fight
+them every shift with no escape short of unbuilding the stand. The test is
+vanilla's own — `ThoughtUtility.CanGetThought(pawn, ClothedNudist,
+checkIfNullified: true)`, lifted from `JobGiver_PrisonerGetDressed:15`, the one
+place the engine itself asks whether to put clothes on someone. Ideology needs
+a second test because the first cannot see it: a pawn with no Nudist trait in a
+nudism ideoligion gets no such thought, the precepts carry it instead, so
+`IdeoPrefersNudityForGender(pawn.gender)` answers that half. Gender-aware, like
+the rule it exempts them from.
+
+Vanilla's prisoner check also demands the pawn be warm enough. That clause is
+deliberately not copied: it is there because the colony is responsible for
+someone who cannot dress themselves, where this path is a player configuring a
+stand on purpose. Holding a coat back on a mandatory-nudity colonist trades a
+temperature problem for a mood one they cannot escape.
+
+Detection cannot see every such colony, so the guard is also defeatable
+outright: `keepColonistsDecent`, on by default, read through
+`ShiftChangeMod.DecencyEnabled`. It is a MOD setting rather than a stand
+setting on purpose — the case is rare, it is a property of the colony rather
+than of one rack, and a per-stand checkbox would cost every player UI to serve
+very few.
+
 `WouldBeNude` needed an `arriving` overload for any of this. Asking the deposit
 question of a dress plan reports every ordinary uniform swap as nudity, because
 the uniform is not on the pawn yet; the set to judge is

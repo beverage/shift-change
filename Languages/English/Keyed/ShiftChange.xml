@@ -69,6 +69,8 @@
 
   <ShiftChange.SettingPoolUnassigned>Unassigned stands are shared</ShiftChange.SettingPoolUnassigned>
   <ShiftChange.SettingPoolUnassignedDesc>When on, an outfit stand with no assigned owner, standing in a work room, may be used by any colonist capable of that room's work.\n\nWhen off, only stands with an explicit owner list ever dress anyone, and every unassigned stand behaves exactly like vanilla furniture.</ShiftChange.SettingPoolUnassignedDesc>
+  <ShiftChange.SettingKeepDecent>Keep colonists decent</ShiftChange.SettingKeepDecent>
+  <ShiftChange.SettingKeepDecentDesc>On by default. A stand will not leave a colonist without basic clothing: if what it hands out does not cover them, their innermost garments stay on and the rest of the swap happens as normal.\n\nTurn this off for a colony where that is not wanted, and a stand will do exactly what its settings say. Individual nudists and nudism ideoligions are already exempt whether this is on or off.</ShiftChange.SettingKeepDecentDesc>
 
   <!-- Rich text: Unity IMGUI supports &lt;b&gt;, &lt;i&gt;, &lt;size&gt; and
        &lt;color&gt; — but NOT &lt;u&gt;, which is TextMeshPro only and would
