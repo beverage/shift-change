@@ -201,7 +201,7 @@ namespace ShiftChange
             Case(map, pad, "a legs-only stand leaves a man decent (control for the pair)",
                  (m, p) => Stage(m, p, StageKit.Displacing, gender: Gender.Male),
                  LegsOnlyStandLeavesAManDecent);
-            Case(map, pad, "and the same stand strips a woman, with nothing said",
+            Case(map, pad, "and the same stand keeps a woman's shirt on, because her rule wants it",
                  (m, p) => Stage(m, p, StageKit.Displacing, gender: Gender.Female),
                  LegsOnlyStandStripsAWoman);
             Case(map, pad, "the rules the description promises hold",
@@ -772,13 +772,12 @@ namespace ShiftChange
         /// transcription is asserted separately as a control; if the two ever
         /// disagree it is ours that is wrong, and this case says so first.</para>
         ///
-        /// <para><b>Scored as a KNOWN GAP, not as a failure, while this is
-        /// unfixed.</b> The two defect assertions are written the way they
-        /// should read once the fix lands, so the harness announces itself the
-        /// day it starts passing instead of staying quiet. Everything else here
-        /// is an ordinary Expect and passes today — including the tail, which
-        /// exists to bound the blast radius: this costs a mood debuff, not
-        /// anybody's gear.</para>
+        /// <para><b>These assertions were known gaps until the retention pass
+        /// landed</b> — the case was written first, confirmed the defect, and
+        /// then became its regression test unchanged in shape. What it asserts
+        /// now is the fix's actual contract: hold back the innermost garments
+        /// decency needs, deposit the rest, and never decline the swap when
+        /// holding back would do.</para>
         /// </summary>
         internal static bool FullChangeRefusesToStripThemBare(Fixture fix)
         {
@@ -786,6 +785,13 @@ namespace ShiftChange
             if (before.Count < 3)
             {
                 return Expect(false, "fixture is wearing shirt, trousers and a parka");
+            }
+            ThingDef parkaDef = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_Parka");
+            Apparel parka = before.Find(a => a.def == parkaDef);
+            if (parka == null)
+            {
+                return Expect(false, "the fixture's parka resolves — it is the garment the "
+                                     + "retention pass must choose to give up");
             }
 
             // Clear the duster the fixture stocks and leave exactly one garment
@@ -814,23 +820,35 @@ namespace ShiftChange
                          "the stand issues the belt, so toWear is non-empty — which is the "
                          + "condition that switches the decency question off");
 
-            // THE DEFECT, stated as it should read after the fix.
-            ok &= ExpectKnownGap(!SwapPlan.WouldBeNude(fix.Pawn, store),
-                                 "the plan it builds leaves them dressed",
-                                 "the dress path runs no decency check once toWear is "
-                                 + "non-empty, so full change plans to take everything");
+            ok &= Expect(!SwapPlan.WouldBeNude(fix.Pawn, store, wear),
+                         "and the plan it builds still leaves them dressed");
+
+            // WHICH garments were held back is the design, not an accident.
+            // The retention pass ranks candidates by innermost layer, so the
+            // two OnSkin garments stay on and the Shell parka is what goes to
+            // the stand. Asserting the parka by name is what stops a future
+            // "keep the first one that works" from passing this case.
+            int heldBack = 0;
+            for (int i = 0; i < before.Count; i++)
+            {
+                if (before[i] != parka && !store.Contains(before[i]))
+                {
+                    heldBack++;
+                }
+            }
+            ok &= Expect(heldBack == 2,
+                         "both OnSkin garments — the shirt and the trousers — were held back")
+                & Expect(store.Count == 1 && store[0].def == parkaDef,
+                         "and the outermost garment, the parka, is the one that goes");
 
             ok &= Expect(RunSwap(fix), "dress leg ran to completion");
-            ok &= ExpectKnownGap(!fix.Pawn.apparel.PsychologicallyNude,
-                                 "and the colonist is still dressed afterwards",
-                                 "vanilla's own PsychologicallyNude disagrees");
+            ok &= Expect(!fix.Pawn.apparel.PsychologicallyNude,
+                         "and the colonist is still dressed afterwards, by vanilla's reckoning");
 
-            // Blast radius. These pass today and are the reason this is a mood
-            // bug rather than a destructive one: the ledger has everything and
-            // the return trip is unaffected.
-            ok &= Expect(fix.Comp.StoredOwnerApparelForReading.Count == before.Count,
-                         "all " + before.Count + " of their own garments are in the ledger, "
-                         + "so the cost is the Naked thought and not the gear");
+            ok &= Expect(fix.Comp.StoredOwnerApparelForReading.Count == 1,
+                         "the ledger holds only what actually came off")
+                & Expect(fix.Pawn.apparel.WornApparel.Count == 3,
+                         "and they are wearing the belt over their own shirt and trousers");
 
             fix.Comp.SetFullChange(false);
             ok &= Expect(RunSwap(fix), "return leg ran to completion");
@@ -906,8 +924,9 @@ namespace ShiftChange
         /// stand configuration, not a contrived one: trousers on a work stand,
         /// full change on, no top stocked.</para>
         ///
-        /// <para>Scored as a known gap alongside the shield-belt case, and
-        /// phrased for the day the fix lands.</para>
+        /// <para>Was a known gap alongside the shield-belt case until the
+        /// retention pass landed. It is now the regression test for the half of
+        /// the rule a male-only fixture cannot see.</para>
         /// </summary>
         internal static bool LegsOnlyStandStripsAWoman(Fixture fix)
         {
@@ -924,14 +943,17 @@ namespace ShiftChange
 
             fix.Comp.SetFullChange(true);
             ok &= Expect(RunSwap(fix), "dress leg ran to completion");
-            ok &= Expect(fix.Pawn.apparel.WornApparel.Count == 1,
-                         "she is wearing the stand's trousers and nothing else — the same "
-                         + "outcome the man got");
 
-            ok &= ExpectKnownGap(!fix.Pawn.apparel.PsychologicallyNude,
-                                 "and is left decent, as he was",
-                                 "vanilla wants a covered torso for her, so the identical "
-                                 + "stand strips her and says nothing");
+            // THE PAIR, POST-FIX. The man walked away in the stand's trousers
+            // and nothing else, and that was correct for him. She keeps her
+            // shirt as well — the SAME stand, the same flag, a different plan,
+            // because the plan now asks a question whose answer depends on who
+            // is standing there.
+            ok &= Expect(fix.Pawn.apparel.WornApparel.Count == 2,
+                         "she is wearing the stand's trousers AND her own shirt, where the "
+                         + "man needed only the trousers")
+                & Expect(!fix.Pawn.apparel.PsychologicallyNude,
+                         "and is left decent, as he was");
 
             // Same tail as the shield-belt case: recoverable, not destructive.
             fix.Comp.SetFullChange(false);
