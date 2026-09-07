@@ -64,9 +64,15 @@ sauna robe, wrong for a lab coat. It costs the equip time of every
 garment in both directions, and everything their own clothes were providing
 comes off with them: warmth, armor, any bonuses those garments carried. They
 have exactly what the stand holds and nothing more, which is worth a thought
-before putting a robe rack in a cold biome. A stand holding nothing they can
-wear still won't undress them; there is no configuration in which a colonist
-strips for a shift and gets nothing back.
+before putting a robe rack in a cold biome.
+
+One exception, and it is the only one: if the stand's kit would leave a colonist
+without basic clothing, they keep their innermost garments on instead. RimWorld
+asks for trousers on everyone and a covered torso as well on women, so a stand
+holding only a hat or a belt will not send anyone out bare, and the same stand
+can hold a shirt back for one colonist and not for another. A stand holding
+nothing they can wear still won't undress them; there is no configuration in
+which a colonist strips for a shift and gets nothing back.
 
 **"Allow removing items" is held off while a stand is in service.**
 Shift changes never need it, and turning it on hands the stand's contents to
