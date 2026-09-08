@@ -220,7 +220,9 @@ CARDS = [
                 "body": "**off by default.** The difference between a lab coat worn over "
                         "ordinary clothes and a sauna robe worn instead of them. Ticked, "
                         "the colonist wears only what the stand holds and loses whatever "
-                        "their own clothes were providing, !!warmth included!!.",
+                        "their own clothes were providing, !!warmth included!!. If that "
+                        "would leave them without basic clothing they keep their innermost "
+                        "garments on instead.",
             },
             {
                 "lead": "Keep contents out of trade",

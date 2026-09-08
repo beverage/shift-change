@@ -645,6 +645,81 @@ adversarial pass caught it: a shield belt is ApparelUtility, precisely what the
 default filter excludes, so it survived the deposit and licensed stripping
 everything that actually covered the pawn.
 
+### The dress path asks the same question and answers it differently
+
+Until 2026-09-07 it did not ask at all. The driver consulted a decency
+predicate only inside `if (toWear.Count == 0 ...)`, so the moment a stand
+issued anything the question went away — and `fullChange` is precisely the flag
+that then takes everything else off. A stand holding one garment that covers
+neither `Torso` nor `Legs` stripped its borrower bare, which is the standing
+rule in this file inverted.
+
+It was never full-change-specific. `KeepThemDecent` therefore runs at the END of
+`BuildDress`, where it sees the finished plan: an ordinary conflict swap strips
+a colonist too whenever the displaced garment covered more than the incoming one
+does — a Shell robe over torso and legs, displaced by a Shell jacket over only
+the torso.
+
+**It holds garments back rather than declining, which is deliberately the
+opposite of the deposit path above.** Deposit-only declines because it issues
+nothing, so keeping one garment would be an arbitrary pick among equals. A dress
+plan HAS an incoming set: the only question is which of their own things stays
+on underneath it, and that has a non-arbitrary answer. Candidates are ranked by
+the lowest `ApparelLayerDef.drawOrder` they occupy, so a shirt is retained
+before a parka — what a person actually keeps on under a uniform, and the choice
+least likely to fight what is issued. Each is checked against `CanWearTogether`
+anyway, since a retained garment conflicting with an issued one would be dropped
+on the floor by `Wear`. Declining survives as the last resort, for when no
+candidate can be kept.
+
+**The rule is "never make it worse", not "never nude".** A colonist already
+psychologically nude is left alone: the swap is not the cause, and refusing
+there would stop a stand dressing the pawn who most needs it.
+
+**Nudity is sometimes the intent, and the guard has to know that.** For a
+Nudist, `ClothedNudist` is a mood PENALTY: holding garments back would fight
+them every shift with no escape short of unbuilding the stand. The test is
+vanilla's own — `ThoughtUtility.CanGetThought(pawn, ClothedNudist,
+checkIfNullified: true)`, lifted from `JobGiver_PrisonerGetDressed:15`, the one
+place the engine itself asks whether to put clothes on someone. Ideology needs
+a second test because the first cannot see it: a pawn with no Nudist trait in a
+nudism ideoligion gets no such thought, the precepts carry it instead, so
+`IdeoPrefersNudityForGender(pawn.gender)` answers that half. Gender-aware, like
+the rule it exempts them from.
+
+Vanilla's prisoner check also demands the pawn be warm enough. That clause is
+deliberately not copied: it is there because the colony is responsible for
+someone who cannot dress themselves, where this path is a player configuring a
+stand on purpose. Holding a coat back on a mandatory-nudity colonist trades a
+temperature problem for a mood one they cannot escape.
+
+Detection cannot see every such colony, so the guard is also switchable:
+`keepColonistsDecent`, read through `ShiftChangeMod.DecencyEnabled`. A MOD
+setting rather than a stand setting on purpose — the case is a property of the
+colony rather than of one rack, and a per-stand checkbox would cost every player
+UI to serve very few.
+
+**It ships OFF, and that is release sequencing rather than a view about which
+behaviour is better** (decided 2026-09-08). This mod arrives inside mod packs,
+where the player did not choose it and will not read its change note, and a patch
+release is the wrong place to change how an existing colony behaves under them.
+The cost is real and worth stating plainly: the guard is what this repo's README
+promises, so while it is off that promise holds only for players who found the
+checkbox. Revisit the default at the next MINOR version, where the bump itself
+is the notice.
+
+`DecencyEnabled` therefore falls back to OFF when settings have not loaded,
+which is the opposite of `PoolingEnabled`. A null-tolerant read has to agree
+with the shipped default, or a stand behaves differently for the first moments
+of a session than the player configured.
+
+`WouldBeNude` needed an `arriving` overload for any of this. Asking the deposit
+question of a dress plan reports every ordinary uniform swap as nudity, because
+the uniform is not on the pawn yet; the set to judge is
+`worn - leaving + arriving`. The driver re-runs the pass on arrival for the same
+reason deposit-only re-checks: `toWear` can shrink during the walk, so a plan
+that covered them when built can arrive no longer doing so.
+
 A deposit-only trip issues nothing, which the ledger had to learn. `OnShift`
 was `issuedUniform.Count > 0` and now counts either half, because a stand
 holding a colonist's armour with no borrower recorded against it is armour

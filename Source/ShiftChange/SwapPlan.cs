@@ -168,6 +168,19 @@ namespace ShiftChange
                 }
             }
 
+            // LAST, so it sees the finished plan — the conflict pass and the
+            // full-change pass both feed it. This is not a full-change guard:
+            // an ordinary swap can strip a colonist too, when the garment an
+            // incoming one displaces covered MORE than the incoming one does
+            // (a Shell robe covering torso and legs, displaced by a Shell
+            // jacket covering only the torso).
+            if (!KeepThemDecent(pawn, toWear, toStore))
+            {
+                toWear.Clear();
+                toStore.Clear();
+                return false;
+            }
+
             return toWear.Count > 0;
         }
 
@@ -305,39 +318,28 @@ namespace ShiftChange
         /// </summary>
         internal static bool WouldBeNude(Pawn pawn, List<Apparel> leaving)
         {
+            return WouldBeNude(pawn, leaving, null);
+        }
+
+        /// <summary>
+        /// The same question, asked about a plan that ALSO puts garments on.
+        ///
+        /// <para>The two-argument form above answers for the deposit path,
+        /// where nothing is issued and the only question is what survives. The
+        /// dress path hands garments out as well, so the set to judge is
+        /// <c>worn - leaving + arriving</c>. Asking the deposit question on a
+        /// dress plan reports every ordinary uniform swap as nudity, because
+        /// the uniform is not on the pawn yet.</para>
+        /// </summary>
+        internal static bool WouldBeNude(Pawn pawn, List<Apparel> leaving, List<Apparel> arriving)
+        {
             // Vanilla's two exemptions, in its order.
             if (pawn.gender == Gender.None || pawn.IsWildMan())
             {
                 return false;
             }
 
-            bool hasShirt = false;
-            bool hasPants = false;
-            List<Apparel> worn = pawn.apparel.WornApparel;
-            for (int i = 0; i < worn.Count && !(hasShirt && hasPants); i++)
-            {
-                Apparel item = worn[i];
-                if (item == null || leaving.Contains(item))
-                {
-                    continue;
-                }
-                List<BodyPartGroupDef> groups = item.def?.apparel?.bodyPartGroups;
-                if (groups == null)
-                {
-                    continue;
-                }
-                for (int j = 0; j < groups.Count; j++)
-                {
-                    if (groups[j] == BodyPartGroupDefOf.Torso)
-                    {
-                        hasShirt = true;
-                    }
-                    else if (groups[j] == BodyPartGroupDefOf.Legs)
-                    {
-                        hasPants = true;
-                    }
-                }
-            }
+            Coverage(pawn, leaving, arriving, out bool hasShirt, out bool hasPants);
 
             // A pawn with no legs left cannot be trouserless (vanilla, :198-213).
             if (!hasPants)
@@ -358,6 +360,250 @@ namespace ShiftChange
             }
 
             return pawn.gender == Gender.Male ? !hasPants : !hasPants || !hasShirt;
+        }
+
+        /// <summary>
+        /// Which of vanilla's two decency groups a hypothetical outfit covers.
+        /// Layer is deliberately not consulted: <c>HasBasicApparel</c>
+        /// (<c>:667-688</c>) scans every worn garment for <c>Torso</c> and
+        /// <c>Legs</c> regardless of layer, so a Belt-layer item declaring
+        /// Torso counts as a shirt. Ours has to agree with it, not improve on
+        /// it.
+        /// </summary>
+        internal static void Coverage(Pawn pawn, List<Apparel> leaving, List<Apparel> arriving,
+                                      out bool hasShirt, out bool hasPants)
+        {
+            hasShirt = false;
+            hasPants = false;
+            List<Apparel> worn = pawn.apparel.WornApparel;
+            for (int i = 0; i < worn.Count; i++)
+            {
+                if (leaving == null || !leaving.Contains(worn[i]))
+                {
+                    Count(worn[i], ref hasShirt, ref hasPants);
+                }
+            }
+            if (arriving == null)
+            {
+                return;
+            }
+            for (int i = 0; i < arriving.Count; i++)
+            {
+                Count(arriving[i], ref hasShirt, ref hasPants);
+            }
+        }
+
+        internal static void Count(Apparel item, ref bool hasShirt, ref bool hasPants)
+        {
+            List<BodyPartGroupDef> groups = item?.def?.apparel?.bodyPartGroups;
+            if (groups == null)
+            {
+                return;
+            }
+            for (int j = 0; j < groups.Count; j++)
+            {
+                if (groups[j] == BodyPartGroupDefOf.Torso)
+                {
+                    hasShirt = true;
+                }
+                else if (groups[j] == BodyPartGroupDefOf.Legs)
+                {
+                    hasPants = true;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Hold back whatever the plan must leave on to keep a dressed colonist
+        /// dressed. Returns false only when that is impossible, in which case
+        /// the caller must abandon the swap.
+        ///
+        /// <para><b>The rule is "never make it worse", not "never nude".</b> A
+        /// colonist who is ALREADY psychologically nude is left alone — the
+        /// swap is not the cause, and refusing there would stop a stand from
+        /// dressing the one pawn who most needs it. Only a plan that takes a
+        /// decent colonist and leaves them indecent is intervened on.</para>
+        ///
+        /// <para><b>Holding back beats declining here, which is the opposite of
+        /// the deposit path's answer</b> (<c>:274-277</c>) — and deliberately
+        /// so. Deposit-only declines outright because it issues nothing, so
+        /// keeping one garment back would be an arbitrary pick among equals.
+        /// The dress path HAS an incoming set: the question is only which of
+        /// their own things stays on underneath it, and that has a
+        /// non-arbitrary answer.</para>
+        ///
+        /// <para><b>The innermost garment wins.</b> Candidates are ordered by
+        /// the lowest <c>ApparelLayerDef.drawOrder</c> they occupy, so a shirt
+        /// is retained before a parka. That is both what a person actually
+        /// keeps on under a uniform and the choice least likely to fight the
+        /// incoming garments — and every candidate is checked against
+        /// <c>CanWearTogether</c> anyway, because a retained garment that
+        /// conflicts with an issued one would be dropped on the floor by
+        /// <c>Wear</c>.</para>
+        ///
+        /// <para>Two passes at most: vanilla asks about exactly two body part
+        /// groups, so at most one garment is needed for each.</para>
+        /// </summary>
+        internal static bool KeepThemDecent(Pawn pawn, List<Apparel> toWear, List<Apparel> toStore)
+        {
+            if (pawn?.apparel == null || toStore.Count == 0)
+            {
+                return true;
+            }
+            // The global override. This guard can contradict a deliberate
+            // configuration, and for a colony built around nudity it would do
+            // so constantly, so it is defeatable outright.
+            if (!ShiftChangeMod.DecencyEnabled)
+            {
+                return true;
+            }
+            // And the per-pawn exemption, which is the common case: one nudist
+            // in an otherwise ordinary colony should not cost the whole
+            // setting.
+            if (PrefersNudity(pawn))
+            {
+                return true;
+            }
+            if (!WouldBeNude(pawn, toStore, toWear))
+            {
+                return true;
+            }
+            // Already indecent before we touched them: not ours to fix, and not
+            // ours to refuse over.
+            if (WouldBeNude(pawn, null, null))
+            {
+                return true;
+            }
+
+            for (int pass = 0; pass < 2; pass++)
+            {
+                Apparel best = null;
+                int bestLayer = int.MaxValue;
+                for (int i = 0; i < toStore.Count; i++)
+                {
+                    Apparel candidate = toStore[i];
+                    if (candidate == null || !ReducesExposure(pawn, candidate, toWear, toStore))
+                    {
+                        continue;
+                    }
+                    if (ConflictsWithIssued(pawn, candidate, toWear))
+                    {
+                        continue;
+                    }
+                    int layer = InnermostLayer(candidate);
+                    if (layer < bestLayer)
+                    {
+                        bestLayer = layer;
+                        best = candidate;
+                    }
+                }
+                if (best == null)
+                {
+                    break;
+                }
+                toStore.Remove(best);
+                if (!WouldBeNude(pawn, toStore, toWear))
+                {
+                    return true;
+                }
+            }
+
+            return !WouldBeNude(pawn, toStore, toWear);
+        }
+
+        /// <summary>
+        /// Is being undressed what this colonist actually wants?
+        ///
+        /// <para><b>Vanilla asks this in exactly one place and we copy it.</b>
+        /// <c>JobGiver_PrisonerGetDressed:15</c> declines to clothe a prisoner
+        /// when <c>CanGetThought(pawn, ClothedNudist, checkIfNullified: true)</c>
+        /// holds — the trait test plus nullification, in one call. That is the
+        /// engine's own answer to "should I put clothes on this pawn", so it is
+        /// the answer used here rather than a hand-rolled trait check.</para>
+        ///
+        /// <para><b>The Ideology half is separate, because the trait test does
+        /// not reach it.</b> A pawn with no Nudist trait in a nudism ideoligion
+        /// gets no <c>ClothedNudist</c> thought; the precepts carry it instead.
+        /// <c>IdeoPrefersNudityForGender</c> is gender-aware, and so is the
+        /// rule it exempts them from — a moral code where the men go bare and
+        /// the women do not is expressible in vanilla, and this reads it per
+        /// pawn rather than per colony.</para>
+        ///
+        /// <para>Vanilla's prisoner check also requires the pawn be warm enough.
+        /// That clause is deliberately NOT copied: it exists because the colony
+        /// is responsible for a prisoner who cannot dress themselves, whereas
+        /// this path is a player who configured a stand on purpose. Holding a
+        /// coat back on a mandatory-nudity colonist to keep them warm would
+        /// trade a temperature problem for a mood one they cannot escape.</para>
+        /// </summary>
+        internal static bool PrefersNudity(Pawn pawn)
+        {
+            if (pawn == null)
+            {
+                return false;
+            }
+            if (pawn.story?.traits != null
+                && ThoughtUtility.CanGetThought(pawn, ThoughtDefOf.ClothedNudist,
+                                                checkIfNullified: true))
+            {
+                return true;
+            }
+            return ModsConfig.IdeologyActive
+                   && pawn.Ideo != null
+                   && pawn.Ideo.IdeoPrefersNudityForGender(pawn.gender);
+        }
+
+        /// <summary>
+        /// Would keeping this garment on cover something the plan currently
+        /// leaves bare? Asked by trial rather than by reasoning about groups,
+        /// so it cannot drift from <see cref="Coverage"/>.
+        /// </summary>
+        internal static bool ReducesExposure(Pawn pawn, Apparel candidate,
+                                             List<Apparel> toWear, List<Apparel> toStore)
+        {
+            Coverage(pawn, toStore, toWear, out bool hasShirt, out bool hasPants);
+            bool withShirt = hasShirt;
+            bool withPants = hasPants;
+            Count(candidate, ref withShirt, ref withPants);
+            return withShirt != hasShirt || withPants != hasPants;
+        }
+
+        internal static bool ConflictsWithIssued(Pawn pawn, Apparel candidate, List<Apparel> toWear)
+        {
+            for (int k = 0; k < toWear.Count; k++)
+            {
+                if (toWear[k] != null
+                    && !ApparelUtility.CanWearTogether(candidate.def, toWear[k].def,
+                                                      pawn.RaceProps.body))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// The lowest draw order this garment occupies. Vanilla's layers are a
+        /// clean total order (OnSkin 0, Middle 100, Shell 200, Belt 300,
+        /// Overhead 400, EyeCover 500) and modded layers slot in by their own
+        /// value, so this ranks any garment from any mod without a table.
+        /// </summary>
+        internal static int InnermostLayer(Apparel apparel)
+        {
+            List<ApparelLayerDef> layers = apparel?.def?.apparel?.layers;
+            if (layers == null || layers.Count == 0)
+            {
+                return int.MaxValue;
+            }
+            int lowest = int.MaxValue;
+            for (int i = 0; i < layers.Count; i++)
+            {
+                if (layers[i] != null && layers[i].drawOrder < lowest)
+                {
+                    lowest = layers[i].drawOrder;
+                }
+            }
+            return lowest;
         }
 
         /// <summary>

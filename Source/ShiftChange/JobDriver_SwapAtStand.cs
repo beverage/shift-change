@@ -213,6 +213,27 @@ namespace ShiftChange
             // So the test is what is underneath, not what the ledger says.
             // Give up only when the uniform is all the pawn has on.
             toWear.RemoveAll(a => a == null || a.ParentHolder != stand || !SwapPlan.CanWear(pawn, a));
+
+            // ARRIVAL RE-CHECK FOR DECENCY, mirroring the one deposit-only has
+            // had since it shipped. The plan was built back in Notify_Starting
+            // and toWear may have just shrunk on the line above — a garment
+            // hauled off the stand, or a body part lost on the walk. A plan
+            // that kept them covered when it was made can therefore arrive
+            // here no longer doing so, and the retention pass has to run
+            // against what is actually left rather than against what was
+            // promised.
+            //
+            // Dress direction only. The return trip's guard below is
+            // deliberately a different question (see WearingAnythingBesides:
+            // there the alternative is donating the uniform permanently), and
+            // deposit-only issues nothing, so it has no incoming set to weigh
+            // and is already answered by the strict test underneath.
+            if (!undressing && !comp.DepositOnly
+                && !SwapPlan.KeepThemDecent(pawn, toWear, toStore))
+            {
+                NothingToWear(comp);
+                return;
+            }
             // A DEPOSIT-ONLY stand hands nothing out by design, so an empty
             // incoming set is not evidence that anything went wrong — it
             // belongs on the same side of this test as the return trip. Both
