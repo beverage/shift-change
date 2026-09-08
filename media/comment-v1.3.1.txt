@@ -1,0 +1,9 @@
+v1.3.1 update:
+
+New setting, Keep colonists decent, in the mod settings. It is OFF by default, so nothing changes in a colony you are already playing unless you switch it on.
+
+Turn it on and a stand will not leave a colonist without basic clothing: if what it hands out does not cover them, their innermost garments stay on instead, and the rest of the swap happens as normal.
+
+It matters most with Change the whole outfit ticked, where a stand holding only a hat, a belt or a pair of trousers would otherwise send someone out with nothing else on.
+
+Nudists, and anyone whose ideoligion prefers nudity, are never affected either way.
