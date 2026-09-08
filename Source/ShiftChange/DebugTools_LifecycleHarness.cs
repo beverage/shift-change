@@ -193,6 +193,9 @@ namespace ShiftChange
             Case(map, pad, "a deposit-only stand parks what its filter accepts and hands it back",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  DepositOnlyParksAndReturns);
+            Case(map, pad, "and haulers leave it alone, while an ordinary stand still takes deliveries",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 DepositOnlyStandIsNoHaulTarget);
             Case(map, pad, "full change swaps the whole outfit and gives it all back",
                  (m, p) => Stage(m, p, StageKit.Displacing), FullChangeSwapsEverything);
             Case(map, pad, "full change refuses to strip a colonist bare",
@@ -1768,6 +1771,109 @@ namespace ShiftChange
                          "because stripping to nothing reads as nude (positive control)")
                 & Expect(!SwapPlan.WouldBeNude(fix.Pawn, beltWear),
                          "while keeping everything on does not (negative control)");
+        }
+
+        /// <summary>
+        /// HAULING: an empty deposit-only stand is not somewhere to put
+        /// apparel, and an ordinary one still is.
+        ///
+        /// <para>Driven through <c>StoreUtility</c>'s own search rather than by
+        /// reading our flag back, because the flag is not the claim — "a hauler
+        /// does not come" is. The one approximation is the argument
+        /// <c>currentPriority</c>, passed as <c>Normal</c>: that is the value
+        /// <c>CurrentStoragePriorityOf</c> returns for a garment sitting in an
+        /// ordinary stockpile, which is where the garment in the report was.
+        /// Everything downstream of it is the engine's.</para>
+        ///
+        /// <para><b>Two stands, because "not stand A" is a claim a broken
+        /// search satisfies too.</b> B is an ordinary stand, further away, and
+        /// the assertion is that the hauler switches TO it — so a result of
+        /// "nowhere to put it" fails rather than passes.</para>
+        ///
+        /// <para><b>And B is filled at the end, because that is the state that
+        /// made this so hard to see in play (2026-09-08).</b> Three stands
+        /// configured identically, one afflicted: <c>Accepts</c> ends at
+        /// <c>HasRoomForApparelOfDef</c>, so a stand already holding a
+        /// conflicting garment is immune by vanilla's own gate. The other two
+        /// held an alternate gear set. Deposit-only is the one mode whose
+        /// resting state is empty, so it is the one that can never become
+        /// immune on its own.</para>
+        /// </summary>
+        internal static bool DepositOnlyStandIsNoHaulTarget(Fixture fix)
+        {
+            Map map = fix.Map;
+            ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
+            ThingDef dusterDef = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_Duster");
+            if (standDef == null || dusterDef == null)
+            {
+                return Expect(false, "the fixture's stand and apparel defs resolve");
+            }
+
+            // Empty is deposit-only's resting state, and an empty stand is the
+            // only kind vanilla will haul into. Stage stocks a duster.
+            ClearStand(fix.Stand);
+            IntVec3 origin = fix.Stand.Position;
+
+            Building_OutfitStand other = DebugTools_Fixtures.Spawn(
+                map, standDef, ThingDefOf.WoodLog,
+                origin + new IntVec3(3, 0, 0), Rot4.North) as Building_OutfitStand;
+            if (other == null)
+            {
+                return Expect(false, "a second, ordinary stand could be staged");
+            }
+            ClearStand(other);
+
+            // Adjacent to the fixture stand and three cells from the other, so
+            // the search's distance tiebreak has an unambiguous answer and the
+            // switch below is visible.
+            Apparel garment = DebugTools_Fixtures.MakeGarment(dusterDef, null);
+            GenSpawn.Spawn(garment, origin + new IntVec3(1, 0, 0), map);
+
+            IHaulDestination found;
+            bool ok = Expect(
+                StoreUtility.TryFindBestBetterNonSlotGroupStorageFor(
+                    garment, null, map, StoragePriority.Normal, Faction.OfPlayer, out found)
+                && found == fix.Stand,
+                "an empty stand outbids a Normal stockpile, and the nearest one is chosen "
+                + "(positive control: this is the vanilla behaviour being narrowed)");
+
+            fix.Comp.ToggleRest();
+            fix.Comp.SetDepositOnly(true);
+            ok &= Expect(fix.Comp.DepositOnly, "the stand is deposit-only");
+
+            ok &= Expect(
+                StoreUtility.TryFindBestBetterNonSlotGroupStorageFor(
+                    garment, null, map, StoragePriority.Normal, Faction.OfPlayer, out found)
+                && found == other,
+                "and the hauler now walks past it to the ordinary stand instead");
+
+            // The narrowing is the DESTINATION flag and nothing else. If this
+            // ever fails, the sleep change's own deposit and the player's
+            // right-click delivery have gone with it.
+            ok &= Expect(((IHaulDestination)fix.Stand).Accepts(garment),
+                         "while the stand still ACCEPTS the garment, so a deposit and an "
+                         + "ordered delivery are untouched");
+
+            // Vanilla's own immunity, which is why two identical stands in play
+            // never showed this: fill the fallback and it stops accepting too.
+            if (!StockOne(other, "Apparel_Duster"))
+            {
+                return ok & Expect(false, "the ordinary stand can be stocked for the immunity case");
+            }
+            ok &= Expect(!((IHaulDestination)other).Accepts(garment),
+                         "a stand already holding a conflicting garment refuses it "
+                         + "(HasRoomForApparelOfDef — vanilla's gate, not ours)");
+            bool anywhere = StoreUtility.TryFindBestBetterNonSlotGroupStorageFor(
+                garment, null, map, StoragePriority.Normal, Faction.OfPlayer, out found);
+            ok &= Expect(!anywhere || (found != fix.Stand && found != other),
+                         "so with one stand deposit-only and the other full, neither takes it");
+
+            fix.Comp.SetDepositOnly(false);
+            return ok
+                & Expect(StoreUtility.TryFindBestBetterNonSlotGroupStorageFor(
+                             garment, null, map, StoragePriority.Normal, Faction.OfPlayer, out found)
+                         && found == fix.Stand,
+                         "and dropping the mode hands the stand straight back, with nothing to invalidate");
         }
 
         /// <summary>

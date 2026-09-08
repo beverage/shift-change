@@ -132,6 +132,21 @@ a narrowed filter parks exactly what it names and issues nothing, that the trip
 claims the stand so a return exists, that the parked gear comes back, and that a
 deposit which would leave a colonist in nothing but a shield belt is refused.
 
+Its neighbour covers **hauling into** such a stand, and drives `StoreUtility`'s
+own search rather than reading our flag back, because the claim is "a hauler
+does not come" and not "the flag is set". It stages a SECOND, ordinary stand
+further from the garment, so the assertion can be that the hauler switches to it
+rather than merely that it stops choosing the first — "nowhere to put it" is a
+result a broken search produces too, and it has to fail. Three states in the one
+run: an empty ordinary stand outbids a Normal stockpile and is chosen, the same
+stand set to deposit only is walked past while still ACCEPTING the garment (the
+narrowing is the destination flag and nothing else, so a deposit and a
+right-click delivery are untouched), and a stand already holding a conflicting
+garment refuses it by vanilla's own `HasRoomForApparelOfDef`. That last is the
+state that made the bug so hard to see in play: three identically configured
+stands, and only the deposit-only one afflicted, because only its resting state
+is empty.
+
 **Ownership cases** guard the owner list, which went from one pawn to a set.
 One walks a stand through pool, one owner, two owners and back, asserting who
 may claim it at each step; its load-bearing assertion is the SECOND owner,
