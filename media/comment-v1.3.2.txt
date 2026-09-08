@@ -1,0 +1,7 @@
+v1.3.2 update:
+
+Fix: colonists were hauling spare clothing onto stands set to Deposit only. Outfit stands outrank stockpiles in the storage order, so an empty one pulled apparel in from across the base, filling the slots its owner needed for their own gear. A stand in service does not let haulers take it back out, so it stayed there.
+
+You may have seen this on one stand and not another. A stand that already holds an outfit refuses further deliveries, so only the deposit-only ones, which are meant to sit empty, collected anything.
+
+Nothing else changes. You can still put a garment on the stand yourself with a right-click order, and the sleep change works as before. A stand that haulers already filled clears itself at its owner's next change.
