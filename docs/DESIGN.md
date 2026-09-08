@@ -645,6 +645,44 @@ adversarial pass caught it: a shield belt is ApparelUtility, precisely what the
 default filter excludes, so it survived the deposit and licensed stripping
 everything that actually covered the pawn.
 
+**And the stand has to be kept empty, because vanilla works hard to fill it.**
+`OutfitStandBase`'s `defaultStorageSettings` carry priority `Important`, above
+an ordinary stockpile, so an empty stand does not merely accept apparel that
+passes by — it outbids the shelf a garment is already on, and haulers walk
+clothing out of storage and into it until `HasRoomForApparelOfDef` refuses, one
+garment per body part group. On a display stand that is the whole point of the
+building. On a deposit-only stand it is the inverse: empty is the correct
+resting state, every slot a hauler fills is a slot the colonist's own armour
+cannot land in, and `Patch_AllowRemovingToggle` holds `allowRemovingItems` off
+while the stand is in service, so what a hauler puts in cannot be hauled back
+out.
+
+Found in play 2026-09-08, and it presented as one cursed stand out of three
+configured identically. The difference was their CONTENTS, not their settings:
+`Accepts` ends at `HasRoomForApparelOfDef`, which refuses anything conflicting
+with what the stand already holds (`Building_OutfitStand.cs:332`), so a stand
+with a spare outfit parked on it is immune — every slot is already taken. Two of
+the three held an alternate gear set. The third was the deposit-only one, whose
+resting state is empty, and it had a duplicate of its owner's armour sitting in
+a lower-priority stockpile to pull. Both conditions are required, neither is
+visible in the stand's settings, and deposit-only is the one mode that
+guarantees the first of them permanently — so comparing configurations to find
+the difference turns up nothing.
+
+`Patch_DepositOnlyHauling` answers `IHaulDestination.HaulDestinationEnabled`
+false for such a stand, which is the one question
+`StoreUtility.TryFindBestBetterNonSlotGroupStorageFor` asks before considering a
+destination (`StoreUtility.cs:252`) and `Building_OutfitStand`'s only
+unconditional `true` (`:100`). That removes the stand from the automatic search
+and touches nothing else: both EXPLICIT player routes, the "put apparel on
+stand" targeter (`Building_OutfitStand.cs:675`) and
+`FloatMenuOptionProvider_DressOtherPawn`, build the `PutApparelOnOutfitStand`
+job directly and never consult it. An ordered delivery still lands. The engine
+reads the property inside its search loop rather than caching it, so ticking the
+mode on or off takes effect on the next haul search with no lister to
+invalidate — which is what lets the answer key on `DepositOnly`, and so unwind
+by itself the moment the stand stops handling rest.
+
 ### The dress path asks the same question and answers it differently
 
 Until 2026-09-07 it did not ask at all. The driver consulted a decency
