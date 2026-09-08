@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using HarmonyLib;
 using RimWorld;
 using Verse;
@@ -72,62 +69,29 @@ namespace ShiftChange
     /// stockpile now, rather than straight back onto the stand it was just
     /// dropped from.</para>
     ///
-    /// <para><b>The target has no C# name to reference.</b> It is an explicit
-    /// interface implementation, which the compiler mangles to
-    /// <c>RimWorld.IHaulDestination.get_HaulDestinationEnabled</c>; the
-    /// interface map is asked for it instead, so the patch depends on the
-    /// interface rather than on a naming convention. It is accepted only when
-    /// declared on <c>Building_OutfitStand</c> itself, since the postfix binds
-    /// <c>__instance</c> to that type. If the type ever stops implementing
-    /// <c>IHaulDestination</c>, <see cref="TargetMethods"/> yields nothing, the
-    /// patch does not apply, and stands go back to being stocked by haulers —
-    /// which is where they started. <c>Building_KidOutfitStand</c> and Outfit
-    /// Stands Plus' powered stands inherit the implementation, so the one patch
-    /// covers the whole family.</para>
+    /// <para><b>The target is named as a string because it has no C# name.</b>
+    /// An explicit interface implementation is emitted under its qualified
+    /// name, verified against the shipped assembly's metadata rather than
+    /// assumed: <c>RimWorld.IHaulDestination.get_HaulDestinationEnabled</c>.
+    /// That is the same problem a private method poses and gets the same
+    /// answer here as in <see cref="Patch_OptimizeApparelOnShift"/>, which
+    /// names <c>TryGiveJob</c> the same way. An earlier version resolved it
+    /// through <c>GetInterfaceMap</c> instead; that survives one failure this
+    /// does not, Ludeon making the implementation implicit, and fails
+    /// identically on every other, for forty lines and a patch class shaped
+    /// like nothing else in the mod.</para>
+    ///
+    /// <para>A target that stops resolving throws out of <c>PatchAll</c> and
+    /// takes the rest of the mod's patches with it. That is true of every
+    /// patch in this mod, not just this one, and wants a single answer for all
+    /// thirteen rather than a private guard on the newest.</para>
+    ///
+    /// <para><c>Building_KidOutfitStand</c> and Outfit Stands Plus' powered
+    /// stands inherit the implementation, so one patch covers the family.</para>
     /// </summary>
-    [HarmonyPatch]
+    [HarmonyPatch(typeof(Building_OutfitStand), "RimWorld.IHaulDestination.get_HaulDestinationEnabled")]
     public static class Patch_DepositOnlyHauling
     {
-        internal static IEnumerable<MethodBase> TargetMethods()
-        {
-            MethodInfo getter = ResolveHaulDestinationEnabledGetter();
-            if (getter != null)
-            {
-                yield return getter;
-            }
-        }
-
-        /// <summary>
-        /// <c>Building_OutfitStand</c>'s own implementation of
-        /// <c>IHaulDestination.HaulDestinationEnabled</c>, or null if it is not
-        /// declared there any more.
-        /// </summary>
-        internal static MethodInfo ResolveHaulDestinationEnabledGetter()
-        {
-            try
-            {
-                InterfaceMapping map = typeof(Building_OutfitStand).GetInterfaceMap(typeof(IHaulDestination));
-                for (int i = 0; i < map.InterfaceMethods.Length; i++)
-                {
-                    if (map.InterfaceMethods[i].Name != "get_" + nameof(IHaulDestination.HaulDestinationEnabled))
-                    {
-                        continue;
-                    }
-                    MethodInfo target = map.TargetMethods[i];
-                    return target?.DeclaringType == typeof(Building_OutfitStand) ? target : null;
-                }
-            }
-            catch (Exception e)
-            {
-                // GetInterfaceMap throws rather than returning empty when the
-                // type does not implement the interface. Not fatal: no patch,
-                // vanilla hauling, one line in the log saying why.
-                Log.Warning("[ShiftChange] could not resolve Building_OutfitStand's IHaulDestination implementation; "
-                            + "deposit-only stands will be stocked by haulers as in vanilla: " + e);
-            }
-            return null;
-        }
-
         // ReSharper disable once InconsistentNaming — Harmony injection.
         public static void Postfix(Building_OutfitStand __instance, ref bool __result)
         {
