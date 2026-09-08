@@ -693,12 +693,25 @@ someone who cannot dress themselves, where this path is a player configuring a
 stand on purpose. Holding a coat back on a mandatory-nudity colonist trades a
 temperature problem for a mood one they cannot escape.
 
-Detection cannot see every such colony, so the guard is also defeatable
-outright: `keepColonistsDecent`, on by default, read through
-`ShiftChangeMod.DecencyEnabled`. It is a MOD setting rather than a stand
-setting on purpose — the case is rare, it is a property of the colony rather
-than of one rack, and a per-stand checkbox would cost every player UI to serve
-very few.
+Detection cannot see every such colony, so the guard is also switchable:
+`keepColonistsDecent`, read through `ShiftChangeMod.DecencyEnabled`. A MOD
+setting rather than a stand setting on purpose — the case is a property of the
+colony rather than of one rack, and a per-stand checkbox would cost every player
+UI to serve very few.
+
+**It ships OFF, and that is release sequencing rather than a view about which
+behaviour is better** (decided 2026-09-08). This mod arrives inside mod packs,
+where the player did not choose it and will not read its change note, and a patch
+release is the wrong place to change how an existing colony behaves under them.
+The cost is real and worth stating plainly: the guard is what this repo's README
+promises, so while it is off that promise holds only for players who found the
+checkbox. Revisit the default at the next MINOR version, where the bump itself
+is the notice.
+
+`DecencyEnabled` therefore falls back to OFF when settings have not loaded,
+which is the opposite of `PoolingEnabled`. A null-tolerant read has to agree
+with the shipped default, or a stand behaves differently for the first moments
+of a session than the player configured.
 
 `WouldBeNude` needed an `arriving` overload for any of this. Asking the deposit
 question of a dress plan reports every ordinary uniform swap as nudity, because

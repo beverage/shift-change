@@ -66,19 +66,22 @@ comes off with them: warmth, armor, any bonuses those garments carried. They
 have exactly what the stand holds and nothing more, which is worth a thought
 before putting a robe rack in a cold biome.
 
-One exception, and it is the only one: if the stand's kit would leave a colonist
-without basic clothing, they keep their innermost garments on instead. RimWorld
-asks for trousers on everyone and a covered torso as well on women, so a stand
-holding only a hat or a belt will not send anyone out bare, and the same stand
-can hold a shirt back for one colonist and not for another. A stand holding
-nothing they can wear still won't undress them; there is no configuration in
-which a colonist strips for a shift and gets nothing back.
+A stand holding nothing they can wear still won't undress them.
 
-**Nudists are exempt, and so are nudist ideoligions.** For them being dressed
-is the penalty, so nothing is held back and the stand does what it was set to
-do. If you want that for the whole colony rather than for the colonists the
-game already marks, **Keep colonists decent** in the mod settings turns the
-whole thing off.
+**Keep colonists decent**, in the mod settings, is off by default and changes
+that. Enable it and a stand will not leave a colonist without basic clothing:
+if what it hands out does not cover them, their innermost garments stay on and
+the rest of the swap happens as normal. RimWorld asks for trousers on everyone
+and a covered torso as well on women, so the same stand can hold a shirt back
+for one colonist and not for another.
+
+It ships off so that updating the mod does not change how a colony you are
+already playing behaves — this arrives in mod packs, where nobody reads a change
+note. Turn it on if you would rather a stand never left anyone indecent.
+
+**Nudists and nudist ideoligions are exempt either way.** For them being dressed
+is the penalty, so nothing is ever held back and the stand does what it was set
+to do.
 
 **"Allow removing items" is held off while a stand is in service.**
 Shift changes never need it, and turning it on hands the stand's contents to

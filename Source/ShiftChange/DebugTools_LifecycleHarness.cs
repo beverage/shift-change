@@ -206,8 +206,8 @@ namespace ShiftChange
                  LegsOnlyStandStripsAWoman);
             Case(map, pad, "a nudist is left undressed, because that is the point",
                  (m, p) => Stage(m, p, StageKit.Displacing), NudistIsExemptFromDecency);
-            Case(map, pad, "and the decency guard can be switched off outright",
-                 (m, p) => Stage(m, p, StageKit.Displacing), DecencyGuardCanBeDisabled);
+            Case(map, pad, "the decency guard ships off, and turning it on takes effect",
+                 (m, p) => Stage(m, p, StageKit.Displacing), DecencyGuardIsOptIn);
             Case(map, pad, "the rules the description promises hold",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
@@ -785,6 +785,14 @@ namespace ShiftChange
         /// </summary>
         internal static bool FullChangeRefusesToStripThemBare(Fixture fix)
         {
+            // The guard ships OFF (opt-in, decided 2026-09-08), so a case
+            // about what it does has to turn it on. Case() restores it.
+            if (ShiftChangeMod.Settings == null)
+            {
+                return Expect(false, "mod settings resolve");
+            }
+            ShiftChangeMod.Settings.keepColonistsDecent = true;
+
             List<Apparel> before = new List<Apparel>(fix.Pawn.apparel.WornApparel);
             if (before.Count < 3)
             {
@@ -891,6 +899,14 @@ namespace ShiftChange
         /// </summary>
         internal static bool LegsOnlyStandLeavesAManDecent(Fixture fix)
         {
+            // The guard ships OFF (opt-in, decided 2026-09-08), so a case
+            // about what it does has to turn it on. Case() restores it.
+            if (ShiftChangeMod.Settings == null)
+            {
+                return Expect(false, "mod settings resolve");
+            }
+            ShiftChangeMod.Settings.keepColonistsDecent = true;
+
             ClearStand(fix.Stand);
             if (!StockOne(fix.Stand, "Apparel_Pants"))
             {
@@ -934,6 +950,14 @@ namespace ShiftChange
         /// </summary>
         internal static bool LegsOnlyStandStripsAWoman(Fixture fix)
         {
+            // The guard ships OFF (opt-in, decided 2026-09-08), so a case
+            // about what it does has to turn it on. Case() restores it.
+            if (ShiftChangeMod.Settings == null)
+            {
+                return Expect(false, "mod settings resolve");
+            }
+            ShiftChangeMod.Settings.keepColonistsDecent = true;
+
             ClearStand(fix.Stand);
             if (!StockOne(fix.Stand, "Apparel_Pants"))
             {
@@ -985,6 +1009,14 @@ namespace ShiftChange
         /// </summary>
         internal static bool NudistIsExemptFromDecency(Fixture fix)
         {
+            // The guard ships OFF (opt-in, decided 2026-09-08), so a case
+            // about what it does has to turn it on. Case() restores it.
+            if (ShiftChangeMod.Settings == null)
+            {
+                return Expect(false, "mod settings resolve");
+            }
+            ShiftChangeMod.Settings.keepColonistsDecent = true;
+
             TraitDef nudist = TraitDefOf.Nudist;
             if (nudist == null || fix.Pawn.story?.traits == null)
             {
@@ -1039,7 +1071,7 @@ namespace ShiftChange
         /// config, but cases run in sequence and every later one would inherit
         /// it.</para>
         /// </summary>
-        internal static bool DecencyGuardCanBeDisabled(Fixture fix)
+        internal static bool DecencyGuardIsOptIn(Fixture fix)
         {
             if (ShiftChangeMod.Settings == null)
             {
@@ -1052,31 +1084,35 @@ namespace ShiftChange
             }
             List<Apparel> before = new List<Apparel>(fix.Pawn.apparel.WornApparel);
 
-            bool ok = Expect(!SwapPlan.PrefersNudity(fix.Pawn),
-                             "an ordinary colonist, so only the setting can be doing this "
-                             + "(control)");
-            fix.Comp.SetFullChange(true);
+            // THE SHIPPED DEFAULT IS THE ASSERTION. Nothing else in the suite
+            // pins it, and a default that flips by accident is exactly the kind
+            // of change nobody notices until a colony behaves differently after
+            // an update — which is the whole reason it ships off.
+            bool ok = Expect(!ShiftChangeMod.DecencyEnabled,
+                             "the guard is OFF out of the box: this ships opt-in")
+                & Expect(!SwapPlan.PrefersNudity(fix.Pawn),
+                         "and an ordinary colonist, so only the setting decides (control)");
 
-            bool previous = ShiftChangeMod.Settings.keepColonistsDecent;
-            ShiftChangeMod.Settings.keepColonistsDecent = false;
+            fix.Comp.SetFullChange(true);
 
             List<Apparel> wear = new List<Apparel>();
             List<Apparel> store = new List<Apparel>();
             ok &= Expect(SwapPlan.BuildDress(fix.Pawn, fix.Stand, wear, store),
-                         "with the guard off there is a plan")
+                         "there is a plan")
                 & Expect(store.Count == before.Count,
-                         "and it takes everything, exactly as it did before the guard existed");
+                         "which takes everything, exactly as every version up to v1.3.0 did");
 
-            ShiftChangeMod.Settings.keepColonistsDecent = previous;
+            // Case() restores this.
+            ShiftChangeMod.Settings.keepColonistsDecent = true;
 
             List<Apparel> onWear = new List<Apparel>();
             List<Apparel> onStore = new List<Apparel>();
             return ok
-                & Expect(ShiftChangeMod.DecencyEnabled, "the setting was restored")
+                & Expect(ShiftChangeMod.DecencyEnabled, "turning it on takes effect")
                 & Expect(SwapPlan.BuildDress(fix.Pawn, fix.Stand, onWear, onStore),
-                         "and with it back on there is still a plan")
+                         "there is still a plan")
                 & Expect(onStore.Count < before.Count,
-                         "which now holds something back again");
+                         "and it now holds something back");
         }
 
         /// <summary>
@@ -2404,6 +2440,14 @@ namespace ShiftChange
         {
             Report.Append("  ").AppendLine(name);
             GapThisCase = false;
+            // MOD SETTINGS ARE GLOBAL AND CASES RUN IN SEQUENCE. A case that
+            // needs the decency guard in a particular state sets it and does
+            // not clean up; this is the cleanup, so a leak cannot silently
+            // decide the outcome of every case after it. Snapshot-and-restore
+            // rather than force-to-default: the harness must not fight a
+            // player's own configuration on a manual run either.
+            bool decencyBefore = ShiftChangeMod.Settings != null
+                                 && ShiftChangeMod.Settings.keepColonistsDecent;
             try
             {
                 if (!body())
@@ -2419,6 +2463,13 @@ namespace ShiftChange
             {
                 Fail("threw: " + e);
             }
+            finally
+            {
+                if (ShiftChangeMod.Settings != null)
+                {
+                    ShiftChangeMod.Settings.keepColonistsDecent = decencyBefore;
+                }
+            }
         }
 
         /// <summary>
@@ -2433,6 +2484,14 @@ namespace ShiftChange
             Report.Append("  ").AppendLine(name);
             GapThisCase = false;
             Fixture fix = null;
+            // MOD SETTINGS ARE GLOBAL AND CASES RUN IN SEQUENCE. A case that
+            // needs the decency guard in a particular state sets it and does
+            // not clean up; this is the cleanup, so a leak cannot silently
+            // decide the outcome of every case after it. Snapshot-and-restore
+            // rather than force-to-default: the harness must not fight a
+            // player's own configuration on a manual run either.
+            bool decencyBefore = ShiftChangeMod.Settings != null
+                                 && ShiftChangeMod.Settings.keepColonistsDecent;
             try
             {
                 Exception lastBuildError = null;
@@ -2476,6 +2535,10 @@ namespace ShiftChange
             }
             finally
             {
+                if (ShiftChangeMod.Settings != null)
+                {
+                    ShiftChangeMod.Settings.keepColonistsDecent = decencyBefore;
+                }
                 Teardown(fix, map, pad);
             }
         }

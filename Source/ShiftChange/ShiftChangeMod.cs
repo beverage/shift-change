@@ -16,24 +16,35 @@ namespace ShiftChange
         public bool poolUnassignedStands = true;
 
         /// <summary>
-        /// When true (the default), a stand will not leave a colonist without
-        /// basic clothing: it holds back the innermost garments vanilla's own
-        /// decency rule asks for and deposits the rest. When false the guard is
-        /// off entirely and a stand does exactly what its settings say.
+        /// When true, a stand will not leave a colonist without basic clothing:
+        /// it holds back the innermost garments vanilla's own decency rule asks
+        /// for and deposits the rest. When false a stand does exactly what its
+        /// settings say, which is how every version up to v1.3.0 behaved.
         ///
-        /// <para>Off is for a colony where nudity is the point. Individual
-        /// nudists and nudism ideoligions are already exempt without touching
-        /// this (<see cref="SwapPlan.PrefersNudity"/>) — this is for the cases
-        /// that detection cannot see, and for a player who simply wants the
-        /// stand to obey.</para>
+        /// <para><b>OFF by default, and that is a release-sequencing decision
+        /// rather than a view about which behaviour is better</b> (decided
+        /// 2026-09-08). This mod ships inside mod packs, where the player did
+        /// not choose it and will not read its change note; a patch release is
+        /// the wrong place to change how an existing colony behaves under them.
+        /// Opt-in for now; revisit the default at the next MINOR version, where
+        /// the bump itself is the notice.</para>
+        ///
+        /// <para>Note the asymmetry this creates: the guard is what the mod's
+        /// own README promises ("there is no configuration in which a colonist
+        /// strips for a shift and gets nothing back"), so while this is off,
+        /// that promise holds only for players who found the checkbox.</para>
+        ///
+        /// <para>Individual nudists and nudism ideoligions are exempt either
+        /// way (<see cref="SwapPlan.PrefersNudity"/>) — that detection is not
+        /// what this switch controls.</para>
         /// </summary>
-        public bool keepColonistsDecent = true;
+        public bool keepColonistsDecent = false;
 
         public override void ExposeData()
         {
             base.ExposeData();
             Scribe_Values.Look(ref poolUnassignedStands, "poolUnassignedStands", defaultValue: true);
-            Scribe_Values.Look(ref keepColonistsDecent, "keepColonistsDecent", defaultValue: true);
+            Scribe_Values.Look(ref keepColonistsDecent, "keepColonistsDecent", defaultValue: false);
         }
     }
 
@@ -57,10 +68,12 @@ namespace ShiftChange
 
         /// <summary>
         /// The single read point for the decency guard. Null-tolerant for the
-        /// same reason as <see cref="PoolingEnabled"/>: comp and plan code must
-        /// never crash on load ordering, and the safe default is the guard ON.
+        /// same reason as <see cref="PoolingEnabled"/> — but note the fallback
+        /// is the OPPOSITE way round: this defaults OFF, so settings that have
+        /// not loaded yet must read as off too, or a stand would briefly behave
+        /// differently from how the player configured it.
         /// </summary>
-        public static bool DecencyEnabled => Settings == null || Settings.keepColonistsDecent;
+        public static bool DecencyEnabled => Settings != null && Settings.keepColonistsDecent;
 
         public ShiftChangeMod(ModContentPack content) : base(content)
         {
