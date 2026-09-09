@@ -1,0 +1,9 @@
+v1.3.3 update:
+
+Fix: with FrozenSnowFox's Complex Jobs installed, stands dressed colonists for part of a room's work and skipped the rest. That mod moves tasks off vanilla's work types onto finer ones, so surgery stopped counting as Doctor work, butchering stopped counting as Cooking, and training stopped counting as Handling. Shift Change was still watching only the vanilla names.
+
+It showed up as a stand working sometimes and not others. A hospital stand dressed a doctor to tend a patient, then sat there when the same colonist went to operate. A kitchen stand caught cooking and not butchering.
+
+Stands now read the added work types as well: Nurse and Surgeon in a hospital, Drugs in a laboratory, Butcher in a kitchen, the bench types in a workshop, Train in a barn.
+
+Nothing changes without Complex Jobs, and a stand whose work list you set by hand keeps the list you gave it.

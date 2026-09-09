@@ -280,6 +280,23 @@ job carries a joy kind, which is the whole of what the trigger looks for. Any
 modded recreation that does the same is caught. Its room does not score as a
 pool, though, so that stand takes the switch by hand.
 
+**[Complex Jobs](https://steamcommunity.com/sharedfiles/filedetails/?id=2069684319)**
+works from v1.3.3. It splits vanilla's work types into finer ones and moves
+the tasks across, so surgery stops being Doctor work, butchering stops being
+Cooking work, and taming and training stop being Handling. A stand that matched
+only the vanilla names served part of its room's work and passed over the rest,
+which read as the stand working intermittently. The room table now names its
+work types as well: hospital picks up Nurse and Surgeon, laboratory Drugs,
+kitchen Butcher, workshop Stone Cut, Smelt, Machining, Fabricate, Refine and
+Production, barn Train and slaughter. Slaughter exists only if you switch it on
+in Complex Jobs' own settings, which needs XML Extensions; anything absent is
+passed over, so nothing changes for a game without it.
+
+Taming is the one piece deliberately left out. A stand is chosen by where the
+job happens, and taming happens wherever the wild animal is standing, which is
+not the barn. Vanilla's own Handling row never fired for it either, so no barn
+stand has ever dressed anyone for taming.
+
 **An apparel mod is worth having.** Not required and not a dependency, but
 vanilla has no scrubs, no lab coat and no chef's whites, so in a pure vanilla
 game there is very little to actually dress anyone *in*. Any apparel mod fixes
