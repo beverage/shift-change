@@ -31,7 +31,13 @@ namespace ShiftChange
     {
         internal static readonly List<WorkTypeDef> None = new List<WorkTypeDef>();
 
-        /// <summary>role defName → work type defNames.</summary>
+        /// <summary>
+        /// role defName → work type defNames. VANILLA ONLY: every name here
+        /// is required to exist, and the harness asserts it, because a name
+        /// that stops resolving empties a role's list and the mod then does
+        /// nothing at all — green harness, no log line. Mod-supplied types
+        /// belong in <see cref="CompatDefaults"/>, which is allowed to miss.
+        /// </summary>
         internal static readonly Dictionary<string, string[]> Defaults =
             new Dictionary<string, string[]>
             {
@@ -42,7 +48,85 @@ namespace ShiftChange
                 { "Barn",       new[] { "Handling", "Doctor" } },
             };
 
+        /// <summary>
+        /// Work types folded into <see cref="Defaults"/> when another mod
+        /// supplies them. A SEPARATE table, because these are allowed to be
+        /// absent and those are not: missing here is the ordinary case (the
+        /// mod is not installed), missing there means a vanilla def was
+        /// renamed under us. One table cannot say both, and the harness case
+        /// that guards the second meaning is what makes the split load-bearing
+        /// rather than tidy.
+        ///
+        /// <para>Today that is [FSF] Complex Jobs
+        /// (<c>FrozenSnowFox.ComplexJobs</c>), which does not so much add work
+        /// as MOVE it: it repoints the <c>workType</c> field on vanilla
+        /// WorkGiverDefs at its own finer-grained types, leaving the vanilla
+        /// type in place but hollowed out. Surgery stops being Doctor work,
+        /// butchering stops being Cooking work, taming and training stop being
+        /// Handling work. A stand keyed to the vanilla name alone then dresses
+        /// for some of its room's work and silently not the rest — which
+        /// reads as flakiness rather than as a missing mod patch.</para>
+        ///
+        /// <para>A row earns its place only where the type inherits work from
+        /// <see cref="Defaults"/> AND that work lands in this role's room,
+        /// checked against each bench's <c>workTableRoomRole</c> rather than
+        /// assumed. Hence the brewery counts as Workshop, not Kitchen, even
+        /// though brewing is what leaves Cooking; hence the drug lab is
+        /// Laboratory. Deliberately absent: <c>FSFPaint</c> and
+        /// <c>FSFSmoothing</c>, which collect the base-wide pass-through work
+        /// these sets exclude on purpose, and <c>FSFMechanoids</c>, whose
+        /// gestators are Laboratory-roled but whose work is vanilla SMITHING —
+        /// no lab stand dressed for it in vanilla either, so covering it here
+        /// would be a new feature wearing a compatibility fix's clothes.</para>
+        ///
+        /// <para><c>FSFTaming</c> and <c>FSFSlaughter</c> exist only when
+        /// Complex Jobs' own XML Extensions options are switched on, so they
+        /// are absent even with that mod installed and left unconfigured. That
+        /// is the normal case for this table, not a defect.</para>
+        /// </summary>
+        internal static readonly Dictionary<string, string[]> CompatDefaults =
+            new Dictionary<string, string[]>
+            {
+                { "Hospital",   new[] { "FSFNurse", "FSFSurgeon" } },
+                { "Laboratory", new[] { "FSFDrugs" } },
+                { "Kitchen",    new[] { "FSFButcher" } },
+                {
+                    "Workshop",
+                    new[]
+                    {
+                        "FSFStoneCut", "FSFSmelt", "FSFMachining",
+                        "FSFFabrication", "FSFRefining", "FSFProduction",
+                    }
+                },
+                {
+                    "Barn",
+                    new[] { "FSFTraining", "FSFTaming", "FSFSlaughter" }
+                },
+            };
+
         internal static Dictionary<RoomRoleDef, List<WorkTypeDef>> resolved;
+
+        /// <summary>
+        /// Appends each name the loaded def set actually has, skipping
+        /// duplicates so a type named by both tables lands once. Silent-fail
+        /// is the contract: an absent name is a mod that is not installed, and
+        /// the row simply narrows.
+        /// </summary>
+        internal static void AddResolvable(List<WorkTypeDef> into, string[] names)
+        {
+            if (names == null)
+            {
+                return;
+            }
+            foreach (string workName in names)
+            {
+                WorkTypeDef work = DefDatabase<WorkTypeDef>.GetNamedSilentFail(workName);
+                if (work != null && !into.Contains(work))
+                {
+                    into.Add(work);
+                }
+            }
+        }
 
         internal static Dictionary<RoomRoleDef, List<WorkTypeDef>> Resolved
         {
@@ -59,13 +143,11 @@ namespace ShiftChange
                             continue;
                         }
                         List<WorkTypeDef> works = new List<WorkTypeDef>();
-                        foreach (string workName in pair.Value)
+                        AddResolvable(works, pair.Value);
+                        string[] compat;
+                        if (CompatDefaults.TryGetValue(pair.Key, out compat))
                         {
-                            WorkTypeDef work = DefDatabase<WorkTypeDef>.GetNamedSilentFail(workName);
-                            if (work != null)
-                            {
-                                works.Add(work);
-                            }
+                            AddResolvable(works, compat);
                         }
                         if (works.Count > 0)
                         {
