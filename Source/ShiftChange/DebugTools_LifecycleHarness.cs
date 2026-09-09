@@ -2328,6 +2328,15 @@ namespace ShiftChange
         /// list, <c>HandlesWork</c> returns false everywhere, and the mod does
         /// nothing at all — with a green harness and no log line. Most likely
         /// to fire on a game update rather than on an edit.
+        ///
+        /// <para>That assertion is hard for <c>Defaults</c> and must NOT be
+        /// for <c>CompatDefaults</c>, whose names come from other mods and are
+        /// absent on any list that does not carry them — the four-mod minimal
+        /// list included. What is still checked there is the merge: whatever
+        /// DOES resolve has to reach <c>ForRole</c>, so a compat row that
+        /// silently fails to fold in is caught on a list that has the mod
+        /// while a row naming a def nobody ships stays invisible. That is the
+        /// intended asymmetry, not a weaker test.</para>
         /// </summary>
         internal static bool RoomRoleTableResolves()
         {
@@ -2349,6 +2358,20 @@ namespace ShiftChange
                         ok = false;
                     }
                 }
+
+                // Absent is the ordinary case here, so count without asserting.
+                string[] compat;
+                if (RoomWorkTypes.CompatDefaults.TryGetValue(entry.Key, out compat))
+                {
+                    for (int i = 0; i < compat.Length; i++)
+                    {
+                        if (DefDatabase<WorkTypeDef>.GetNamedSilentFail(compat[i]) != null)
+                        {
+                            resolved++;
+                        }
+                    }
+                }
+
                 if (role != null)
                 {
                     ok &= Expect(RoomWorkTypes.ForRole(role).Count == resolved,
