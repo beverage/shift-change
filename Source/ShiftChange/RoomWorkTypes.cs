@@ -79,10 +79,21 @@ namespace ShiftChange
         /// no lab stand dressed for it in vanilla either, so covering it here
         /// would be a new feature wearing a compatibility fix's clothes.</para>
         ///
-        /// <para><c>FSFTaming</c> and <c>FSFSlaughter</c> exist only when
-        /// Complex Jobs' own XML Extensions options are switched on, so they
-        /// are absent even with that mod installed and left unconfigured. That
-        /// is the normal case for this table, not a defect.</para>
+        /// <para><c>FSFSlaughter</c> exists only when Complex Jobs' own XML
+        /// Extensions option is switched on, so it is absent even with that
+        /// mod installed and left unconfigured. That is the normal case for
+        /// this table, not a defect.</para>
+        ///
+        /// <para><c>FSFTaming</c> is deliberately NOT here, and the reason is
+        /// the room gate rather than the work. Taming targets a WILD animal
+        /// (<c>WorkGiver_Tame</c> reads the Tame designation), the gate keys
+        /// on where that animal is standing, and a Barn is an enclosed room
+        /// scored by its animal BEDS, so a Tame target is out on the map
+        /// rather than in it (a wild animal that wanders inside is the only
+        /// exception, and not what a row would be for). Vanilla's own <c>Handling</c> row has never fired for
+        /// taming either; listing the split would inherit that fiction rather
+        /// than fix anything. <c>FSFTraining</c> stays, because Train targets
+        /// a TAME animal, which lives in the barn.</para>
         /// </summary>
         internal static readonly Dictionary<string, string[]> CompatDefaults =
             new Dictionary<string, string[]>
@@ -98,10 +109,7 @@ namespace ShiftChange
                         "FSFFabrication", "FSFRefining", "FSFProduction",
                     }
                 },
-                {
-                    "Barn",
-                    new[] { "FSFTraining", "FSFTaming", "FSFSlaughter" }
-                },
+                { "Barn",       new[] { "FSFTraining", "FSFSlaughter" } },
             };
 
         internal static Dictionary<RoomRoleDef, List<WorkTypeDef>> resolved;
