@@ -180,6 +180,12 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing), WorkAndRecreationAreExclusive);
             Case(map, pad, "the removal flag is held off while a stand is in service",
                  RemovalFlagHeldOffInService);
+            Case(map, pad, "the change-back gate hands the chain back untouched",
+                 ChangeBackGateHandsTheChainBack);
+            Case(map, pad, "and still appends the button for a pawn in uniform",
+                 ChangeBackGateStillAppends);
+            Case(map, pad, "the removal-toggle gate leaves a stand it does not govern alone",
+                 RemovalToggleGateLeavesForeignStandsAlone);
             Case(map, pad, "an owner list restricts the stand to its owners",
                  (m, p) => Stage(m, p, StageKit.Displacing), OwnerListRestricts);
             Case(map, pad, "the owner dialog's gender filter offers the right candidates",
@@ -1355,6 +1361,186 @@ namespace ShiftChange
                          "so the optimizer's gate is shut by construction")
                 & Expect(!((IHaulSource)fix.Stand).HaulSourceEnabled,
                          "and the stand is not a haul source while in service");
+        }
+
+        // --------------------------------------------------- the gizmo gates
+        //
+        // Both gizmo postfixes hand the upstream sequence back UNTOUCHED when
+        // they have nothing to add, rather than wrapping it in an iterator
+        // that re-yields every gizmo. `GizmoGridDrawer` rebuilds the
+        // bar once per rendered frame for every selected object, and ours is
+        // the LAST postfix on `Pawn.GetGizmos`, so a wrapper there sits around
+        // every other mod's gizmos for every selected pawn to answer a
+        // question that is usually "no".
+        //
+        // THE CHANGE IS INVISIBLE FROM THE OUTSIDE. The bar a player sees is
+        // identical either way, so a case that only checks which gizmos come
+        // out passes just as happily on a wrapper. What tells the two apart is
+        // REFERENCE IDENTITY of the returned sequence: a gate returns the very
+        // object it was given, and nothing else can. That is the assertion
+        // doing the work below; the rest guard the behaviour around it.
+
+        /// <summary>
+        /// A stand-in gizmo chain. Identity is all that matters — these are
+        /// never drawn, only counted and compared by reference.
+        /// </summary>
+        internal static List<Gizmo> Sentinels()
+        {
+            return new List<Gizmo>
+            {
+                new Command_Action { defaultLabel = "sentinel one" },
+                new Command_Action { defaultLabel = "sentinel two" },
+                new Command_Action { defaultLabel = "sentinel three" },
+            };
+        }
+
+        /// <summary>Same gizmos, same order, by reference.</summary>
+        internal static bool SameSequence(IEnumerable<Gizmo> got, IList<Gizmo> want)
+        {
+            List<Gizmo> actual = got.ToList();
+            if (actual.Count != want.Count)
+            {
+                return false;
+            }
+            for (int i = 0; i < want.Count; i++)
+            {
+                if (!ReferenceEquals(actual[i], want[i]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        internal static bool ChangeBackGateHandsTheChainBack(Fixture fix)
+        {
+            Pawn bystander = SpawnExtra(fix, Gender.Female, "Bystander");
+            List<Gizmo> chain = Sentinels();
+            IEnumerable<Gizmo> passed = Patch_ChangeBackGizmo.Postfix(chain, bystander);
+
+            bool ok = Expect(CompShiftStand.OnShiftStandFor(bystander) == null,
+                             "the bystander is on no stand (control)")
+                    & Expect(ReferenceEquals(passed, chain),
+                             "so the gate hands back the SAME sequence, not a wrapper around it")
+                    & Expect(SameSequence(passed, chain),
+                             "with every upstream gizmo still in it, in order");
+
+            // The defensive arm. Harmony will not hand us a null pawn, but the
+            // guard is written and a refactor that drops it should fail here
+            // rather than throw in somebody's colony.
+            ok &= Expect(ReferenceEquals(Patch_ChangeBackGizmo.Postfix(chain, null), chain),
+                         "and a null pawn is handed back untouched too");
+            return ok;
+        }
+
+        internal static bool ChangeBackGateStillAppends(Fixture fix)
+        {
+            List<Gizmo> chain = Sentinels();
+            List<Gizmo> got = Patch_ChangeBackGizmo.Postfix(chain, fix.Pawn).ToList();
+
+            bool ok = Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == fix.Comp,
+                             "the fixture pawn is in uniform (control)")
+                    & Expect(got.Count == chain.Count + 1,
+                             "so the chain comes back with exactly one gizmo added")
+                    & Expect(SameSequence(got.Take(chain.Count), chain),
+                             "the upstream gizmos are untouched, and still in order")
+                    & Expect(got.Count > chain.Count
+                             && got[got.Count - 1] is Command_Action button
+                             && button.groupKey == Patch_ChangeBackGizmo.GroupKey,
+                             "and the added one is ours, appended LAST");
+
+            // THE INVARIANT THAT HAD A COMMENT AND NO TEST. The fault latch
+            // stops the mod ACTING on its own; it must not also take away the
+            // player's manual way out, because a latched switch is exactly the
+            // moment every pawn already in uniform is stranded there.
+            bool armedBefore = Patch_JobInterception.Enabled;
+            try
+            {
+                Patch_JobInterception.Enabled = false;
+                ok &= Expect(
+                    Patch_ChangeBackGizmo.Postfix(chain, fix.Pawn).Count() == chain.Count + 1,
+                    "and it is STILL offered once interception has latched off");
+            }
+            finally
+            {
+                Patch_JobInterception.Enabled = armedBefore;
+            }
+
+            // A boxed stand keeps its ledger — that is the reinstall case's
+            // whole point — so the registry still answers for this pawn. The
+            // Spawned half of the guard is the only thing between that and a
+            // button pointing at a stand inside a crate.
+            IntVec3 cell = fix.Stand.Position;
+            fix.Stand.DeSpawn(DestroyMode.WillReplace);
+            ok &= Expect(ReferenceEquals(Patch_ChangeBackGizmo.Postfix(chain, fix.Pawn), chain),
+                         "while a stand that is boxed rather than spawned gets no button at all");
+            GenSpawn.Spawn(fix.Stand, cell, fix.Map, Rot4.North);
+            fix.Stand.PostSwapMap();
+            return ok;
+        }
+
+        /// <summary>A stand-in for vanilla's own "Allow removing items" toggle.</summary>
+        internal static Command_Toggle RemovalToggle(string label, bool active, string desc)
+        {
+            return new Command_Toggle
+            {
+                defaultLabel = label,
+                defaultDesc = desc,
+                isActive = () => active,
+                toggleAction = () => { },
+            };
+        }
+
+        internal static bool RemovalToggleGateLeavesForeignStandsAlone(Fixture fix)
+        {
+            string vanillaLabel = "CommandAllowRemovingApparel".Translate().ToString();
+            string ours = "ShiftChange.AllowRemovingDesc".Translate().RawText;
+            const string untouched = "vanilla's own description, verbatim";
+
+            fix.Comp.SetExcluded();
+            Command_Toggle foreign = RemovalToggle(vanillaLabel, active: false, desc: untouched);
+            List<Gizmo> chain = new List<Gizmo> { Sentinels()[0], foreign };
+            IEnumerable<Gizmo> passed = Patch_AllowRemovingToggle.Postfix(chain, fix.Stand);
+
+            bool ok = Expect(fix.Comp.IsExcluded, "the stand is declared not-ours (control)")
+                    & Expect(ReferenceEquals(passed, chain),
+                             "so the gate hands back the SAME sequence, not a wrapper around it")
+                    & Expect(foreign.defaultDesc == untouched,
+                             "and vanilla's tooltip is left exactly as vanilla wrote it")
+                    & Expect(!foreign.Disabled, "with the toggle still live");
+
+            fix.Comp.SetAutomatic();
+            Command_Toggle governed = RemovalToggle(vanillaLabel, active: false, desc: untouched);
+            Command_Toggle alreadyOn = RemovalToggle(vanillaLabel, active: true, desc: untouched);
+            // A toggle that is not vanilla's. The patch matches by LABEL,
+            // because the command is anonymous and there is no other handle —
+            // so if Ludeon renames the key the match stops finding it and the
+            // whole patch reverts to vanilla behaviour. This arm is that
+            // graceful failure, written down.
+            Command_Toggle stranger = RemovalToggle("Another mod's toggle", active: false,
+                                                    desc: untouched);
+            List<Gizmo> governedChain = new List<Gizmo> { governed, alreadyOn, stranger };
+            List<Gizmo> got = Patch_AllowRemovingToggle.Postfix(governedChain, fix.Stand).ToList();
+
+            return ok
+                & Expect(!fix.Comp.IsExcluded, "the stand is back in service (control)")
+                & Expect(SameSequence(got, governedChain),
+                         "every gizmo still comes through, in order")
+                & Expect(governed.defaultDesc != untouched && governed.defaultDesc.Contains(ours),
+                         "the tooltip now carries our paragraph as well as vanilla's")
+                // .RawText on both halves is load-bearing: TaggedString's
+                // implicit conversion to string calls StripTags, so assigning a
+                // Translate() result straight into the field silently deletes
+                // the markup. It ate the colour and bold on this very tooltip
+                // once, on 2026-08-17, with no error and nothing on screen.
+                & Expect(ours.Contains("<color") && governed.defaultDesc.Contains("<color"),
+                         "with its rich-text markup intact, not stripped by TaggedString")
+                & Expect(governed.Disabled,
+                         "an OFF toggle is disabled while the stand is in service")
+                & Expect(!alreadyOn.Disabled,
+                         "while one already ON keeps its way back out")
+                & Expect(stranger.defaultDesc == untouched && !stranger.Disabled,
+                         "and a toggle that is not vanilla's passes through untouched");
         }
 
         internal static bool WorkAndRecreationAreExclusive(Fixture fix)
