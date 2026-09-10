@@ -60,14 +60,20 @@ namespace ShiftChange
         /// </summary>
         internal const int GroupKey = 83619427;
 
+        /// <summary>
+        /// The gate is deliberately NOT an iterator. `GizmoGridDrawer`
+        /// rebuilds the bar once per rendered frame for every selected object
+        /// (`GizmoGridDrawer.cs:54-100` caches on `Time.frameCount` plus the
+        /// selection), and passthrough postfixes nest in run order — ours runs
+        /// last on `Pawn.GetGizmos`, so an iterator here wraps every gizmo of
+        /// every other mod in the chain, for every selected pawn, every frame,
+        /// to decide something that is almost always "no". Returning `values`
+        /// untouched keeps our frame off that path entirely; only a pawn who
+        /// actually gets the button pays for the wrapper.
+        /// </summary>
         // ReSharper disable once InconsistentNaming — Harmony injection.
         public static IEnumerable<Gizmo> Postfix(IEnumerable<Gizmo> values, Pawn __instance)
         {
-            foreach (Gizmo gizmo in values)
-            {
-                yield return gizmo;
-            }
-
             // Deliberately NOT gated on Patch_JobInterception.Enabled. That
             // flag latching false is precisely the moment this button matters
             // most: automatic return trips have stopped, so without it every
@@ -76,16 +82,26 @@ namespace ShiftChange
             // own; it must not also remove the player's manual remedy.
             if (__instance == null || !__instance.IsColonistPlayerControlled)
             {
-                yield break;
+                return values;
             }
-            SessionGuard.Ensure();
+            // No SessionGuard.Ensure() call of our own: OnShiftStandFor opens
+            // with one, so a second here only repeats a reference compare.
             CompShiftStand stand = CompShiftStand.OnShiftStandFor(__instance);
             if (stand?.parent == null || !stand.parent.Spawned)
             {
-                yield break;
+                return values;
             }
+            return WithChangeBack(values, __instance, stand);
+        }
 
-            yield return BuildCommand(__instance, stand);
+        internal static IEnumerable<Gizmo> WithChangeBack(IEnumerable<Gizmo> values,
+                                                         Pawn pawn, CompShiftStand stand)
+        {
+            foreach (Gizmo gizmo in values)
+            {
+                yield return gizmo;
+            }
+            yield return BuildCommand(pawn, stand);
         }
 
         internal static Command_Action BuildCommand(Pawn pawn, CompShiftStand stand)

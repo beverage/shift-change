@@ -68,12 +68,24 @@ namespace ShiftChange
             // question is whether this stand is DECLARED in service; the
             // excluded switch is the player's explicit answer.
             CompShiftStand comp = __instance?.TryGetComp<CompShiftStand>();
-            bool ours = comp != null && !comp.IsExcluded;
-            string vanillaLabel = ours ? "CommandAllowRemovingApparel".Translate().ToString() : null;
+            if (comp == null || comp.IsExcluded)
+            {
+                // Nothing to rewrite on a stand we do not govern, so hand the
+                // chain straight back instead of wrapping every gizmo on it in
+                // our own enumerator for as long as it stays selected — the
+                // same reasoning as the pawn-side gate.
+                return values;
+            }
+            return WithGovernedToggle(values);
+        }
+
+        internal static IEnumerable<Gizmo> WithGovernedToggle(IEnumerable<Gizmo> values)
+        {
+            string vanillaLabel = "CommandAllowRemovingApparel".Translate().ToString();
 
             foreach (Gizmo gizmo in values)
             {
-                if (ours && gizmo is Command_Toggle toggle && toggle.defaultLabel == vanillaLabel)
+                if (gizmo is Command_Toggle toggle && toggle.defaultLabel == vanillaLabel)
                 {
                     // .RawText on BOTH halves, and it is load-bearing.
                     // TaggedString's implicit conversion to string calls
