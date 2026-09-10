@@ -65,7 +65,7 @@ to stop, and `--alongside` is the deliberate opt-in.
 
 ## What the cases assert
 
-Twenty-nine cases, in seven kinds.
+Thirty-eight cases, in seven kinds.
 
 **Regression cases** guard a bug that happened. A stand whose stock shares no
 apparel layer with what the pawn wears once donated its uniform permanently and

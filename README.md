@@ -4,25 +4,40 @@
 > stand this mod builds on is Odyssey content, so without it the mod does
 > nothing at all.
 
-A RimWorld mod. Colonists change into the right clothes for the room they are
-going to, whether they are there to work or to enjoy themselves, and back out
-again afterwards, using the vanilla outfit stand.
+A RimWorld mod.
+
+In a game with so many choices of arms, armor, and apparel, why limit yourself
+to just one set for all jobs? There is different gear best for work, play,
+combat - use all of them!
+
+With Shift Change, colonists can change into the right clothes for the room
+they are going to, whether they are there to work, to enjoy themselves, or to
+sleep, and back out again afterwards, using the vanilla outfit stand.
 
 Put an outfit stand in a room and put an outfit on it. Each stand dresses for
 one of three things:
+
+Your doctor operates in combat armor. It's always been on, and never taken
+off.
 
 **Work.** A colonist taking on **automatic** work of that room's kind
 (doctoring in the hospital, researching or synthesizing drugs in the lab,
 cooking in the kitchen) changes into the stand's outfit before starting, and
 changes back when their work takes them elsewhere.
 
-**Recreation.** The same machinery, for a colonist arriving to enjoy
-themselves. A frame of billiards, a hand of poker, an hour at the harp. A robe
-for the sauna, black tie for the games room.
+Somewhere in your stockpile is probably not a set of formal wear that nobody
+has ever put on. So go make some, and put them in the rec room.
 
-**Rest.** And for turning in: a colonist changes into whatever the bedroom
-stand holds, or simply parks their power armour on one that holds nothing, and
-collects it again in the morning.
+**Recreation.** A stand set to recreation dresses anyone who arrives in that
+room to enjoy themselves, and changes them back when they leave.
+
+Your space marine has been sleeping in their cataphract armor since the day
+you got it.
+
+**Rest.** A stand in the bedroom hands out whatever is on it at bedtime and
+holds their day clothes until morning. Set it to **Deposit only** and it
+issues nothing at all: the armor goes onto the rack on the way to bed and
+comes back in the morning.
 
 Their own clothes wait in the stand every time, and come back exactly as they
 were, force-worn markers included.
@@ -44,9 +59,9 @@ borrower's civvies while they are on shift. Sped up 3–6×.*
      Name one and it is their personal kit, off-limits to everyone else; name
      several and it serves that group and nobody outside it. Left unassigned,
      the stand is **shared**: any capable colonist may use whichever stand is
-     free, like beds. A kitchen needs one stand per cook *working at once*,
-     not one per cook.
-   - **The stand's switch**, labelled with what it currently dresses for
+     free, like beds. A kitchen needs one stand per cook working at the
+     same time, not one stand per cook.
+   - **The stand's switch**, labeled with what it currently dresses for
      ("Shift stand: doctoring", "Shift stand: recreation", "Not used for
      shift changes"), opens the checklist when the room's reading isn't what
      you want: a multi-purpose room, a room the game scores oddly, a place
@@ -76,8 +91,8 @@ and a covered torso as well on women, so the same stand can hold a shirt back
 for one colonist and not for another.
 
 It ships off so that updating the mod does not change how a colony you are
-already playing behaves — this arrives in mod packs, where nobody reads a change
-note. Turn it on if you would rather a stand never left anyone indecent.
+already playing behaves. This arrives in mod packs, where nobody reads a
+change note. Turn it on if you would rather a stand never left anyone indecent.
 
 **Nudists and nudist ideoligions are exempt either way.** For them being dressed
 is the penalty, so nothing is ever held back and the stand does what it was set
@@ -95,7 +110,7 @@ for shift changes" first; the toggle unlocks with it and stays unlocked.
 
 **"Keep contents out of trade" is on by default.** Traders will otherwise buy
 anything sitting on an outfit stand: the uniform, and the owner's own clothes
-parked there while they're on shift. That's vanilla behaviour, it reaches both
+parked there while they're on shift. That's vanilla behavior, it reaches both
 caravans at the gate and ships in orbit, and nothing else about the stand
 prevents it. "Allow removing items" doesn't cover trade, and neither does an
 assigned owner. With this on, the stand's contents never reach a trade window,
@@ -123,8 +138,8 @@ help (a single kind spans prayer, stargazing, building snowmen and visiting a
 grave), so a list of activities would only offer you categories your rooms do
 not have.
 
-Recreation and work types are mutually exclusive on a stand. A stand holds one
-outfit, and one outfit serves one purpose. Tick recreation and the work
+Recreation and work types are mutually exclusive on a stand, because a stand
+holds one outfit. Tick recreation and the work
 checklist goes away; tick any work type and recreation drops. A room that does
 both wants two stands.
 
@@ -154,14 +169,14 @@ over ordinary clothes; a sauna robe does not.
 
 - **Drinking and drug-taking are invisible to it.** Fetching a beer runs the
   same job whether it ends at a bar or in a corridor, and nothing in that job
-  says recreation, so nothing dresses anyone for it. Sitting down to socialise
+  says recreation, so nothing dresses anyone for it. Sitting down to socialize
   at a table or a counter *is* caught, and the drink comes along.
 - **Reading is left alone.** A colonist picks their reading spot after setting
   off. The only room known at the start is wherever the book sits on a shelf,
   and dressing them for the library because that is where the novel lives would
   be the wrong room.
 - **Outdoors is excluded, for now.** Every outdoor cell on the map belongs to
-  one enormous room, so a recreation stand in open ground would dress
+  the same map-spanning room, so a recreation stand in open ground would dress
   colonists for every walk and every bit of stargazing anywhere on the map. A
   walled but roofless yard is its own room and still counts. Serving open
   ground needs a boundary of its own: a zone, or a radius around the stand.
@@ -175,28 +190,28 @@ over ordinary clothes; a sauna robe does not.
 
 Tick **Sleeping: going to bed in this room** and the stand dresses whoever
 turns in there. A stand in a bedroom does it by itself, because the room's own
-role is enough — pyjamas on a rack beside the bed is the whole setup.
+role is enough: pyjamas on a rack beside the bed is the whole setup.
 
-![Two soldiers in prestige cataphract turn in; one parks her armour on an empty rack, the other swaps his for a duster and helmet](media/demo-sleep.gif)
+![Two soldiers in prestige cataphract turn in; one parks her armor on a deposit-only rack, the other swaps his for a duster and helmet](media/demo-sleep.gif)
 
-*Two bedrooms off one corridor. On the left the stand holds nothing and simply
-takes the armour in; on the right it holds a light kit and does a swap. Both
+*Two bedrooms off one corridor. On the left the stand holds nothing and is set
+to Deposit only, so it takes the armor in and issues nothing; on the right it holds a light kit and does a swap. Both
 collect their gear again in the morning. Sped up 8× through the walk and the
 changes.*
 
 A stand with an outfit on it swaps, exactly as it does for work. **Deposit
 only, issue no outfit** does the other half: the stand hands out nothing and
 takes in whatever its storage filter accepts, so a marine parks their power
-armour by the bed and sleeps in what was underneath.
+armor by the bed and sleeps in what was underneath.
 
 **The storage filter is the control on a deposit-only stand**, and it wants
 narrowing. A newly built stand already accepts nearly all clothing, so set it
-to the pieces you actually want parked — armour and helmet, say — and leave the
+to the pieces you actually want parked (armor and helmet, say) and leave the
 rest out.
 
 It will not send anyone to bed naked. If what the filter would take leaves a
 colonist without basic clothing, the stand is skipped for that colonist
-entirely. A soldier who wears nothing under their armour therefore needs
+entirely. A soldier who wears nothing under their armor therefore needs
 something underneath before a deposit-only stand will do anything for them.
 
 **"Resting in bed" in the work list is not this.** That is vanilla's own work
@@ -204,15 +219,14 @@ type, for a colonist recovering from injury or illness, and it behaves like any
 other work type. Ordinary sleep is the **Sleeping** row. Tick the work type for
 a hospital gown; tick Sleeping for pyjamas.
 
-Bedrooms turn this on by themselves. Barracks deliberately do not — ten
-colonists cycling one pyjama stand at lights-out is churn rather than charm, so
-a shared sleeping room takes the switch by hand.
+Bedrooms turn this on by themselves. Barracks deliberately do not: a stand
+serves one colonist at a time, so in a ten-bunk barracks the first sleeper to
+reach it would hold it all night and the other nine would go to bed in what
+they were already wearing. A shared sleeping room takes the switch by hand.
 
 ## The rules it follows
 
-Deliberately narrow, so it never fights you:
-
-- **Automatic only**, for work and recreation alike. Right-click orders
+- **Automatic only**, for work, recreation and sleeping alike. Right-click orders
   execute immediately, in both directions: a doctor ordered to tend *right
   now* goes straight there, and a pawn in uniform given a direct order keeps
   it on and returns it later.
@@ -222,7 +236,7 @@ Deliberately narrow, so it never fights you:
   already wearing one still changes back out of it, on their own next job.
   Getting dressed is a trip nobody should make in a firefight; getting changed
   back is a colonist heading toward their own gear, which on a stand set to
-  change the whole outfit is where their armour is.
+  change the whole outfit is where their armor is.
 - **Personal kit stays personal.** A stand with owners serves only them,
   nobody takes clothes out of a stand someone else is using, and whoever
   checked a uniform out is whom it goes back to.
@@ -262,7 +276,7 @@ service, theirs when the stand is set to "Not used for shift changes". Its
 wardrobe features, its "allow adding items" toggle and its research are all
 untouched.
 
-Two of its behaviours are worth knowing about, because they can look like
+Two of its behaviors are worth knowing about, because they can look like
 faults here: it switches off its own "allow adding items" after a manual
 swap, which quietly stops haulers restocking that stand until it is switched
 back on; and its right-click "Return to stand", used on a colonist who is
@@ -298,25 +312,26 @@ not the barn. Vanilla's own Handling row never fired for it either, so no barn
 stand has ever dressed anyone for taming.
 
 **An apparel mod is worth having.** Not required and not a dependency, but
-vanilla has no scrubs, no lab coat and no chef's whites, so in a pure vanilla
-game there is very little to actually dress anyone *in*. Any apparel mod fixes
-that; [Vanilla Apparel Expanded](https://steamcommunity.com/sharedfiles/filedetails/?id=1814987817)
-adds exactly those three and is what all the footage here uses.
+vanilla has no scrubs and no chef's whites, and the one lab coat it does have
+is Anomaly's, so in a pure vanilla game there is very little to actually dress
+anyone *in*. Any apparel mod fixes that;
+[Vanilla Apparel Expanded](https://steamcommunity.com/sharedfiles/filedetails/?id=1814987817)
+adds all three and is what all the footage here uses.
 
 **[Apparel Painter](https://steamcommunity.com/sharedfiles/filedetails/?id=3792795811)
 is the companion piece**, from the same author, and was built for exactly the
 wardrobe walls this mod creates: fine-grained painting of the apparel already
 on the stands, one garment or a whole stand at once, with live preview on the
-map and a per-item reset back to the natural material colour. It earns its
+map and a per-item reset back to the natural material color. It earns its
 keep on the recreation side, where the outfit is the point: black tie in one
-matched palette, sauna robes in the house colour. Bulk repainting tools
-cannot see inside a stand; this is the fine brush, one garment at a time.
+matched palette, sauna robes in the house color. Bulk repainting tools
+cannot see inside a stand at all.
 
 ## Save safety
 
 Add it to an existing save freely: your existing outfit stands gain the new
 controls on load, nothing needs rebuilding. Removing it is also safe: stands
-revert to ordinary vanilla furniture, and a colonist who was mid-shift simply
+revert to ordinary vanilla furniture, and a colonist who was mid-shift
 keeps the uniform (**Clear forced apparel** on the Assign tab un-forces it)
 with their own clothes waiting in the stand.
 
@@ -337,7 +352,7 @@ This mod is built with AI assistance and it is worth being precise about where.
 and contains all of it, so none of this has to be taken on trust.
 
 **All the art here is captured in game.** The mod itself ships no textures and
-no apparel of any kind. It adds behaviour to a building the base game already
+no apparel of any kind. It adds behavior to a building the base game already
 draws, its icons come from vanilla's own UI atlas, and the only image inside the
 mod folder is the Workshop preview, which is a screenshot.
 
@@ -359,11 +374,11 @@ were caught by reading the decompiled engine instead, including one that had
 been running unnoticed on the demo film set for days. Both kinds are real, and
 neither method finds the other's.
 
-**The behaviour is tested, and you can run the tests.**
+**The behavior is tested, and you can run the tests.**
 `devtools/run-harness.sh` runs a suite inside RimWorld itself, against the real
 engine rather than mocks, in about thirty-five seconds (game launch, mod
 load and quit included). Cases arrive from four
-places: a bug that happened, a claim this page makes, an engine behaviour worth
+places: a bug that happened, a claim this page makes, an engine behavior worth
 pinning down before an update moves it, and a feature that shipped with its own.
 The standing rule is that anything which goes wrong leaves a case behind that
 fails without its fix. It does not cover everything:

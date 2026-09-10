@@ -55,6 +55,23 @@ REJECTED = {
 
 TAG = re.compile(r"\[(/?)([a-zA-Z*]+)(?:=([^\]]*))?\]")
 
+#: Our own raw.githubusercontent URLs serve whatever is COMMITTED, so a
+#: preview built straight from them shows the last art that was pushed and
+#: not the art in the working tree. That is the one mistake this file exists
+#: to prevent, so rewrite them to the local file whenever it is on disk: the
+#: point of previewing before upload is seeing what you are about to upload.
+RAW = re.compile(r"^https://raw\.githubusercontent\.com/[^/]+/[^/]+/[^/]+/")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def localise(src, near):
+    """A repo raw URL becomes a path relative to the preview file."""
+    match = RAW.match(src)
+    if near is None or not match:
+        return src
+    local = os.path.join(ROOT, src[match.end():])
+    return os.path.relpath(local, near) if os.path.exists(local) else src
+
 
 def validate(text):
     """Return a list of human-readable problems, empty when the file is sound."""
@@ -93,7 +110,7 @@ def validate(text):
     return problems
 
 
-def render(text):
+def render(text, near=None):
     """BBCode subset to HTML. Structure only — this is not a Steam emulator."""
     out = html.escape(text)
 
@@ -122,8 +139,8 @@ def render(text):
     # An unresolved image is drawn as a labelled box rather than a broken
     # icon: the placeholders are the point of the check at this stage.
     def as_img(match):
-        src = match.group(1).strip()
-        if src.startswith("http"):
+        src = localise(match.group(1).strip(), near)
+        if src.startswith("http") or os.path.exists(os.path.join(near or ".", src)):
             return f'<img src="{src}" alt="">'
         return f'<div class="ph">[img] {src}</div>'
 
@@ -183,7 +200,7 @@ def main():
                         "_bbcode-preview.html")
     with open(dest, "w", encoding="utf-8") as handle:
         handle.write(PAGE.format(title=os.path.basename(source),
-                                 body=render(text)))
+                                 body=render(text, os.path.dirname(dest))))
 
     placeholders = len(re.findall(r"REPLACE-WITH-[A-Z-]+", text))
     over_limit = len(text) > DESCRIPTION_LIMIT

@@ -70,6 +70,10 @@ SHOT_W = 521
 # Markup inside copy: **bold** for a term or a default, `code` for a literal
 # in-game label, !!warning!! for the one thing on a card that bites.
 #
+# A BODY IN A `lead` ENTRY STARTS LOWERCASE. The lead closes with a full stop
+# and the renderer uppercases the first lowercase letter it finds, so writing
+# "**Off by default.**" yourself renders as "OFf". Let the renderer do it.
+#
 # `lede` IS USUALLY EMPTY, AND SHOULD STAY THAT WAY. A title followed by a
 # one-line restatement of the title is the single most recognisable tell of
 # machine-written copy — "Four optional controls, on every stand", "Deliberately
@@ -185,16 +189,16 @@ CARDS = [
                    "cards/parts/giz-removing.png", "cards/parts/giz-changeback.png"],
         "entries": [
             {
-                "body": "Select a stand and the first two appear. The switch names "
-                        "what that stand is currently dressing for, so its face "
-                        "changes as you set it, and beside another outfit-stand mod "
-                        "it also decides whose owner control you see.",
+                "body": "The first two appear on any stand you select. The switch "
+                        "names what that stand currently dresses for, so it changes "
+                        "as you set it. Beside another outfit-stand mod it also "
+                        "decides whose owner control you see.",
             },
             {
                 "body": "**Allow removing items** is vanilla's own button, held off "
-                        "here while a stand is in service. **Change back** is the odd "
-                        "one out: it sits on the colonist rather than the stand, and "
-                        "only while they are wearing a uniform.",
+                        "while a stand is in service. **Change back** sits on the "
+                        "colonist, not the stand, and appears only while they are "
+                        "wearing a uniform.",
             },
         ],
     },
@@ -207,22 +211,21 @@ CARDS = [
             {
                 "shot": "cards/parts/sec-type.png",
                 "lead": "The switch",
-                "body": "the top of the stand's own dialog, and the only control that "
-                        "must be set for anything to happen at all. It reads back **what "
-                        "the game thinks the room is**, which can be surprising, for "
-                        "example, !!a crib can turn a hospital into a barracks!!. Set it "
-                        "by hand for a room that does two jobs, or for a decorative "
-                        "stand you do not want used.",
+                "body": "**automatic by default.** It reads the room, so a stand needs "
+                        "no setup. The label names what the game thinks the room is: "
+                        "!!a crib turns a hospital into a barracks!!. Set it by hand "
+                        "for a room that does two jobs, or for a decorative stand you "
+                        "do not want used.",
             },
             {
                 "shot": "cards/parts/sec-flags.png",
                 "lead": "Change the whole outfit",
-                "body": "**off by default.** The difference between a lab coat worn over "
-                        "ordinary clothes and a sauna robe worn instead of them. Ticked, "
-                        "the colonist wears only what the stand holds and loses whatever "
-                        "their own clothes were providing, !!warmth included!!. If that "
-                        "would leave them without basic clothing they keep their innermost "
-                        "garments on instead.",
+                "body": "**off by default.** The stand's outfit goes on over their own "
+                        "clothes. Ticked, a colonist wears only what the stand holds "
+                        "and loses whatever their clothes were providing, !!warmth "
+                        "included!!. A mod setting, **Keep colonists decent**, holds "
+                        "back their innermost garments rather than leave them bare, "
+                        "and !!it ships off!!.",
             },
             {
                 "lead": "Keep contents out of trade",
@@ -234,21 +237,19 @@ CARDS = [
             {
                 "shot": "cards/parts/sec-activities.png",
                 "lead": "What sets it off",
-                "body": "every work type in your game, plus recreation and sleeping. "
-                        "Left on **Automatic** the stand follows the room and this list "
-                        "only reports what that resolved to. Tick them yourself for rooms "
-                        "that don't fit what the game thinks they are, like multi-purpose "
-                        "rooms. Work types, recreation and sleeping are **mutually "
-                        "exclusive**, so ticking one clears the others: one outfit serves "
-                        "one purpose.",
+                "body": "left on **Automatic** the stand follows the room, and this "
+                        "list only reports what that resolved to. Tick them yourself for a "
+                        "room the game reads oddly. Work types, recreation and sleeping "
+                        "are **mutually exclusive**, so ticking one clears the others, "
+                        "and a room that does two jobs wants two stands.",
             },
             {
                 "shot": "cards/parts/dlg-owners.png",
                 "lead": "Set owners",
-                "body": "restricts a stand to the colonists you list: one for a personal "
-                        "kit, several to serve a group and nobody outside it. Left "
-                        "unassigned it is **shared**, like a bed, so a kitchen needs one "
-                        "stand per cook working *at once*, not one per cook.",
+                "body": "left unassigned a stand is **shared**, and shared works like "
+                        "a bed: a kitchen needs one stand per cook working at the same "
+                        "time, not one stand per cook. Assign owners to hold a stand "
+                        "for a personal kit, or for a group and nobody outside it.",
             },
         ],
     },
@@ -262,8 +263,8 @@ CARDS = [
             {
                 "body": "This vanilla toggle is **held off while the stand is in "
                         "service**. Turning it on exposes the stand's contents to every "
-                        "colonist's outfit optimizer, which may simply take the uniform "
-                        "and wear it as everyday clothes. It never covered trade.",
+                        "colonist's outfit optimizer, which will take the uniform and "
+                        "wear it as everyday clothes if it outscores what they have on.",
             },
             {
                 "body": "To take a garment back, use the **eject button** in the stand's "
@@ -284,7 +285,7 @@ CARDS = [
              "body": "Nobody changes into a uniform while the map is under threat, "
                      "and firefighting or a rescue is never held up. A colonist "
                      "already in one still changes back, which on a full-change "
-                     "stand is how they get back to their armour."},
+                     "stand is how they get back to their armor."},
             {"q": "Can another colonist take the uniform?",
              "body": "Not from a stand with owners; that one serves only the colonists "
                      "you list. Nobody takes clothes out of a stand somebody else is "
@@ -299,7 +300,7 @@ CARDS = [
              "body": "No. Only doing the room's work does it."},
             {"q": "Do they eat in uniform?",
              "body": "No, a meal break gets them changed first, wherever the food is "
-                     "stored. Food already in hand they simply eat."},
+                     "stored. Food already in hand they eat where they are."},
             {"q": "What if every stand was busy when they started?",
              "body": "If one frees up while they are working in its room out of uniform, "
                      "they step over and change, unless they are mid-treatment on a "
@@ -335,7 +336,7 @@ CARDS = [
                 "body": "**Shift Change** dresses a colonist for the room they walk "
                         "into: scrubs in the hospital, whites in the kitchen, a robe for "
                         "the sauna. In practice that means a wall of stands, and every "
-                        "garment on it arrives in whatever colour its "
+                        "garment on it arrives in whatever color its "
                         "material happened to be.",
             },
             {
