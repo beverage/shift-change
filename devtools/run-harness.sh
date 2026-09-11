@@ -43,11 +43,12 @@ PROC="RimWorld by Ludeon Studios"
 # pass takes ~20s, so a high ceiling costs nothing except when something is
 # genuinely wrong.
 #
-# The usual cause of a multi-minute run is NOT slowness: RimWorld's loading
-# screen stalls while its window is backgrounded, and resumes when it comes
-# forward. A four-mod run was observed at 715s that way (2026-08-17). Leave the
-# window in front, or expect the wall clock to measure your attention rather
-# than the game.
+# Historically the usual cause of a multi-minute run was NOT slowness: a
+# backgrounded instance stalled at its loading screen, and a four-mod run was
+# once observed at 715s that way (2026-08-17). That is fixed — the Prefs.xml
+# block below seeds runInBackground, and an unfocused run now loads normally.
+# The ceiling stays high because --full on a large list legitimately takes
+# minutes.
 TIMEOUT=1200
 
 # How long to allow for the game to reach RIMWORLD'S OWN startup, as opposed to
@@ -91,6 +92,15 @@ STARTUP_GRACE=120
 # is called stalled. A loading game writes constantly; the stall writes nothing
 # ever again.
 STALL_QUIET=60
+
+# The seeded runInBackground value, overridable ONLY so the A/B that justified
+# it can be re-run without editing this file:
+#
+#   HARNESS_RUN_IN_BACKGROUND=False devtools/run-harness.sh
+#
+# True is the shipped default and the one every ordinary run should use. See
+# the Prefs.xml block below for what it does and does not explain.
+RUN_IN_BACKGROUND="${HARNESS_RUN_IN_BACKGROUND:-True}"
 
 # Harmony, Core, Odyssey (the outfit stand is Odyssey content) and us. Vanilla
 # Apparel Expanded is deliberately absent: the fixture falls back to vanilla
@@ -253,21 +263,29 @@ fi
 # instance that does not, and it went unnoticed through every session that
 # debugged this.
 #
-# It is NOT the answer to the startup stall, and the earlier version of this
-# comment asserted a theory that says it should be. Root.Start() sets
-# `Application.runInBackground = true` outright (Verse/Root.cs:72) in the
-# !PlayDataLoader.Loaded branch, immediately before queueing LoadAllPlayData —
-# and Prefs.Apply() runs from Root.Update() behind `!LongEventHandler
-# .ShouldWaitForEvent` and `Time.frameCount > 3` (:128, :139-143), so it lands
-# only AFTER that first long event finishes. The initial load already runs with
-# the flag forced on. Whatever blocks it sits below managed code, so the
-# LongEventHandler render-loop explanation that used to be written here cannot
-# be the whole story and has been removed rather than repeated.
+# MEASURED 2026-09-11, and it is THE FIX. Six runs on the minimal list with
+# focus deliberately held on another application for the whole of every run:
 #
-# What the flag DOES govern is everything after that first load — map gen, and
-# the save/load round-trip cases, which come back through SavedGameLoaderNow
-# late in the run. Those are a different failure that happens to look the same,
-# and this is the cheap half of telling them apart.
+#   True  -> PASSED 3/3, startup in 20s
+#   False -> STALLED 3/3, log frozen at 48 lines, ~0.8% CPU, killed at 120s
+#
+# Then --full against the real mod list, unfocused and unattended end to end:
+# 35 passed, 0 failed, 3 known gaps in 166s, with the game never once holding
+# the foreground. That is the whole point of the flag being here.
+#
+# WHY IT LANDS EARLY ENOUGH TO MATTER, because a wrong prediction was written
+# in this very comment three days before the measurement. Prefs.Init() ENDS
+# with an unqualified Apply() (Prefs.cs:861) — a grep for `Prefs.Apply` does not
+# find it — and Prefs.Init() runs inside Root.CheckGlobalInit() (Root.cs:104),
+# right after the version banner. PrefsData.Apply() then sets the flag (:153)
+# and IMMEDIATELY reconfigures the resolution (:154-161). So the flag is set
+# just before a Unity window/surface rebuild, which is exactly the operation
+# that needs a live update loop — and exactly what the asset-unload block at
+# the end of every stalled log is.
+#
+# Root.cs:72 sets the same flag true unconditionally, which is what the earlier
+# prediction leaned on. It is TOO LATE: it sits after CheckGlobalInit() returns,
+# and with the pref false an unfocused instance never gets that far.
 #
 # Written into the throwaway folder
 # that is rm -rf'd at the top of every run; the real Prefs.xml is never read or
@@ -278,12 +296,12 @@ fi
   printf '  <screenWidth>1280</screenWidth>\n'
   printf '  <screenHeight>720</screenHeight>\n'
   printf '  <fullscreen>False</fullscreen>\n'
-  printf '  <runInBackground>True</runInBackground>\n'
+  printf '  <runInBackground>%s</runInBackground>\n' "$RUN_IN_BACKGROUND"
   printf '  <volumeMaster>0</volumeMaster>\n'
   printf '</PrefsData>\n'
 } > "$TESTDATA/Config/Prefs.xml"
 xmllint --noout "$TESTDATA/Config/Prefs.xml" || die "generated Prefs.xml is not well-formed"
-printf 'display: windowed 1280x720 (fullscreen stalls a second instance)\n'
+printf 'display: windowed 1280x720, muted, runInBackground=%s\n' "$RUN_IN_BACKGROUND"
 
 printf 'save data: %s\n' "$TESTDATA"
 printf 'launching…\n'
@@ -354,14 +372,16 @@ $evidence
     die "stalled before RimWorld started (log silent ${quiet}s, ${elapsed}s in).
 
        This is NOT a mod-wiring problem: Unity's preamble finished and the game
-       stopped before loading any assembly. The known cause is the window never
-       coming to the front. A near-zero CPU reading below confirms it is blocked
-       rather than slow; a busy one means look elsewhere.
+       stopped before loading any assembly. A near-zero CPU reading below
+       confirms it is blocked rather than slow; a busy one means look elsewhere.
 
 $evidence
-       Bring the new RimWorld window to the front and run again. Note that
-       --alongside cannot do this for you: the instance already running owns the
-       foreground.
+       This USED to mean the window was not frontmost, and that cause is fixed:
+       the seeded Prefs.xml sets runInBackground, which makes an unfocused
+       instance load normally (measured, 3/3 either way). So if you are seeing
+       this, check that first — HARNESS_RUN_IN_BACKGROUND is not set to False,
+       and the Prefs.xml written above really does carry the key. Fronting the
+       window by hand is still a valid way to get unblocked once.
 
        Log: $LOG"
   fi

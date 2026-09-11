@@ -104,6 +104,25 @@ namespace ShiftChange
         internal readonly int rowsPerColumn;
         internal Vector2 scroll;
 
+        /// <summary>
+        /// Height the body actually took when it last drew, fed back into
+        /// <see cref="InitialSize"/>. Zero until the first frame, which is
+        /// harmless: the constants estimate it and <see cref="FitToMode"/>
+        /// re-fits the window every frame.
+        ///
+        /// <para>This exists because the estimate was WRONG in the direction
+        /// that hides controls. Every row here is a wrapping label whose height
+        /// depends on the window width, which depends on the work-type count,
+        /// and the window is then clamped to 85% of the screen. Below about
+        /// 460px of UI height — 1920x1080 at 3x UI scale, or a 1366x768 laptop
+        /// at 2x — the fixed rows needed more than the clamped window had, and
+        /// everything from the trigger rows down was drawn outside it and
+        /// clipped away. No exception, nothing in the log, and the window kept
+        /// the height it had reserved, so it read as a blank panel. Reported by
+        /// a player and reproduced at four UI sizes, 2026-09-11.</para>
+        /// </summary>
+        internal float measuredBody;
+
         internal static string LabelOf(WorkTypeDef w)
         {
             return (w.gerundLabel ?? w.labelShort ?? w.defName).CapitalizeFirst();
@@ -212,10 +231,19 @@ namespace ShiftChange
                     + (columns - 1) * ColumnGutter + ScrollbarAllowance;
                 width = Mathf.Clamp(width, MinWindowWidth, UI.screenWidth * 0.9f);
 
-                float height = WindowMargin * 2f + CloseButSize.y + 10f + autoLabelOverflow
-                    + (ModeOnly
-                        ? ModeOnlyAllowance
-                        : HeaderAllowance + TriggerRowsAllowance + rowsPerColumn * RowHeight);
+                // MEASURED body first, the constants only until one exists.
+                // HeaderAllowance is a guess at a stack of rows whose real
+                // height depends on how the labels wrap, and a guess that runs
+                // under the screen clamp below is how the body came to be drawn
+                // outside its own window (reproduced 2026-09-11).
+                float body = ModeOnly
+                    ? ModeOnlyAllowance
+                    : (measuredBody > 0f
+                        ? measuredBody
+                        : HeaderAllowance + TriggerRowsAllowance
+                            + rowsPerColumn * RowHeight + autoLabelOverflow);
+
+                float height = WindowMargin * 2f + CloseButSize.y + 10f + body;
                 height = Mathf.Min(height, UI.screenHeight * 0.85f);
 
                 return new Vector2(width, height);
@@ -242,8 +270,74 @@ namespace ShiftChange
             float footer = CloseButSize.y + 10f;
             Rect content = new Rect(inRect.x, inRect.y, inRect.width, inRect.height - footer);
 
+            // ONE scroll view, around the WHOLE body, and only when the body
+            // does not fit. Nothing below this point can be pushed outside the
+            // window: the scroll view is the overflow, rather than the grid
+            // being handed "whatever is left" and the rest running off the
+            // bottom when that was negative (reproduced 2026-09-11).
+            //
+            // It also means the grid no longer nests a scroll view inside this
+            // one. A window with no clipped region at all is the common case
+            // now, which is one less thing to depend on a graphics backend
+            // clipping the way we assume.
+            bool scrolling;
+            Rect body = BodyRect(measuredBody, content, out scrolling);
+            if (scrolling)
+            {
+                Widgets.BeginScrollView(content, ref scroll, body);
+            }
+            measuredBody = DrawBody(body);
+            if (scrolling)
+            {
+                Widgets.EndScrollView();
+            }
+            FitToMode();
+        }
+
+        /// <summary>
+        /// The rect the body listing is drawn into, and whether it scrolls.
+        ///
+        /// <para>Static and free of any GUI call ON PURPOSE: this is the one
+        /// piece of the layout the release gate can assert, and the harness
+        /// runs from <c>Game.FinalizeInit</c> where there is no GUI context to
+        /// draw in. Its invariant is the whole bug in one line — the listing is
+        /// never handed a rect shorter than the body it has to draw, because
+        /// that is the condition under which <c>Listing.NewColumnIfNeeded</c>
+        /// moves the remaining rows into a column outside the window.</para>
+        /// </summary>
+        internal static Rect BodyRect(float measuredBody, Rect content, out bool scrolling)
+        {
+            scrolling = measuredBody > content.height + 1f;
+            return scrolling
+                ? new Rect(0f, 0f, content.width - ScrollbarAllowance, measuredBody)
+                : content;
+        }
+
+        /// <summary>
+        /// Draws every control and returns the height it used, which
+        /// <see cref="DoWindowContents"/> feeds back to size the window and to
+        /// decide whether the body needs to scroll.
+        /// </summary>
+        internal float DrawBody(Rect content)
+        {
             Listing_Standard listing = new Listing_Standard();
             listing.Begin(content);
+
+            // NEVER let the listing wrap, and this is the whole bug rather than
+            // a precaution. Listing.GetRect calls NewColumnIfNeeded on EVERY
+            // row (Verse/Listing.cs:62-68), which starts a second column at
+            // `curX + ColumnWidth + 17` the moment a row does not fit
+            // (:54-60). Our listing is full width, so that column begins
+            // outside the window and every row from there on is clipped away
+            // whole: the header looks perfect and the trigger rows and grid
+            // simply are not there. That is what a player photographed.
+            //
+            // It also breaks the measurement that fixes it. NewColumn resets
+            // curY to 0 (:50) and CurHeight is curY (:30), so a wrapped listing
+            // reports the LAST column's height, not the total — measuredBody
+            // would come back too small, the scroll view would never engage,
+            // and the repair would silently not apply on the screens it is for.
+            listing.maxOneColumn = true;
 
             Text.Font = GameFont.Medium;
             listing.Label("ShiftChange.WorkTypesTitle".Translate());
@@ -325,11 +419,10 @@ namespace ShiftChange
             // are the whole control surface until one of them brings it back.
             if (ModeOnly)
             {
+                float modeOnlyHeight = listing.CurHeight;
                 listing.End();
-                FitToMode();
-                return;
+                return modeOnlyHeight;
             }
-            FitToMode();
 
             listing.GapLine();
 
@@ -453,8 +546,9 @@ namespace ShiftChange
                     ? "ShiftChange.RestExclusiveNote".Translate()
                     : "ShiftChange.RecreationExclusiveNote".Translate());
                 GUI.color = Color.white;
+                float exclusiveHeight = listing.CurHeight;
                 listing.End();
-                return;
+                return exclusiveHeight;
             }
             // The from-room note is drawn BELOW the grid, not above it. Ticking
             // a work type overrides the room's trigger, which correctly makes
@@ -467,18 +561,19 @@ namespace ShiftChange
             // of movement.
             bool roomTrigger = comp.HandlesRecreation() || comp.HandlesRest();
 
-            // Reserve the note's own height before the grid claims what is
-            // left, or drawing it after EndScrollView would run off the bottom.
-            // Measured, not assumed: the string wraps to two lines at this
-            // dialog's clamped minimum width.
-            float noteHeight = roomTrigger
-                ? Text.CalcHeight("ShiftChange.TriggerFromRoomNote".Translate(), content.width) + 4f
-                : 0f;
-            Rect outRect = listing.GetRect(content.height - listing.CurHeight - noteHeight);
-            Rect viewRect = new Rect(0f, 0f,
-                columns * cellWidth + (columns - 1) * ColumnGutter,
-                rowsPerColumn * RowHeight);
+            // The grid takes the height it NEEDS. It used to take
+            // `content.height - listing.CurHeight`, which is fine while the
+            // window is big enough to hold the rows above it and goes NEGATIVE
+            // when the screen clamp cuts the window below what those rows need
+            // — at which point the grid drew nothing and everything after it
+            // landed outside the window, which is how it was reported. The
+            // body scroll view absorbs
+            // the overflow instead, so nothing here can underflow and the note
+            // below no longer has to be reserved out of the grid's share.
             float labelWidth = cellWidth - CheckboxSize;
+            Rect grid = listing.GetRect(works.Count > 0
+                ? rowsPerColumn * RowHeight
+                : EmptyNoteRows * RowHeight);
 
             // An empty grid has to SAY it is empty. The list is every work type
             // the game will show, and another mod can empty it: Personal Work
@@ -492,18 +587,17 @@ namespace ShiftChange
             if (works.Count == 0)
             {
                 GUI.color = Color.gray;
-                Widgets.Label(outRect, "ShiftChange.NoWorkTypes".Translate());
+                Widgets.Label(grid, "ShiftChange.NoWorkTypes".Translate());
                 GUI.color = Color.white;
             }
             else
             {
-                Widgets.BeginScrollView(outRect, ref scroll, viewRect);
                 for (int i = 0; i < works.Count; i++)
                 {
                     WorkTypeDef work = works[i];
                     Rect cell = new Rect(
-                        i / rowsPerColumn * (cellWidth + ColumnGutter),
-                        i % rowsPerColumn * RowHeight,
+                        grid.x + i / rowsPerColumn * (cellWidth + ColumnGutter),
+                        grid.y + i % rowsPerColumn * RowHeight,
                         cellWidth,
                         RowHeight - 2f);
                     bool on = comp.HandlesWork(work);
@@ -518,7 +612,6 @@ namespace ShiftChange
                         comp.ToggleWork(work);
                     }
                 }
-                Widgets.EndScrollView();
             }
 
             if (roomTrigger)
@@ -528,7 +621,9 @@ namespace ShiftChange
                 GUI.color = Color.white;
             }
 
+            float bodyHeight = listing.CurHeight;
             listing.End();
+            return bodyHeight;
         }
     }
 }
