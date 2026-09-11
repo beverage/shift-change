@@ -116,6 +116,37 @@ done
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
 
+# WHAT THE STALL LOOKED LIKE, PRINTED RATHER THAN ASSERTED.
+#
+# Every session that has debugged this paid twenty minutes to learn the log had
+# stopped around line 49 — a fact available in one second. The bail-out message
+# used to state a cause and show no evidence for it, so the next reader had to
+# reproduce the stall to see anything at all.
+#
+# Sampled BEFORE the kill, because `ps` needs the process alive and "blocked,
+# not slow" is the entire diagnosis: a stalled instance sits near 0% CPU with
+# real CPU time already banked, which is a different shape from a slow load.
+#
+# The frontmost reading is here because every previous record of this failure
+# says "focus state unknown" or "self-reported". A run that stalls should say
+# what had the foreground at the time, without anyone having to remember.
+stall_evidence() {
+  lines=$(wc -l < "$LOG" 2>/dev/null | tr -d ' ' || printf 0)
+  # ps pads its columns, and the point of this block is that it can be read at
+  # a glance. Trim to one space so the three labels line up.
+  cpu=$(ps -o %cpu=,time= -p "$GAME_PID" 2>/dev/null | sed 's/^ *//;s/  */ /g' \
+    || printf '(process gone)')
+  [ -n "$cpu" ] || cpu='(process gone)'
+  front=$(osascript -e \
+    'tell application "System Events" to get name of first process whose frontmost is true' \
+    2>/dev/null || printf '(unavailable)')
+  printf '       log lines:    %s\n' "$lines"
+  printf '       cpu / time:   %s\n' "$cpu"
+  printf '       frontmost:    %s\n' "$front"
+  printf '       last 5 lines:\n'
+  tail -n 5 "$LOG" 2>/dev/null | sed 's/^/         | /'
+}
+
 # The instance this script starts is tracked by PID and is the only one it ever
 # waits on or signals. Another instance already running is somebody's colony
 # with unsaved progress in it — the safe default is to stop, and `--alongside`
@@ -199,10 +230,8 @@ fi
 #   setPresentationOptions called with NSApplicationPresentationFullScreen
 #   when there is no visible fullscreen window; this call will be ignored
 #
-# and is left with no compositing window at all. LongEventHandler advances the
-# loading screen off the main-thread update, so a window that never composites
-# never progresses: the log stops around line 50 and the process sits near 0%
-# CPU until something kills it.
+# and is left with no compositing window at all: the log stops around line 50
+# and the process sits near 0% CPU until something kills it.
 #
 # THIS IS NOT A PROVEN FIX, and the first version of this comment claimed it
 # was. Seeding windowed prefs was followed by one clean pass and then, on the
@@ -213,6 +242,33 @@ fi
 # instance regardless, and because it plausibly removes one failure mode — not
 # because the stall is understood. See the tracker item for the live state.
 #
+# runInBackground, AND WHY IT IS HERE DESPITE NOT ANSWERING THE STARTUP STALL.
+#
+# `runInBackground` is one of RimWorld's own preferences (Verse/PrefsData.cs:68)
+# and it DEFAULTS TO FALSE — the field has no initializer, and PrefsData.Apply()
+# hands it straight to Unity as `Application.runInBackground` (:153). A fresh
+# -savedatafolder therefore produced a test instance with it OFF, while a real
+# player's config, having been through the options screen, may well have it on.
+# That was an uncontrolled difference between the instance that stalls and the
+# instance that does not, and it went unnoticed through every session that
+# debugged this.
+#
+# It is NOT the answer to the startup stall, and the earlier version of this
+# comment asserted a theory that says it should be. Root.Start() sets
+# `Application.runInBackground = true` outright (Verse/Root.cs:72) in the
+# !PlayDataLoader.Loaded branch, immediately before queueing LoadAllPlayData —
+# and Prefs.Apply() runs from Root.Update() behind `!LongEventHandler
+# .ShouldWaitForEvent` and `Time.frameCount > 3` (:128, :139-143), so it lands
+# only AFTER that first long event finishes. The initial load already runs with
+# the flag forced on. Whatever blocks it sits below managed code, so the
+# LongEventHandler render-loop explanation that used to be written here cannot
+# be the whole story and has been removed rather than repeated.
+#
+# What the flag DOES govern is everything after that first load — map gen, and
+# the save/load round-trip cases, which come back through SavedGameLoaderNow
+# late in the run. Those are a different failure that happens to look the same,
+# and this is the cheap half of telling them apart.
+#
 # Written into the throwaway folder
 # that is rm -rf'd at the top of every run; the real Prefs.xml is never read or
 # touched. Only the keys that matter are set — RimWorld fills in every absent
@@ -222,6 +278,7 @@ fi
   printf '  <screenWidth>1280</screenWidth>\n'
   printf '  <screenHeight>720</screenHeight>\n'
   printf '  <fullscreen>False</fullscreen>\n'
+  printf '  <runInBackground>True</runInBackground>\n'
   printf '  <volumeMaster>0</volumeMaster>\n'
   printf '</PrefsData>\n'
 } > "$TESTDATA/Config/Prefs.xml"
@@ -273,14 +330,35 @@ do
   # run has ever recovered. Both conditions are required — see STARTUP_GRACE.
   if [ "$started" -eq 0 ] && [ "$elapsed" -ge "$STARTUP_GRACE" ] && [ "$quiet" -ge "$STALL_QUIET" ]
   then
+    evidence="$(stall_evidence)"
     kill "$GAME_PID" 2>/dev/null || true
+
+    # A GAME THROWING EVERY FRAME ALSO GOES SILENT, AND LOOKS IDENTICAL.
+    #
+    # RimWorld stops logging entirely after "Reached max messages limit", so a
+    # per-frame exception storm presents to a liveness check exactly as a stall
+    # does. Bailing out is the right move either way — but blaming the window
+    # for a mod fault sends the next reader somewhere there is nothing to find.
+    # This mode was known on 2026-09-05 and went unhandled until now.
+    if grep -q "Reached max messages limit" "$LOG" 2>/dev/null
+    then
+      die "the log went silent because RimWorld STOPPED LOGGING, not because the
+       game is blocked: it hit its own message cap, which is what happens when
+       something throws every frame. That is a fault in the mod list under test.
+       This is NOT the focus stall, whatever the timing looks like.
+
+$evidence
+       Log: $LOG"
+    fi
+
     die "stalled before RimWorld started (log silent ${quiet}s, ${elapsed}s in).
 
-       This is NOT a mod-wiring problem. Unity's preamble finished and the game
-       stopped before loading any assembly, which is what happens when its
-       window never comes to the front — the loading screen advances off the
-       main-thread update, so a window that is not compositing never progresses.
+       This is NOT a mod-wiring problem: Unity's preamble finished and the game
+       stopped before loading any assembly. The known cause is the window never
+       coming to the front. A near-zero CPU reading below confirms it is blocked
+       rather than slow; a busy one means look elsewhere.
 
+$evidence
        Bring the new RimWorld window to the front and run again. Note that
        --alongside cannot do this for you: the instance already running owns the
        foreground.
