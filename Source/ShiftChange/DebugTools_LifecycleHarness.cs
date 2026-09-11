@@ -248,6 +248,8 @@ namespace ShiftChange
             Case("the recreation job classifier holds", RecreationClassifierHolds);
             Case("the sleep job classifier holds", RestClassifierHolds);
             Case("the room-role table resolves", RoomRoleTableResolves);
+            Case("the work-type dialog never hands its listing a short rect",
+                 WorkTypeDialogBodyRectFitsTheBody);
             // Last: it drives a deliberately failing assertion, and the tallies
             // are global.
             Case("the harness counts its own results correctly", HarnessAccounting);
@@ -2524,6 +2526,66 @@ namespace ShiftChange
         /// while a row naming a def nobody ships stays invisible. That is the
         /// intended asymmetry, not a weaker test.</para>
         /// </summary>
+        /// <summary>
+        /// The work-type dialog's body must never be drawn into a rect shorter
+        /// than the body itself.
+        ///
+        /// <para>WHY THIS IS A CASE AND NOT A COMMENT. A player on a high UI
+        /// scale photographed the dialog with its trigger rows and work grid
+        /// simply absent. Nothing had thrown and nothing was in the log: the
+        /// window is clamped to 85% of screen height, the rows above the grid
+        /// needed more than the clamp left, and <c>Listing.GetRect</c> runs
+        /// <c>NewColumnIfNeeded</c> on EVERY row — so at the first row that did
+        /// not fit it did <c>curX += ColumnWidth + 17</c> and carried on
+        /// drawing in a column outside the window. Captured at an effective
+        /// 640x360: a 479-wide group, header rows at x=0, and the Recreation
+        /// row at x=496.</para>
+        ///
+        /// <para>WHAT THIS COVERS, AND WHAT IT DOES NOT. The harness runs from
+        /// <c>Game.FinalizeInit</c>, with no GUI context, so it cannot draw a
+        /// listing and watch it wrap; <c>Listing.Begin</c> calls
+        /// <c>Widgets.BeginGroup</c>. It asserts the arithmetic that decides
+        /// the rect, which is the half a refactor is likely to get wrong. The
+        /// other half — <c>maxOneColumn</c>, and the measured feedback that
+        /// makes the number honest — is only exercised by drawing, and was
+        /// verified by opening the dialog at four effective UI sizes
+        /// (960x540, 853x480, 640x360, 480x270) on 2026-09-11.</para>
+        ///
+        /// <para>The heights are the ones really measured in that sweep rather
+        /// than invented: bodies of 533, 665 and 847 against window content of
+        /// 143, 220, 306 and 373.</para>
+        /// </summary>
+        internal static bool WorkTypeDialogBodyRectFitsTheBody()
+        {
+            float[] bodies = { 180f, 533f, 665f, 847f, 1200f };
+            float[] contents = { 143f, 220f, 306f, 373f, 900f };
+            bool ok = true;
+            for (int b = 0; b < bodies.Length; b++)
+            {
+                for (int c = 0; c < contents.Length; c++)
+                {
+                    Rect content = new Rect(0f, 0f, 480f, contents[c]);
+                    bool scrolling;
+                    Rect given = Dialog_SetStandWorkTypes.BodyRect(bodies[b], content, out scrolling);
+
+                    ok &= Expect(given.height >= bodies[b] - 0.5f,
+                        "body " + bodies[b].ToString("0") + " into a "
+                        + contents[c].ToString("0") + " window gets "
+                        + given.height.ToString("0"));
+
+                    // The converse matters too: a body that fits must NOT open
+                    // a scroll view. Every clipped region is one more thing
+                    // that has to clip the way we assume, and the grid's own
+                    // scroll view was removed for that reason.
+                    bool shouldScroll = bodies[b] > contents[c] + 1f;
+                    ok &= Expect(scrolling == shouldScroll,
+                        "body " + bodies[b].ToString("0") + " in "
+                        + contents[c].ToString("0") + (shouldScroll ? " scrolls" : " does not scroll"));
+                }
+            }
+            return ok;
+        }
+
         internal static bool RoomRoleTableResolves()
         {
             bool ok = Expect(RoomWorkTypes.Defaults.Count > 0, "the table is not empty");
