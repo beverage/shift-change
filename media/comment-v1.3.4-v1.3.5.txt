@@ -1,0 +1,7 @@
+v1.3.4 and v1.3.5 update:
+
+v1.3.4: Shift Change no longer reads through every other mod's buttons before deciding it has nothing to add. RimWorld rebuilds a colonist's button list every frame; it now checks the colonist first and steps aside when they are not wearing a stand's outfit. Stands behave as they did.
+
+v1.3.5: when a mod that rearranges work categories empties a stand's work-type list, the list says so instead of showing a blank panel. Personal Work Categories switches a category off once its preset leaves no work givers in that column, and the same category leaves RimWorld's Work tab with it. If a category is gone from there too, Shift Change is reporting the game rather than losing it. Complex Jobs does not do this on its own.
+
+Also in v1.3.5: the description and several tooltips were rewritten, fixing three wrong claims. The decency guard ships switched off, Anomaly has vanilla's only lab coat, and Deposit only is what parks armor on a stand.

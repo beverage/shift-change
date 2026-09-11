@@ -82,6 +82,12 @@ namespace ShiftChange
         internal const int TargetRows = 14;
 
         /// <summary>
+        /// Height, in grid rows, reserved for the note that replaces the grid
+        /// when there are no work types to list at all.
+        /// </summary>
+        internal const int EmptyNoteRows = 3;
+
+        /// <summary>
         /// Mirror of <c>Verse.Window.Margin</c>'s default (18f,
         /// <c>Window.cs:104</c>), NOT a read of it: Margin is a protected base
         /// member, and hot-swapped bodies live on a twin type that the
@@ -138,7 +144,13 @@ namespace ShiftChange
             float usableWidth = UI.screenWidth * 0.9f - WindowMargin * 2f - ScrollbarAllowance;
             int fitting = Mathf.Max(1, Mathf.FloorToInt((usableWidth + ColumnGutter) / (cellWidth + ColumnGutter)));
             columns = Mathf.Clamp(wanted, 1, fitting);
-            rowsPerColumn = Mathf.Max(1, Mathf.CeilToInt(works.Count / (float)columns));
+            // With no work types at all the grid draws a note instead of rows
+            // (see the empty branch in DoWindowContents), so reserve the note's
+            // lines rather than the one phantom row the row maths would give
+            // it — at this dialog's minimum width the sentence wraps.
+            rowsPerColumn = works.Count > 0
+                ? Mathf.Max(1, Mathf.CeilToInt(works.Count / (float)columns))
+                : EmptyNoteRows;
         }
 
         /// <summary>
@@ -468,28 +480,46 @@ namespace ShiftChange
                 rowsPerColumn * RowHeight);
             float labelWidth = cellWidth - CheckboxSize;
 
-            Widgets.BeginScrollView(outRect, ref scroll, viewRect);
-            for (int i = 0; i < works.Count; i++)
+            // An empty grid has to SAY it is empty. The list is every work type
+            // the game will show, and another mod can empty it: Personal Work
+            // Categories (densevoid.hui.personalworkcat) flips
+            // WorkTypeDef.visible off for every category its selected preset
+            // leaves without a work giver, and that happens before we or the
+            // work tab ever read the database. A blank box under the explainer
+            // reads as this dialog having broken, which sends the player to the
+            // wrong mod — so name where else the same types are missing, and
+            // the player can check in one click (reported 2026-09-11).
+            if (works.Count == 0)
             {
-                WorkTypeDef work = works[i];
-                Rect cell = new Rect(
-                    i / rowsPerColumn * (cellWidth + ColumnGutter),
-                    i % rowsPerColumn * RowHeight,
-                    cellWidth,
-                    RowHeight - 2f);
-                bool on = comp.HandlesWork(work);
-                bool was = on;
-                // Default placement puts the box at the cell's right edge —
-                // which, with the cell sized to the widest label, is a fixed
-                // aligned column just past the text, and the gutter beyond it
-                // is dead space no box can wander into.
-                Widgets.CheckboxLabeled(cell, LabelOf(work).Truncate(labelWidth - 4f), ref on);
-                if (on != was)
-                {
-                    comp.ToggleWork(work);
-                }
+                GUI.color = Color.gray;
+                Widgets.Label(outRect, "ShiftChange.NoWorkTypes".Translate());
+                GUI.color = Color.white;
             }
-            Widgets.EndScrollView();
+            else
+            {
+                Widgets.BeginScrollView(outRect, ref scroll, viewRect);
+                for (int i = 0; i < works.Count; i++)
+                {
+                    WorkTypeDef work = works[i];
+                    Rect cell = new Rect(
+                        i / rowsPerColumn * (cellWidth + ColumnGutter),
+                        i % rowsPerColumn * RowHeight,
+                        cellWidth,
+                        RowHeight - 2f);
+                    bool on = comp.HandlesWork(work);
+                    bool was = on;
+                    // Default placement puts the box at the cell's right edge —
+                    // which, with the cell sized to the widest label, is a fixed
+                    // aligned column just past the text, and the gutter beyond it
+                    // is dead space no box can wander into.
+                    Widgets.CheckboxLabeled(cell, LabelOf(work).Truncate(labelWidth - 4f), ref on);
+                    if (on != was)
+                    {
+                        comp.ToggleWork(work);
+                    }
+                }
+                Widgets.EndScrollView();
+            }
 
             if (roomTrigger)
             {
