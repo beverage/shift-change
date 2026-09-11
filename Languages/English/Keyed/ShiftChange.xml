@@ -32,6 +32,7 @@
   <ShiftChange.RegimeOff>Not used for shift changes</ShiftChange.RegimeOff>
   <ShiftChange.WorkTypesTitle>Work types</ShiftChange.WorkTypesTitle>
   <ShiftChange.WorkTypesExplainer>Ticked activities, done in this room, trigger a change into this stand's outfit:</ShiftChange.WorkTypesExplainer>
+  <ShiftChange.NoWorkTypes>No work types exist to tick, here or anywhere. They are gone from the work tab as well, so a mod that rearranges work categories has hidden them.</ShiftChange.NoWorkTypes>
   <ShiftChange.Recreation>recreation</ShiftChange.Recreation>
   <ShiftChange.RecreationRow>Recreation: any joy activity in this room</ShiftChange.RecreationRow>
   <ShiftChange.RecreationExclusiveNote>While recreation is on, this stand serves recreation only; work types do not apply.</ShiftChange.RecreationExclusiveNote>
