@@ -737,14 +737,20 @@ setting rather than a stand setting on purpose — the case is a property of the
 colony rather than of one rack, and a per-stand checkbox would cost every player
 UI to serve very few.
 
-**It ships OFF, and that is release sequencing rather than a view about which
-behaviour is better** (decided 2026-09-08). This mod arrives inside mod packs,
-where the player did not choose it and will not read its change note, and a patch
-release is the wrong place to change how an existing colony behaves under them.
-The cost is real and worth stating plainly: the guard is what this repo's README
-promises, so while it is off that promise holds only for players who found the
-checkbox. Revisit the default at the next MINOR version, where the bump itself
-is the notice.
+**It ships OFF and stays OFF, and that is a distribution decision rather than a
+view about which behaviour is better** (settled 2026-09-12; the original
+2026-09-08 call deferred the question to the next minor version, and this
+replaces it). Most of this mod's players meet it inside a mod pack. They did not
+choose the mod, they will not read its change note, and a default that changes
+how their colonists undress is not ours to flip on their behalf. That reasoning
+does not expire with a version bump, so no version turns it on — this is not a
+default waiting for the right release to carry it.
+
+The cost is real, and it is accepted rather than solved: the guard covers a case
+the player cannot see coming, and while it is off it covers only the players who
+found the checkbox. The mitigation is that the default leads in both places a
+player might meet the setting — the README paragraph and the in-game
+description — rather than being a footnote under them.
 
 `DecencyEnabled` therefore falls back to OFF when settings have not loaded,
 which is the opposite of `PoolingEnabled`. A null-tolerant read has to agree

@@ -21,18 +21,21 @@ namespace ShiftChange
         /// for and deposits the rest. When false a stand does exactly what its
         /// settings say, which is how every version up to v1.3.0 behaved.
         ///
-        /// <para><b>OFF by default, and that is a release-sequencing decision
-        /// rather than a view about which behaviour is better</b> (decided
-        /// 2026-09-08). This mod ships inside mod packs, where the player did
-        /// not choose it and will not read its change note; a patch release is
-        /// the wrong place to change how an existing colony behaves under them.
-        /// Opt-in for now; revisit the default at the next MINOR version, where
-        /// the bump itself is the notice.</para>
+        /// <para><b>OFF by default, permanently, and that is a distribution
+        /// decision rather than a view about which behaviour is better</b>
+        /// (settled 2026-09-12, replacing the 2026-09-08 intent to revisit it
+        /// at the next minor). Most of this mod's players meet it inside a mod
+        /// pack: they did not choose it, they will not read a change note, and
+        /// a default that changes how their colonists undress is not ours to
+        /// flip on their behalf. That reasoning does not expire with a version
+        /// bump, so there is no version at which this becomes on. Do not
+        /// re-open it as release sequencing; it is not waiting for a bump.</para>
         ///
-        /// <para>Note the asymmetry this creates: the guard is what the mod's
-        /// own README promises ("there is no configuration in which a colonist
-        /// strips for a shift and gets nothing back"), so while this is off,
-        /// that promise holds only for players who found the checkbox.</para>
+        /// <para>The cost, stated plainly and accepted: the guard covers a case
+        /// the player cannot see coming, and while it is off it covers only the
+        /// players who found the checkbox. The README and the setting
+        /// description therefore both lead with the default rather than burying
+        /// it, which is the whole mitigation.</para>
         ///
         /// <para>Individual nudists and nudism ideoligions are exempt either
         /// way (<see cref="SwapPlan.PrefersNudity"/>) — that detection is not

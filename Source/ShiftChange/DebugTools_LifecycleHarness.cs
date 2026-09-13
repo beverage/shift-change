@@ -1099,6 +1099,11 @@ namespace ShiftChange
             // pins it, and a default that flips by accident is exactly the kind
             // of change nobody notices until a colony behaves differently after
             // an update — which is the whole reason it ships off.
+            //
+            // This pins a SETTLED property, not a temporary state (2026-09-12).
+            // Off is the permanent default because most players meet this mod
+            // inside a mod pack; see ShiftChangeSettings.keepColonistsDecent.
+            // If this case ever fails, the default moved — fix the default.
             bool ok = Expect(!ShiftChangeMod.DecencyEnabled,
                              "the guard is OFF out of the box: this ships opt-in")
                 & Expect(!SwapPlan.PrefersNudity(fix.Pawn),
