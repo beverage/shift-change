@@ -1419,12 +1419,19 @@ namespace ShiftChange
         /// inside the building, so both answer null too. The ring around the
         /// whole occupied rect is what has to be walked.</para>
         ///
-        /// <para>Takes the room MOST of the ring sits in rather than the first
-        /// found, so a processor set into a wall between two rooms resolves to
-        /// the side it actually opens onto instead of to whichever cell
-        /// enumerated first. Ties keep the earlier cell, so the answer is
-        /// stable, which the shared resolver requires: both arms must read the
-        /// same room for the same job or the pawn oscillates.</para>
+        /// <para>Resolved by COUNT first: the room owning most of the ring
+        /// wins. At an equal count an enclosed room beats an outdoor one,
+        /// because the outdoor room is one map-wide object and every stand
+        /// this mod looks for lives in a room. Two enclosed rooms that still
+        /// tie get no answer at all: this returns the roomless cell rather
+        /// than guess. The engine has no opinion on such a building either,
+        /// since one wedged into a wall carries no interaction cell.</para>
+        ///
+        /// <para>Nothing here reads a stand, and iteration order changes
+        /// nothing, so both arms read the same room for the same job. That is
+        /// required rather than tidy: make the answer depend on where a free
+        /// stand happens to be and the two arms disagree, which is a pawn
+        /// walking between the stand and the work forever.</para>
         ///
         /// <para>Only runs when the cheap answer is null, so the ordinary case
         /// costs one region lookup.</para>
@@ -1441,10 +1448,12 @@ namespace ShiftChange
                 return cell;
             }
 
-            Room best = null;
-            IntVec3 bestCell = cell;
-            int bestCount = 0;
+            // Count how much of the ring each room owns, keeping the first
+            // cell seen for each. Iteration order decides nothing below: the
+            // winner is settled by count and by indoor-ness, and a tie that
+            // survives both refuses rather than picks.
             Dictionary<Room, int> counts = new Dictionary<Room, int>();
+            Dictionary<Room, IntVec3> firstCell = new Dictionary<Room, IntVec3>();
             foreach (IntVec3 ring in GenAdj.CellsAdjacent8Way(thing))
             {
                 if (!ring.InBounds(map))
@@ -1457,17 +1466,75 @@ namespace ShiftChange
                     continue;
                 }
                 int seen;
-                counts.TryGetValue(room, out seen);
-                seen++;
-                counts[room] = seen;
-                if (seen > bestCount)
+                if (!counts.TryGetValue(room, out seen))
                 {
-                    best = room;
-                    bestCell = ring;
-                    bestCount = seen;
+                    firstCell[room] = ring;
+                }
+                counts[room] = seen + 1;
+            }
+
+            int topCount = 0;
+            int atTop = 0;
+            Room leader = null;
+            foreach (KeyValuePair<Room, int> entry in counts)
+            {
+                if (entry.Value > topCount)
+                {
+                    topCount = entry.Value;
+                    atTop = 1;
+                    leader = entry.Key;
+                }
+                else if (entry.Value == topCount)
+                {
+                    atTop++;
                 }
             }
-            return best != null ? bestCell : cell;
+
+            if (atTop == 0)
+            {
+                return cell;
+            }
+
+            // The ordinary case, and the reason enclosure is not consulted
+            // here: one room owns more of the ring than any other, so whether
+            // it is enclosed cannot change the answer. Mining is the hot
+            // caller — every mineable rock is impassable and full-fillage, so
+            // every Mine job reaches this — and its ring is rock plus one
+            // room. Testing enclosure anyway would spend a
+            // PsychologicallyOutdoors on each of those for nothing.
+            if (atTop == 1)
+            {
+                return firstCell[leader];
+            }
+
+            // A genuine tie, so now it is worth asking. An enclosed room beats
+            // an outdoor one: the outdoor room is a single map-wide object,
+            // and letting it take a tie hands the job to a "room" spanning the
+            // whole colony. PsychologicallyOutdoors reads a per-room cached
+            // count after its first call (Room.cs:557), and the count check
+            // short-circuits ahead of it, so only the tied rooms are asked.
+            Room pick = null;
+            int enclosed = 0;
+            foreach (KeyValuePair<Room, int> entry in counts)
+            {
+                if (entry.Value != topCount || entry.Key.PsychologicallyOutdoors)
+                {
+                    continue;
+                }
+                pick = entry.Key;
+                enclosed++;
+            }
+
+            // Exactly one enclosed room among the tied ones wins. Otherwise
+            // there is nothing left to separate them — two enclosed rooms, or
+            // none at all — so refuse rather than guess. Both arms then read
+            // null and agree, which is the conservative pair: no dressing, and
+            // a pawn already dressed returns their gear.
+            if (enclosed != 1)
+            {
+                return cell;
+            }
+            return firstCell[pick];
         }
     }
 }

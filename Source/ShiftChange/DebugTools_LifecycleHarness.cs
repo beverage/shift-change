@@ -235,6 +235,8 @@ namespace ShiftChange
             // the map cases and before the game-replacing ones below.
             Case("a work target with no room of its own still resolves one",
                  () => SolidTargetResolvesARoom(map, pad));
+            Case("a work target in an exterior wall resolves the room from either side",
+                 () => ExteriorWallTargetResolvesTheRoom(map, pad));
 
             // Last among the map cases: these replace Current.Game, so `map`,
             // `pad` and every fixture above them belong to a disposed game once
@@ -2697,6 +2699,107 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// <summary>
+        /// A work target sunk into an EXTERIOR wall must resolve to the room it
+        /// encloses, whichever side of that room it sits in.
+        ///
+        /// <para>The ring around such a target splits evenly: three cells in
+        /// the room, three outdoors, and the two flanking cells are wall and
+        /// carry no room at all. Nothing wins on count, so the answer is
+        /// whatever breaks the tie. <c>GenAdj.CellsAdjacent8Way</c> enumerates
+        /// the SOUTH row first (<c>GenAdj.cs:190</c>) and <c>RoomBearing</c>
+        /// promotes only on a strict <c>&gt;</c>, so a tie goes to whichever
+        /// room the walk reached first, which is always the southern one.</para>
+        ///
+        /// <para>The same building in the north wall and in the south wall of
+        /// one room therefore resolves two different ways: the room in the
+        /// first case, the map-wide outdoor room in the second. That is the
+        /// shipped v1.4.0 defect. A plutonium processor is 4x4 rather than
+        /// 1x1, but the tie is identical and a vanilla wall reproduces it
+        /// without Rimatomics loaded, so this runs on the minimal list.</para>
+        ///
+        /// <para>The even split is ASSERTED, not assumed. If the ring ever
+        /// stopped tying, the case would pass while exercising nothing.</para>
+        /// </summary>
+        internal static bool ExteriorWallTargetResolvesTheRoom(Map map, CellRect pad)
+        {
+            try
+            {
+                GenDebug.ClearArea(pad, map);
+                EnclosePad(map, pad);
+
+                Room inside = pad.CenterCell.GetRoom(map);
+                bool ok = Expect(inside != null && !inside.PsychologicallyOutdoors,
+                                 "the pad encloses a real indoor room");
+                if (!ok)
+                {
+                    return false;
+                }
+
+                int x = pad.CenterCell.x;
+                ok &= EdgeWallBears(map, new IntVec3(x, 0, pad.maxZ), inside, "north");
+                ok &= EdgeWallBears(map, new IntVec3(x, 0, pad.minZ), inside, "south");
+                return ok;
+            }
+            finally
+            {
+                foreach (IntVec3 cell in pad)
+                {
+                    map.roofGrid.SetRoof(cell, null);
+                }
+                GenDebug.ClearArea(pad, map);
+            }
+        }
+
+        /// <summary>
+        /// One edge of <see cref="ExteriorWallTargetResolvesTheRoom"/>: counts
+        /// how the wall's ring divides between the enclosed room and everything
+        /// else, requires that division to be even (otherwise there is no tie
+        /// to break and the case proves nothing), then asserts the bearing
+        /// lands in the room rather than outdoors.
+        /// </summary>
+        internal static bool EdgeWallBears(Map map, IntVec3 cell, Room inside, string edge)
+        {
+            Thing wall = cell.GetEdifice(map);
+            if (!Expect(wall != null, "the " + edge + " edge cell holds a wall"))
+            {
+                return false;
+            }
+
+            int inRoom = 0;
+            int elsewhere = 0;
+            foreach (IntVec3 ring in GenAdj.CellsAdjacent8Way(wall))
+            {
+                if (!ring.InBounds(map))
+                {
+                    continue;
+                }
+                Room room = ring.GetRoom(map);
+                if (room == null)
+                {
+                    continue;
+                }
+                if (room == inside)
+                {
+                    inRoom++;
+                }
+                else
+                {
+                    elsewhere++;
+                }
+            }
+
+            bool ok = Expect(inRoom > 0 && inRoom == elsewhere,
+                             "the " + edge + " ring splits evenly (" + inRoom + " in the room, "
+                             + elsewhere + " out), so the answer is a tie-break");
+
+            IntVec3 bearing = Patch_JobInterception.RoomBearing(
+                cell, new LocalTargetInfo(wall), map);
+            ok &= Expect(bearing.GetRoom(map) == inside,
+                         "a target in the " + edge + " wall resolves to the room it encloses");
+            return ok;
+        }
+
         /// Whether the mod those compat tables are written against is loaded.
         /// Asked by resolving a type we already depend on rather than by name,
         /// so the answer is the same question the tables themselves ask.
