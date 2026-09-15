@@ -121,7 +121,7 @@ namespace ShiftChange
         /// </summary>
         internal static bool RoundTrip(Map map, CellRect pad)
         {
-            DebugTools_LifecycleHarness.Fixture fix = DebugTools_LifecycleHarness.Build(map, pad);
+            DebugTools_LifecycleHarness.Fixture fix = HarnessFixtures.Build(map, pad);
             if (fix == null)
             {
                 DebugTools_LifecycleHarness.Report.AppendLine("      fixture could not be staged");
@@ -403,7 +403,7 @@ namespace ShiftChange
             try
             {
                 DebugTools_LifecycleHarness.Fixture fix =
-                    DebugTools_LifecycleHarness.Stage(map, pad,
+                    HarnessFixtures.Stage(map, pad,
                         DebugTools_LifecycleHarness.StageKit.Displacing);
                 if (fix == null)
                 {
