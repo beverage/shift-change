@@ -312,18 +312,27 @@ not the barn. Vanilla's own Handling row never fired for it either, so no barn
 stand has ever dressed anyone for taming.
 
 **[Dubs Rimatomics](https://steamcommunity.com/sharedfiles/filedetails/?id=1127530465)**
-needs no setup. Put a stand in a reactor hall, stock it with rad suits, and
-whoever loads or unloads fuel changes into them first. The row to tick by hand,
-if you ever want to, is Nuclear loading: Rimatomics calls that work type
-Nuclear in the work tab and Loading in the field a list like this one reads,
-so the grid shows both halves of the name.
+needs no setup. A stand arms itself in any room holding a reactor core, the
+plutonium processor or the spent fuel pool, so stocking it with rad suits is the
+whole job. Put one where the fuel rods are kept as well as one in the reactor
+hall: a colonist changes where the job begins, and fetching fuel begins at the
+fuel rather than at the core. The row to tick by hand, if you ever want to, is
+Nuclear loading: Rimatomics calls that work type Nuclear in the work tab and
+Loading in the field a list like this one reads, so the grid shows both halves
+of the name.
 
 Rimatomics sets no room role on any of its buildings, which is why this needed
 anything at all. Its machining table and research bench now count as a workshop
 and a laboratory, the way the same benches from any other mod already did. A
 reactor hall has no bench to key on, so a stand there reads the room's contents
 instead and recognises the reactor cores, the plutonium processor and the spent
-fuel pool.
+fuel pool. The benches are read that way too, which is what lets one room hold
+both of them and still arm for both.
+
+One layout will not arm, and it is worth knowing about. A plutonium processor
+built into a wall so that it faces two enclosed rooms equally belongs to
+neither, and a stand in either one stays quiet. Setting it against a wall rather
+than through one avoids that, and so does a stand on both sides.
 
 Fetching the chemfuel that goes into the plutonium processor is left alone on
 purpose, and it is the one part of that loop that will not change anyone.
