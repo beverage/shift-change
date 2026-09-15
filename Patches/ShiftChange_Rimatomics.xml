@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Root element is <Patch>, singular. <Patches> silently discards every
+     operation in the file. -->
+<Patch>
+
+  <!-- Dubs Rimatomics ships two real benches and gives neither of them a room
+       role, so the rooms they stand in score zero for every RoomRoleDef and
+       come back as the generic "Room".
+
+       That is the whole bug, and it is one field. RoomRoleWorker_Workshop and
+       RoomRoleWorker_Laboratory score on exactly one thing —
+       def.building.workTableRoomRole — and never look at the thingClass, even
+       though TableRimatomicsMachining IS a Building_WorkTable and
+       NuclearResearchBench IS a research bench. Vanilla sets the field on every
+       one of its own benches; nothing makes a mod do the same.
+
+       Verified in game 2026-09-13 with a control: two identical 9x9 rooms, a
+       Rimatomics machining table in one and a vanilla TableMachining in the
+       other. The vanilla room armed a stand for crafting, tailoring, smithing
+       and art; the Rimatomics room reported "nothing; the game reads this room
+       as: Room".
+
+       NO SPEED PENALTY COMES WITH THIS. The "not in optimal room" malus is a
+       SEPARATE field, workTableNotInRoomRoleFactor, which defaults to 1f, and
+       StatPart_WorkTableRoomRole bails out at 1f
+       (StatPart_WorkTableRoomRole.cs:41). Setting only the role is inert for
+       gameplay: it changes room scoring and adds an "optimal room" line to the
+       info card, nothing else. We deliberately do not set the factor —
+       inventing a work-speed penalty for somebody else's bench is not a
+       compatibility fix.
+
+       The reactor hall is NOT fixable here and is not attempted: it holds no
+       work table at all, so there is no def to hang the field on. That case is
+       handled in the assembly, by contents — see RoomContentsWork.
+
+       Everything is guarded by mod NAME (PatchOperationFindMod matches display
+       names, not packageIds), then per-def existence, then per-field existence.
+       So the file is a silent no-op without the mod, survives a def rename with
+       nothing worse than that def staying vanilla, and stands down entirely if
+       Rimatomics ever sets the field itself.
+
+       The ensure-then-append shape on <building> is not ceremony. Two mods that
+       each Add a container node to the same def do not merge: the loader
+       reports "defines the same field twice" and keeps only the last one, so a
+       bare Add of <building> here would delete whatever another Rimatomics
+       patch had put in that node, depending on load order. Test for the
+       container, create it only when absent, then add the field into it. -->
+  <Operation Class="PatchOperationFindMod">
+    <mods>
+      <li>Dubs Rimatomics</li>
+    </mods>
+    <match Class="PatchOperationSequence">
+      <operations>
+
+        <!-- The nuclear machining table is a Building_WorkTable; its bills are
+             Smithing work (DoBillsTableNuclear), which a Workshop stand already
+             covers. -->
+        <li Class="PatchOperationConditional">
+          <xpath>/Defs/ThingDef[defName="TableRimatomicsMachining"]</xpath>
+          <match Class="PatchOperationSequence">
+            <operations>
+              <li Class="PatchOperationConditional">
+                <xpath>/Defs/ThingDef[defName="TableRimatomicsMachining"]/building</xpath>
+                <nomatch Class="PatchOperationAdd">
+                  <xpath>/Defs/ThingDef[defName="TableRimatomicsMachining"]</xpath>
+                  <value>
+                    <building />
+                  </value>
+                </nomatch>
+              </li>
+              <li Class="PatchOperationConditional">
+                <xpath>/Defs/ThingDef[defName="TableRimatomicsMachining"]/building/workTableRoomRole</xpath>
+                <nomatch Class="PatchOperationAdd">
+                  <xpath>/Defs/ThingDef[defName="TableRimatomicsMachining"]/building</xpath>
+                  <value>
+                    <workTableRoomRole>Workshop</workTableRoomRole>
+                  </value>
+                </nomatch>
+              </li>
+            </operations>
+          </match>
+        </li>
+
+        <!-- The Rimatomics research bench. Laboratory already resolves to
+             Research AND Crafting, and their research giver exists under both
+             work types (RimatomicsResearch, RimatomicsCrafting), so the role is
+             all that was missing. -->
+        <li Class="PatchOperationConditional">
+          <xpath>/Defs/ThingDef[defName="NuclearResearchBench"]</xpath>
+          <match Class="PatchOperationSequence">
+            <operations>
+              <li Class="PatchOperationConditional">
+                <xpath>/Defs/ThingDef[defName="NuclearResearchBench"]/building</xpath>
+                <nomatch Class="PatchOperationAdd">
+                  <xpath>/Defs/ThingDef[defName="NuclearResearchBench"]</xpath>
+                  <value>
+                    <building />
+                  </value>
+                </nomatch>
+              </li>
+              <li Class="PatchOperationConditional">
+                <xpath>/Defs/ThingDef[defName="NuclearResearchBench"]/building/workTableRoomRole</xpath>
+                <nomatch Class="PatchOperationAdd">
+                  <xpath>/Defs/ThingDef[defName="NuclearResearchBench"]/building</xpath>
+                  <value>
+                    <workTableRoomRole>Laboratory</workTableRoomRole>
+                  </value>
+                </nomatch>
+              </li>
+            </operations>
+          </match>
+        </li>
+
+      </operations>
+    </match>
+  </Operation>
+
+</Patch>
