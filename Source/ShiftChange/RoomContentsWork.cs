@@ -21,12 +21,18 @@ namespace ShiftChange
     /// vanilla one in the other, gave "nothing; the game reads this room as:
     /// Room" and "crafting, tailoring, smithing, art" respectively.</para>
     ///
-    /// <para>The bench case is fixed in XML — <c>Patches/ShiftChange_Rimatomics.xml</c>
-    /// hands those two defs the role field they are missing. This class is for
-    /// the case XML cannot reach: a reactor hall holds no work table at all, so
-    /// there is no <c>workTableRoomRole</c> to set on anything. Nuclear work
-    /// happens at the cores and the plutonium processor, and those are plain
-    /// buildings.</para>
+    /// <para><c>Patches/ShiftChange_Rimatomics.xml</c> hands the two benches the
+    /// role field they are missing, and this class covers them a second time on
+    /// purpose. A room ROLE is winner-take-all, so one of each bench in a room
+    /// resolves to Laboratory and the machining table's Smithing is armed by
+    /// nobody; reading the benches from the contents as well is what makes a
+    /// shared bench room work. The patch still earns its place — it is what
+    /// makes the room READ as a workshop or a laboratory to everything else.</para>
+    ///
+    /// <para>And a reactor hall is the case XML cannot reach at all: it holds no
+    /// work table, so there is no <c>workTableRoomRole</c> to set on anything.
+    /// Nuclear work happens at the cores and the plutonium processor, and those
+    /// are plain buildings.</para>
     ///
     /// <para><b>Why we do not ship a RoomRoleDef for it.</b> A new role would
     /// enter the global <c>MaxBy</c> scoring against every vanilla role and
@@ -104,9 +110,19 @@ namespace ShiftChange
         ///
         /// <para>So a reactor hall and a processor room match both and arm both
         /// work types; a spent fuel pool arms nuclear work only; a research
-        /// reactor or weapons bench arms research only. No room ends up armed
-        /// for work that cannot happen in it, which a single combined marker
-        /// could not manage.</para>
+        /// reactor or weapons bench arms research only. One combined marker
+        /// could not manage that.</para>
+        ///
+        /// <para>One known overreach, left as it is: a hall holding ONLY cores
+        /// still arms Research, because the cores inherit
+        /// <c>CompResearchFacility</c> from the abstract reactor base — yet the
+        /// only research steps naming a core (<c>BuildReactorCore</c>,
+        /// <c>AdvReactor3</c>) are <c>WorkType Construction</c>, which we leave
+        /// off. So no Research job ever targets a core and nothing misfires;
+        /// the stand simply lists a work type that will never come up. Narrowing
+        /// it means reading their research step table instead of the comp they
+        /// key on themselves, which is a worse dependency than a wrong label.
+        /// Found by an adversarial review of v1.4.0.</para>
         ///
         /// <para>Research matters here for the same reason the suits do: the
         /// steps run at the research reactor and the plutonium processor are
@@ -120,8 +136,19 @@ namespace ShiftChange
         {
             new Marker("Rimatomics.IFuelFilter", false, new[] { "NuclearWork" }),
             new Marker("Rimatomics.CompResearchFacility", true, new[] { "Research" }),
+            new Marker("Rimatomics.Building_RimatomicsWorkbench", false, new[] { "Smithing" }),
+            new Marker("Rimatomics.Building_RimatomicsResearchBench", false,
+                       new[] { "Research", "Crafting" }),
         };
 
+        // The last two overlap ShiftChange_Rimatomics.xml, which gives those
+        // same benches a workTableRoomRole, and that is deliberate. Room ROLE
+        // is winner-take-all: RoomRoleWorker_Laboratory scores 60 a bench and
+        // _Workshop 27 a table, so one of each in a room resolves to Laboratory
+        // and the machining table's Smithing is never armed. (Three tables the
+        // other way and the bench's Research is the casualty instead.) Reading
+        // the benches from the room's CONTENTS as well arms both regardless of
+        // which role won the scoring. Shipped wrong in v1.4.0.
         internal static List<Marker> active;
 
         /// <summary>
