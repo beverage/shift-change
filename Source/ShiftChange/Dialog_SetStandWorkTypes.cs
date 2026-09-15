@@ -125,7 +125,7 @@ namespace ShiftChange
 
         internal static string LabelOf(WorkTypeDef w)
         {
-            return (w.gerundLabel ?? w.labelShort ?? w.defName).CapitalizeFirst();
+            return WorkTypeLabels.Cap(w);
         }
 
         public Dialog_SetStandWorkTypes(CompShiftStand comp)
@@ -348,14 +348,27 @@ namespace ShiftChange
             // resolves to — BOTH halves, works and recreation — so
             // "automatic" is never a mystery box.
             RoomRoleDef roomRole = comp.parent.Spawned ? comp.parent.GetRoom()?.Role : null;
-            List<WorkTypeDef> roomDefaults = RoomWorkTypes.ForRole(roomRole);
+            // The comp's own answer, not ForRole's: automatic work can come
+            // from the room's CONTENTS as well as its role (RoomContentsWork),
+            // and a line that only read the role would tell a reactor-hall
+            // stand it resolves to "nothing" while it is busily resolving to
+            // nuclear loading. Deliberately NOT HandlesWork/HandlesRecreation
+            // — those answer for the CURRENT mode, and this label's whole job
+            // is to show what automatic would give even while a custom set is
+            // in force.
+            List<WorkTypeDef> roomDefaults = comp.parent.Spawned
+                ? comp.AutomaticWorkTypes
+                : CompShiftStand.NoWork;
             List<string> autoParts = roomDefaults
-                .Select(w => (string)(w.gerundLabel ?? w.defName)).ToList();
-            if (RoomWorkTypes.RecreationForRole(roomRole))
+                .Select(w => WorkTypeLabels.Of(w)).ToList();
+            // Work wins, exactly as in the comp — mirror its guard or the
+            // label would promise a recreation trigger the stand will not fire.
+            bool autoTriggers = roomDefaults.Count == 0;
+            if (autoTriggers && RoomWorkTypes.RecreationForRole(roomRole))
             {
                 autoParts.Add("ShiftChange.Recreation".Translate().RawText);
             }
-            if (RoomWorkTypes.RestForRole(roomRole))
+            if (autoTriggers && RoomWorkTypes.RestForRole(roomRole))
             {
                 autoParts.Add("ShiftChange.Rest".Translate().RawText);
             }

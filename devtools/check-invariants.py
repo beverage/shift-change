@@ -120,6 +120,18 @@ def check_translation_keys():
         text = open(path, encoding="utf-8").read()
         for match in re.finditer(r'"([A-Za-z0-9_.]+)"\s*\.Translate\s*\(', text):
             used.setdefault(match.group(1), rel(path))
+        # A key can also be held in a lookup table and translated through a
+        # variable, which the inline form above cannot see — WorkTypeLabels
+        # maps a work type's defName to the key that renames it. Matched
+        # narrowly, as a two-string dictionary-initializer pair, so this stays
+        # a second known shape rather than "any string that resembles a key".
+        # The value must carry our own key prefix. Without that the pattern
+        # also swallows ordinary two-element defName arrays — new[] { "Research",
+        # "Crafting" } reads as a pair — and every one of them lands here as a
+        # bogus "uses an undefined key".
+        for match in re.finditer(
+                r'\{\s*"[A-Za-z0-9_.]+"\s*,\s*"(ShiftChange\.[A-Za-z0-9_.]+)"\s*\}', text):
+            used.setdefault(match.group(1), rel(path))
 
     for key, where in sorted(used.items()):
         if key in defined or key in VANILLA_KEYS:

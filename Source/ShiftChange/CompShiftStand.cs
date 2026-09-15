@@ -370,7 +370,78 @@ namespace ShiftChange
                 {
                     return NoWork;
                 }
-                return RoomWorkTypes.ForRole(parent.GetRoom()?.Role);
+                return AutomaticWorkTypes;
+            }
+        }
+
+        /// <summary>
+        /// How long an automatic answer is reused before the room is looked at
+        /// again. ~4 seconds at normal speed.
+        /// </summary>
+        internal const int AutomaticCacheTicks = 250;
+
+        internal List<WorkTypeDef> automaticCache;
+        internal int automaticCacheTick = -1;
+        internal int automaticCacheRoomId = -1;
+
+        /// <summary>
+        /// The room's own answer: its role's defaults, plus whatever its
+        /// CONTENTS earn (see <see cref="RoomContentsWork"/>, which covers the
+        /// rooms the engine gives no useful role to).
+        ///
+        /// <para>CACHED, and it has to be. The contents half calls
+        /// <see cref="Room.ContainedAndAdjacentThings"/>, which clears and
+        /// rebuilds a set and a list every call, and this property is read
+        /// every frame to draw the gizmo label. Two invalidations: the room
+        /// identity changing — walls moved, stand reinstalled — and a short
+        /// interval, which is what notices a reactor built into a room that
+        /// already existed. A building placed while the game is PAUSED
+        /// therefore lands on unpause, since TicksGame is what expires the
+        /// entry; that is the only visible lag and it is not worth a listener.</para>
+        ///
+        /// <para>Returns the shared role list unchanged when contents add
+        /// nothing, which is every room in a game without a contents mod
+        /// installed, so the common path allocates nothing.</para>
+        /// </summary>
+        internal List<WorkTypeDef> AutomaticWorkTypes
+        {
+            get
+            {
+                Room room = parent.GetRoom();
+                if (room == null)
+                {
+                    return NoWork;
+                }
+                if (!RoomContentsWork.Any)
+                {
+                    return RoomWorkTypes.ForRole(room.Role);
+                }
+
+                TickManager ticks = Find.TickManager;
+                int now = ticks != null ? ticks.TicksGame : -1;
+                if (automaticCache != null
+                    && automaticCacheRoomId == room.ID
+                    && now >= 0 && automaticCacheTick >= 0
+                    && now - automaticCacheTick < AutomaticCacheTicks)
+                {
+                    return automaticCache;
+                }
+
+                List<WorkTypeDef> byRole = RoomWorkTypes.ForRole(room.Role);
+                List<WorkTypeDef> combined = new List<WorkTypeDef>(byRole);
+                RoomContentsWork.Collect(room, combined);
+                // Nothing added: hand back the SHARED list rather than a copy,
+                // so identity comparisons and allocation both behave as they
+                // did before contents existed.
+                if (combined.Count == byRole.Count)
+                {
+                    combined = byRole;
+                }
+
+                automaticCache = combined;
+                automaticCacheRoomId = room.ID;
+                automaticCacheTick = now;
+                return combined;
             }
         }
 
@@ -400,7 +471,16 @@ namespace ShiftChange
             {
                 return false;
             }
-            return RoomWorkTypes.RecreationForRole(parent.GetRoom()?.Role);
+            // WORK WINS, and this limb is what still enforces that. The tables
+            // used to guarantee it by construction — ResolvedRecreation drops
+            // any role that ResolvedRole already claims — but contents-supplied
+            // work does not go through a role at all, so a recreation-roled
+            // room holding a marker building could now answer yes to both and
+            // resurrect the dual-purpose stand the exclusivity rule exists to
+            // prevent. A rec room with a reactor core in it is absurd; so was
+            // the collision the table guards, and it is guarded anyway.
+            return RoomWorkTypes.RecreationForRole(parent.GetRoom()?.Role)
+                && AutomaticWorkTypes.Count == 0;
         }
 
         /// <summary>
@@ -424,7 +504,10 @@ namespace ShiftChange
             {
                 return false;
             }
-            return RoomWorkTypes.RestForRole(parent.GetRoom()?.Role);
+            // Same ordering guard as HandlesRecreation, for the same reason:
+            // work, then recreation, then rest, decided identically every time.
+            return RoomWorkTypes.RestForRole(parent.GetRoom()?.Role)
+                && AutomaticWorkTypes.Count == 0;
         }
 
         /// <summary>
@@ -647,7 +730,7 @@ namespace ShiftChange
             List<string> labels = new List<string>(works.Count + 1);
             for (int i = 0; i < works.Count; i++)
             {
-                labels.Add(works[i].gerundLabel ?? works[i].labelShort ?? works[i].defName);
+                labels.Add(WorkTypeLabels.Of(works[i]));
             }
             if (recreation)
             {
@@ -1229,7 +1312,7 @@ namespace ShiftChange
                 }
                 else
                 {
-                    string first = effective[0].gerundLabel ?? effective[0].labelShort ?? effective[0].defName;
+                    string first = WorkTypeLabels.Of(effective[0]);
                     regime = effective.Count == 1
                         ? "ShiftChange.RegimeShift".Translate(first).RawText
                         : "ShiftChange.RegimeShiftMore".Translate(first, effective.Count - 1).RawText;
