@@ -481,6 +481,131 @@ The trigger is the **job**, not the doorway: work-type-in-set AND
 job-target-in-room. A doctor crossing the hospital to reach the storeroom, or
 anyone walking in to eat, changes nothing.
 
+## Mod compatibility
+
+Four tables, each keyed by defName and each allowed to miss. A name no loaded
+mod supplies is a mod that is not installed, which is the ordinary case — so
+every lookup is silent-fail and an absent row simply narrows the answer. They
+are separate tables rather than one because they fail differently: a missing
+vanilla name means a def was renamed under us and the harness asserts against
+it, while a missing modded name means nothing at all.
+
+**Work types another mod supplies** (`RoomWorkTypes.CompatDefaults`). Complex
+Jobs does not add work so much as MOVE it: it repoints the `workType` field on
+vanilla WorkGiverDefs at finer-grained types, so surgery stops being Doctor
+work and butchering stops being Cooking work. A stand keyed to the vanilla name
+alone then serves part of its room's work and passes over the rest, which reads
+as the stand working intermittently rather than as a missing patch.
+
+**Rooms the engine gives no role to** (`RoomContentsWork`). Automatic mode asks
+the room's `RoomRoleDef`, and the two roles that matter are scored by exactly
+one thing: `def.building.workTableRoomRole`
+(`RoomRoleWorker_Workshop.GetScore`). It is a declarative opt-in and a mod has
+to set it. Dubs Rimatomics sets it nowhere, so a reactor hall scores zero for
+every role and comes back as the generic `Room`.
+
+A bench that misses the field can be handed it in XML, and `Patches/` does that
+for the two Rimatomics benches. A reactor hall cannot: it holds no work table,
+so there is no def to hang the field on. Those rooms are read by **contents**
+instead, keyed on markers resolved by name. Detecting by type is the vanilla
+idiom rather than a workaround: Storeroom is `thing is Building_Storage` and
+Tomb is `is Building_Sarcophagus`.
+
+Two markers, because the two questions have different answers per building and
+a room can want both. `Rimatomics.IFuelFilter` is "holds nuclear fuel" and is
+implemented by exactly three classes: the reactor cores, the plutonium
+processor, the spent fuel pool. `Rimatomics.CompResearchFacility` is
+"Rimatomics research happens here", and is matched on the **comp** rather than
+the class because that is what the mod itself keys on: the comp adds its own
+parent to `map.Rimatomics().Facilities` on spawn, which is the list
+`WorkGiver_SuperviseResearch` scans. Four defs carry it — the abstract reactor
+base, so every core, plus the plutonium processor, the research reactor and the
+weapons bench.
+
+So a reactor hall and a processor room match both markers and arm both work
+types; a spent fuel pool arms nuclear work only; a research reactor or weapons
+bench arms research only. No room is armed for work that cannot happen in it,
+which one combined marker could not manage. Research earns its place for the
+same reason the suits do: the steps run at the research reactor and the
+plutonium processor are the ones whose `FacilityFailures` include
+`Failure_RadiationLeak`, which sets the facility radiating at strength 2 out to
+8 cells for up to 2000 ticks with the researcher standing at it. The weapons
+bench steps fail electrically instead.
+
+No `RoomRoleDef` is shipped for it. One would enter the global `MaxBy` scoring
+against every vanilla role and change what the game CALLS that room for every
+other mod reading roles. Deciding what a stand dresses for is this mod's
+business; naming someone else's architecture is not.
+
+The contents answer is cached per stand, on room ID plus a short interval,
+because `Room.ContainedAndAdjacentThings` clears and rebuilds a set on every
+call and `WorkTypes` is read every frame to draw the gizmo label. It also
+carries the work-wins guard: contents-supplied work does not pass through a
+role, so the disjointness the role tables used to guarantee by construction is
+now enforced in `HandlesRecreation` and `HandlesRest` directly.
+
+**Work-type names** (`WorkTypeLabels`). A `WorkTypeDef` carries four name
+fields and the grid shows `gerundLabel`, because it is the one that reads as an
+activity in a list. Vanilla always makes the gerund the `-ing` form of
+`labelShort`, so the choice is invisible there, but nothing requires it.
+Rimatomics puts the domain in `labelShort` ("Nuclear", which is what the work
+tab column shows via `PawnColumnWorker_WorkPriority`) and the action in
+`gerundLabel` ("Loading"), so the grid offered a row nobody searching for
+"Nuclear" would find. It worked; it was unfindable.
+
+The override is ours rather than a def patch, and that is not a preference:
+`gerundLabel` is `[MustTranslate]`, Rimatomics ships DefInjected translations
+for that exact field in four languages, and
+`InjectIntoData_AfterImpliedDefs` (`PlayDataLoader.cs:333`) runs after def
+patches apply. A patch would work in English and silently stop working
+elsewhere.
+
+**Jobs that name their destination first** (`JobRoomTargets`). `TargetCell`
+reads targetA because that is where vanilla puts the place the work happens, in
+both shapes that matter: a bill's targetA is the workbench, and a haul's
+targetA is the thing being carried, whose cell is where the pawn starts. Either
+way targetA is where the pawn first puts their hands on the job.
+
+Rimatomics inverts that for fuel handling — targetA is the reactor core its
+scanner walks, targetB the rod found separately — while the driver's toils run
+`GotoThing(TargetIndex 2)`, `StartCarryThing`, `GotoThing(TargetIndex 1)`. The
+pawn walks to the fuel first, so targetB is where the exposure begins and
+targetA is a room they only reach already carrying a rod.
+
+It is a list rather than a rule because "prefer targetB when set" is wrong for
+vanilla hauling, whose targetB is the destination cell. Nothing in a job's
+shape separates the two conventions; only the job def does. And it keys on the
+job def and nothing else — never on which room has a free stand — because the
+resolver is shared by the dressing and change-back arms, and an
+availability-dependent answer would let them disagree.
+
+**Givers we ignore outright** (`JobRoomTargets.IgnoredGivers`). The same table
+file carries a second list, keyed on the WorkGiverDef rather than the job def,
+whose jobs this mod does not act on in either direction — no dressing, and no
+changing back either. It sits in the same gate as player-forced and emergency
+work, so the uniform rides along and the next ordinary job settles it.
+
+Keyed on the giver because the job def cannot always separate two givers.
+Rimatomics runs two into one `LoadSpentFuel` job: one carries spent rods to the
+plutonium processor, the other carries the CHEMFUEL that goes in with them.
+Their WorkGiverDefs differ, and `JobGiver_Work` stamps `workGiverDef` on every
+scanner job, so the giver is the only thing that tells them apart.
+
+That puts one job def in the path of both tables, and the ORDER settles it
+rather than a rule about precedence. The giver gate sits with player-forced and
+emergency work, above the room resolver, so a chemfuel run returns there and
+`LoadSpentFuel`'s targetB entry is never consulted for it. A spent-rod run
+carries a giver that is not on the list, passes the gate, and reads targetB as
+normal. Same job def, opposite outcomes, and neither table has to know about
+the other.
+
+Chemfuel is inert and lives wherever a colony stores chemfuel, not beside a
+reactor. Treating it as nuclear work meant either a wardrobe detour before a
+very long haul, or, for an already-suited pawn, undressing for the trip and
+dressing again after — two wardrobe walks for a job needing no suit. Changing
+is the expensive part, not the wearing, and that is the general principle this
+list encodes.
+
 ## The recreation branch
 
 Work jobs name their purpose through `workGiverDef.workType`; recreation jobs
@@ -567,7 +692,9 @@ runs the same driver, as do mech dormancy and Odyssey's deactivation, and
 requiring a bed excludes all three without naming classes a DLC can add to. It
 is also why this arm needs none of the late-room caution the joy classes need:
 a bed does not move, and targetA already points at it when StartJob runs, so
-the room resolver is the work arm's A-first `TargetCell`, untouched.
+the room resolver is the work arm's `TargetCell`, untouched. `LayDown` is not
+in the `JobRoomTargets` list, so that resolver reads targetA here as it always
+has.
 
 **Medical bed rest belongs to the work arm, and the TAG is what says so.**
 Vanilla ships a `PatientBedRest` WorkTypeDef whose gerund label reads "resting

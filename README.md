@@ -311,6 +311,49 @@ job happens, and taming happens wherever the wild animal is standing, which is
 not the barn. Vanilla's own Handling row never fired for it either, so no barn
 stand has ever dressed anyone for taming.
 
+**[Dubs Rimatomics](https://steamcommunity.com/sharedfiles/filedetails/?id=1127530465)**
+needs no setup. Put a stand in a reactor hall, stock it with rad suits, and
+whoever loads or unloads fuel changes into them first. The row to tick by hand,
+if you ever want to, is Nuclear loading: Rimatomics calls that work type
+Nuclear in the work tab and Loading in the field a list like this one reads,
+so the grid shows both halves of the name.
+
+Rimatomics sets no room role on any of its buildings, which is why this needed
+anything at all. Its machining table and research bench now count as a workshop
+and a laboratory, the way the same benches from any other mod already did. A
+reactor hall has no bench to key on, so a stand there reads the room's contents
+instead and recognises the reactor cores, the plutonium processor and the spent
+fuel pool.
+
+Fetching the chemfuel that goes into the plutonium processor is left alone on
+purpose, and it is the one part of that loop that will not change anyone.
+Chemfuel is inert, and it lives wherever your colony keeps chemfuel rather than
+beside the reactor, so suiting up for that haul costs a walk to the wardrobe and
+buys nothing. Carrying the spent rods themselves still changes them, at the
+rods.
+
+Research counts too, in the rooms where it can hurt you. The steps run at a
+research reactor or a plutonium processor are the ones that can spring a
+radiation leak, with your researcher standing at the machine when it does, so
+those rooms turn a stand on for research as well as for fuel work. A spent fuel
+pool arms for fuel work alone, and a weapons bench for research alone, because
+that is what happens in each.
+
+Construction is left off on purpose, and the reason is worth knowing. A reactor
+leaks nothing at full health. The leak scales with damage, so an intact core is
+safe to build beside no matter how much fuel is in it, and the two Rimatomics
+research steps that count as construction work fail with fire and glare rather
+than radiation. What exposes a builder is repairing a damaged core, which is a
+job you only send someone on after a raid or a fire. Arming construction would
+put a colonist through a change of clothes for every wall they lay in the hall
+to cover that one case. Tick Constructing by hand on the reactor stand when you
+have damage to repair, and untick it afterwards.
+
+Working the reactor console is the exception, and it is not a gap we can close:
+no work type sits behind it, it arrives as a right-click order, and a shift
+change never interrupts an order you gave. In practice the colonist who loaded
+the fuel is already wearing the suit when you send them to the console.
+
 **An apparel mod is worth having.** Not required and not a dependency, but
 vanilla has no scrubs and no chef's whites, and the one lab coat it does have
 is Anomaly's, so in a pure vanilla game there is very little to actually dress
