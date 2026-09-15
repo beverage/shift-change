@@ -1,0 +1,11 @@
+v1.4.0 update:
+
+Works with Dubs Rimatomics. Put a stand in a reactor hall, stock it with rad suits, and whoever loads or unloads fuel changes into them first. Nothing to set up.
+
+Rimatomics gives none of its buildings a room role, so the game scores a reactor hall the way it scores an empty box, and a stand in one had nothing to read. Stands now read what is in the room with them instead, which is how they find the reactor cores, the plutonium processor and the spent fuel pool. Research counts in those rooms too, since that is where a leak can catch the researcher.
+
+The nuclear work type is listed as Nuclear loading. It was always in the list, under Loading, which is not a name anyone hunting for Nuclear would find.
+
+Fetching fuel rods dresses them at the rods now, rather than beside the core. Fetching chemfuel dresses nobody: it is inert, and stored nowhere near a reactor.
+
+Nothing changes without Rimatomics.
