@@ -505,14 +505,19 @@ to set it. Dubs Rimatomics sets it nowhere, so a reactor hall scores zero for
 every role and comes back as the generic `Room`.
 
 A bench that misses the field can be handed it in XML, and `Patches/` does that
-for the two Rimatomics benches. A reactor hall cannot: it holds no work table,
-so there is no def to hang the field on. Those rooms are read by **contents**
-instead, keyed on markers resolved by name. Detecting by type is the vanilla
+for the two Rimatomics benches. That alone is not enough, because a room role is
+winner-take-all: `RoomRoleWorker_Laboratory` scores 60 a bench and `_Workshop`
+27 a table, so a room holding one of each resolves to Laboratory and the
+machining table's Smithing is armed by nobody. A reactor hall is further out of
+reach again: it holds no work table, so there is no def to hang the field on.
+
+Both are answered by reading the room's **contents**, keyed on markers resolved
+by name. Detecting by type is the vanilla
 idiom rather than a workaround: Storeroom is `thing is Building_Storage` and
 Tomb is `is Building_Sarcophagus`.
 
-Two markers, because the two questions have different answers per building and
-a room can want both. `Rimatomics.IFuelFilter` is "holds nuclear fuel" and is
+Four markers, because the questions have different answers per building and a
+room can want several. `Rimatomics.IFuelFilter` is "holds nuclear fuel" and is
 implemented by exactly three classes: the reactor cores, the plutonium
 processor, the spent fuel pool. `Rimatomics.CompResearchFacility` is
 "Rimatomics research happens here", and is matched on the **comp** rather than
@@ -520,12 +525,20 @@ the class because that is what the mod itself keys on: the comp adds its own
 parent to `map.Rimatomics().Facilities` on spawn, which is the list
 `WorkGiver_SuperviseResearch` scans. Four defs carry it — the abstract reactor
 base, so every core, plus the plutonium processor, the research reactor and the
-weapons bench.
+weapons bench. The other two are the bench classes themselves,
+`Building_RimatomicsWorkbench` for Smithing and
+`Building_RimatomicsResearchBench` for Research and Crafting, which is what arms
+a shared bench room for both whichever role won the scoring.
 
 So a reactor hall and a processor room match both markers and arm both work
 types; a spent fuel pool arms nuclear work only; a research reactor or weapons
-bench arms research only. No room is armed for work that cannot happen in it,
-which one combined marker could not manage. Research earns its place for the
+bench arms research only. One combined marker could not manage that. One
+overreach is knowingly left in: a hall holding only cores arms Research, because
+the cores inherit the comp from the abstract reactor base, yet the only research
+steps naming a core are Construction work. Nothing misfires, since no Research
+job ever targets a core; the stand just lists a work type that will not come up,
+and narrowing it means depending on their research step table instead of the
+comp they key on themselves. Research earns its place for the
 same reason the suits do: the steps run at the research reactor and the
 plutonium processor are the ones whose `FacilityFailures` include
 `Failure_RadiationLeak`, which sets the facility radiating at strength 2 out to

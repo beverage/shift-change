@@ -57,6 +57,15 @@ namespace ShiftChange
         /// <c>WorkGiver_LoadPuProcChems</c> for the chemfuel that goes with
         /// them — and both build it the same way round.</para>
         ///
+        /// <para><c>LoadSilo</c> (<c>WorkGiver_LoadSilo</c>) and
+        /// <c>LoadRailgunMagazine</c> (<c>WorkGiver_LoadMagazine</c>) are the
+        /// same shape again, for the missile silo and the railgun: destination
+        /// in targetA, the round in targetB, toils walking to the round first.
+        /// Both are <c>workType Hauling</c>, which no room arms by default, so
+        /// they reach this only through a hand-ticked Hauling stand. They were
+        /// missed when this table was first written because the survey stopped
+        /// at the fuel loop; an adversarial review of v1.4.0 found them.</para>
+        ///
         /// <para>Deliberately absent: <c>UnloadPlutonium</c> and
         /// <c>RemoveFuelModule</c>. Those take the material OUT of a single
         /// building and their targetA is that building, which is already
@@ -67,6 +76,8 @@ namespace ShiftChange
             {
                 "HaulModuletoCore",
                 "LoadSpentFuel",
+                "LoadSilo",
+                "LoadRailgunMagazine",
             };
 
         /// <summary>Whether this job's room should be read from targetB.</summary>
