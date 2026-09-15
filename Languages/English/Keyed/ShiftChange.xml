@@ -54,6 +54,13 @@
   <ShiftChange.WorkTypeNone>Not used for shift changes</ShiftChange.WorkTypeNone>
   <ShiftChange.RoomReadsAs>the game reads this room as: {0}</ShiftChange.RoomReadsAs>
   <ShiftChange.NoRoomRole>this spot is not in a roled room</ShiftChange.NoRoomRole>
+
+  <!-- Work-type names we override, because the mod supplying them fills
+       gerundLabel and labelShort with names for different things. Keyed on the
+       work type's defName; see WorkTypeLabels for why this is not a def patch.
+       Dubs Rimatomics calls this 'Nuclear' in the work tab and 'Loading' in its
+       gerund, and 'Loading' is what our list showed. -->
+  <ShiftChange.WorkTypeLabel.NuclearWork>nuclear loading</ShiftChange.WorkTypeLabel.NuclearWork>
   <ShiftChange.FromRoom>from the room</ShiftChange.FromRoom>
   <ShiftChange.Manual>set manually</ShiftChange.Manual>
   <ShiftChange.Excluded>excluded</ShiftChange.Excluded>

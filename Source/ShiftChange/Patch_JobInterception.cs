@@ -344,7 +344,13 @@ namespace ShiftChange
                     continue;
                 }
                 WorkGiverDef giver = job.workGiverDef;
+                // The ignored-giver gate applies here too. StartJob's copy
+                // only stops a pawn being dressed as they TAKE such a job; a
+                // freed stand would otherwise reach across and pull them off
+                // one mid-haul, which is the same wardrobe detour by another
+                // route.
                 bool forWork = giver?.workType != null && !giver.emergency
+                    && !JobRoomTargets.Ignored(giver)
                     && stand.HandlesWork(giver.workType);
                 // The joy twin: a colonist already at recreation bare when
                 // this stand freed — the pool-party case — is caught up the
@@ -531,7 +537,12 @@ namespace ShiftChange
             // automatic job. This must sit ABOVE the return-trip block —
             // it originally gated only the dressing path, which meant an
             // emergency in another room was delayed by an undress detour.
-            if (job.playerForced || job.workGiverDef?.emergency == true)
+            // Some givers are not ours to act on, and for the same reason the
+            // uniform rides along here rather than forcing a detour. See
+            // JobRoomTargets.IgnoredGivers — keyed on the giver because the
+            // job def cannot always tell two givers apart.
+            if (job.playerForced || job.workGiverDef?.emergency == true
+                || JobRoomTargets.Ignored(job.workGiverDef))
             {
                 return false;
             }
@@ -1333,13 +1344,42 @@ namespace ShiftChange
         /// mode cares about, but queue-based jobs (hauling, harvesting) leave
         /// it empty — verified in the spike — so fall back to the queue rather
         /// than treating those as "no location".
+        ///
+        /// <para>A short list of jobs answers from <c>targetB</c> instead,
+        /// because they name their destination in targetA and the thing being
+        /// carried in targetB; see <see cref="JobRoomTargets"/>.</para>
         /// </summary>
         internal static IntVec3 TargetCell(Job job, Map map)
         {
+            // A few jobs name their DESTINATION in targetA and the thing being
+            // carried in targetB, which is the reverse of both vanilla shapes
+            // — see JobRoomTargets for the list and why it is a list. Tried
+            // first, and it falls through to targetA when targetB is unreadable
+            // so a malformed job still resolves somewhere.
+            //
+            // targetB's thing is read exactly like targetA's, PositionHeld and
+            // all. That means once the pawn has PICKED THE ROD UP this answers
+            // "wherever the carrier is standing" rather than the pool. At a job
+            // boundary, which is where both arms ask, the rod is still on the
+            // ground and the answer is the pool. The catch-up sweep can ask
+            // mid-carry, and there it degrades to the room the pawn is walking
+            // through — which is the room a freed stand would have to be in to
+            // match anyway, so it stays harmless.
+            if (JobRoomTargets.UsesTargetB(job.def))
+            {
+                IntVec3 carried = job.targetB.HasThing
+                    ? job.targetB.Thing.PositionHeld
+                    : job.targetB.Cell;
+                if (carried.IsValid && carried.InBounds(map))
+                {
+                    return RoomBearing(carried, job.targetB, map);
+                }
+            }
+
             IntVec3 cell = job.targetA.HasThing ? job.targetA.Thing.PositionHeld : job.targetA.Cell;
             if (cell.IsValid && cell.InBounds(map))
             {
-                return cell;
+                return RoomBearing(cell, job.targetA, map);
             }
 
             List<LocalTargetInfo> queue = job.targetQueueA;
@@ -1355,6 +1395,79 @@ namespace ShiftChange
                 }
             }
             return IntVec3.Invalid;
+        }
+
+        /// <summary>
+        /// A cell that HAS a room, for a work target that does not.
+        ///
+        /// <para>A building's own cells stop belonging to any room once it is
+        /// both impassable and full-fillage:
+        /// <c>RegionTypeUtility.GetExpectedRegionType</c> returns
+        /// <c>RegionType.None</c> for a non-walkable cell holding anything
+        /// whose <c>Fillage</c> is <c>Full</c>, so no region covers it and
+        /// <c>GetRoom</c> answers null. Every arm here reads the job's room
+        /// from the target cell and gives up when it is null, so a work target
+        /// built like that is invisible to this mod: pawns work at it and
+        /// never change. Rimatomics' plutonium processor is one (impassable,
+        /// fillPercent 1, 4x4), which is how two colonists supervised research
+        /// at it in a room with two stands set to Research and nothing
+        /// happened.</para>
+        ///
+        /// <para>The engine has no helper for this. <c>Thing.GetRoom</c> and
+        /// <c>GetRoomOrAdjacent</c> both work from the thing's Position, and on
+        /// a 4x4 solid building that centre cell's eight neighbours are still
+        /// inside the building, so both answer null too. The ring around the
+        /// whole occupied rect is what has to be walked.</para>
+        ///
+        /// <para>Takes the room MOST of the ring sits in rather than the first
+        /// found, so a processor set into a wall between two rooms resolves to
+        /// the side it actually opens onto instead of to whichever cell
+        /// enumerated first. Ties keep the earlier cell, so the answer is
+        /// stable, which the shared resolver requires: both arms must read the
+        /// same room for the same job or the pawn oscillates.</para>
+        ///
+        /// <para>Only runs when the cheap answer is null, so the ordinary case
+        /// costs one region lookup.</para>
+        /// </summary>
+        internal static IntVec3 RoomBearing(IntVec3 cell, LocalTargetInfo target, Map map)
+        {
+            if (cell.GetRoom(map) != null)
+            {
+                return cell;
+            }
+            Thing thing = target.HasThing ? target.Thing : null;
+            if (thing == null || !thing.Spawned || thing.Map != map)
+            {
+                return cell;
+            }
+
+            Room best = null;
+            IntVec3 bestCell = cell;
+            int bestCount = 0;
+            Dictionary<Room, int> counts = new Dictionary<Room, int>();
+            foreach (IntVec3 ring in GenAdj.CellsAdjacent8Way(thing))
+            {
+                if (!ring.InBounds(map))
+                {
+                    continue;
+                }
+                Room room = ring.GetRoom(map);
+                if (room == null)
+                {
+                    continue;
+                }
+                int seen;
+                counts.TryGetValue(room, out seen);
+                seen++;
+                counts[room] = seen;
+                if (seen > bestCount)
+                {
+                    best = room;
+                    bestCell = ring;
+                    bestCount = seen;
+                }
+            }
+            return best != null ? bestCell : cell;
         }
     }
 }

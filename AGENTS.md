@@ -130,6 +130,24 @@ silently discards every operation in the file, and `xmllint` still passes.
 **Never hot reload defs.** Vanilla's own command and the community mod both
 corrupt live state. Restart the game.
 
+**The job-room resolver is shared, so it must not read the map.** Dressing and
+changing back both call `TargetCell`, and they have to answer identically for
+the same job. Resolve on the job def and its targets only. Make the answer
+depend on which room happens to hold a free stand and the two arms disagree,
+which is a pawn walking between the stand and the work forever.
+
+**Anything reading `Room.ContainedAndAdjacentThings` needs a cache.** It clears
+and rebuilds a set and a list on every call, and `WorkTypes` — which
+`RoomContentsWork` feeds — is read every frame to draw a gizmo label. Cache on
+room ID plus a tick interval, as `CompShiftStand.AutomaticWorkTypes` does.
+
+**Never patch a `[MustTranslate]` field on another mod's def.** Def patches
+apply while defs load; `InjectIntoData_AfterImpliedDefs`
+(`PlayDataLoader.cs:333`) runs afterwards and stamps the mod's own DefInjected
+translation back over yours. The patch works in English and silently does
+nothing in every language that mod ships. Override it on our side instead, in
+our own keyed strings — `WorkTypeLabels` is the pattern.
+
 ## Scope rules
 
 **The mod ships no art and no apparel.** That is positioning, not laziness. If a
