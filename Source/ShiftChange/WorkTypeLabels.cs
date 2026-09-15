@@ -63,11 +63,37 @@ namespace ShiftChange
                 return string.Empty;
             }
             string key;
-            if (Overrides.TryGetValue(work.defName, out key) && key.CanTranslate())
+            if (Overrides.TryGetValue(work.defName, out key) && Renderable(key))
             {
                 return key.Translate().RawText;
             }
             return work.gerundLabel ?? work.labelShort ?? work.defName;
+        }
+
+        /// <summary>
+        /// Whether <c>Translate()</c> can render this key into SOMETHING a
+        /// player should read.
+        ///
+        /// <para><c>CanTranslate</c> alone is not that test. It is
+        /// <c>activeLanguage.HaveTextForKey</c> (<c>Translator.cs:9</c>), which
+        /// never consults the default language, while <c>Translate</c> itself
+        /// falls back to it (<c>Translator.cs:58</c>). We ship English keys
+        /// only, so guarding on <c>CanTranslate</c> rejected a key that
+        /// <c>Translate</c> would have rendered perfectly well, and every
+        /// non-English player kept seeing the unfindable vanilla label this
+        /// file exists to replace. Shipped that way in v1.4.0.</para>
+        ///
+        /// <para>Both languages are asked, so a key missing everywhere still
+        /// falls through to the vanilla chain rather than printing itself.</para>
+        /// </summary>
+        internal static bool Renderable(string key)
+        {
+            if (key.CanTranslate())
+            {
+                return true;
+            }
+            LoadedLanguage fallback = LanguageDatabase.defaultLanguage;
+            return fallback != null && fallback.HaveTextForKey(key);
         }
 
         /// <summary>
