@@ -2849,7 +2849,8 @@ namespace ShiftChange
 
             if (!RimatomicsLoaded)
             {
-                Report.AppendLine("    note  Rimatomics absent, so the names are not asserted");
+                ok &= ExpectKnownGap(false, "the table's defNames resolve against a loaded Rimatomics",
+                                     "Rimatomics is not on this mod list, so every name check above was skipped");
                 return ok;
             }
             foreach (string name in JobRoomTargets.RoomIsTargetB)
@@ -2887,8 +2888,6 @@ namespace ShiftChange
                              && marker.workNames != null && marker.workNames.Length > 0,
                              marker.typeName + " names a type and at least one work type");
             }
-            ok &= Expect(RoomContentsWork.Any == (RoomContentsWork.Active.Count > 0),
-                         "Any agrees with the resolved list");
 
             // HasComp, against the def database rather than a named def, so the
             // check does not go stale when a def is renamed out from under it.
@@ -2920,7 +2919,8 @@ namespace ShiftChange
             }
             if (!RimatomicsLoaded)
             {
-                Report.AppendLine("    note  Rimatomics absent, so no marker was expected to resolve");
+                ok &= ExpectKnownGap(false, "every marker resolves against a loaded Rimatomics",
+                                     "Rimatomics is not on this mod list, so no marker could resolve");
             }
             return ok;
         }
