@@ -615,7 +615,30 @@ namespace ShiftChange
                 // change out first, wherever the meal happens to be stored.
                 if (IsIngestJob(job))
                 {
-                    if (FoodSourceIsOnPawn(job, pawn))
+                    // Eat-as-is is a WORK and RECREATION rule, and the rest arm
+                    // must not inherit it (found in play 2026-09-17).
+                    // Mid-shift the exemption is right: the pawn is at their
+                    // bench, so changing first is a real detour. At the WAKE-UP
+                    // there is no detour to avoid — they are standing AT the
+                    // stand with their gear inside it, and the exemption sends
+                    // them out in sleepwear to eat and back again to change,
+                    // which is the entire walk the rest arm exists to prevent.
+                    //
+                    // The mod already disagreed with itself here. The same
+                    // breakfast sitting in a STOCKPILE fails FoodSourceIsOnPawn,
+                    // so it reaches Insert and changes them back today, as
+                    // shipped; only the food's location changed the answer. This
+                    // makes the carried case match the stored one rather than
+                    // inventing a third behaviour — which is also why no
+                    // rest-need or timetable heuristic is needed to tell
+                    // breakfast from a 3am snack. That snack already costs two
+                    // wardrobe trips whenever the food is stored, and stored is
+                    // the common case.
+                    //
+                    // Same known limit as the recreation carve-out below: it
+                    // reads the stand's CURRENT config, not why the pawn was
+                    // dressed.
+                    if (FoodSourceIsOnPawn(job, pawn) && !onShift.HandlesRest())
                     {
                         return false;
                     }
