@@ -233,6 +233,9 @@ namespace ShiftChange
                  PromisesHold);
             Case(map, pad, "a meal break gets them out of uniform first",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), MealBreakChangesOut);
+            Case(map, pad, "and a sleepwear meal break does too, even with the meal in inventory",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 SleepwearMealBreakChangesOut);
             Case(map, pad, "under threat they may not change in, but may change back",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
