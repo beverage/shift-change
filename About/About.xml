@@ -69,7 +69,7 @@ The rules it follows:
 - Emergencies are never delayed. While the map is under threat nobody changes into a uniform, but a colonist already wearing one still changes back out of it.
 - Personal kit stays personal. A stand with owners serves only them, and nobody takes clothes out of a stand somebody else is using.
 - Passing through a room changes nothing; only doing the room's work does.
-- A meal break gets them out of uniform first, unless the food is already in their hands or their pack.
+- A meal break gets them out of uniform first, unless the food is already in their hands or their pack. That exception does not apply to a sleeping stand: a colonist wakes up standing beside it, so they change before going to eat either way.
 - If a stand frees up while someone is already working in its room out of uniform, they step over and change, unless they are mid-treatment on a patient.
 - A Change back button appears on any colonist currently in a uniform, for when you want them out of it now.
 

@@ -245,6 +245,8 @@ they were already wearing. A shared sleeping room takes the switch by hand.
   stored. The exception is food already in their hands or their pack: that
   they just eat. Otherwise a cook would carry a meal across the base in
   whites to reach a chair, which is the walk this mod exists to prevent.
+  A sleeping stand does not take that exception, because a colonist wakes up
+  standing beside it, so changing first costs them no walking at all.
 - If a stand frees up while someone is already working in its room out of
   uniform, they'll step over and change, unless they're mid-treatment on a
   patient.
