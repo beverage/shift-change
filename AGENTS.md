@@ -39,11 +39,22 @@ must never reach a player. These are not harmless menu entries: each stage
 builder clears a 200–320 cell footprint, destroying every building, item and
 pawn inside it, then leaves permanent colonists and buildings behind.
 
-**The harness BODY and `-shiftchange-harness` ship in every configuration**, and
-that is deliberate — `run-harness.sh` builds plain Release and drives it through
-the flag, so the release gate asserts against the literal dll players install.
-Over-gating silently deletes the gate; `check-shipped-dll.py` fails on that too,
-not just on the reverse.
+**The harness and `-shiftchange-harness` ship in NO configuration.** They sit
+behind `#if HARNESS`, which every configuration except a plain `-c Release`
+defines; `run-harness.sh` asks for them with `-p:Harness=true` on top of Release
+codegen and sweeps `Assemblies/` back to the shipping dll when it finishes. Dev
+tooling is not a player's to carry, and that flag clears a pad, spawns
+colonists, writes save files and quits the game.
+
+**`HARNESS` is a whole-file guard, always.** Never write `#if HARNESS` inside a
+file that ships. The point is that a harness build and a shipping build differ
+by the presence of whole types and by nothing else — no shipping code path
+changes shape between the build the harness asserts against and the build that
+goes out. That property is what replaced the old arrangement, where the harness
+shipped so the gate could assert against the literal dll players install.
+`check-invariants.py` enforces the guard's shape and `check-shipped-dll.py` the
+absence in the artifact, so breaking either is a failed check rather than a
+surprise at the next release.
 
 **The five `[TweakValue]` fields also ship, on purpose.** The bar is
 destructiveness, not reachability: they are how a player is walked through

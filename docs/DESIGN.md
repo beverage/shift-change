@@ -998,18 +998,29 @@ required *menu presence*:
   not the shipped dll. The `Media` config films identical product behaviour
   with the fixtures riding along.
 - *The harness must run against exactly the assembly that ships.* That binds
-  the harness **code**, not its menu entry. `-shiftchange-harness`
-  (`Patch_HarnessAutoRun`) is the release gate and never touches the menu, and
-  `run-harness.sh` builds plain Release itself — so the gate still asserts
-  against the literal dll players install.
+  what the harness build may DIFFER BY, not whether it is the shipped file.
 
-**So the harness body ships and its menu entry does not.** `SCENES` (defined on
-Debug and Media, never Release) carries the stage files and the harness's
-`[DebugAction]`; the shared fixture primitives live in `DebugTools_Fixtures`,
-which always compiles because the harness builds its fixtures from them. A
-shipped build registers no debug actions at all, so the "Shift Change" category
-never renders. `devtools/check-shipped-dll.py` asserts both directions in CI —
-stages absent, gate present.
+**The harness does not ship either, as of 2026-09-17**, and that reverses the
+arrangement this section described for v1.0.0 through v1.3.x, where the harness
+body and `-shiftchange-harness` were compiled into Release on the second
+argument above. Nothing was wrong with the argument; the price was. A player's
+install carried a launch flag that clears a pad, spawns colonists, writes save
+files and quits the game — unreachable in practice, and still not a player's to
+carry.
+
+What replaced it: `HARNESS` (defined everywhere except a plain Release build)
+may only ever be a **whole-file** guard. A harness build and a shipping build
+therefore differ by the presence of the harness types and by nothing else — no
+shipping code path changes shape between the build the harness asserts against
+and the build that goes out, which is what the second argument actually wanted.
+`devtools/check-invariants.py` enforces the guard's shape;
+`devtools/check-shipped-dll.py` enforces the absence in the artifact, in CI and
+again inside `publish-workshop.sh` against the staged copy.
+
+`SCENES` (Debug and Media, never Release) still carries the stage files and the
+harness's `[DebugAction]`; `DebugTools_Fixtures` sits under `SCENES || HARNESS`
+because both dev-only callers build their fixtures from it. A shipped build
+registers no debug actions at all, so the "Shift Change" category never renders.
 
 **The five `[TweakValue]` fields do still ship**, and that is not an
 inconsistency. The bar here is destructiveness, not reachability: a TweakValue

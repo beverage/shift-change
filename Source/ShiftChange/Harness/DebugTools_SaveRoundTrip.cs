@@ -1,3 +1,13 @@
+// HARNESS only — see the configuration table in ShiftChange.csproj. The
+// harness is dev tooling and does not ship: a Release build compiles this
+// file out entirely, and devtools/run-harness.sh asks for it back with
+// -p:Harness=true on top of Release codegen.
+//
+// The guard is whole-file, always. Never put an #if HARNESS inside a file
+// that ships — a shipping build and a harness build must differ by the
+// presence of these types and by nothing else, or a harness run stops saying
+// anything about the assembly that goes out. check-invariants.py enforces it.
+#if HARNESS
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -39,9 +49,9 @@ namespace ShiftChange
     /// one that never left the object. Mechanisms:
     /// <c>rimworld-docs/gamedata/scribe-system.md</c>.</para>
     ///
-    /// <para>This body ships in every configuration, like the rest of the
-    /// harness: <c>-shiftchange-harness</c> is the release gate and asserts
-    /// against the shipped dll.</para>
+    /// <para>This body ships in no configuration, like the rest of the
+    /// harness: it is behind <c>#if HARNESS</c>, and a plain Release build
+    /// does not define it.</para>
     /// </summary>
     internal static class DebugTools_SaveRoundTrip
     {
@@ -723,3 +733,4 @@ namespace ShiftChange
         }
     }
 }
+#endif

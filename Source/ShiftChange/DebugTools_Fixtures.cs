@@ -1,3 +1,7 @@
+// Dev tooling, under either guard — see the configuration table in
+// ShiftChange.csproj. Both callers compile out of a shipping build, so this
+// does too.
+#if SCENES || HARNESS
 using RimWorld;
 using UnityEngine;
 using Verse;
@@ -8,23 +12,21 @@ namespace ShiftChange
     /// Fixture primitives shared by the lifecycle harness and the SCENES-only
     /// stage builders: make a thing, make a pawn, make a garment, dress them.
     ///
-    /// <para><b>Why this file is not <c>#if SCENES</c>.</b> The harness BODY
-    /// ships in every configuration on purpose — <c>-shiftchange-harness</c>
-    /// (<see cref="Patch_HarnessAutoRun"/>) is the release gate, and a gate
-    /// that ran against a build nobody installs would assert nothing. The
-    /// harness builds its fixtures out of these six members, so gating them
-    /// out with the stage scripts would simply break the Release build. They
-    /// live here, always compiled; everything that BUILDS A SCENE from them
-    /// stays in <c>DebugTools_DemoStage</c> / <c>DebugTools_PreviewStage</c>,
-    /// which do compile out.</para>
+    /// <para><b>Why the guard is <c>SCENES || HARNESS</c> and not either one
+    /// alone.</b> Two dev-only callers gate independently — the stage builders
+    /// on SCENES, the harness on HARNESS — and each builds its fixtures out of
+    /// these six members. Naming one guard would break the other's build. The
+    /// OR is the whole reason this file is not simply part of one of them;
+    /// everything that BUILDS A SCENE from these stays in
+    /// <c>DebugTools_DemoStage</c> / <c>DebugTools_PreviewStage</c>.</para>
     ///
-    /// <para><b>This adds no player-facing surface.</b> Nothing here carries a
-    /// <c>[DebugAction]</c>, and in Release the only caller is the harness,
-    /// which is unreachable without the launch flag. <see cref="Spawn"/> and
+    /// <para><b>This reaches no player.</b> Nothing here carries a
+    /// <c>[DebugAction]</c>, and a shipping build has neither constant, so the
+    /// type is not in the assembly at all. <see cref="Spawn"/> and
     /// <see cref="AveragePawn"/> do make player-faction things and colonists —
     /// that is what a fixture is — so keep it that way: if a shipped code path
-    /// ever wants one of these, that is a new resident and needs its own
-    /// go/no-go.</para>
+    /// ever wants one of these, that is a new resident, it needs its own
+    /// go/no-go, and it does not live in this file.</para>
     /// </summary>
     internal static class DebugTools_Fixtures
     {
@@ -222,3 +224,4 @@ namespace ShiftChange
         }
     }
 }
+#endif

@@ -1,3 +1,13 @@
+// HARNESS only — see the configuration table in ShiftChange.csproj. The
+// harness is dev tooling and does not ship: a Release build compiles this
+// file out entirely, and devtools/run-harness.sh asks for it back with
+// -p:Harness=true on top of Release codegen.
+//
+// The guard is whole-file, always. Never put an #if HARNESS inside a file
+// that ships — a shipping build and a harness build must differ by the
+// presence of these types and by nothing else, or a harness run stops saying
+// anything about the assembly that goes out. check-invariants.py enforces it.
+#if HARNESS
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -75,21 +85,30 @@ namespace ShiftChange
     /// game — see <see cref="DebugTools_SaveRoundTrip"/>. Still out of reach: a
     /// real gravship launch.</para>
     ///
-    /// <para><b>What ships and what does not (2026-08-17).</b> This
-    /// BODY ships in every configuration, and that is load-bearing: the
-    /// release gate is <c>-shiftchange-harness</c> via
-    /// <see cref="Patch_HarnessAutoRun"/>, and <c>run-harness.sh</c> builds
-    /// plain Release itself, so the gate keeps asserting against the literal
-    /// dll players install. The <c>[DebugAction]</c> wrapper is SCENES only.
+    /// <para><b>What ships: none of this (2026-09-17).</b> The whole harness
+    /// is behind <c>#if HARNESS</c>, which a plain Release build does not
+    /// define, so neither this body nor <c>-shiftchange-harness</c> exists in
+    /// a player's install. <c>run-harness.sh</c> asks for them with
+    /// <c>-p:Harness=true</c> on top of Release codegen, and sweeps
+    /// <c>Assemblies/</c> back to the shipping dll when it is done. The
+    /// <c>[DebugAction]</c> wrapper remains SCENES only on top of that.
     ///
-    /// This corrects the rationale that used to sit here — "ships in Release,
-    /// dev-mode gated, like the other two debug tools; a test you have to
-    /// switch build configurations to run is a test that stops being run."
-    /// The second half is true and is why the body still ships. The first half
-    /// was wrong twice over: the debug actions menu is a surface players
-    /// genuinely use, and menu presence was never what kept this test alive —
-    /// the launch flag is. Both halves are satisfied at once by compiling out
-    /// the entry and keeping the code.</para>
+    /// Two earlier rationales sat here and are both superseded. The first —
+    /// "ships in Release, dev-mode gated, like the other two debug tools" —
+    /// was wrong because the debug actions menu is a surface players genuinely
+    /// use. The second — "the BODY ships, because a gate is only worth running
+    /// if it asserts against the literal dll players install" — was right
+    /// about what it wanted and paid for it in the wrong currency. The thing
+    /// it was protecting is that no shipping code path differs between the
+    /// build under test and the build that goes out, and that is now a rule
+    /// with a check behind it: HARNESS is only ever a whole-file guard
+    /// (<c>check-invariants.py</c>), so the two builds differ by the presence
+    /// of these types and by nothing else.
+    ///
+    /// What survives from both: a test you have to switch build
+    /// configurations to run is a test that stops being run. Nobody switches
+    /// configurations here either — <c>run-harness.sh</c> passes the property
+    /// itself, and the command is the same one it always was.</para>
     ///
     /// <para><b>First run, 2026-08-14</b>, clean Release restart on the ~100-mod
     /// profile, quicktest map: 4 passed, 0 failed, 1 known gap. The gravship
@@ -118,9 +137,9 @@ namespace ShiftChange
         /// (<see cref="DebugTools_Menu"/>), which carries the game-state and
         /// Odyssey gating.
         ///
-        /// <see cref="Run"/> below is the shared body and ships in EVERY
-        /// configuration, because <c>-shiftchange-harness</c> is the release
-        /// gate and has to assert against the assembly players install.
+        /// <see cref="Run"/> below is the shared body, reached from here on a
+        /// dev build and from <c>-shiftchange-harness</c> under
+        /// <c>run-harness.sh</c>. Neither door exists in a shipping build.
         ///
         /// The menu entry is what cannot ship: this is a <c>ToolMap</c> action
         /// with no confirmation, and on a live colony it clears its 7×7 pad 22
@@ -561,3 +580,4 @@ namespace ShiftChange
         }
     }
 }
+#endif

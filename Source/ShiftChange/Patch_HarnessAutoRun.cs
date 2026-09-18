@@ -1,3 +1,8 @@
+// HARNESS only — see the configuration table in ShiftChange.csproj. This file
+// IS the -shiftchange-harness launch flag, and it does not ship: a Release
+// build compiles it out, so the flag does not exist in a player's install at
+// all. devtools/run-harness.sh builds with -p:Harness=true to get it back.
+#if HARNESS
 using System;
 using HarmonyLib;
 using RimWorld;
@@ -16,20 +21,20 @@ namespace ShiftChange
     /// devtools/rimworld-profile.sh restore
     /// </code>
     ///
-    /// <para><b>Why this ships.</b> Driving the harness by hand costs a menu
-    /// hunt and a map click, and the menu's layout moves with the mod list, so
-    /// the coordinates that work on one profile are wrong on the other. That
-    /// is a small cost per run and a large one over a release, and it is
-    /// exactly the sort of friction that stops a test being run at all. With
-    /// this the whole loop is one command and a log read.</para>
+    /// <para><b>Why the flag exists.</b> Driving the harness by hand costs a
+    /// menu hunt and a map click, and the menu's layout moves with the mod
+    /// list, so the coordinates that work on one profile are wrong on the
+    /// other. That is a small cost per run and a large one over a release, and
+    /// it is exactly the sort of friction that stops a test being run at all.
+    /// With this the whole loop is one command and a log read.</para>
     ///
-    /// <para><b>What it costs a player.</b> One
-    /// <c>CommandLineArgPassed</c> string comparison, once, when a game
-    /// finishes loading. Nothing else in here runs without the flag, and the
-    /// flag is not something anyone sets by accident. It is a Harmony postfix
-    /// rather than a <c>GameComponent</c> deliberately: components are scribed
-    /// into every save (<c>Game.ExposeData</c>, <c>LookMode.Deep</c>), and a
-    /// dev-only feature has no business appearing in a player's save file.</para>
+    /// <para><b>What it costs a player: nothing, because it is not there.</b>
+    /// Release compiles this file out, so a shipped assembly carries no
+    /// postfix on <c>FinalizeInit</c> and no flag to pass. It is a Harmony
+    /// postfix rather than a <c>GameComponent</c> for a second reason that
+    /// still governs the harness build: components are scribed into every save
+    /// (<c>Game.ExposeData</c>, <c>LookMode.Deep</c>), and a dev-only feature
+    /// has no business appearing in a save file at all.</para>
     ///
     /// <para><b>It quits when it is done</b>, pass or fail. The point is a
     /// loop that terminates on its own so a caller can wait on the process and
@@ -108,14 +113,41 @@ namespace ShiftChange
         /// comparable, and only wanders if the centre is unusable — the pad is
         /// cleared before use, so the bar is "in bounds and not water", not
         /// "empty".
+        ///
+        /// <para><b>The one-cell MARGIN has to have rooms in it too</b>
+        /// (2026-09-18). Cases reach past the pad they were given: the
+        /// exterior-wall case counts the ring around a wall built on the pad's
+        /// edge, and that ring includes cells the clear never touched. Natural
+        /// rock there carries no room, <c>GetRoom</c> returns null, and the
+        /// case's geometry silently stops being the geometry it was written
+        /// for. Rejecting such an origin costs nothing on an ordinary map —
+        /// outdoor cells all belong to one enormous room — and it keeps runs
+        /// comparable, which is what the map-centre preference was already
+        /// reaching for. The case clears its own margin as well; this is the
+        /// half that also covers a pad chosen by hand from the debug menu
+        /// landing somewhere silly.</para>
         /// </summary>
         internal static bool TryFindPad(Map map, out IntVec3 origin)
         {
             int size = DebugTools_LifecycleHarness.PadSize;
             Predicate<IntVec3> usable = c =>
-                new CellRect(c.x, c.z, size, size).InBounds(map)
-                && c.Standable(map)
-                && !c.GetTerrain(map).IsWater;
+            {
+                CellRect pad = new CellRect(c.x, c.z, size, size);
+                if (!pad.ExpandedBy(1).InBounds(map)
+                    || !c.Standable(map)
+                    || c.GetTerrain(map).IsWater)
+                {
+                    return false;
+                }
+                foreach (IntVec3 cell in pad.ExpandedBy(1))
+                {
+                    if (cell.GetRoom(map) == null)
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            };
 
             IntVec3 centre = map.Center - new IntVec3(size / 2, 0, size / 2);
             if (usable(centre))
@@ -127,3 +159,4 @@ namespace ShiftChange
         }
     }
 }
+#endif

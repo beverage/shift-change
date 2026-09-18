@@ -1,3 +1,13 @@
+// HARNESS only — see the configuration table in ShiftChange.csproj. The
+// harness is dev tooling and does not ship: a Release build compiles this
+// file out entirely, and devtools/run-harness.sh asks for it back with
+// -p:Harness=true on top of Release codegen.
+//
+// The guard is whole-file, always. Never put an #if HARNESS inside a file
+// that ships — a shipping build and a harness build must differ by the
+// presence of these types and by nothing else, or a harness run stops saying
+// anything about the assembly that goes out. check-invariants.py enforces it.
+#if HARNESS
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -273,7 +283,10 @@ namespace ShiftChange
             }
             fix.Comp.ToggleWork(doctor);
 
-            ForceDangerRecheck(fix.Map);
+            // ARRANGE the control, do not hope for it. Everything below sits
+            // behind this one reading, and the map it runs on was generated
+            // rather than built — see MakeCalm for the run that proved it.
+            MakeCalm(fix.Map);
             bool ok = Expect(fix.Map.dangerWatcher.DangerRating == StoryDanger.None,
                              "the map starts calm (control)")
                     & Expect(Diverts(fix, WorkJob(fix, tend)),
@@ -347,6 +360,11 @@ namespace ShiftChange
             }
             fix.Comp.ToggleWork(doctor);
 
+            // Same reason as the case above: arranged, not assumed. The
+            // preceding case leaves the map calm on its ordinary path, but
+            // "the case before me cleaned up" is not a precondition this one
+            // should be resting on either.
+            MakeCalm(fix.Map);
             bool ok = Expect(fix.Map.dangerWatcher.DangerRating == StoryDanger.None,
                              "the map is calm — the catch-up is danger-gated")
                     & Expect(RunSwap(fix), "the first colonist dressed");
@@ -388,3 +406,4 @@ namespace ShiftChange
         }
     }
 }
+#endif

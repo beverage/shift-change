@@ -1,3 +1,13 @@
+// HARNESS only — see the configuration table in ShiftChange.csproj. The
+// harness is dev tooling and does not ship: a Release build compiles this
+// file out entirely, and devtools/run-harness.sh asks for it back with
+// -p:Harness=true on top of Release codegen.
+//
+// The guard is whole-file, always. Never put an #if HARNESS inside a file
+// that ships — a shipping build and a harness build must differ by the
+// presence of these types and by nothing else, or a harness run stops saying
+// anything about the assembly that goes out. check-invariants.py enforces it.
+#if HARNESS
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -225,12 +235,27 @@ namespace ShiftChange
         ///
         /// <para>The even split is ASSERTED, not assumed. If the ring ever
         /// stopped tying, the case would pass while exercising nothing.</para>
+        ///
+        /// <para><b>And it is now ARRANGED as well as asserted (2026-09-18).</b>
+        /// The ring of the north wall reaches one cell OUTSIDE the pad, which
+        /// <c>ClearArea</c> was not touching. A generated map put natural rock
+        /// there, <c>GetRoom</c> came back null for it, the counter skipped it,
+        /// and the split read 3 in / 2 out — no tie, so the precondition failed
+        /// and the bearing assertion behind it failed honestly, having been
+        /// handed geometry it was never written for. Clearing a one-cell margin
+        /// costs 24 more cells on a throwaway map and makes the fixture say
+        /// what it means. The assertion stays: arranging a precondition is not
+        /// a reason to stop checking it.</para>
         /// </summary>
         internal static bool ExteriorWallTargetResolvesTheRoom(Map map, CellRect pad)
         {
+            // The margin is part of the fixture: the wall's ring reaches into
+            // it. Clipped, because a pad against the map edge would otherwise
+            // expand out of bounds.
+            CellRect surround = pad.ExpandedBy(1).ClipInsideMap(map);
             try
             {
-                GenDebug.ClearArea(pad, map);
+                GenDebug.ClearArea(surround, map);
                 EnclosePad(map, pad);
 
                 Room inside = pad.CenterCell.GetRoom(map);
@@ -252,7 +277,7 @@ namespace ShiftChange
                 {
                     map.roofGrid.SetRoof(cell, null);
                 }
-                GenDebug.ClearArea(pad, map);
+                GenDebug.ClearArea(surround, map);
             }
         }
 
@@ -431,3 +456,4 @@ namespace ShiftChange
         }
     }
 }
+#endif

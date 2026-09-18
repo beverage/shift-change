@@ -23,18 +23,28 @@ it finds there, including hot-reload leftovers.
 
 ### Three configurations
 
-| Config | `SCENES` | ECR | Job |
-|---|---|---|---|
-| `Debug` | yes | yes | test runs — the default for observation and iteration |
-| `Media` | yes | no | footage and screenshots: Release codegen, fixtures present |
-| `Release` | no | no | shipping, and the harness release gate |
+| Config | `SCENES` | `HARNESS` | ECR | Job |
+|---|---|---|---|---|
+| `Debug` | yes | yes | yes | test runs — the default for observation and iteration |
+| `Media` | yes | yes | no | footage and screenshots: Release codegen, fixtures present |
+| `Release` | no | no | no | shipping |
+| `Release -p:Harness=true` | no | yes | no | what `run-harness.sh` builds and drives |
 
 `SCENES` compiles in the demo and preview stage builders and the harness's
 `[DebugAction]`. **Release ships none of them** — the stages are destructive
 enough that a player reaching one is a colony-scale accident, and the reasoning
-is in [DESIGN.md](DESIGN.md#development-tooling). The harness *body* and the
-`-shiftchange-harness` flag ship in every configuration, deliberately, because
-that is the release gate.
+is in [DESIGN.md](DESIGN.md#development-tooling).
+
+`HARNESS` compiles in the harness itself and the `-shiftchange-harness` launch
+flag, and **Release ships neither**. Dev tooling is not a player's to carry: the
+flag clears a pad, spawns colonists, writes save files and quits the game.
+`run-harness.sh` passes `-p:Harness=true` itself and sweeps `Assemblies/` back
+to the shipping dll afterwards, so nothing in the loop changes for you.
+
+The guard is **whole-file, never inline** — that is what keeps the build the
+harness runs against and the build that ships different only in which types are
+present, rather than different in shape. `check-invariants.py` enforces the
+rule; `check-shipped-dll.py` enforces the outcome on the artifact.
 
 `SCENES` on Debug is mandatory rather than a nicety: test runs happen on Debug,
 and without it that build loses the fixtures they exist to drive.
@@ -251,9 +261,9 @@ collapsing three loose entries into one; it is paid on a dev build only,
 where the submenu holds three items and hunting is not the problem it was when
 they sat loose among vanilla's hundreds.
 
-A **Release** build has no menu entry for this by design; drive it there with
-`run-harness.sh`, which uses the launch flag. That is not a lesser path — it is
-the release gate, and it is the reason the harness body still ships.
+A **Release** build has neither the menu entry nor the harness at all; drive it
+with `run-harness.sh`, which builds `-p:Harness=true` and uses the launch flag.
+That is not a lesser path — it is the release gate, and it is the only one.
 
 For a fast interactive session without the headless run,
 `devtools/rimworld-profile.sh minimal` / `restore` swaps the live mod list. It
@@ -272,7 +282,7 @@ broke that way once; the rest block a failure that would land silently.
 | `devtools/check-invariants.py` | hot-reload hazards, translation keys in both directions, XML-to-C# type bindings, the `<Patch>` root walk, and the Workshop preview size. Runs locally too — see [TESTING.md](TESTING.md). |
 | `devtools/bbcode-preview.py` | an unclosed tag in the store description, which makes Steam render the rest of the page as literal text |
 | Committed dll is uninstrumented, and alone | an instrumented Debug build reaching the mod's load path |
-| `devtools/check-shipped-dll.py` | a `SCENES` build shipping the destructive scene builders, **and** the opposite failure — over-gating that deletes the release gate. Run against the committed dll and again against the fresh Release build. |
+| `devtools/check-shipped-dll.py` | a `SCENES` build shipping the destructive scene builders, a `-p:Harness=true` build shipping the harness and its launch flag, and the opposite failure — over-gating that leaves the feature surface out. Run against the committed dll and again against the fresh Release build. |
 | Media build | the filming config rotting between shoots, discovered on a shoot |
 | Release build | compile errors against Krafs |
 
@@ -406,10 +416,10 @@ flowchart LR
 | `ShiftChangeDefOf.cs` | Def references. |
 | `SessionGuard.cs` | Clears session-scoped statics when the loaded game changes. Route any new static through it. |
 | `HarmonyInit.cs` | Patch bootstrap. |
-| `DebugTools_Fixtures.cs` | Fixture primitives — make a thing, a pawn, a garment. **Always compiled**, because the harness builds its fixtures from these in Release. |
-| `DebugTools_LifecycleHarness.cs` | The test suite. Twenty-three cases driving real engine entry points — see [TESTING.md](TESTING.md). Body always compiled; its `[DebugAction]` is `SCENES` only. |
-| `DebugTools_SaveRoundTrip.cs` | The three save/load cases. Separate file because they replace `Current.Game` and must run last. |
-| `Patch_HarnessAutoRun.cs` | Runs the harness and quits, when launched with `-shiftchange-harness`. Inert without the flag. Always compiled — this is the release gate. |
+| `DebugTools_Fixtures.cs` | Fixture primitives — make a thing, a pawn, a garment. `SCENES \|\| HARNESS`: both dev-only callers gate independently and both build their fixtures from these. |
+| `Harness/DebugTools_LifecycleHarness.cs` | `HARNESS` only. The test suite: twenty-three cases driving real engine entry points — see [TESTING.md](TESTING.md). Its `[DebugAction]` wrapper is `SCENES` on top of that. |
+| `Harness/DebugTools_SaveRoundTrip.cs` | `HARNESS` only. The three save/load cases. Separate file because they replace `Current.Game` and must run last. |
+| `Patch_HarnessAutoRun.cs` | `HARNESS` only. Runs the harness and quits, when launched with `-shiftchange-harness`. Neither it nor the flag exists in a shipping build. |
 | `DebugTools_Menu.cs` | `SCENES` only. The mod's entire debug-menu surface: one "Dev tools…" submenu. Absent in Release, so the category never renders. |
 | `DebugTools_DemoStage.cs` | `SCENES` only. The demo stage. Test fixture and film set. Clears 13×16 before building. |
 | `DebugTools_PreviewStage.cs` | `SCENES` only. The title-card stage, sized to crop to Workshop cards. Clears 32×10 before building. |
@@ -440,7 +450,7 @@ docs LICENSE README.md`.
 |---|---|
 | `run-harness.sh` | Runs the test suite headless in an isolated instance. `--full`, `--alongside`. |
 | `check-invariants.py` | The static checks CI runs. Run it before pushing. |
-| `check-shipped-dll.py` | Asserts the built assembly ships no debug scenes and still carries the release gate. Run it before pushing. |
+| `check-shipped-dll.py` | Asserts the built assembly ships no debug scenes, no harness and no launch flag, and still carries the feature surface. Run it before pushing; `publish-workshop.sh` runs it against the staged copy too. |
 | `rimworld-profile.sh` | Swaps the live mod list for a fast interactive session. |
 | `publish-workshop.sh` | Stages a Workshop upload out of the working tree, and swaps it into `Mods/`. |
 | `bbcode-preview.py` | Validates the store description and renders a local preview. |

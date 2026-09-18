@@ -69,11 +69,15 @@ jobs:
           fi
 
       # The other half of the same question, and deliberately NOT a grep: the
-      # debug stages must be absent and the harness must be present, and .NET
-      # keeps type names in #Strings (UTF-8) but string literals in #US
-      # (UTF-16), so a grep for "-shiftchange-harness" finds nothing whether or
-      # not it shipped. The script explains the trap and searches both.
-      - name: Committed dll ships no debug scenes
+      # debug stages and the harness must both be ABSENT, and .NET keeps type
+      # names in #Strings (UTF-8) but string literals in #US (UTF-16), so a
+      # grep for "-shiftchange-harness" finds nothing whether or not it
+      # shipped. The script explains the trap and searches both encodings.
+      #
+      # run-harness.sh writes this same path with -p:Harness=true and sweeps
+      # itself afterwards; this is what catches the run where the sweep did
+      # not happen and the harness build got committed.
+      - name: Committed dll ships no debug scenes or harness
         run: python3 devtools/check-shipped-dll.py
 
       - uses: actions/setup-dotnet@v4
@@ -91,10 +95,18 @@ jobs:
 
       # Re-run against the FRESHLY BUILT dll, not just the committed one. The
       # committed check catches a mis-staged config; this catches a new debug
-      # action that nobody wrapped in #if SCENES, which is the failure that
-      # would otherwise ship silently.
-      - name: Release build ships no debug scenes
+      # action that nobody wrapped in #if SCENES, or a new harness file nobody
+      # wrapped in #if HARNESS — the failures that would otherwise ship
+      # silently.
+      - name: Release build ships no debug scenes or harness
         run: python3 devtools/check-shipped-dll.py
+
+      # The harness must still COMPILE, and nothing above builds it: Release
+      # strips it, and a harness file that stopped compiling would be found at
+      # the next release instead of here. Built to a scratch path so it cannot
+      # become the dll that gets zipped.
+      - name: Build (Release + harness)
+        run: dotnet build Source/ShiftChange/ShiftChange.csproj -c Release -p:Harness=true -p:OutputPath=$RUNNER_TEMP/harness/
 
       - name: Assemblies swept after Release build
         run: |
@@ -116,6 +128,11 @@ jobs:
 
       - name: Build (Release)
         run: dotnet build Source/ShiftChange/ShiftChange.csproj -c Release
+
+      # The zip is a thing players install, so it gets the same gate the
+      # Workshop copy gets: no debug scenes, no harness, no launch flag.
+      - name: Release zip ships no debug scenes or harness
+        run: python3 devtools/check-shipped-dll.py
 
       # The zip is the mod folder a player drops into Mods/ — game-loaded
       # content plus the human documents, no Source/, no CI, no dev tooling.

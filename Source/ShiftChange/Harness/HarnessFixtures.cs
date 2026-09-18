@@ -1,3 +1,13 @@
+// HARNESS only — see the configuration table in ShiftChange.csproj. The
+// harness is dev tooling and does not ship: a Release build compiles this
+// file out entirely, and devtools/run-harness.sh asks for it back with
+// -p:Harness=true on top of Release codegen.
+//
+// The guard is whole-file, always. Never put an #if HARNESS inside a file
+// that ships — a shipping build and a harness build must differ by the
+// presence of these types and by nothing else, or a harness run stops saying
+// anything about the assembly that goes out. check-invariants.py enforces it.
+#if HARNESS
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -190,6 +200,53 @@ namespace ShiftChange
         {
             AccessTools.Field(typeof(DangerWatcher), "lastUpdateTick")
                        ?.SetValue(map.dangerWatcher, -10000);
+        }
+
+        /// <summary>
+        /// MAKE the map calm, rather than assert that it is. Returns how many
+        /// targets were swept, so a caller can say whether it had to do
+        /// anything.
+        ///
+        /// <para><b>Why this exists (2026-09-18).</b> A quicktest map is
+        /// generated, not arranged, and what it contains is a roll. One came up
+        /// with something already hostile on it, and every case opening with
+        /// <c>DangerRating == None</c> as a control failed — along with each
+        /// assertion sitting behind that control, because the danger gate is
+        /// one-directional and nothing dresses on a map under threat. Eleven
+        /// assertions across six cases, and not one of them was about the mod:
+        /// the run before and the run after were both green. A control that
+        /// fails on a dice roll is worse than no control at all, because what
+        /// it spends is the release gate's credibility.</para>
+        ///
+        /// <para><b>What has to go is exactly what the rating sums.</b>
+        /// <c>DangerWatcher.CalculateDangerRating</c> walks
+        /// <c>attackTargetsCache.TargetsHostileToColony</c> through
+        /// <c>AffectsStoryDanger</c>, and only a Pawn (its
+        /// <c>kindDef.combatPower</c>) or an unmanned mortar contributes
+        /// anything at all; every other hostile sums to zero. Sweeping the
+        /// whole hostile set is that same answer with no arithmetic in it, and
+        /// on a throwaway map nothing in that set is worth keeping.</para>
+        ///
+        /// <para>The set is snapshotted first, because destroying a target
+        /// mutates the very cache this enumerates. The fixture's own colonists
+        /// are not in it; a threat staged by <see cref="Threat"/> is, which is
+        /// harmless — the case that stages one destroys it itself, and this
+        /// runs before any of that.</para>
+        /// </summary>
+        internal static int MakeCalm(Map map)
+        {
+            int swept = 0;
+            foreach (IAttackTarget target in map.attackTargetsCache.TargetsHostileToColony.ToList())
+            {
+                Thing thing = target?.Thing;
+                if (thing != null && !thing.Destroyed)
+                {
+                    thing.Destroy();
+                    swept++;
+                }
+            }
+            ForceDangerRecheck(map);
+            return swept;
         }
 
         /// <summary>
@@ -589,3 +646,4 @@ namespace ShiftChange
         // ------------------------------------------------------- assertions
     }
 }
+#endif

@@ -317,6 +317,68 @@ def check_patch_roots():
                      "operation in the file is silently discarded" % (rel(path), root))
 
 
+# -------------------------------------------------------------- harness gating
+
+# The regression harness and its launch flag are dev tooling and do not ship:
+# the csproj defines HARNESS in every configuration EXCEPT a plain Release
+# build, so `-c Release` compiles the whole thing away and a player's install
+# has no such flag in it. That switch is worth exactly as much as two
+# properties of the source, and neither is visible at a glance:
+#
+#   1. Harness code is actually behind the guard. A new harness file nobody
+#      wrapped compiles into the shipping dll and puts a launch flag in a
+#      player's install, which is the entire thing this prevents.
+#
+#   2. The guard is WHOLE-FILE, never inline. That is what makes a harness
+#      build and a shipping build differ by the presence of whole types and by
+#      nothing else — no shipping code path changes shape between the build the
+#      harness asserts against and the build that goes out. Lose it and a
+#      harness run stops being evidence about the shipped assembly, which was
+#      the whole argument for shipping the harness in the first place, back
+#      when it did.
+#
+# check-shipped-dll.py asserts the outcome on the artifact; this asserts the
+# shape of the source, which is where the mistake is actually made. Neither
+# subsumes the other: a self-contained harness file named something else
+# entirely passes rule 1 here and is caught there by the "harness" token sweep.
+def check_harness_gating():
+    for path in cs_files():
+        text = open(path, encoding="utf-8").read()
+        lines = text.split("\n")
+        guards = [i for i, line in enumerate(lines)
+                  if line.startswith("#if") and "HARNESS" in line]
+        named_harness = "Harness" in os.path.basename(path) or "/Harness/" in path
+
+        if not guards:
+            if named_harness:
+                fail("harness", "%s is harness code and carries no `#if HARNESS` "
+                     "— it would compile into the shipping dll" % rel(path))
+            elif "CommandLineArgPassed" in text:
+                fail("harness", "%s reads a launch flag outside `#if HARNESS` — "
+                     "dev-only flags are not a player's to carry" % rel(path))
+            continue
+
+        if len(guards) > 1:
+            fail("harness", "%s has %d `#if HARNESS` directives — the guard is "
+                 "whole-file, exactly one per file" % (rel(path), len(guards)))
+        first_code = next((i for i, line in enumerate(lines)
+                           if line.strip() and not line.lstrip().startswith("//")),
+                          None)
+        if first_code != guards[0]:
+            fail("harness", "%s:%d `#if HARNESS` is not the file's first code "
+                 "line — an inline guard makes the shipping build differ from "
+                 "the harness build in shape, not just in contents"
+                 % (rel(path), guards[0] + 1))
+        body = [line for line in lines if line.strip()]
+        if not body or body[-1].strip() != "#endif":
+            fail("harness", "%s does not close with `#endif` as its last line — "
+                 "the guard has to cover the whole file" % rel(path))
+        if any(line.strip() == "#else" for line in lines):
+            fail("harness", "%s has an `#else` under its HARNESS guard — that is "
+                 "shipping code living inside a harness file; move it out"
+                 % rel(path))
+
+
 def main():
     check_hot_reload()
     check_translation_keys()
@@ -325,6 +387,7 @@ def main():
     check_patch_roots()
     check_private_tracking_refs()
     check_home_paths()
+    check_harness_gating()
 
     for note in notes:
         print("note: %s" % note)
