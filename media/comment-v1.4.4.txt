@@ -1,0 +1,11 @@
+v1.4.4 update:
+
+Fixes a wardrobe loop that shows up alongside a loadout mod. It was found with Compositable Loadouts, but nothing about it is specific to that mod.
+
+A stand holds a colonist's own clothes while they are in uniform, and hides them from anything that goes looking, so a hauler cannot carry them off mid-shift. Anything else that dresses colonists reads that hidden slot as an empty one and sends them to storage for a replacement.
+
+The replacement comes back off when they change out, so the colonist pays the equip time twice and ends up where they started. In power armour that is a long walk and two slow changes. Kit also drifts between colonists, because whatever sat nearest in storage is what they came back wearing, and after a few days nobody is in the suit you gave them.
+
+A colonist is no longer sent after clothing their own stand is already holding for them. If that parked garment is worn through, they still go and find a better one.
+
+Nothing changes without a mod that dresses colonists for you.
