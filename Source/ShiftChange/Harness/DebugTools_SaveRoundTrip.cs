@@ -367,9 +367,7 @@ namespace ShiftChange
             Map map = Find.CurrentMap;
             if (map == null || !Patch_HarnessAutoRun.TryFindPad(map, out IntVec3 origin))
             {
-                DebugTools_LifecycleHarness.Report.AppendLine(
-                    "      no usable pad on the current map — cannot stage");
-                return false;
+                return CannotStage("no usable pad on the current map");
             }
             // A fresh pad on the current map: the map and pad the harness was
             // handed belong to a game the earlier legs replaced.
@@ -641,21 +639,6 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Whether the log contains <paramref name="needle"/>.
-        ///
-        /// <para>Scans the whole queue rather than a range past a saved index.
-        /// Positional scanning is unsound in two ways, both producing false
-        /// passes: the queue caps at 1000 entries and dequeues past that
-        /// (<c>LogMessageQueue.cs:8</c>), so a noisy load pushes earlier entries
-        /// out from under the index; and an identical message does not enqueue
-        /// but increments <c>repeats</c> on the existing entry (<c>:24-34</c>),
-        /// placing a repeat of an earlier line behind the index.</para>
-        ///
-        /// <para>Scanning everything costs a duplicate failure instead — an
-        /// earlier leg's warning fails the later legs too. These strings appear
-        /// only when a load went wrong.</para>
-        /// </summary>
-        /// <summary>
         /// The stand is gone after a load. Decide whether that is OUR failure
         /// or the environment's, and say which.
         ///
@@ -685,6 +668,54 @@ namespace ShiftChange
                 "Map.FinalizeLoading aborted in " + culprit
                 + ", so the map spawned nothing. Not ours: a third-party static "
                 + "cache that is not cleared between in-process loads");
+        }
+
+        /// <summary>
+        /// There is nowhere to stage. Same fork as <see cref="MissingStand"/>,
+        /// one leg earlier: that one asks whether a load produced a stand, this
+        /// one asks whether the map a later leg inherited is fit to build on at
+        /// all.
+        ///
+        /// <para><b>Why leg 3 is the one that needs this.</b> The three
+        /// round-trip cases replace <c>Current.Game</c>, so each runs on
+        /// whatever the one before it left behind. When an earlier load aborts
+        /// in <c>Map.FinalizeLoading</c> the region and room grids are never
+        /// built, <c>TryFindPad</c> requires a room on every cell of the pad
+        /// and its margin, and so no origin can be found anywhere on the map.
+        /// Legs 1 and 2 already report that as a gap through
+        /// <see cref="MissingStand"/>; leg 3 fails EARLIER than any assertion,
+        /// at staging, so it never reached the treatment its siblings get and
+        /// the release gate read red for a cause none of the three share with
+        /// the mod. Found on the v1.4.4 release gate, 2026-09-19.</para>
+        ///
+        /// <para><b>The discriminator is the abort, not the missing pad.</b>
+        /// "The previous leg killed the map" and "this run never had a usable
+        /// map" arrive at the same symptom and must not get the same verdict:
+        /// the first is the environment, the second is a broken harness
+        /// invocation and has to stay a failure. An abort in the log is
+        /// precisely the first — and only an abort, so a genuinely padless map
+        /// handed to the harness still fails here, as it does in
+        /// <c>Patch_HarnessAutoRun</c> before the run even starts.</para>
+        ///
+        /// <para>It excuses nothing past staging. Every other way this case
+        /// returns false — no stand def, no fixture, an assignable missing off
+        /// the staged stand — is untouched and still fails.</para>
+        /// </summary>
+        internal static bool CannotStage(string where)
+        {
+            string culprit = FinalizeAbortCulprit();
+            if (culprit == null)
+            {
+                DebugTools_LifecycleHarness.Report.AppendLine(
+                    "      " + where + " — cannot stage");
+                return false;
+            }
+            return DebugTools_LifecycleHarness.ExpectKnownGap(
+                false, where,
+                "Map.FinalizeLoading aborted in " + culprit
+                + ", so the map an earlier leg left behind has no region grid "
+                + "to stage on. Not ours: a third-party static cache that is "
+                + "not cleared between in-process loads");
         }
 
         /// <summary>
@@ -720,6 +751,21 @@ namespace ShiftChange
             return null;
         }
 
+        /// <summary>
+        /// Whether the log contains <paramref name="needle"/>.
+        ///
+        /// <para>Scans the whole queue rather than a range past a saved index.
+        /// Positional scanning is unsound in two ways, both producing false
+        /// passes: the queue caps at 1000 entries and dequeues past that
+        /// (<c>LogMessageQueue.cs:8</c>), so a noisy load pushes earlier entries
+        /// out from under the index; and an identical message does not enqueue
+        /// but increments <c>repeats</c> on the existing entry (<c>:24-34</c>),
+        /// placing a repeat of an earlier line behind the index.</para>
+        ///
+        /// <para>Scanning everything costs a duplicate failure instead — an
+        /// earlier leg's warning fails the later legs too. These strings appear
+        /// only when a load went wrong.</para>
+        /// </summary>
         internal static bool Logged(string needle)
         {
             foreach (LogMessage message in Log.Messages)
