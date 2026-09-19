@@ -25,6 +25,7 @@ using static ShiftChange.HarnessFixtures;
 using static ShiftChange.HarnessGates;
 using static ShiftChange.HarnessLifecycle;
 using static ShiftChange.HarnessOwnership;
+using static ShiftChange.HarnessScoring;
 using static ShiftChange.HarnessSwap;
 using static ShiftChange.HarnessTables;
 using static ShiftChange.HarnessTriggers;
@@ -263,6 +264,13 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  FreedStandCatchesUp);
+            // The pair, and it only means anything as a pair: the refusal that
+            // stops a checked-out pawn re-arming from the spare pile, and the
+            // release that lets them shop once their parked kit is worn out.
+            Case(map, pad, "a checked-out pawn refuses a spare that duplicates their parked kit",
+                 ParkedKitRefusesSpares);
+            Case(map, pad, "but takes one once the parked kit is worn through",
+                 WornOutParkedKitStillGoesShopping);
             // Needs a live map and touches no fixture, so it sits at the end of
             // the map cases and before the game-replacing ones below.
             Case("a work target with no room of its own still resolves one",
