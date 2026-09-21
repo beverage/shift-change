@@ -260,6 +260,14 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  DangerGateIsOneDirectional);
+            Case(map, pad, "a pawn under a lord duty is left alone, and released when it ends",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 DutyGateShutsBothArms);
+            Case(map, pad, "a job handed to a pawn mid-swap is not deferred on top of it",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 MidSwapJobIsNotDeferredAgain);
             Case(map, pad, "a freed stand catches up a colonist working bare",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),

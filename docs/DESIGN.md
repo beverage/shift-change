@@ -143,10 +143,44 @@ The prefix declines to act when:
 | map danger ≠ None | **dressing only** — see below. No vanilla precedent to copy: `JobGiver_OptimizeApparel` has no danger check; vanilla gets apparel-change safety from think-tree position (`Humanlike.xml:302-306`), and this hook sits downstream of the think tree |
 | `job.playerForced` | direct orders execute immediately, in both directions. A pawn in uniform given a forced order keeps it on and returns it later |
 | `workGiverDef.emergency` | emergency givers exist because something cannot wait (`DoctorTendEmergency`). A bleeding pawn must not wait for a wardrobe trip |
+| `pawn.GetLord()` or `mindState.duty` | a lord holds the pawn and reissues their job on its own clock, so a swap is pre-empted rather than finished. Both directions — see below |
+| the pawn's current job is the swap | never stack a swap on a swap, whatever handed them the new job |
 
 The forced and emergency exemptions originally gated only the dressing path.
 Play showed the return trip could delay an emergency identically, so both were
 hoisted above each direction.
+
+The duty gate is the same argument as the danger gate, arriving late.
+`Humanlike.xml` puts the lord directive nodes at `:112` (`HighPriority`) and
+`:288` (`MediumPriority`) and `JobGiver_OptimizeApparel` at `:306`, so a duty
+that issues a job takes it at one of the first two and the pawn never reaches
+the apparel node. Where the node is reached, vanilla still does not defer the
+apparel job: it carries `leaveJoinableLordIfIssuesJob`, so changing clothes
+leaves a voluntarily joinable lord rather than waiting for it. Both levers
+belong to the tree. From below it this hook has neither — it cannot make its
+own swap unreachable, and walking a pawn out of a ritual is not its call — so
+it declines instead, which is broader than vanilla by one case: a partygoer
+whose duty issues no job could have changed, and left the party doing it, and
+now stays in what they are wearing until the lord ends. One wardrobe trip
+deferred, against the alternative of guessing which lords are safe to walk a
+colonist out of. Found in play
+when a colonist was pulled into a modded art exhibit: the return trip fired as
+the ritual took her out of her work room, the lord replaced the half-finished
+swap on its next duty update, and that fresh duty job arrived at the prefix to
+be deferred again. Thirty-four queued jobs, one per programme piece, and a
+colonist stood on "changing clothes" for the length of the show. The trade was
+never available — a completed change was not on offer, only a stranded pawn.
+
+It cannot latch a colonist out of the mod: `Lord.Cleanup`, `RemovePawn` and
+`RemoveAllPawns` each clear `mindState.duty` and `pawn.lord` together, so the
+next ordinary job changes them back the usual way. `duty` is tested beside the
+lord because a mod can leave one on a pawn with no `Lord` of its own.
+
+The swap-in-progress gate is the general form of the same failure: whatever
+pre-empts a swap in flight, deferring the replacement starts a second swap and
+pushes the first one's displaced job deeper down the queue. `TryDressMidJob`
+carries the duty check too — its job filter rejects a job that is not casually
+interruptible, but a duty job is not obliged to say so.
 
 The danger gate went the other way, and for the same reason: read the
 directions separately. It sat above both arms, which made a raid a freeze

@@ -5,6 +5,7 @@ using LudeonTK;
 using RimWorld;
 using Verse;
 using Verse.AI;
+using Verse.AI.Group;
 
 namespace ShiftChange
 {
@@ -332,6 +333,16 @@ namespace ShiftChange
                 {
                     continue;
                 }
+                // The duty guard applies here too, and this path needs it
+                // said out loud: the job filter below rejects a job that is
+                // not casually interruptible, but a duty job is not required
+                // to say so, and a freed stand reaching across the room to
+                // pull a ritual participant off their duty is the same
+                // stranding by another route.
+                if (pawn.GetLord() != null || pawn.mindState?.duty != null)
+                {
+                    continue;
+                }
                 if (CompShiftStand.OnShiftStandFor(pawn) != null)
                 {
                     continue;
@@ -544,6 +555,86 @@ namespace ShiftChange
             if (job.playerForced || job.workGiverDef?.emergency == true
                 || JobRoomTargets.Ignored(job.workGiverDef))
             {
+                return false;
+            }
+
+            // A PAWN UNDER A LORD DUTY IS SPOKEN FOR, in both directions.
+            // Rituals, ceremonies, parties, caravan forming: the lord holds
+            // the pawn and reissues their job on its own clock, so a swap we
+            // start is pre-empted rather than finished.
+            //
+            // This is the same argument the danger gate below makes for
+            // itself, and it comes from the same place. Humanlike.xml puts the
+            // lord directive nodes at :112 (HighPriority) and :288
+            // (MediumPriority) and JobGiver_OptimizeApparel at :306, so a duty
+            // that issues a job takes it at one of the first two and the pawn
+            // never reaches the apparel node.
+            //
+            // Where the node IS reached, vanilla does not defer the apparel
+            // job either: it carries leaveJoinableLordIfIssuesJob, so changing
+            // clothes LEAVES a voluntarily joinable lord rather than waiting
+            // for it. Both of those levers belong to the tree, and from below
+            // it we have neither — we cannot make our own swap unreachable,
+            // and walking a pawn out of a ritual is not ours to do. So we
+            // decline.
+            //
+            // That is broader than vanilla by one case, deliberately: a
+            // partygoer whose duty issues no job could have changed (and left
+            // the party doing it) and now stays in what they are wearing until
+            // the lord ends. The alternative is guessing which lords are safe
+            // to walk a colonist out of, and the cost of being wrong is the
+            // stranding below. The cost of being conservative is one wardrobe
+            // trip deferred to the end of the party.
+            //
+            // Found in play 2026-09-20 during a modded art exhibit, with a
+            // verbose repro the next day. The return trip took presenters and
+            // spectators alike as the ritual pulled them out of their work
+            // rooms; Insert enqueued each duty job with its tag preserved,
+            // the lord's next duty update replaced the half-finished swap,
+            // and that fresh duty job arrived here to be deferred again. One
+            // colonist accumulated 34 queued jobs, one per programme piece,
+            // and stood on "changing clothes" for the length of the show.
+            // The trade was never worth taking: a completed change was not on
+            // offer, only a stranded colonist.
+            //
+            // It cannot latch on. Lord.Cleanup, RemovePawn and RemoveAllPawns
+            // each clear mindState.duty and pawn.lord together, so when the
+            // ritual ends the pawn's next ordinary job changes them back the
+            // usual way. The duty is tested beside the lord because a mod may
+            // assign one without a Lord of its own to own it.
+            Lord lord = pawn.GetLord();
+            if (lord != null || pawn.mindState?.duty != null)
+            {
+                if (Verbose)
+                {
+                    Log.Message($"[ShiftChange] {pawn.LabelShort} is under a duty " +
+                                $"({lord?.LordJob?.GetType().Name ?? "no lord"}) — " +
+                                $"not diverted for {job.def.defName}");
+                }
+                return false;
+            }
+
+            // NEVER STACK A SWAP ON A SWAP. The incoming-job test far above
+            // catches our own re-entry; this catches the other direction —
+            // the pawn is already walking to a stand and something else has
+            // handed them a new job. Whatever that job is, deferring it
+            // starts a second swap and pushes the first one's displaced job
+            // further down the queue, which is how one pre-emption becomes a
+            // stack of them. Letting the new job through costs at most one
+            // abandoned change; the pawn is dressed or not, and the next
+            // ordinary job boundary settles it.
+            //
+            // Cheaper and broader than a tick bound, and it needs no
+            // bookkeeping: whoever pre-empts the swap — a lord, a mod's own
+            // think node, a player order — the shape is the same and the
+            // answer is the same.
+            if (tracker.curJob?.def == ShiftChangeDefOf.ShiftChange_SwapAtStand)
+            {
+                if (Verbose)
+                {
+                    Log.Message($"[ShiftChange] {pawn.LabelShort} is mid-swap — " +
+                                $"{job.def.defName} is not deferred on top of it");
+                }
                 return false;
             }
 
