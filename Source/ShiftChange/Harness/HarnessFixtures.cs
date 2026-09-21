@@ -17,6 +17,7 @@ using RimWorld;
 using UnityEngine;
 using Verse;
 using Verse.AI;
+using Verse.AI.Group;
 using static ShiftChange.DebugTools_LifecycleHarness;
 
 namespace ShiftChange
@@ -493,6 +494,36 @@ namespace ShiftChange
                           .Append(", not Succeeded — toil ").Append(started.CurToilIndex)
                           .Append(", pawn at ").Append(fix.Pawn.Position)
                           .Append(" vs cell ").Append(fix.Stand.InteractionCell)
+                          .AppendLine();
+                    // WHAT took the pawn, not merely that something did. An end
+                    // condition names the verb and leaves the actor unnamed, so
+                    // a red run bought a second red run to diagnose — and these
+                    // have been intermittent, which makes the second one a wait
+                    // of unknown length. Everything here is read from the pawn
+                    // at the moment the driver changed.
+                    Job replacement = fix.Pawn.CurJob;
+                    Report.Append("        taken by ")
+                          .Append(replacement == null ? "nothing" : replacement.def.defName)
+                          .Append(", driver ")
+                          .Append(fix.Pawn.jobs.curDriver == null
+                                  ? "null" : fix.Pawn.jobs.curDriver.GetType().Name)
+                          .Append(", giver ")
+                          .Append(replacement == null || replacement.jobGiver == null
+                                  ? "none" : replacement.jobGiver.GetType().Name)
+                          .Append(", lastTag ")
+                          .Append(fix.Pawn.mindState == null
+                                  ? "none" : fix.Pawn.mindState.lastJobTag.ToString())
+                          .Append(", playerForced ")
+                          .Append(replacement != null && replacement.playerForced)
+                          .Append(", queued ")
+                          .Append(fix.Pawn.jobs.jobQueue == null ? -1 : fix.Pawn.jobs.jobQueue.Count)
+                          .Append(", duty ")
+                          .Append(fix.Pawn.mindState == null || fix.Pawn.mindState.duty == null
+                                  ? "none" : fix.Pawn.mindState.duty.def.defName)
+                          .Append(", lord ")
+                          .Append(fix.Pawn.GetLord() == null
+                                  ? "none" : fix.Pawn.GetLord().LordJob.GetType().Name)
+                          .Append(", onShift ").Append(fix.Comp.OnShift)
                           .AppendLine();
                     return false;
                 }

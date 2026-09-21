@@ -179,7 +179,36 @@ namespace ShiftChange
         internal static bool SolidTargetResolvesARoom(Map map, CellRect pad)
         {
             IntVec3 cell = pad.CenterCell;
+            // A ROOM OBJECT DOES NOT SURVIVE THE SPAWN BELOW, so nothing may be
+            // compared across it by reference. Measured on a red run
+            // (2026-09-21): before room 64 with 16767 cells, after room 65 with
+            // 16766 — the same space minus the one cell the wall now fills,
+            // rebuilt into a new object, with regions NOT dirty on entry. The
+            // engine reuses the object often enough that comparing references
+            // passes most runs, which is what made this intermittent rather
+            // than simply wrong.
+            //
+            // A first attempt settled the map here, on the theory that an
+            // earlier case's teardown had left a stale room behind. The
+            // diagnostic disproved it — the rebuild is caused by this case's
+            // own spawn — so that call is gone rather than left in place as a
+            // second explanation for a symptom with one cause.
+            //
+            // The probe is the fix: a neighbouring cell that shares `before`,
+            // re-read AFTER the spawn, so both sides of the comparison come
+            // from the same generation.
+            bool dirtyOnEntry = map.regionAndRoomUpdater.AnythingToRebuild;
             Room before = cell.GetRoom(map);
+            IntVec3 probe = IntVec3.Invalid;
+            for (int i = 0; i < GenAdj.AdjacentCells.Length; i++)
+            {
+                IntVec3 neighbour = cell + GenAdj.AdjacentCells[i];
+                if (neighbour.InBounds(map) && neighbour.GetRoom(map) == before)
+                {
+                    probe = neighbour;
+                    break;
+                }
+            }
             Thing wall = null;
             try
             {
@@ -200,8 +229,42 @@ namespace ShiftChange
                     cell, new LocalTargetInfo(wall), map);
                 Room after = bearing.GetRoom(map);
                 ok &= Expect(after != null, "RoomBearing returns a cell that has a room");
-                ok &= Expect(before == null || after == before,
-                             "and it is the room the target sits in");
+
+                // Read the expected room NOW, from a cell that shared the
+                // target's room before the wall went in. Both sides of the
+                // comparison then belong to the generation the spawn produced.
+                ok &= Expect(before == null || probe.IsValid,
+                             "a neighbouring cell shares the target's room (control)");
+                Room expected = probe.IsValid ? probe.GetRoom(map) : null;
+                bool sameRoom = before == null || expected == null || after == expected;
+                if (!sameRoom)
+                {
+                    // Say WHICH two rooms disagreed. A bare "it is not the same
+                    // room" cannot tell a genuinely split room from a rebuilt
+                    // object carrying the same cells, and telling those apart
+                    // is the whole diagnosis. `before` is printed too, but it
+                    // is read after the spawn and so reports whatever its
+                    // abandoned object last cached.
+                    Report.Append("      expected room ")
+                          .Append(expected == null ? -1 : expected.ID)
+                          .Append(" (").Append(expected == null ? -1 : expected.CellCount)
+                          .Append(" cells), stale before room ").Append(before.ID)
+                          .Append(" (").Append(before.CellCount).Append(" cells, outdoors ")
+                          .Append(before.PsychologicallyOutdoors).Append(", edge ")
+                          .Append(before.TouchesMapEdge).Append(")")
+                          .Append(" vs after room ")
+                          .Append(after == null ? -1 : after.ID)
+                          .Append(" (").Append(after == null ? -1 : after.CellCount)
+                          .Append(" cells, outdoors ")
+                          .Append(after != null && after.PsychologicallyOutdoors)
+                          .Append(", edge ").Append(after != null && after.TouchesMapEdge)
+                          .Append("), bearing ").Append(bearing)
+                          .Append(" from ").Append(cell)
+                          .Append(", pad ").Append(pad)
+                          .Append(", regions dirty on entry ").Append(dirtyOnEntry)
+                          .AppendLine();
+                }
+                ok &= Expect(sameRoom, "and it is the room the target sits in");
                 return ok;
             }
             finally
