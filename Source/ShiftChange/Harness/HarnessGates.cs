@@ -17,6 +17,7 @@ using RimWorld;
 using UnityEngine;
 using Verse;
 using Verse.AI;
+using Verse.AI.Group;
 using static ShiftChange.DebugTools_LifecycleHarness;
 using static ShiftChange.HarnessFixtures;
 
@@ -332,6 +333,141 @@ namespace ShiftChange
 
             ok &= Expect(fix.Map.dangerWatcher.DangerRating == StoryDanger.None,
                          "and the map reads calm again once the threat is gone");
+            return ok;
+        }
+
+        /// <summary>
+        /// THE DUTY GATE, and it shuts BOTH arms.
+        ///
+        /// <para>Found in play 2026-09-20: a colonist pulled into a modded art
+        /// exhibit stood on "changing clothes" for the whole show. The return
+        /// trip fired as the ritual took her out of her work room, the lord
+        /// replaced the half-finished swap on its next duty update, and the
+        /// fresh duty job arrived at the prefix to be deferred again — 34
+        /// queued jobs, one per programme piece.</para>
+        ///
+        /// <para>Staged through <c>LordMaker</c> rather than by hand-setting
+        /// the fields, because the gate reads what the engine writes and a
+        /// fixture that writes them itself would certify its own guess. Any
+        /// lord duty reproduces it; this one defends a point, which needs no
+        /// ritual, no DLC and no second pawn.</para>
+        ///
+        /// <para>The RELEASE half matters as much as the refusal. duty and
+        /// lord are cleared together on every path a lord can end
+        /// (<c>Cleanup</c>, <c>RemovePawn</c>, <c>RemoveAllPawns</c>), so the
+        /// gate cannot latch a colonist out of the mod for the rest of the
+        /// save — the case asserts that it opens again.</para>
+        /// </summary>
+        internal static bool DutyGateShutsBothArms(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+            ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
+            if (doctor == null || tend == null || mealDef == null)
+            {
+                return Expect(false, "the doctor and meal defs resolve");
+            }
+            fix.Comp.ToggleWork(doctor);
+            MakeCalm(fix.Map);
+
+            bool ok = Expect(Diverts(fix, WorkJob(fix, tend)),
+                             "an automatic work job dresses a free colonist (control)");
+
+            Lord lord = LordMaker.MakeNewLord(Faction.OfPlayer,
+                new LordJob_DefendPoint(fix.Pawn.Position), fix.Map, new[] { fix.Pawn });
+            if (lord == null)
+            {
+                return Expect(false, "a lord could be staged");
+            }
+            ok &= Expect(fix.Pawn.GetLord() == lord, "the colonist is under that lord")
+                & Expect(fix.Pawn.mindState?.duty != null, "and the lord issued them a duty")
+                & Expect(!Diverts(fix, WorkJob(fix, tend)),
+                         "so an automatic work job does NOT dress them");
+
+            // The arm that did the stranding. Dressed while free, because the
+            // dress arm is the one just proved shut.
+            lord.RemovePawn(fix.Pawn);
+            ok &= Expect(RunSwap(fix), "dressed for the shift once released")
+                & Expect(fix.Comp.OnShift, "and is on shift (control)");
+            if (!fix.Comp.OnShift)
+            {
+                fix.Map.lordManager.RemoveLord(lord);
+                return false;
+            }
+
+            // A meal break is the cleanest return-trip trigger in this
+            // fixture: the ingest branch changes them out wherever the food
+            // is, so it needs no second room. Same call the danger case uses.
+            Thing meal = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef),
+                                        fix.Pawn.Position, fix.Map);
+            ok &= Expect(Diverts(fix, IngestJob(meal)),
+                         "a meal break changes a free colonist back (control)");
+
+            lord.AddPawn(fix.Pawn);
+            ok &= Expect(fix.Pawn.mindState?.duty != null, "back under a duty")
+                & Expect(!Diverts(fix, IngestJob(meal)),
+                         "and the return trip does NOT fire — this is the stranding");
+
+            lord.RemovePawn(fix.Pawn);
+            ok &= Expect(fix.Pawn.GetLord() == null && fix.Pawn.mindState?.duty == null,
+                         "releasing the pawn clears the lord and the duty together")
+                & Expect(Diverts(fix, IngestJob(meal)),
+                         "so the change-back fires the moment the duty ends");
+
+            // A duty with no Lord owning it — what a mod's own think node can
+            // leave on a pawn, and the reason the gate tests both.
+            fix.Pawn.mindState.duty = new PawnDuty(DutyDefOf.Idle);
+            ok &= Expect(!Diverts(fix, IngestJob(meal)),
+                         "a bare duty with no lord holds the gate shut too");
+            fix.Pawn.mindState.duty = null;
+            ok &= Expect(Diverts(fix, IngestJob(meal)),
+                         "and clearing it opens the gate again (control)");
+
+            fix.Map.lordManager.RemoveLord(lord);
+            return ok;
+        }
+
+        /// <summary>
+        /// A JOB HANDED TO A PAWN MID-SWAP IS NOT DEFERRED ON TOP OF THE SWAP.
+        ///
+        /// <para>The second guard from the same case, and the general one: the
+        /// duty gate names the cause that was found, this names the shape.
+        /// Whatever pre-empts a swap in flight — a lord's duty update, another
+        /// mod's think node, a job a player queued — deferring the replacement
+        /// starts a second swap and pushes the first one's displaced job
+        /// deeper, which is how one pre-emption becomes a stack of them.</para>
+        ///
+        /// <para>The pawn is put on a real swap job through their own tracker,
+        /// because <c>Diverts</c> reads <c>curJob</c> from exactly there.</para>
+        /// </summary>
+        internal static bool MidSwapJobIsNotDeferredAgain(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+            if (doctor == null || tend == null)
+            {
+                return Expect(false, "the doctor defs resolve");
+            }
+            fix.Comp.ToggleWork(doctor);
+            MakeCalm(fix.Map);
+
+            bool ok = Expect(Diverts(fix, WorkJob(fix, tend)),
+                             "an automatic work job dresses an idle colonist (control)");
+
+            Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, fix.Stand);
+            fix.Pawn.jobs.StartJob(swap, JobCondition.InterruptForced, null,
+                resumeCurJobAfterwards: false, cancelBusyStances: true, null,
+                JobTag.ChangingApparel);
+            ok &= Expect(fix.Pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
+                         "the colonist is on a swap job")
+                & Expect(!Diverts(fix, WorkJob(fix, tend)),
+                         "and a work job handed to them now is NOT deferred on top of it");
+
+            fix.Pawn.jobs.EndCurrentJob(JobCondition.InterruptForced, startNewJob: false);
+            ok &= Expect(fix.Pawn.CurJobDef != ShiftChangeDefOf.ShiftChange_SwapAtStand,
+                         "the swap is over")
+                & Expect(Diverts(fix, WorkJob(fix, tend)),
+                         "and the next work job dresses them as usual (control)");
             return ok;
         }
 

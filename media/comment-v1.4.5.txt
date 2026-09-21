@@ -1,0 +1,9 @@
+v1.4.5 update:
+
+Fixes a colonist getting stuck changing clothes through a ritual.
+
+It took a narrow set of circumstances. The colonist had to be required at a ritual that began as soon as they were called, and had to be slower changing than the leader was arriving. A wardrobe next door finished in time. One across the base did not, and that colonist then walked between the ceremony and the wardrobe until it ended or you withdrew them from it.
+
+Stands change a colonist out of uniform when a job takes them out of the room, and a ritual looked like an ordinary job. It is not one: the ceremony can call them back halfway through a change, and the stand would send them off again.
+
+Colonists held by a ritual, ceremony, party or caravan are now left alone. They attend in what they have on and change back afterwards, including the ones who used to make it in time.

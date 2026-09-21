@@ -2,6 +2,7 @@
 // ShiftChange.csproj. Both callers compile out of a shipping build, so this
 // does too.
 #if SCENES || HARNESS
+using System.Collections.Generic;
 using RimWorld;
 using UnityEngine;
 using Verse;
@@ -90,6 +91,40 @@ namespace ShiftChange
 
             pawn.Name = new NameTriple(gender == Gender.Female ? "Jane" : "John", nick, "Doe");
             pawn.story.traits.allTraits.Clear();
+            // THE IDEO HALF OF THE SAME PROBLEM, and it cost three red gate
+            // runs before anyone looked (2026-09-21). Traits are cleared one
+            // line above because a rolled Nudist hijacks a take; the decency
+            // cases then ask SwapPlan.PrefersNudity, whose SECOND arm is the
+            // ideoligion. IdeoUtility.IdeoPrefersNudityForGender walks the
+            // precepts for def.prefersNudity and matches when
+            // genderPrefersNudity is None or this pawn's gender — and a
+            // quicktest colony rolls its ideo at random. On the runs where
+            // that roll carried a nudity precept, the decency fixtures were
+            // staging a colonist the guard is supposed to exempt, so the
+            // assertions failed on a premise nobody had arranged. The tell was
+            // that the male and female halves of one pair disagreed, which
+            // only a gender-aware precept can do once traits are gone.
+            //
+            // The precept is removed rather than the ideo replaced: the pawn
+            // keeps a normal colony ideoligion, and only the axis these cases
+            // are blind to is pinned. NudistIsExemptFromDecency still arranges
+            // its own nudity, by trait, and is unaffected.
+            if (ModsConfig.IdeologyActive && pawn.Ideo != null)
+            {
+                List<Precept> nudity = new List<Precept>();
+                List<Precept> all = pawn.Ideo.PreceptsListForReading;
+                for (int i = 0; i < all.Count; i++)
+                {
+                    if (all[i].def.prefersNudity)
+                    {
+                        nudity.Add(all[i]);
+                    }
+                }
+                for (int i = 0; i < nudity.Count; i++)
+                {
+                    pawn.Ideo.RemovePrecept(nudity[i]);
+                }
+            }
             pawn.story.HairColor = new Color(0.35f, 0.24f, 0.15f);
             pawn.story.bodyType = gender == Gender.Female ? BodyTypeDefOf.Female : BodyTypeDefOf.Male;
             if (pawn.style != null)
