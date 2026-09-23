@@ -63,6 +63,22 @@ has a real pid, and only ever waits on — or signals — that one. Another inst
 already running is somebody's colony with unsaved progress in it: the default is
 to stop, and `--alongside` is the deliberate opt-in.
 
+With `--alongside`, the running game keeps the dll it loaded.
+`Mods/ShiftChange` is a symlink to this checkout, so that game loaded
+`Assemblies/ShiftChange.dll` from here. Neither build writes that file: both
+compile into `dist/build/`, and each result is copied in as
+`ShiftChange.dll.new` and renamed over the target. A rename swaps the directory
+entry and nothing else, so the running game keeps the file it opened and the
+next one to start loads the new one. On the way out the script runs
+`check-shipped-dll.py` and lists `Assemblies/`, and warns if that directory
+holds anything but the one shipping dll.
+
+Beside a Debug session the run swaps nothing in: the hot-reload watchdog polls
+`ShiftChange.dll_orig`, which only a Debug build writes, and both harness builds
+are Release. Their sweep does delete that file, though, so reload ends for that
+session, exactly as [building Release during a hot session](DEVELOPMENT.md#hot-reload)
+does.
+
 ## What the cases assert
 
 Thirty-eight cases, in seven kinds.
