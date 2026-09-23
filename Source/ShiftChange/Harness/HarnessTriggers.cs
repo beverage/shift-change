@@ -379,6 +379,116 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// THE HOSPITAL GOWN: a stand ticked for vanilla's PatientBedRest work
+        /// type dresses a colonist going to bed to recuperate, and leaves one
+        /// who needs a doctor first exactly where they are.
+        ///
+        /// <para><b>This case exists because its absence shipped a dead
+        /// feature.</b> Every medical assertion the harness had was a negative
+        /// — medical rest must not reach the sleep arm — and
+        /// <see cref="RestClassifierHolds"/> added that PatientBedRest is still
+        /// a work type whose giver still names it. All of that was true the
+        /// whole time the tickbox did nothing: the patient givers are
+        /// NonScanJob overrides, JobGiver_Work stamps workGiverDef on its
+        /// scanner paths only, so the job reached StartJob naming no work type
+        /// and the work arm never saw it. A forwarding address is not a
+        /// delivery, and only a positive can tell the two apart. Reported by a
+        /// player on the Workshop, 2026-09-23.</para>
+        ///
+        /// <para>The bed is set MEDICAL, which is what a hospital is made of
+        /// and also what keeps the fixture honest:
+        /// <c>RoomRoleWorker_Bedroom</c> returns 0 the moment it sees a medical
+        /// bed, so the room scores as a Hospital and the stand does not quietly
+        /// pick up the sleep trigger that
+        /// <see cref="SleepJobInTheRoomDresses"/> relies on. Work and sleep are
+        /// mutually exclusive on a stand, so a bedroom fixture would have
+        /// tested the wrong arm.</para>
+        /// </summary>
+        internal static bool MedicalBedRestDressesAtAGownStand(Fixture fix)
+        {
+            ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Bed");
+            JobDef laydown = DefDatabase<JobDef>.GetNamedSilentFail("LayDown");
+            WorkTypeDef bedRest = DefDatabase<WorkTypeDef>.GetNamedSilentFail("PatientBedRest");
+            if (bedDef == null || laydown == null || bedRest == null)
+            {
+                return Expect(false, "the bed, lay-down and bed-rest defs resolve");
+            }
+
+            Building_Bed bed = DebugTools_Fixtures.Spawn(
+                fix.Map, bedDef, ThingDefOf.WoodLog,
+                new IntVec3(fix.Stand.Position.x + 2, 0, fix.Stand.Position.z + 2),
+                Rot4.North) as Building_Bed;
+            if (bed == null)
+            {
+                return Expect(false, "a bed spawns in the stand's room");
+            }
+            bed.Medical = true;
+
+            // Tick the row the README tells a player to tick, and nothing else.
+            fix.Comp.ToggleWork(bedRest);
+            bool ok = Expect(bed.Medical,
+                             "the bed takes the medical flag, so the room is a hospital")
+                    & Expect(fix.Comp.HandlesWork(bedRest),
+                             "and the stand is ticked for bed rest")
+                    & Expect(!fix.Comp.HandlesRest(),
+                             "without taking the sleep trigger — the gown and the pyjamas "
+                             + "stay separate rows");
+
+            ok &= Expect(Diverts(fix, JobMaker.MakeJob(laydown, bed),
+                                 JobTag.RestingForMedicalReasons),
+                         "so going to bed to recuperate dresses at the stand");
+
+            // THE URGENT HALF, which is the emergency rule reaching this arm.
+            // Vanilla splits the two itself: WorkGiver_PatientGoToBedTreatment
+            // gates on ShouldSeekMedicalRestUrgent and Recuperate takes the
+            // rest, so reading the same predicate puts the gown on the
+            // recovering and leaves the bleeding alone. Asserted on ONE pawn
+            // either side of one wound, so the only variable is the wound.
+            BodyPartRecord part = fix.Pawn.health.hediffSet.GetNotMissingParts().FirstOrDefault();
+            Hediff wound = HediffMaker.MakeHediff(HediffDefOf.Cut, fix.Pawn, part);
+            wound.Severity = 6f;
+            fix.Pawn.health.AddHediff(wound, part);
+            ok &= Expect(HealthAIUtility.ShouldSeekMedicalRestUrgent(fix.Pawn),
+                         "an untended wound makes this pawn an urgent case (precondition)")
+                & Expect(!fix.Pawn.Downed,
+                         "and does not down them, which would refuse for a different reason")
+                & Expect(!Diverts(fix, JobMaker.MakeJob(laydown, bed),
+                                  JobTag.RestingForMedicalReasons),
+                         "so a patient who needs a doctor now is not sent to a wardrobe first");
+
+            fix.Pawn.health.RemoveHediff(wound);
+            ok &= Expect(!HealthAIUtility.ShouldSeekMedicalRestUrgent(fix.Pawn),
+                         "the wound is gone again")
+                & Expect(Diverts(fix, JobMaker.MakeJob(laydown, bed),
+                                 JobTag.RestingForMedicalReasons),
+                         "and the same pawn dresses once tended — the control that says the "
+                         + "refusal above was the wound and not the fixture");
+
+            // ALREADY IN BED. Vanilla reissues the patient job at a pawn
+            // lying in the bed, after a tend most obviously, and without the
+            // OnABed guard every reissue is a fresh trip to the wardrobe. The
+            // sleep arm paid for this one in play when the trigger shipped.
+            IntVec3 wasAt = fix.Pawn.Position;
+            fix.Pawn.pather?.StopDead();
+            fix.Pawn.Position = bed.Position;
+            ok &= Expect(Patch_JobInterception.OnABed(fix.Pawn),
+                         "a pawn standing on the bed reads as on it (precondition)")
+                & Expect(!Diverts(fix, JobMaker.MakeJob(laydown, bed),
+                                  JobTag.RestingForMedicalReasons),
+                         "and a reissued patient job leaves them where they are");
+
+            fix.Pawn.pather?.StopDead();
+            fix.Pawn.Position = wasAt;
+
+            // A PLAYER-FORCED trip to bed is an order here as in every arm.
+            Job forced = JobMaker.MakeJob(laydown, bed);
+            forced.playerForced = true;
+            return ok
+                & Expect(!Diverts(fix, forced, JobTag.RestingForMedicalReasons),
+                         "a player-forced trip to a sickbed is never diverted");
+        }
+
+        /// <summary>
         /// DEPOSIT ONLY: the stand that hands nothing out. A colonist parks
         /// what its storage filter accepts, keeps the rest of their clothes
         /// on, and gets it all back on the return trip.
@@ -633,15 +743,24 @@ namespace ShiftChange
                     & Expect(!Patch_JobInterception.IsRestJob(JobMaker.MakeJob(laydown)),
                              "and a lay-down job with no bed does not classify as rest");
 
-            // The medical half of the disjointness. If PatientBedRest stopped
-            // being a work type, or its giver stopped reporting one, medical
-            // bed rest would fall through to the sleep arm and the two
-            // controls would silently merge.
+            // The medical half. PatientBedRest is the work type
+            // MedicalRestWorkType charges a tagged lay-down to, so if it
+            // stopped existing, stopped being visible, or stopped being what
+            // its own giver names, the gown row would go quiet again.
+            //
+            // THESE ARE DEF-DATABASE FACTS AND NOTHING MORE. Read on their own
+            // they once looked like proof the feature worked, and they were all
+            // true for the whole period it did not: the job never carried the
+            // giver, so nothing here was ever consulted at runtime. The
+            // delivery is asserted in MedicalBedRestDressesAtAGownStand, which
+            // is the case to look at if this one is green and players say the
+            // tickbox is dead.
             ok &= Expect(bedRest != null, "vanilla still has a PatientBedRest work type")
                 & Expect(bedRest == null || bedRest.visible,
                          "still visible, so it still appears in the stand's own grid")
                 & Expect(recuperate == null || recuperate.workType == bedRest,
-                         "and its work giver still reports it, keeping the two arms disjoint");
+                         "and its work giver still names it, so charging medical rest to it "
+                         + "still matches what the work tab shows a player");
 
             RoomRoleDef bedroom = DefDatabase<RoomRoleDef>.GetNamedSilentFail("Bedroom");
             RoomRoleDef recRoom = DefDatabase<RoomRoleDef>.GetNamedSilentFail("RecRoom");

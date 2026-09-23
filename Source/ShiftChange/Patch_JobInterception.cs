@@ -797,7 +797,25 @@ namespace ShiftChange
                 return false;
             }
 
-            WorkTypeDef work = job.workGiverDef?.workType;
+            // MEDICAL BED REST ENTERS THE WORK ARM HERE, and it has to be
+            // HANDED its work type because it never arrives carrying one. All
+            // three patient WorkGivers are NonScanJob overrides, and
+            // JobGiver_Work stamps workGiverDef only on its scanner paths
+            // (the non-scan return at JobGiver_Work.cs:102 leaves the job
+            // unstamped; :240 is where a scanned job gets its giver), so a
+            // medical LayDown reaches us with workGiverDef NULL.
+            //
+            // Reading the giver alone therefore left vanilla's PatientBedRest
+            // work type owning nothing at all: the work arm never saw those
+            // jobs, the sleep arm turned them away on the grounds that the
+            // work arm owned them, and both tickboxes were dead from the day
+            // the sleep trigger shipped. Reported by a player who had followed
+            // the README exactly (2026-09-23). Nothing caught it because the
+            // hand-off had been written down as settled, and because every
+            // medical case in the harness asserted a negative — that medical
+            // rest does not reach the sleep arm, which stayed true the whole
+            // time it reached nothing else either.
+            WorkTypeDef work = job.workGiverDef?.workType ?? MedicalRestWorkType(pawn, job, tag);
             if (work != null)
             {
                 if (!target.IsValid)
@@ -840,12 +858,11 @@ namespace ShiftChange
 
             // The SLEEP arm, the third trigger class. Disjoint from
             // the other two by construction: a lay-down job carries no
-            // joyKind so it can never be a recreation job, and the
-            // workGiverDef test below is what keeps MEDICAL bed rest on the
-            // work arm where it already lives. The room resolver at the top
-            // hands rest jobs the A-first TargetCell, which is right — a
-            // lay-down job's targetA IS the bed the pawn will occupy, the
-            // cleanest target any arm gets.
+            // joyKind so it can never be a recreation job, and the tag test
+            // below is what keeps MEDICAL bed rest out of it. The room
+            // resolver at the top hands rest jobs the A-first TargetCell,
+            // which is right — a lay-down job's targetA IS the bed the pawn
+            // will occupy, the cleanest target any arm gets.
             if (IsRestJob(job))
             {
                 // MEDICAL BED REST IS NOT SLEEPWEAR, and THE TAG is what says
@@ -856,18 +873,21 @@ namespace ShiftChange
                 // so every route vanilla has into medical rest arrives here
                 // wearing it.
                 //
+                // REACHING THIS LINE MEANS THE WORK ARM DECLINED IT, which
+                // since 2026-09-23 is a real decision rather than a job the
+                // work arm could not see. MedicalRestWorkType resolved no
+                // work type (the pawn needs a doctor now, or is already on the
+                // bed), or it resolved one and no stand in this room was
+                // ticked for it. Either way a pyjama stand must not then pick
+                // the job up as ordinary sleep: keeping the hospital gown and
+                // the pyjamas separately configurable is what this test has
+                // always been for, and it still does that job.
+                //
                 // The workGiverDef limb is REDUNDANT, kept as a conservative
-                // catch for a modded WorkGiverDef with a null workType. It
-                // cannot fire for anything vanilla, and the reasoning it used
-                // to carry was simply wrong (verification pass, 2026-09-03):
-                // all three patient WorkGivers are NonScanJob overrides and
-                // JobGiver_Work stamps workGiverDef only on its scanner paths,
-                // so a medical LayDown reaches us with workGiverDef NULL — the
-                // work arm never sees it and the two arms were never in
-                // danger of fighting over it. Structurally it is dead twice
-                // over: the work arm above consumes and returns from every job
-                // whose workGiverDef.workType is non-null, so this limb is
-                // only reached once that expression is already null.
+                // catch for a modded WorkGiverDef with a null workType: the
+                // work arm above consumes and returns from every job whose
+                // workGiverDef.workType is non-null, so this limb is only
+                // reached once that expression is already null.
                 //
                 // WHAT IS DELIBERATELY NOT HERE: HealthAIUtility.ShouldSeekMedicalRest.
                 // It was added as a third limb to cover
@@ -884,6 +904,13 @@ namespace ShiftChange
                 // silently, for the whole recovery. Do not re-add it: a health
                 // predicate cannot tell "going to bed because hurt" from
                 // "going to bed because it is night".
+                //
+                // MedicalRestWorkType's ShouldSeekMedicalRestUrgent is not
+                // that rule coming back. It reads a different predicate, and
+                // it reads it INSIDE the tagged branch, where vanilla has
+                // already told us why the pawn is going to bed — so it only
+                // ever refuses a divert, and can never reach a colonist
+                // turning in for the night.
                 if (job.workGiverDef != null || tag == JobTag.RestingForMedicalReasons)
                 {
                     return false;
@@ -1208,6 +1235,51 @@ namespace ShiftChange
             return driver != null
                    && typeof(JobDriver_LayDown).IsAssignableFrom(driver)
                    && job.targetA.Thing is Building_Bed;
+        }
+
+        /// <summary>
+        /// The work type a medical lay-down should be charged to, or null when
+        /// this job is not one or must not divert.
+        ///
+        /// <para>This is the whole of the hospital-gown trigger. Vanilla's
+        /// patient WorkGivers produce their jobs from <c>NonScanJob</c>, and
+        /// <c>JobGiver_Work</c> stamps <c>workGiverDef</c> only on its scanner
+        /// paths, so the job that arrives at <c>StartJob</c> names no giver and
+        /// no work type. The tag is the only thing on it that says why the pawn
+        /// is going to bed, so the tag is what we resolve from.</para>
+        ///
+        /// <para><b>Urgent cases never divert</b>, and that is the same rule
+        /// the emergency gate states further up rather than a new one. Vanilla
+        /// splits the two itself: <c>WorkGiver_PatientGoToBedTreatment</c>
+        /// gates on <see cref="HealthAIUtility.ShouldSeekMedicalRestUrgent"/>
+        /// and covers the colonist who is downed, bleeding, awaiting surgery or
+        /// in labour, while <c>...Recuperate</c> takes everyone else. Reading
+        /// the same predicate puts the gown on the recovering and leaves the
+        /// bleeding alone, and it means a colonist who needs a doctor now is
+        /// never sent to a wardrobe first. The <c>Patient</c> work type is
+        /// therefore never returned, and its row in the stand dialog stays
+        /// inert — the same as every other emergency giver.</para>
+        ///
+        /// <para><b>The bed guard is not optional.</b> Vanilla reissues the
+        /// patient job at a pawn already lying in the bed — after a tend, most
+        /// obviously — and without <see cref="OnABed"/> that reissue is a fresh
+        /// dressing opportunity every time, which is a patient climbing out of
+        /// a sickbed to visit a wardrobe on a loop. The sleep arm paid for this
+        /// one in play when the trigger shipped; the work arm has no equivalent
+        /// guard of its own, because no other work job can start from a
+        /// bed.</para>
+        /// </summary>
+        internal static WorkTypeDef MedicalRestWorkType(Pawn pawn, Job job, JobTag? tag)
+        {
+            if (tag != JobTag.RestingForMedicalReasons || !IsRestJob(job))
+            {
+                return null;
+            }
+            if (OnABed(pawn) || HealthAIUtility.ShouldSeekMedicalRestUrgent(pawn))
+            {
+                return null;
+            }
+            return ShiftChangeDefOf.PatientBedRest;
         }
 
         /// <summary>

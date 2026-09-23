@@ -219,6 +219,13 @@ type, for a colonist recovering from injury or illness, and it behaves like any
 other work type. Ordinary sleep is the **Sleeping** row. Tick the work type for
 a hospital gown; tick Sleeping for pyjamas.
 
+**A patient who still needs a doctor goes straight to bed.** The gown is for
+recuperating, so a colonist who is bleeding, waiting on surgery or in labour is
+never sent to a wardrobe first. That is the trip they make while untended, so
+someone wounded in a raid reaches the bed before the gown: they change on their
+next trip to bed, once a doctor has seen them. Nobody is pulled out of a sickbed
+to change, in either direction.
+
 Bedrooms turn this on by themselves. Barracks deliberately do not: a stand
 serves one colonist at a time, so in a ten-bunk barracks the first sleeper to
 reach it would hold it all night and the other nine would go to bed in what

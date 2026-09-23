@@ -743,18 +743,52 @@ the room resolver is the work arm's `TargetCell`, untouched. `LayDown` is not
 in the `JobRoomTargets` list, so that resolver reads targetA here as it always
 has.
 
-**Medical bed rest belongs to the work arm, and the TAG is what says so.**
-Vanilla ships a `PatientBedRest` WorkTypeDef whose gerund label reads "resting
-in bed", already tickable in the stand dialog — so one `JobDefOf.LayDown` must
-reach exactly one of the two controls. The separator is
+**Medical bed rest belongs to the work arm, and the TAG is what puts it
+there.** Vanilla ships a `PatientBedRest` WorkTypeDef whose gerund label reads
+"resting in bed", already tickable in the stand dialog — so one
+`JobDefOf.LayDown` must reach exactly one of the two controls. The separator is
 `JobTag.RestingForMedicalReasons`: all three patient WorkGivers carry
 `tagToGive`, and `Pawn_JobTracker` passes `ThinkResult.Tag` straight into
-StartJob. It is emphatically **not** `workGiverDef`, though the first version
-of this arm claimed exactly that — those WorkGivers are `NonScanJob` overrides
-and `JobGiver_Work` stamps `workGiverDef` only on its scanner paths, so a
-medical lay-down arrives with it null. The `workGiverDef` limb survives as a
-conservative catch for a modded giver with a null workType, and is dead for
-everything vanilla ships.
+StartJob. It is emphatically **not** `workGiverDef` — those WorkGivers are
+`NonScanJob` overrides and `JobGiver_Work` stamps `workGiverDef` only on its
+scanner paths, so a medical lay-down arrives with it null. The `workGiverDef`
+limb survives as a conservative catch for a modded giver with a null workType,
+and is dead for everything vanilla ships.
+
+**That null was a shipped bug for three weeks, and this paragraph is where it
+hid** (reported by a player, 2026-09-23). "Belongs to the work arm" was
+written as a hand-off and implemented as a rejection: the sleep arm turned the
+job away because the work arm owned it, and the work arm never saw it, because
+reading `job.workGiverDef?.workType` on an unstamped job yields null. Both
+patient rows in the dialog did nothing at all from the day the sleep trigger
+shipped. `MedicalRestWorkType` now RESOLVES the work type from the tag rather
+than hoping to find one on the job, and the sleep arm's rejection stayed exactly
+as it was — it is still what keeps a pyjama stand off a patient.
+
+Two refusals are folded into that resolver, and both are load-bearing.
+`HealthAIUtility.ShouldSeekMedicalRestUrgent` is vanilla's own split between
+`WorkGiver_PatientGoToBedTreatment` and `...Recuperate`, so reading it charges
+the gown to recuperation and leaves the bleeding, the pre-surgical and the
+labouring alone. `OnABed` is the same guard the sleep arm needs and for the same
+reason: vanilla reissues the patient job at a pawn already lying in the bed, and
+without it every reissue is a fresh trip to the wardrobe.
+
+**The known cost of the urgent refusal**, stated rather than discovered later: a
+colonist wounded in a raid is urgent on the walk to the bed, gets tended there,
+and never leaves it, so their gown arrives on the NEXT trip to bed rather than
+this one. Diseases behave the same way while untended. The narrower alternative
+is to refuse on bleed rate and pending surgery instead of the whole predicate,
+which would cover the raid case at the price of a detour — bounded by the target
+room, since the stand is found there — for a colonist with an untended wound.
+
+**Decided 2026-09-23: the refusal stands as the default**, on the grounds that a
+colonist bleeding out at 10% movement should not stop to change, and will change
+on their next trip to bed anyway. Relaxing it is queued as a mod setting scoped
+to medical work only, which is a rule change rather than a bug fix and does not
+belong in this arm's default. Note for whoever builds it: vanilla's
+`emergency: true` sits on `FightFires` as well as the two medical givers, so a
+switch that keys on that flag alone walks colonists to a wardrobe while the base
+burns.
 
 A third limb was tried and removed the same day.
 `HealthAIUtility.ShouldSeekMedicalRest` looked like the backstop for
