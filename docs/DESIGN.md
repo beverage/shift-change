@@ -783,12 +783,40 @@ room, since the stand is found there — for a colonist with an untended wound.
 
 **Decided 2026-09-23: the refusal stands as the default**, on the grounds that a
 colonist bleeding out at 10% movement should not stop to change, and will change
-on their next trip to bed anyway. Relaxing it is queued as a mod setting scoped
-to medical work only, which is a rule change rather than a bug fix and does not
-belong in this arm's default. Note for whoever builds it: vanilla's
-`emergency: true` sits on `FightFires` as well as the two medical givers, so a
-switch that keys on that flag alone walks colonists to a wardrobe while the base
-burns.
+on their next trip to bed anyway.
+
+**`medicalEmergenciesChangeFirst` relaxes it for players who want the opposite**,
+shipped in the same release and OFF by default. It is the one place the mod's
+"emergencies are never delayed" rule bends, and it bends only for medical work.
+
+The switch cannot key on `emergency`. Vanilla sets that flag on exactly three
+givers — `FightFires`, `DoctorTendEmergency` and
+`PatientGoToBedEmergencyTreatment` — so relaxing the flag itself walks a colonist
+to a wardrobe while the base burns. `MedicalWorkTypeNames` is the allow-list
+instead, carrying the vanilla trio plus Complex Jobs' `FSFNurse` and
+`FSFSurgeon`, because that mod repoints vanilla givers at its own types and a
+vanilla-only list would silently stop covering the case the player ticked the box
+for.
+
+The two arms need separate treatment for the same reason BL-era medical rest did.
+A doctor's emergency tend is a scanner job carrying `DoctorTendEmergency`, so it
+is caught at the `emergency` gate; a critical patient's lay-down carries no giver
+at all, so what the setting relaxes there is `ShouldSeekMedicalRestUrgent` inside
+`MedicalRestWorkType`. `PatientGoToBedEmergencyTreatment`'s own `emergency` flag
+has never been read by us and still is not — it is a `NonScanJob` override like
+the rest of that family.
+
+**Turning it on relaxes BOTH directions**, and that is deliberate rather than
+overlooked. The emergency exemption is a single test sitting above the return-trip
+block, placed there on 2026-08-08 precisely so an emergency in another room is not
+delayed by an undress detour. Carving the dressing half out alone would mean two
+rules to explain and an asymmetry to maintain; the setting instead means what it
+says, that medical emergencies become ordinary work for dressing purposes. The
+mod-settings description and the README both state the consequence.
+
+`OnABed` stays unconditional under the setting. Whether an emergency may be
+delayed and whether a patient may be hauled off a bed they are already lying on
+are different questions, and only the first one was asked.
 
 A third limb was tried and removed the same day.
 `HealthAIUtility.ShouldSeekMedicalRest` looked like the backstop for

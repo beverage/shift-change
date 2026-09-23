@@ -552,7 +552,20 @@ namespace ShiftChange
             // uniform rides along here rather than forcing a detour. See
             // JobRoomTargets.IgnoredGivers — keyed on the giver because the
             // job def cannot always tell two givers apart.
-            if (job.playerForced || job.workGiverDef?.emergency == true
+            //
+            // ONE OPT-IN CARVE-OUT, off by default: a player who wants their
+            // doctors in scrubs for the call that matters can say so, and then
+            // MEDICAL emergencies stop being exempt. Firefighting never does —
+            // see MedicalWorkTypes for why the switch cannot key on the
+            // emergency flag alone. Note what the opt-in buys and costs
+            // together: the exemption is one test covering BOTH directions, so
+            // turning it off for medical work re-opens the undress detour this
+            // placement was moved up to close. That is the setting's whole
+            // meaning — medical emergencies become ordinary work for dressing
+            // purposes — rather than an asymmetry worth hiding in here.
+            if (job.playerForced
+                || (job.workGiverDef?.emergency == true
+                    && !EmergencyDressingAllowed(job.workGiverDef))
                 || JobRoomTargets.Ignored(job.workGiverDef))
             {
                 return false;
@@ -1275,11 +1288,78 @@ namespace ShiftChange
             {
                 return null;
             }
-            if (OnABed(pawn) || HealthAIUtility.ShouldSeekMedicalRestUrgent(pawn))
+            // The bed guard is UNCONDITIONAL and stays that way. The setting
+            // below is about whether an emergency may be delayed; nothing in
+            // it argues for hauling a patient off a bed they are already lying
+            // on, which is a different behaviour with a different failure.
+            if (OnABed(pawn))
+            {
+                return null;
+            }
+            if (!ShiftChangeMod.MedicalEmergencyDressingEnabled
+                && HealthAIUtility.ShouldSeekMedicalRestUrgent(pawn))
             {
                 return null;
             }
             return ShiftChangeDefOf.PatientBedRest;
+        }
+
+        /// <summary>
+        /// Work types whose emergencies the medical-emergency setting covers.
+        ///
+        /// <para><b>A switch keyed on <c>emergency</c> alone would walk
+        /// colonists to a wardrobe while the base burns.</b> Vanilla sets that
+        /// flag on exactly three givers — <c>FightFires</c>,
+        /// <c>DoctorTendEmergency</c> and
+        /// <c>PatientGoToBedEmergencyTreatment</c> — so the flag does not mean
+        /// "medical", and the setting has to name the work types it covers.
+        /// Firefighting is the one this list exists to leave out.</para>
+        ///
+        /// <para>The FSF names are [FSF] Complex Jobs, which repoints vanilla
+        /// WorkGiverDefs at its own finer-grained types rather than adding
+        /// work: with it installed an emergency tend is no longer
+        /// <c>Doctor</c>, and a list of vanilla names alone would silently stop
+        /// covering the exact case the player ticked the box for. Same
+        /// silent-fail contract as <see cref="RoomWorkTypes.CompatDefaults"/> —
+        /// an absent name is a mod that is not installed.</para>
+        /// </summary>
+        internal static readonly string[] MedicalWorkTypeNames =
+        {
+            "Doctor", "Patient", "PatientBedRest", "FSFNurse", "FSFSurgeon",
+        };
+
+        internal static HashSet<WorkTypeDef> medicalWorkTypes;
+
+        internal static HashSet<WorkTypeDef> MedicalWorkTypes
+        {
+            get
+            {
+                if (medicalWorkTypes == null)
+                {
+                    medicalWorkTypes = new HashSet<WorkTypeDef>();
+                    for (int i = 0; i < MedicalWorkTypeNames.Length; i++)
+                    {
+                        WorkTypeDef work =
+                            DefDatabase<WorkTypeDef>.GetNamedSilentFail(MedicalWorkTypeNames[i]);
+                        if (work != null)
+                        {
+                            medicalWorkTypes.Add(work);
+                        }
+                    }
+                }
+                return medicalWorkTypes;
+            }
+        }
+
+        /// <summary>
+        /// May this emergency giver's job be delayed for a change, because the
+        /// player asked for that and this is medical work?
+        /// </summary>
+        internal static bool EmergencyDressingAllowed(WorkGiverDef giver)
+        {
+            return ShiftChangeMod.MedicalEmergencyDressingEnabled
+                   && giver?.workType != null
+                   && MedicalWorkTypes.Contains(giver.workType);
         }
 
         /// <summary>

@@ -489,6 +489,108 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// THE MEDICAL EMERGENCY SETTING, both arms it covers and the one it
+        /// must not. Off, an emergency is never delayed for a change. On, the
+        /// two medical emergencies stop being exempt — and fighting a fire
+        /// still does not.
+        ///
+        /// <para><b>The firefighting assertion is what earns this case.</b>
+        /// Vanilla sets <c>emergency: true</c> on <c>FightFires</c> as well as
+        /// the two medical givers, so the obvious implementation — relax the
+        /// emergency test whenever the setting is on — walks a colonist to a
+        /// wardrobe while the base burns. The stand is ticked for Firefighter
+        /// here deliberately, so that refusal cannot be explained away as "no
+        /// stand served that work".</para>
+        ///
+        /// <para>The setting is restored before returning, the same discipline
+        /// the known-gap flag keeps: a case that leaves a global flipped makes
+        /// every case after it test something nobody chose.</para>
+        /// </summary>
+        internal static bool MedicalEmergencySettingCoversTheRightWork(Fixture fix)
+        {
+            if (ShiftChangeMod.Settings == null)
+            {
+                return Expect(false, "mod settings are loaded");
+            }
+            WorkGiverDef tendEmergency =
+                DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendEmergency");
+            WorkGiverDef fightFires = DefDatabase<WorkGiverDef>.GetNamedSilentFail("FightFires");
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            WorkTypeDef firefighter = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Firefighter");
+            WorkTypeDef bedRest = DefDatabase<WorkTypeDef>.GetNamedSilentFail("PatientBedRest");
+            ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Bed");
+            JobDef laydown = DefDatabase<JobDef>.GetNamedSilentFail("LayDown");
+            if (tendEmergency == null || fightFires == null || doctor == null
+                || firefighter == null || bedRest == null || bedDef == null || laydown == null)
+            {
+                return Expect(false, "the emergency givers, work types and bed defs resolve");
+            }
+
+            bool was = ShiftChangeMod.Settings.medicalEmergenciesChangeFirst;
+            bool ok = Expect(!was, "the setting ships off, which is the default under test")
+                    & Expect(tendEmergency.emergency,
+                             "an emergency tend is still flagged emergency")
+                    & Expect(fightFires.emergency,
+                             "and so is fighting a fire — which is the whole trap");
+
+            fix.Comp.ToggleWork(doctor);
+            fix.Comp.ToggleWork(firefighter);
+            ok &= Expect(fix.Comp.HandlesWork(doctor), "the stand serves doctoring")
+                & Expect(fix.Comp.HandlesWork(firefighter),
+                         "and firefighting, so a refusal below cannot mean 'no stand for it'");
+
+            // OFF: today's behaviour, and the state every existing case assumes.
+            ok &= Expect(!Diverts(fix, WorkJob(fix, tendEmergency)),
+                         "with the setting off an emergency tend is not delayed")
+                & Expect(!Diverts(fix, WorkJob(fix, fightFires)),
+                         "and neither is fighting a fire");
+
+            ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = true;
+            ok &= Expect(Diverts(fix, WorkJob(fix, tendEmergency)),
+                         "with it on the doctor changes into scrubs first")
+                & Expect(!Diverts(fix, WorkJob(fix, fightFires)),
+                         "and the fire is STILL not delayed — the switch is medical, "
+                         + "not emergency");
+
+            // THE PATIENT ARM of the same switch, which lives in a different
+            // test entirely: the critical patient's job carries no giver to
+            // flag, so what the setting relaxes there is the urgency refusal in
+            // MedicalRestWorkType.
+            Building_Bed bed = DebugTools_Fixtures.Spawn(
+                fix.Map, bedDef, ThingDefOf.WoodLog,
+                new IntVec3(fix.Stand.Position.x + 2, 0, fix.Stand.Position.z + 2),
+                Rot4.North) as Building_Bed;
+            if (bed == null)
+            {
+                ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = was;
+                return ok & Expect(false, "a bed spawns in the stand's room");
+            }
+            bed.Medical = true;
+            fix.Comp.ToggleWork(bedRest);
+
+            BodyPartRecord part = fix.Pawn.health.hediffSet.GetNotMissingParts().FirstOrDefault();
+            Hediff wound = HediffMaker.MakeHediff(HediffDefOf.Cut, fix.Pawn, part);
+            wound.Severity = 6f;
+            fix.Pawn.health.AddHediff(wound, part);
+            ok &= Expect(HealthAIUtility.ShouldSeekMedicalRestUrgent(fix.Pawn),
+                         "the pawn is an urgent case again (precondition)")
+                & Expect(fix.Comp.HandlesWork(bedRest), "and the stand is ticked for bed rest")
+                & Expect(Diverts(fix, JobMaker.MakeJob(laydown, bed),
+                                 JobTag.RestingForMedicalReasons),
+                         "so with the setting on a critical patient stops for the gown");
+
+            ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = false;
+            ok &= Expect(!Diverts(fix, JobMaker.MakeJob(laydown, bed),
+                                  JobTag.RestingForMedicalReasons),
+                         "and with it off the same patient does not — one switch, both arms");
+
+            fix.Pawn.health.RemoveHediff(wound);
+            ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = was;
+            return ok & Expect(!ShiftChangeMod.Settings.medicalEmergenciesChangeFirst,
+                               "the setting was restored for the cases that follow");
+        }
+
+        /// <summary>
         /// DEPOSIT ONLY: the stand that hands nothing out. A colonist parks
         /// what its storage filter accepts, keeps the rest of their clothes
         /// on, and gets it all back on the return trip.

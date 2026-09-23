@@ -43,11 +43,41 @@ namespace ShiftChange
         /// </summary>
         public bool keepColonistsDecent = false;
 
+        /// <summary>
+        /// When true, a MEDICAL emergency no longer exempts a colonist from
+        /// dressing: a doctor takes an emergency tend in scrubs, and a patient
+        /// in critical condition stops for the gown on the way to bed. Off by
+        /// default, which is the behaviour every version up to now had.
+        ///
+        /// <para><b>Firefighting is never covered, and that is why this is not
+        /// simply "ignore the emergency flag".</b> Vanilla sets
+        /// <c>emergency: true</c> on <c>FightFires</c> as well as the two
+        /// medical givers, so a switch keyed on the flag would send colonists
+        /// to a wardrobe while the base burns. The covered work types are
+        /// named in <see cref="Patch_JobInterception.MedicalWorkTypeNames"/>.</para>
+        ///
+        /// <para>OFF by default on the same distribution reasoning recorded
+        /// for <see cref="keepColonistsDecent"/>: most of this mod's players
+        /// meet it inside a mod pack, they did not choose it and will not read
+        /// a change note, and changing how their doctors answer a bleeding
+        /// colonist is not ours to flip on their behalf.</para>
+        ///
+        /// <para>The cost of turning it on, stated rather than buried: the
+        /// emergency exemption is one test covering both directions, so a
+        /// doctor in another room's uniform may now change BACK before
+        /// answering the call as well as changing into scrubs. That is the
+        /// setting meaning what it says — medical emergencies become ordinary
+        /// work for dressing purposes.</para>
+        /// </summary>
+        public bool medicalEmergenciesChangeFirst = false;
+
         public override void ExposeData()
         {
             base.ExposeData();
             Scribe_Values.Look(ref poolUnassignedStands, "poolUnassignedStands", defaultValue: true);
             Scribe_Values.Look(ref keepColonistsDecent, "keepColonistsDecent", defaultValue: false);
+            Scribe_Values.Look(ref medicalEmergenciesChangeFirst,
+                "medicalEmergenciesChangeFirst", defaultValue: false);
         }
     }
 
@@ -78,6 +108,16 @@ namespace ShiftChange
         /// </summary>
         public static bool DecencyEnabled => Settings != null && Settings.keepColonistsDecent;
 
+        /// <summary>
+        /// The single read point for the medical-emergency carve-out. Defaults
+        /// OFF when settings have not loaded, for the same reason
+        /// <see cref="DecencyEnabled"/> does: unloaded must read as the
+        /// conservative answer, and here that is "an emergency is never
+        /// delayed".
+        /// </summary>
+        public static bool MedicalEmergencyDressingEnabled =>
+            Settings != null && Settings.medicalEmergenciesChangeFirst;
+
         public ShiftChangeMod(ModContentPack content) : base(content)
         {
             settings = GetSettings<ShiftChangeSettings>();
@@ -101,6 +141,10 @@ namespace ShiftChange
                 "ShiftChange.SettingKeepDecent".Translate(),
                 ref Settings.keepColonistsDecent,
                 "ShiftChange.SettingKeepDecentDesc".Translate());
+            listing.CheckboxLabeled(
+                "ShiftChange.SettingMedicalEmergencies".Translate(),
+                ref Settings.medicalEmergenciesChangeFirst,
+                "ShiftChange.SettingMedicalEmergenciesDesc".Translate());
             listing.End();
         }
     }

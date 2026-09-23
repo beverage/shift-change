@@ -229,6 +229,9 @@ namespace ShiftChange
             Case(map, pad, "a stand ticked for bed rest dresses a patient, but never an urgent one",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  MedicalBedRestDressesAtAGownStand);
+            Case(map, pad, "the medical emergency setting covers doctors and patients, never fires",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 MedicalEmergencySettingCoversTheRightWork);
             Case(map, pad, "a deposit-only stand parks what its filter accepts and hands it back",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  DepositOnlyParksAndReturns);
