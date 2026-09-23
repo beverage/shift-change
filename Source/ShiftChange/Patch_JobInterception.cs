@@ -1315,11 +1315,15 @@ namespace ShiftChange
         /// "medical", and the setting has to name the work types it covers.
         /// Firefighting is the one this list exists to leave out.</para>
         ///
-        /// <para>The FSF names are [FSF] Complex Jobs, which repoints vanilla
-        /// WorkGiverDefs at its own finer-grained types rather than adding
-        /// work: with it installed an emergency tend is no longer
-        /// <c>Doctor</c>, and a list of vanilla names alone would silently stop
-        /// covering the exact case the player ticked the box for. Same
+        /// <para>The FSF names are [FSF] Complex Jobs, and they are BELT AND
+        /// BRACES rather than load-bearing (checked against 2069684319 on
+        /// 2026-09-23). That mod repoints vanilla WorkGiverDefs at its own
+        /// finer-grained types rather than adding work, but it leaves both
+        /// types this list needs where they are: its `PatientBedRest` patch
+        /// file is empty, and `DoctorTendEmergency` keeps `Doctor` — its
+        /// priority list annotates every giver it moves, and that one carries
+        /// no annotation. The names are here so a future repoint does not
+        /// silently switch the setting off for the players who ticked it. Same
         /// silent-fail contract as <see cref="RoomWorkTypes.CompatDefaults"/> —
         /// an absent name is a mod that is not installed.</para>
         /// </summary>

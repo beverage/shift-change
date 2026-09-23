@@ -794,9 +794,17 @@ givers — `FightFires`, `DoctorTendEmergency` and
 `PatientGoToBedEmergencyTreatment` — so relaxing the flag itself walks a colonist
 to a wardrobe while the base burns. `MedicalWorkTypeNames` is the allow-list
 instead, carrying the vanilla trio plus Complex Jobs' `FSFNurse` and
-`FSFSurgeon`, because that mod repoints vanilla givers at its own types and a
-vanilla-only list would silently stop covering the case the player ticked the box
-for.
+`FSFSurgeon`.
+
+Those last two are belt and braces, not load-bearing, and the distinction is
+worth keeping straight because the first version of this comment got it wrong.
+Complex Jobs does repoint vanilla givers at its own finer types, but not either
+of the ones here: its `PatientBedRest` patch file is empty, and
+`DoctorTendEmergency` keeps `Doctor` — the mod annotates every giver it moves
+with "(Moved to ...)" in its own priority lists, and that one carries no
+annotation (checked against 2069684319, 1.6 folder, 2026-09-23). The names are
+listed so a future repoint does not silently switch the setting off under
+players who ticked it.
 
 The two arms need separate treatment for the same reason BL-era medical rest did.
 A doctor's emergency tend is a scanner job carrying `DoctorTendEmergency`, so it

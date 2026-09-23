@@ -1,9 +1,11 @@
 v1.4.6 update:
 
-Ticking "Resting in bed" on a stand never dressed anyone. Both patient rows in the work list have been inert since sleepwear arrived, so a hospital stand set up the way the description says did nothing at all, and nothing on screen said so. Reported by a player who had it configured correctly.
+Ticking "Resting in bed" on a stand never dressed anyone. Both patient rows in the work list have been inert since sleepwear arrived, so a hospital stand set up the way the description says did nothing, silently. Reported by a player who had it configured correctly.
 
 It works now. Put a stand in the hospital, tick the row, stock it with gowns, and a colonist going to bed to recuperate changes there on the way.
 
 A colonist who still needs a doctor goes straight to bed instead. Someone wounded in a raid gets the gown on their next trip, once they have been tended.
 
 There is a new setting for the other preference, off by default: "Medical emergencies change first". Turn it on and a doctor answering an emergency tend puts scrubs on first, and a critical patient stops for the gown. Fires are never covered by it.
+
+Both work the same with [FSF] Complex Jobs: it leaves bed rest alone and keeps emergency tending under Doctor.
