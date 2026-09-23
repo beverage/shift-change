@@ -8,4 +8,4 @@ A colonist who still needs a doctor goes straight to bed instead. Someone wounde
 
 There is a new setting for the other preference, off by default: "Medical emergencies change first". Turn it on and a doctor answering an emergency tend puts scrubs on first, and a critical patient stops for the gown. Fires are never covered by it.
 
-Both work the same with [FSF] Complex Jobs: it leaves bed rest alone and keeps emergency tending under Doctor.
+Both work the same with FrozenSnowFox's Complex Jobs: it leaves bed rest alone and keeps emergency tending under Doctor.
