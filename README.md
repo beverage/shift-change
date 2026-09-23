@@ -219,6 +219,13 @@ type, for a colonist recovering from injury or illness, and it behaves like any
 other work type. Ordinary sleep is the **Sleeping** row. Tick the work type for
 a hospital gown; tick Sleeping for pyjamas.
 
+**A patient who still needs a doctor goes straight to bed.** The gown is for
+recuperating, so a colonist who is bleeding, waiting on surgery or in labour is
+never sent to a wardrobe first. That is the trip they make while untended, so
+someone wounded in a raid reaches the bed before the gown: they change on their
+next trip to bed, once a doctor has seen them. Nobody is pulled out of a sickbed
+to change, in either direction.
+
 Bedrooms turn this on by themselves. Barracks deliberately do not: a stand
 serves one colonist at a time, so in a ten-bunk barracks the first sleeper to
 reach it would hold it all night and the other nine would go to bed in what
@@ -231,7 +238,9 @@ they were already wearing. A shared sleeping room takes the switch by hand.
   now* goes straight there, and a pawn in uniform given a direct order keeps
   it on and returns it later.
 - **Emergencies are never delayed.** A colonist bleeding out is not kept
-  waiting for a wardrobe trip.
+  waiting for a wardrobe trip. **Medical emergencies change first** in mod
+  options turns that off for doctors and patients only, if you would rather
+  have scrubs and gowns than the seconds. Fires are never covered either way.
 - **Nobody changes into a uniform while the map is under threat.** A colonist
   already wearing one still changes back out of it, on their own next job.
   Getting dressed is a trip nobody should make in a firefight; getting changed
@@ -255,8 +264,16 @@ they were already wearing. A shared sleeping room takes the switch by hand.
   their own, raid or no raid, but "on their own next job" can be a long time if
   the job they just started was sleep.
 
-One mod setting: **"Unassigned stands are shared"** (default on). Turn it off
-and only stands with an explicit owner list ever dress anyone.
+Three mod settings, under Options → Mod settings:
+
+- **Unassigned stands are shared**, on by default. Turn it off and only stands
+  with an explicit owner list ever dress anyone.
+- **Keep colonists decent**, off by default, described further up.
+- **Medical emergencies change first**, off by default. On, a doctor answering
+  an emergency tend puts scrubs on first and a colonist in critical condition
+  stops for a gown on the way to bed. Fires are never covered by it. It works
+  in both directions, so a doctor already in another room's uniform may change
+  out of it before answering the call as well.
 
 ## Requirements
 

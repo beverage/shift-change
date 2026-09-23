@@ -743,18 +743,88 @@ the room resolver is the work arm's `TargetCell`, untouched. `LayDown` is not
 in the `JobRoomTargets` list, so that resolver reads targetA here as it always
 has.
 
-**Medical bed rest belongs to the work arm, and the TAG is what says so.**
-Vanilla ships a `PatientBedRest` WorkTypeDef whose gerund label reads "resting
-in bed", already tickable in the stand dialog — so one `JobDefOf.LayDown` must
-reach exactly one of the two controls. The separator is
+**Medical bed rest belongs to the work arm, and the TAG is what puts it
+there.** Vanilla ships a `PatientBedRest` WorkTypeDef whose gerund label reads
+"resting in bed", already tickable in the stand dialog — so one
+`JobDefOf.LayDown` must reach exactly one of the two controls. The separator is
 `JobTag.RestingForMedicalReasons`: all three patient WorkGivers carry
 `tagToGive`, and `Pawn_JobTracker` passes `ThinkResult.Tag` straight into
-StartJob. It is emphatically **not** `workGiverDef`, though the first version
-of this arm claimed exactly that — those WorkGivers are `NonScanJob` overrides
-and `JobGiver_Work` stamps `workGiverDef` only on its scanner paths, so a
-medical lay-down arrives with it null. The `workGiverDef` limb survives as a
-conservative catch for a modded giver with a null workType, and is dead for
-everything vanilla ships.
+StartJob. It is emphatically **not** `workGiverDef` — those WorkGivers are
+`NonScanJob` overrides and `JobGiver_Work` stamps `workGiverDef` only on its
+scanner paths, so a medical lay-down arrives with it null. The `workGiverDef`
+limb survives as a conservative catch for a modded giver with a null workType,
+and is dead for everything vanilla ships.
+
+**That null was a shipped bug for three weeks, and this paragraph is where it
+hid** (reported by a player, 2026-09-23). "Belongs to the work arm" was
+written as a hand-off and implemented as a rejection: the sleep arm turned the
+job away because the work arm owned it, and the work arm never saw it, because
+reading `job.workGiverDef?.workType` on an unstamped job yields null. Both
+patient rows in the dialog did nothing at all from the day the sleep trigger
+shipped. `MedicalRestWorkType` now RESOLVES the work type from the tag rather
+than hoping to find one on the job, and the sleep arm's rejection stayed exactly
+as it was — it is still what keeps a pyjama stand off a patient.
+
+Two refusals are folded into that resolver, and both are load-bearing.
+`HealthAIUtility.ShouldSeekMedicalRestUrgent` is vanilla's own split between
+`WorkGiver_PatientGoToBedTreatment` and `...Recuperate`, so reading it charges
+the gown to recuperation and leaves the bleeding, the pre-surgical and the
+labouring alone. `OnABed` is the same guard the sleep arm needs and for the same
+reason: vanilla reissues the patient job at a pawn already lying in the bed, and
+without it every reissue is a fresh trip to the wardrobe.
+
+**The known cost of the urgent refusal**, stated rather than discovered later: a
+colonist wounded in a raid is urgent on the walk to the bed, gets tended there,
+and never leaves it, so their gown arrives on the NEXT trip to bed rather than
+this one. Diseases behave the same way while untended. The narrower alternative
+is to refuse on bleed rate and pending surgery instead of the whole predicate,
+which would cover the raid case at the price of a detour — bounded by the target
+room, since the stand is found there — for a colonist with an untended wound.
+
+**Decided 2026-09-23: the refusal stands as the default**, on the grounds that a
+colonist bleeding out at 10% movement should not stop to change, and will change
+on their next trip to bed anyway.
+
+**`medicalEmergenciesChangeFirst` relaxes it for players who want the opposite**,
+shipped in the same release and OFF by default. It is the one place the mod's
+"emergencies are never delayed" rule bends, and it bends only for medical work.
+
+The switch cannot key on `emergency`. Vanilla sets that flag on exactly three
+givers — `FightFires`, `DoctorTendEmergency` and
+`PatientGoToBedEmergencyTreatment` — so relaxing the flag itself walks a colonist
+to a wardrobe while the base burns. `MedicalWorkTypeNames` is the allow-list
+instead, carrying the vanilla trio plus Complex Jobs' `FSFNurse` and
+`FSFSurgeon`.
+
+Those last two are belt and braces, not load-bearing, and the distinction is
+worth keeping straight because the first version of this comment got it wrong.
+Complex Jobs does repoint vanilla givers at its own finer types, but not either
+of the ones here: its `PatientBedRest` patch file is empty, and
+`DoctorTendEmergency` keeps `Doctor` — the mod annotates every giver it moves
+with "(Moved to ...)" in its own priority lists, and that one carries no
+annotation (checked against 2069684319, 1.6 folder, 2026-09-23). The names are
+listed so a future repoint does not silently switch the setting off under
+players who ticked it.
+
+The two arms need separate treatment for the same reason BL-era medical rest did.
+A doctor's emergency tend is a scanner job carrying `DoctorTendEmergency`, so it
+is caught at the `emergency` gate; a critical patient's lay-down carries no giver
+at all, so what the setting relaxes there is `ShouldSeekMedicalRestUrgent` inside
+`MedicalRestWorkType`. `PatientGoToBedEmergencyTreatment`'s own `emergency` flag
+has never been read by us and still is not — it is a `NonScanJob` override like
+the rest of that family.
+
+**Turning it on relaxes BOTH directions**, and that is deliberate rather than
+overlooked. The emergency exemption is a single test sitting above the return-trip
+block, placed there on 2026-08-08 precisely so an emergency in another room is not
+delayed by an undress detour. Carving the dressing half out alone would mean two
+rules to explain and an asymmetry to maintain; the setting instead means what it
+says, that medical emergencies become ordinary work for dressing purposes. The
+mod-settings description and the README both state the consequence.
+
+`OnABed` stays unconditional under the setting. Whether an emergency may be
+delayed and whether a patient may be hauled off a bed they are already lying on
+are different questions, and only the first one was asked.
 
 A third limb was tried and removed the same day.
 `HealthAIUtility.ShouldSeekMedicalRest` looked like the backstop for
