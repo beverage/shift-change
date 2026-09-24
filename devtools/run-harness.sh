@@ -489,12 +489,31 @@ printf 'game exited after ~%ss\n\n' "$elapsed"
 
 [ -f "$LOG" ] || die "no log at $LOG — did -logfile take?"
 
-# TWO FAILURES, TWO MESSAGES. These were one line until 2026-09-04, and it
-# blamed mod wiring for a stall that happens before any mod is loaded — which
-# misdirected an entire debugging session. The log already knows which happened.
-grep -q "with mods:" "$LOG" \
-  || die "the game exited without ever reaching RimWorld's own startup — the
-       fullscreen stall, not a wiring problem. See $LOG"
+# THREE FAILURES, THREE MESSAGES, and the crash is checked first. These were one
+# line until 2026-09-04, and it blamed mod wiring for a stall that happens
+# before any mod is loaded — which misdirected an entire debugging session. Then
+# a sibling mod reported a native crash as the stall, because a crash fails the
+# "with mods:" test below as well. The log already knows which happened.
+#
+# By this point the game EXITED by itself. A stall never does; the loop above
+# stops those with their own message. So a missing "with mods:" here is never
+# the stall, and the log's last lines are the evidence for what it was.
+if grep -q "Native Crash Reporting" "$LOG"
+then
+  printf 'the game CRASHED (native). Top frames:\n' >&2
+  grep -E "^#([0-9]|1[0-5]) " "$LOG" | cut -c1-140 >&2 || true
+  printf '\n' >&2
+  die "native crash: neither the stall nor a wiring problem. See $LOG"
+fi
+if ! grep -q "with mods:" "$LOG"
+then
+  printf 'last lines of the log:\n' >&2
+  tail -n 5 "$LOG" | sed 's/^/  | /' >&2
+  die "the game exited before RimWorld's own startup, with no native crash
+       recorded: not the stall, which never ends by itself, and not a wiring
+       problem. Something ended the process; the lines above may say what.
+       See $LOG"
+fi
 grep -q "harness auto-run" "$LOG" \
   || die "the game started but the harness never ran — is -shiftchange-harness
        still wired up? See $LOG"
