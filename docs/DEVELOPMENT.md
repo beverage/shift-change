@@ -211,17 +211,24 @@ failure. Measured 2026-08-14, launch to process exit:
 Those are one machine's numbers; `--full` scales with whatever list is active,
 since almost all of it is RimWorld's own load time.
 
-**The window has to be in front, and this is the script's main operational
-hazard.** RimWorld's loading screen advances off the main-thread update, so an
-instance whose window never composites never progresses: the log stops around
-line 49, in Unity's preamble, before a single mod or def loads, and the process
-sits near 0% CPU forever. It does not recover on its own. Bring the new window
-to the front as it appears and the run proceeds normally.
+**The window does not need to be in front.** It used to: RimWorld's loading
+screen advances off the main-thread update, so an instance whose window never
+composited never progressed. The log stopped around line 49, in Unity's
+preamble, before a single mod or def loaded, and the process sat near 0% CPU
+forever. The cause was RimWorld's own `runInBackground` preference, which is
+off in a fresh save-data folder, and the script now seeds it on. Measured
+2026-09-11 with focus held on another app throughout: 3 of 3 seeded runs passed
+with startup in 20 s, and 3 of 3 unseeded runs stalled; `--full` against the
+real list then passed unfocused and unattended end to end. The engine lines
+behind it are in the Prefs.xml block of `run-harness.sh`.
 
-A stall is no longer a long wait. `STARTUP_GRACE` (120 s) kills a run that has
-not reached RimWorld's own startup and says so in those words, instead of the
-old behaviour — twenty minutes, then a message blaming `-shiftchange-harness`
-for something that happens before any mod is loaded. The startup probe greps for
+A stall is still cut short rather than waited out. A run that has not reached
+RimWorld's own startup by `STARTUP_GRACE` (120 s), and whose log has then been
+silent for `STALL_QUIET` (60 s), is stopped with a message saying so, instead of
+the old behaviour — twenty minutes, then a message blaming `-shiftchange-harness`
+for something that happens before any mod is loaded. The grace is a floor, not a
+deadline: a large list takes minutes to reach startup and writes to its log the
+whole time. The startup probe greps for
 `with mods:`, which is Verse's own output from both "Initializing new game with
 mods:" and "Loading game from file … with mods:". **Do not "improve" that to
 something that looks more precise.** The version banner is printed *before* the
@@ -229,15 +236,18 @@ stall, so it matches a hung run; and `Loaded assemblies` — which looks perfect
 in a heavily modded Player.log — is printed by a mod, is absent on the four-mod
 list, and reported a passing run as a stall the first time it was tried.
 
-`--alongside` cannot help here: the instance already running owns the
-foreground, and three consecutive attempts stalled. Two things were tried and
-are not the cause — a second instance existing (a clean run with nothing else
-open stalls identically) and the test instance defaulting to fullscreen (seeding
-windowed prefs did not fix it, though the script now seeds them anyway, since
+Before the fix, `--alongside` could not help: the instance already running
+owned the foreground, and three consecutive attempts stalled. The same fix
+covers it: the measurement held focus on another app for the whole run, which is
+the worst case for an `--alongside` instance. Two things were tried and are not
+the cause — a second instance existing (a clean run with nothing else open
+stalled identically) and the test instance defaulting to fullscreen (seeding
+windowed prefs did not fix it, though the script seeds them anyway, since
 windowed and muted is right for a throwaway instance regardless).
 
-Before investigating a "performance regression", check whether the window was in
-front. The harness itself executes in a single frame and cannot account for
+Before investigating a "performance regression", check what else was running:
+a live colony ticking alongside turns ~25 s into several minutes (the table
+above). The harness itself executes in a single frame and cannot account for
 minutes.
 
 **The four-mod list is for iterating; `--full` is what a release is signed off

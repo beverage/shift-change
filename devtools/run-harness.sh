@@ -339,12 +339,11 @@ fi
 # was. Seeding windowed prefs was followed by one clean pass and then, on the
 # very next run, an identical stall (2026-09-04, 1 for 2). The pass also came
 # straight after an attempt where the window was being fronted by hand, so
-# focus was never controlled for and the two explanations remain tangled. It is
-# kept because windowed-and-muted is the right shape for a throwaway test
-# instance regardless, and because it plausibly removes one failure mode — not
-# because the stall is understood. See the tracker item for the live state.
+# focus was never controlled for; the measurement below controls it. Windowed
+# and muted is kept because it is the right shape for a throwaway test
+# instance, not because it cures anything.
 #
-# runInBackground, AND WHY IT IS HERE DESPITE NOT ANSWERING THE STARTUP STALL.
+# runInBackground, WHICH IS THE STALL FIX.
 #
 # `runInBackground` is one of RimWorld's own preferences (Verse/PrefsData.cs:68)
 # and it DEFAULTS TO FALSE — the field has no initializer, and PrefsData.Apply()
