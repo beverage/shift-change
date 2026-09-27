@@ -41,15 +41,50 @@ namespace ShiftChange
         /// A spare colonist on the pad, registered for teardown. Bare of work
         /// types on purpose: the assignable comp offers every colonist when the
         /// stand has resolved none, which is what these cases want to test.
+        ///
+        /// <para>Retried like a fixture build (<see cref="BuildAttempts"/>), and
+        /// for the same reason: on a large mod list, spawning a fresh pawn
+        /// sometimes throws <c>Collection was modified</c> in
+        /// <c>Pawn_HealthTracker.Notify_Spawned</c>, under third-party postfixes on
+        /// <c>Pawn.SpawnSetup</c>. This runs inside case bodies, where the fixture
+        /// retry never reached, so one such throw failed a whole case on the full
+        /// list. Every retry is printed, so an intermittent fault of our own would
+        /// still show, and the last attempt's exception is left to fail the
+        /// case.</para>
         /// </summary>
         internal static Pawn SpawnExtra(Fixture fix, Gender gender, string nick)
         {
-            Pawn pawn = DebugTools_Fixtures.AveragePawn(gender, nick);
-            pawn.workSettings?.EnableAndInitialize();
-            GenSpawn.Spawn(pawn, fix.Stand.Position + new IntVec3(2, 0, fix.Extras.Count + 1),
-                           fix.Map, Rot4.North);
-            fix.Extras.Add(pawn);
-            return pawn;
+            IntVec3 cell = fix.Stand.Position + new IntVec3(2, 0, fix.Extras.Count + 1);
+            for (int attempt = 1; ; attempt++)
+            {
+                Pawn pawn = DebugTools_Fixtures.AveragePawn(gender, nick);
+                pawn.workSettings?.EnableAndInitialize();
+                try
+                {
+                    GenSpawn.Spawn(pawn, cell, fix.Map, Rot4.North);
+                    fix.Extras.Add(pawn);
+                    return pawn;
+                }
+                catch (Exception e) when (attempt < BuildAttempts)
+                {
+                    Report.Append("    RETRY extra pawn spawn threw on attempt ").Append(attempt)
+                          .Append(" — ").Append(e.GetType().Name).Append(": ")
+                          .AppendLine(e.Message);
+                    try
+                    {
+                        // Half spawned, most likely: out of the way before the
+                        // next one lands on the same cell.
+                        if (!pawn.Destroyed)
+                        {
+                            pawn.Destroy();
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // Teardown clears the pad whatever is left on it.
+                    }
+                }
+            }
         }
 
         /// <summary>
