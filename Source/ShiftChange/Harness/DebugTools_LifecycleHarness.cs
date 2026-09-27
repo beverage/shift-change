@@ -220,6 +220,10 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing), OwnerListRestricts);
             Case(map, pad, "the owner dialog's gender filter offers the right candidates",
                  (m, p) => Stage(m, p, StageKit.Displacing), OwnerFilterOffersTheRightPawns);
+            Case(map, pad, "one owner is copied into another mod's owner list, a shared stand is not",
+                 StageWithForeignAssignable, ForeignOwnersCopyOurs);
+            Case(map, pad, "an older save's two owner lists reconcile to the one the player could see",
+                 StageWithForeignAssignable, ReconcileKeepsTheVisibleList);
             Case(map, pad, "a joy job in the stand's room dresses",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  JoyJobInTheRoomDresses);
@@ -301,7 +305,7 @@ namespace ShiftChange
                  () => DebugTools_SaveRoundTrip.RoundTrip(map, pad));
             Case("a legacy-key save migrates its owner and re-saves prefixed",
                  DebugTools_SaveRoundTrip.LegacyMigration);
-            Case("a foreign assignable's owner round-trips without contest",
+            Case("an older save's foreign owner round-trips without contest and is adopted",
                  DebugTools_SaveRoundTrip.ForeignAssignable);
 
             // The two below need no map, so they are unaffected by the game

@@ -401,6 +401,70 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// <see cref="Stage"/>, with a second, foreign assignable comp on the
+        /// stand: the shape Outfit Stands Plus gives the stands it touches.
+        ///
+        /// <para>Reuses one when the mod list already supplies it, for the reason
+        /// <see cref="DebugTools_SaveRoundTrip.ForeignAssignable"/> spells out: a
+        /// second plain comp beside theirs is two foreign comps, and the case
+        /// stops testing ours against theirs. A plain
+        /// <c>CompAssignableToPawn</c> serves otherwise, since the code under
+        /// test names no foreign type.</para>
+        ///
+        /// <para>The comp goes on the DEF, because comps are built from
+        /// <c>def.comps</c> when the thing is made, and the edit is reverted as
+        /// soon as the stand exists. The spawned stand keeps the comp it was
+        /// built with, and nothing made after it, in this case or any later one,
+        /// sees the edit.</para>
+        /// </summary>
+        internal static Fixture StageWithForeignAssignable(Map map, CellRect pad)
+        {
+            ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
+            if (standDef == null)
+            {
+                return null;
+            }
+            CompProperties_AssignableToPawn added = null;
+            if (!standDef.comps.Any(IsForeignAssignableProps))
+            {
+                added = new CompProperties_AssignableToPawn();
+                standDef.comps.Add(added);
+            }
+            try
+            {
+                return Stage(map, pad, StageKit.Displacing);
+            }
+            finally
+            {
+                if (added != null)
+                {
+                    standDef.comps.Remove(added);
+                }
+            }
+        }
+
+        internal static bool IsForeignAssignableProps(CompProperties props)
+        {
+            return props != null && props.compClass != null
+                   && typeof(CompAssignableToPawn).IsAssignableFrom(props.compClass)
+                   && !typeof(CompAssignableToPawn_ShiftStand).IsAssignableFrom(props.compClass);
+        }
+
+        /// <summary>The first assignable comp on the stand that is not ours.</summary>
+        internal static CompAssignableToPawn ForeignAssignableOn(ThingWithComps stand)
+        {
+            return stand?.AllComps.OfType<CompAssignableToPawn>()
+                .FirstOrDefault(c => !(c is CompAssignableToPawn_ShiftStand));
+        }
+
+        /// <summary>The list names exactly this pawn and nobody else.</summary>
+        internal static bool Names(CompAssignableToPawn comp, Pawn pawn)
+        {
+            List<Pawn> owners = comp.AssignedPawnsForReading;
+            return owners.Count == 1 && owners[0] == pawn;
+        }
+
+        /// <summary>
         /// Strip a fixture stand back to empty, so a case can state exactly what
         /// it holds instead of working around the duster <see cref="Stage"/>
         /// stocks.
