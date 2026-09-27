@@ -294,16 +294,22 @@ colonist handed its old owner a one-click vanilla swap there, which took the new
 owner's parked kit, and nothing on the stand could show or clear it. Hiding a
 control is only safe once nothing reads what it edits independently.
 
-**A stand not used for shift changes belongs to one colonist.** In that mode the
-owner drives nothing of ours; it only reaches the other mod's button through the
-copy, and that mod has one owner per stand, so a group list there only ever meant
-nobody got the button. The list therefore holds one colonist: `TryAssignPawn`
-replaces instead of adding, switching a group stand into the mode clears its list
-with a message (`SetExcluded`), and a group list found there on spawn is cleared
-silently. That last check runs on every spawn rather than once, because a save
-made on an earlier build of the copy already carries the reconcile marker. The
-cost is that a group stand switched out of shift use and back loses its group;
-shift stands keep theirs.
+**A stand not used for shift changes is assigned one colonist at a time.** In
+that mode the owner drives nothing of ours; it only reaches the other mod's button
+through the copy, and that mod has one owner per stand. So the owner dialog there
+picks: its Assign makes the colonist the only owner (`AssignSoleOwner`), and
+Assign all is not drawn. `TryAssignPawn` itself adds in both modes, because the
+base restores a reinstalled stand's parked owners through it one at a time, and a
+replacing override brought a kept group back from a move as its last member.
+
+A group stand switched into that mode keeps its group. The row is one click from
+any configured group stand, and unticking its last work type, Recreation or
+Sleeping lands in the same state, so the first build of this rule, which cleared
+the list there (with a message, plus a silent trim on every spawn), cost a
+configured group on an ordinary edit, and was withdrawn before release (decided
+2026-09-27). While kept, the group fits no foreign slot, so
+the copy is empty and nobody gets the other mod's button until the player picks
+one colonist or switches the stand back.
 
 Older saves reconcile once per stand, on first spawn, marked by a scribed flag
 (`shiftChangeOwnersUnified`, absent in any save that predates it). If only one

@@ -25,9 +25,10 @@ namespace ShiftChange
     /// <summary>
     /// Harness cases for who a stand serves: owner lists, the owner dialog's
     /// filter, the copy of the owner list in another mod's assignable and the
-    /// one-time reconcile that set it up, the one-owner rule on a stand not
-    /// used for shift changes, the removal flag held off in service, and the
-    /// two gizmo-chain gates that must hand an untouched sequence back.
+    /// one-time reconcile that set it up, a stand not used for shift changes
+    /// (one colonist picked, a group from shift use kept), the removal flag
+    /// held off in service, and the two gizmo-chain gates that must hand an
+    /// untouched sequence back.
     ///
     /// <para>Split out of <see cref="DebugTools_LifecycleHarness"/> on
     /// 2026-09-15. These are separate TYPES rather than partials on purpose: a
@@ -306,63 +307,203 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A stand set to "Not used for shift changes" holds one owner, and a
-        /// stand in shift use still holds a group.
+        /// A group stand taken out of shift use keeps its owners, and has them
+        /// all when it goes back.
         ///
-        /// <para>Driven through all three places the rule lives: assigning on
-        /// such a stand replaces the owner, switching a group stand into that
-        /// mode clears the group, and a group list found there on spawn (what
-        /// an older save carries) is cleared by the step that runs the
-        /// reconcile. The control at the top matters as much as the rest: a
-        /// rule that capped every stand at one owner would pass everything
-        /// below it and break the group stands.</para>
+        /// <para>Driven through all four ways into that mode, because three of
+        /// them are not the "Not used for shift changes" row: unticking the
+        /// last work type, Recreation or Sleeping lands in the same state
+        /// (<see cref="CompShiftStand.ToggleWork"/> and its two siblings fall
+        /// through to <see cref="CompShiftStand.SetExcluded"/>). A build that
+        /// cleared the list on the way in cost a configured group on an
+        /// ordinary edit of the stand, so the list is kept (decided
+        /// 2026-09-27). Each arm re-enters shift use through the matching
+        /// tick, which is the control that the arm really left it.</para>
         /// </summary>
-        internal static bool ExcludedStandHoldsOneOwner(Fixture fix)
+        internal static bool GroupSurvivesLeavingShiftUse(Fixture fix)
         {
             CompAssignableToPawn_ShiftStand ours =
                 fix.Stand.TryGetComp<CompAssignableToPawn_ShiftStand>();
-            if (ours == null)
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            if (ours == null || doctor == null)
             {
-                return Expect(false, "the stand carries our assignable comp");
+                return Expect(false, "the stand carries our assignable comp and the Doctor work type resolves");
             }
 
             Pawn a = fix.Pawn;
-            Pawn b = SpawnExtra(fix, Gender.Female, "SoleB");
-            Pawn c = SpawnExtra(fix, Gender.Male, "SoleC");
+            Pawn b = SpawnExtra(fix, Gender.Female, "GroupB");
 
             fix.Comp.SetAutomatic();
             ours.TryAssignPawn(a);
             ours.TryAssignPawn(b);
-            bool ok = Expect(ours.AssignedPawnsForReading.Count == 2,
-                             "a stand in shift use still holds a group (control)")
-                    & Expect(!new Dialog_AssignStandOwners(ours).SingleOwner,
-                             "and its owner dialog is not in one-owner mode");
+            bool ok = Expect(Names(ours, a, b), "a stand in shift use holds a group of two (control)");
 
             fix.Comp.SetExcluded();
-            ok &= Expect(ours.AssignedPawnsForReading.Count == 0,
-                         "switching it out of shift use clears the group");
+            ok &= Expect(fix.Comp.IsExcluded && Names(ours, a, b),
+                         "the Not used for shift changes row keeps both owners");
 
-            ok &= Expect(new Dialog_AssignStandOwners(ours).SingleOwner,
-                         "the owner dialog runs in one-owner mode there");
+            // From here each trigger starts a fresh set, since a stand out of
+            // shift use has no work types to seed one from.
+            fix.Comp.ToggleWork(doctor);
+            ok &= Expect(!fix.Comp.IsExcluded && fix.Comp.WorkTypes.Count == 1,
+                         "ticking Doctor puts it back in shift use with one work type (control)");
+            fix.Comp.ToggleWork(doctor);
+            ok &= Expect(fix.Comp.IsExcluded && Names(ours, a, b),
+                         "unticking that last work type keeps both owners");
+
+            fix.Comp.ToggleRecreation();
+            ok &= Expect(!fix.Comp.IsExcluded && fix.Comp.HandlesRecreation(),
+                         "ticking Recreation puts it back in shift use (control)");
+            fix.Comp.ToggleRecreation();
+            ok &= Expect(fix.Comp.IsExcluded && Names(ours, a, b),
+                         "unticking Recreation keeps both owners");
+
+            fix.Comp.ToggleRest();
+            ok &= Expect(!fix.Comp.IsExcluded && fix.Comp.HandlesRest(),
+                         "ticking Sleeping puts it back in shift use (control)");
+            fix.Comp.ToggleRest();
+            ok &= Expect(fix.Comp.IsExcluded && Names(ours, a, b),
+                         "unticking Sleeping keeps both owners");
+
+            fix.Comp.SetAutomatic();
+            ok &= Expect(Names(ours, a, b), "and back in shift use the group is whole")
+                & Expect(fix.Comp.CanBeClaimedBy(a) && fix.Comp.CanBeClaimedBy(b),
+                         "and the claim check lets either owner take it");
+
+            ours.TryUnassignPawn(a);
+            ours.TryUnassignPawn(b);
+            return ok;
+        }
+
+        /// <summary>
+        /// On a stand out of shift use the owner dialog's Assign is a pick: one
+        /// colonist replaces the whole list, a kept group included, and the
+        /// copy then names that colonist, so the other mod's button comes back.
+        ///
+        /// <para>Driven through <see cref="Dialog_AssignStandOwners.Assign"/>,
+        /// the call a row's button makes, so the dialog's own choice between
+        /// adding and replacing is under test and not only the comp method
+        /// behind it. The shift-use arm is the control: the same call there has
+        /// to ADD, or a group stand could never be built.</para>
+        /// </summary>
+        internal static bool PickReplacesAKeptGroup(Fixture fix)
+        {
+            CompAssignableToPawn_ShiftStand ours =
+                fix.Stand.TryGetComp<CompAssignableToPawn_ShiftStand>();
+            CompAssignableToPawn foreign = ForeignAssignableOn(fix.Stand);
+            if (ours == null || foreign == null)
+            {
+                return Expect(false, "the stand carries our assignable and a foreign one");
+            }
+            if (foreign.TotalSlots != 1)
+            {
+                return Expect(false, "the foreign comp holds one owner, as Outfit Stands Plus's does (control)");
+            }
+
+            Pawn a = fix.Pawn;
+            Pawn b = SpawnExtra(fix, Gender.Female, "PickB");
+            Pawn c = SpawnExtra(fix, Gender.Male, "PickC");
+            Dialog_AssignStandOwners dialog = new Dialog_AssignStandOwners(ours);
+
+            fix.Comp.SetAutomatic();
+            dialog.Assign(a);
+            dialog.Assign(b);
+            bool ok = Expect(!dialog.SingleOwner, "in shift use the dialog does not pick (control)")
+                    & Expect(Names(ours, a, b), "so its Assign adds, and builds a group (control)")
+                    & Expect(foreign.AssignedPawnsForReading.Count == 0,
+                             "which fits no single slot, so the copy is empty (control)");
+
+            fix.Comp.SetExcluded();
+            ok &= Expect(dialog.SingleOwner, "out of shift use the dialog picks one colonist")
+                & Expect(Names(ours, a, b), "and until it does, the group is kept (control)");
+
+            dialog.Assign(c);
+            ok &= Expect(Names(ours, c), "one pick replaces the whole kept group")
+                & Expect(Names(foreign, c),
+                         "and the copy names that colonist, so the other mod's button comes back");
+
+            dialog.Assign(a);
+            ok &= Expect(Names(ours, a) && Names(foreign, a), "a second pick replaces the first");
+
+            fix.Comp.SetAutomatic();
+            ok &= Expect(Names(ours, a),
+                         "back in shift use the pick stands, and the group it replaced stays gone");
+
+            ours.TryUnassignPawn(a);
+            return ok;
+        }
+
+        /// <summary>
+        /// A group kept on a stand out of shift use reaches nobody through the
+        /// copy, and comes back whole when the stand is moved.
+        ///
+        /// <para>The copy half: the group fits Outfit Stands Plus's one slot no
+        /// better out of shift use than in it, so that list stays empty and none
+        /// of the group gets that mod's button for this stand.</para>
+        ///
+        /// <para>The move half is the trap this case exists for. The base parks
+        /// a minified stand's owners and puts them back on landing through
+        /// <c>TryAssignPawn</c>, one at a time
+        /// (<c>CompAssignableToPawn.cs:197-220</c>), so an override that
+        /// replaced there returned the group as its last member. The landing
+        /// also runs <see cref="CompAssignableToPawn_ShiftStand.UnifyOwners"/>,
+        /// the spawn step a load shares, which is where an earlier build of this
+        /// rule cleared a group. Minified and relanded the way
+        /// <see cref="HarnessLifecycle.ReinstallKeepsConfiguration"/> does
+        /// it.</para>
+        /// </summary>
+        internal static bool KeptGroupSurvivesAMove(Fixture fix)
+        {
+            CompAssignableToPawn_ShiftStand ours =
+                fix.Stand.TryGetComp<CompAssignableToPawn_ShiftStand>();
+            CompAssignableToPawn foreign = ForeignAssignableOn(fix.Stand);
+            if (ours == null || foreign == null)
+            {
+                return Expect(false, "the stand carries our assignable and a foreign one");
+            }
+            if (foreign.TotalSlots != 1)
+            {
+                return Expect(false, "the foreign comp holds one owner, as Outfit Stands Plus's does (control)");
+            }
+
+            Pawn a = fix.Pawn;
+            Pawn b = SpawnExtra(fix, Gender.Female, "KeptB");
+
+            fix.Comp.SetAutomatic();
             ours.TryAssignPawn(a);
-            ours.TryAssignPawn(c);
-            ok &= Expect(Names(ours, c), "assigning a second colonist replaces the first");
-
-            fix.Comp.SetAutomatic();
-            ok &= Expect(Names(ours, c), "one owner survives going back into shift use");
+            ours.TryAssignPawn(b);
             fix.Comp.SetExcluded();
-            ok &= Expect(Names(ours, c), "and leaving it again");
+            bool ok = Expect(Names(ours, a, b), "a group is kept on a stand out of shift use (control)")
+                    & Expect(foreign.AssignedPawnsForReading.Count == 0,
+                             "and fits no single slot, so the copy names nobody");
 
-            // What an older save carries: a group already sitting on a stand in
-            // this mode. ForceAddPawn is the unconditional add the load and the
-            // reconcile write through, so it can stage one.
-            ours.ForceAddPawn(a);
-            ok &= Expect(ours.AssignedPawnsForReading.Count == 2,
-                         "a group list can still be staged on such a stand, as a save can carry one (control)");
-            ours.UnifyOwners();
-            ok &= Expect(ours.AssignedPawnsForReading.Count == 0, "and the next spawn clears it");
+            Map map = fix.Map;
+            IntVec3 from = fix.Stand.Position;
+            IntVec3 to = new IntVec3(from.x, 0, from.z + 2);
+            Rot4 rot = fix.Stand.Rotation;
+
+            MinifiedThing box = fix.Stand.MakeMinified();
+            if (box == null)
+            {
+                return ok & Expect(false, "the stand minified");
+            }
+            ok &= Expect(ours.AssignedPawnsForReading.Count == 0,
+                         "boxed, the owners are parked off the list (control)");
+
+            box.InnerThing = null;
+            box.Destroy();
+            GenSpawn.Spawn(fix.Stand, to, map, rot);
+
+            ok &= Expect(fix.Stand.Spawned && fix.Comp.IsExcluded,
+                         "the stand lands, still out of shift use (control)")
+                & Expect(Names(ours, a, b), "with the whole group back, not its last member")
+                & Expect(foreign.AssignedPawnsForReading.Count == 0, "and the copy still names nobody");
 
             fix.Comp.SetAutomatic();
+            ok &= Expect(Names(ours, a, b), "back in shift use, the group serves again");
+
+            ours.TryUnassignPawn(a);
+            ours.TryUnassignPawn(b);
             return ok;
         }
 

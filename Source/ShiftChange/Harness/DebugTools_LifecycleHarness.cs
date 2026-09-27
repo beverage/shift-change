@@ -224,8 +224,12 @@ namespace ShiftChange
                  StageWithForeignAssignable, ForeignOwnersCopyOurs);
             Case(map, pad, "an older save's two owner lists reconcile to the one the player could see",
                  StageWithForeignAssignable, ReconcileKeepsTheVisibleList);
-            Case(map, pad, "a stand not used for shift changes holds one owner, a shift stand a group",
-                 (m, p) => Stage(m, p, StageKit.Displacing), ExcludedStandHoldsOneOwner);
+            Case(map, pad, "a group stand keeps its owners out of shift use, however it gets there",
+                 (m, p) => Stage(m, p, StageKit.Displacing), GroupSurvivesLeavingShiftUse);
+            Case(map, pad, "out of shift use one pick replaces a kept group and reaches the other mod's list",
+                 StageWithForeignAssignable, PickReplacesAKeptGroup);
+            Case(map, pad, "a kept group reaches nobody through the copy and survives a move",
+                 StageWithForeignAssignable, KeptGroupSurvivesAMove);
             Case(map, pad, "a joy job in the stand's room dresses",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  JoyJobInTheRoomDresses);

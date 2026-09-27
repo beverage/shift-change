@@ -595,17 +595,13 @@ namespace ShiftChange
             recreationOverride = false;
             restOverride = false;
             workTypeOverrides?.Clear();
-
-            // A stand in this mode belongs to one colonist
-            // (CompAssignableToPawn_ShiftStand.SingleOwnerOnly), so a group
-            // list has nothing left to do. Said out loud, because a list of
-            // owners vanishing on a mode switch would otherwise read as a bug.
-            int cleared = parent.TryGetComp<CompAssignableToPawn_ShiftStand>()?.ClearGroupList() ?? 0;
-            if (cleared > 0)
-            {
-                Messages.Message("ShiftChange.ExcludedOwnersCleared".Translate(parent.LabelCap, cleared),
-                                 parent, MessageTypeDefOf.NeutralEvent, historical: false);
-            }
+            // Owners are left alone. A group list waits here for the stand to
+            // go back into shift use, and picking one colonist while it is out
+            // of shift use is what replaces it
+            // (CompAssignableToPawn_ShiftStand.SingleOwnerOnly). Unticking the
+            // last work type, Recreation or Sleeping lands here too, so
+            // clearing owners on this path would cost a configured group on an
+            // ordinary edit.
         }
 
         /// <summary>

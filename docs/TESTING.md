@@ -185,11 +185,17 @@ drives the one-time reconcile through each arm of its rule, and ends on the arm
 that makes it one-time: once reconciled, a copy that drifted is rewritten, never
 adopted.
 
-One more covers the one-owner rule on a stand not used for shift changes, through
-all three places it lives: assigning there replaces the owner, switching a group
-stand into that mode clears the group, and a group list found there on spawn is
-cleared. A group stand in shift use is the control, since a rule that capped every
-stand at one owner would pass the rest.
+Three more cover a stand not used for shift changes. The first takes a group stand
+out of shift use by all four ways in (the row itself, and unticking the last work
+type, Recreation or Sleeping, which land in the same state) and asserts the group
+is still listed after each and whole when the stand goes back. The second drives
+the owner dialog's own Assign: in shift use it adds, which is the control, and out
+of it one pick replaces a kept group and the copy then names that colonist. The
+third minifies and relands a stand holding a kept group, and asserts the group
+comes back whole with the copy still empty. That is the trap it was written for:
+vanilla restores parked owners through `TryAssignPawn` one at a time, so an
+override that replaced there returned the group as its last member. The last two
+stage the foreign assignable as well.
 
 **Round-trip cases** save the game, load it back through the engine's own
 synchronous loader, and assert on what came out. There are three: a plain trip

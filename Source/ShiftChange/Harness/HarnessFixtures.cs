@@ -492,11 +492,11 @@ namespace ShiftChange
                 .FirstOrDefault(c => !(c is CompAssignableToPawn_ShiftStand));
         }
 
-        /// <summary>The list names exactly this pawn and nobody else.</summary>
-        internal static bool Names(CompAssignableToPawn comp, Pawn pawn)
+        /// <summary>The list names exactly these pawns, in any order, and nobody else.</summary>
+        internal static bool Names(CompAssignableToPawn comp, params Pawn[] pawns)
         {
             List<Pawn> owners = comp.AssignedPawnsForReading;
-            return owners.Count == 1 && owners[0] == pawn;
+            return owners.Count == pawns.Length && pawns.All(owners.Contains);
         }
 
         /// <summary>

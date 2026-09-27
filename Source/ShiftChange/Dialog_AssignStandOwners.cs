@@ -34,11 +34,12 @@ namespace ShiftChange
     /// for: two clicks to make a stand the women's stand.</para>
     ///
     /// <para><b>One owner on a stand not used for shift changes.</b> There
-    /// the list holds one colonist
-    /// (<see cref="CompAssignableToPawn_ShiftStand.SingleOwnerOnly"/>), so
-    /// Assign replaces the current owner, which the comp enforces, and Assign
-    /// all is not drawn. The gender tabs stay: they still help find one
-    /// colonist in a long list.</para>
+    /// Assign is a pick (<see cref="Assign"/>,
+    /// <see cref="CompAssignableToPawn_ShiftStand.SingleOwnerOnly"/>): the
+    /// colonist replaces the whole list, a group kept from shift use included,
+    /// and Assign all is not drawn. Unassign and Remove all owners work as
+    /// anywhere else. The gender tabs stay: they still help find one colonist
+    /// in a long list.</para>
     /// </summary>
     public class Dialog_AssignStandOwners : Window
     {
@@ -86,9 +87,26 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>The stand holds one owner; see the class summary.</summary>
+        /// <summary>Assign is a pick here; see the class summary.</summary>
         internal bool SingleOwner =>
             (assignable as CompAssignableToPawn_ShiftStand)?.SingleOwnerOnly ?? false;
+
+        /// <summary>
+        /// What a row's Assign button does: on a stand not used for shift
+        /// changes, make <paramref name="pawn"/> the only owner; everywhere
+        /// else, add them to the list.
+        /// </summary>
+        internal void Assign(Pawn pawn)
+        {
+            if (SingleOwner)
+            {
+                ((CompAssignableToPawn_ShiftStand)assignable).AssignSoleOwner(pawn);
+            }
+            else
+            {
+                assignable.TryAssignPawn(pawn);
+            }
+        }
 
         internal List<Pawn> Candidates()
         {
@@ -176,8 +194,9 @@ namespace ShiftChange
                 SoundDefOf.Click.PlayOneShotOnCamera();
             }
 
-            // Assigning everyone shown onto a one-owner stand would replace
-            // each owner with the next and leave the last name in the list.
+            // Not drawn where Assign is a pick. A group built out of shift use
+            // would drive nothing of ours and fit no Outfit Stands Plus slot,
+            // so it would reach nobody at all.
             if (SingleOwner)
             {
                 return;
@@ -253,7 +272,7 @@ namespace ShiftChange
                 }
                 else
                 {
-                    assignable.TryAssignPawn(pawn);
+                    Assign(pawn);
                 }
                 SoundDefOf.Click.PlayOneShotOnCamera();
             }
