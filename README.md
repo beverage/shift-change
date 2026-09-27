@@ -286,14 +286,15 @@ The kid outfit stand (Biotech) is not used, by design.
 ## Mod compatibility
 
 **[Outfit Stands Plus](https://steamcommunity.com/workshop/filedetails/?id=3545172389)**
-works alongside this mod, in either load order (tested with both). The two
-divide a stand cleanly: its mechanized and mending stands are full shift
-stands here (shift changes run at their boosted swap speeds, and the mending
-stand repairs a borrower's parked clothes while they work), and each stand
-shows exactly one Set owner control: this mod's while the stand is in
-service, theirs when the stand is set to "Not used for shift changes". Its
-wardrobe features, its "allow adding items" toggle and its research are all
-untouched.
+works alongside this mod, in either load order (tested with both). Its
+mechanized and mending stands are full shift stands here: shift changes run at
+their boosted swap speeds, and the mending stand repairs a borrower's parked
+clothes while they work. Every stand has one owner list, set with this mod's
+Set owner whether or not the stand is used for shift changes, and Outfit Stands
+Plus follows it. A stand with exactly one owner gives that colonist the Outfit
+Stands Plus button for it (equip outfit, or return to stand); a stand with
+several owners, or none, gives that button to nobody. Its wardrobe features,
+its "allow adding items" toggle and its research are all untouched.
 
 Two of its behaviors are worth knowing about, because they can look like
 faults here: it switches off its own "allow adding items" after a manual
