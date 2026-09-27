@@ -224,6 +224,8 @@ namespace ShiftChange
                  StageWithForeignAssignable, ForeignOwnersCopyOurs);
             Case(map, pad, "an older save's two owner lists reconcile to the one the player could see",
                  StageWithForeignAssignable, ReconcileKeepsTheVisibleList);
+            Case(map, pad, "a stand not used for shift changes holds one owner, a shift stand a group",
+                 (m, p) => Stage(m, p, StageKit.Displacing), ExcludedStandHoldsOneOwner);
             Case(map, pad, "a joy job in the stand's room dresses",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  JoyJobInTheRoomDresses);

@@ -411,8 +411,8 @@ flowchart LR
 | `JobDriver_SwapAtStand.cs` | Moves apparel, one direction at a time. Sets the forced flag on the way in, clears it on the way out. |
 | `SwapPlan.cs` | The single answer to "what would this swap move". Every wearability predicate lives here. |
 | `CompShiftStand.cs` | Per-stand work types and the checkout ledger. Static registry of on-shift stands. |
-| `CompAssignableToPawn_ShiftStand.cs` | Ownership. Narrows candidates to pawns capable of the stand's work, swaps the vanilla assign window for ours, and keeps any other mod's owner list on the stand as a copy of ours (reconciling the two once for an older save). |
-| `Dialog_AssignStandOwners.cs` | The owner list. Replaces `Dialog_AssignBuildingOwner` for stands only — multi-select, a gender column and a gender filter, none of which the vanilla window exposes a seam for. |
+| `CompAssignableToPawn_ShiftStand.cs` | Ownership. Narrows candidates to pawns capable of the stand's work, swaps the vanilla assign window for ours, and keeps any other mod's owner list on the stand as a copy of ours (reconciling the two once for an older save). Holds one owner on a stand not used for shift changes. |
+| `Dialog_AssignStandOwners.cs` | The owner list. Replaces `Dialog_AssignBuildingOwner` for stands only — multi-select, a gender column and a gender filter, none of which the vanilla window exposes a seam for. One-owner mode, without Assign all, on a stand not used for shift changes. |
 | `Interop_OutfitStandsPlus.cs` | Reflection bridge to Outfit Stands Plus. Silent-fail; absent mod means an inert file. |
 | `Patch_ForeignOwnerGizmos.cs` | Hides the other mod's Set owner control on every stand carrying ours, in both modes. Its list is a copy of ours, so an edit made through it would only be overwritten. |
 | `Patch_AllowRemovingToggle.cs` | Holds the stand's "Allow removing items" off while it is in service. |

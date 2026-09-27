@@ -595,6 +595,17 @@ namespace ShiftChange
             recreationOverride = false;
             restOverride = false;
             workTypeOverrides?.Clear();
+
+            // A stand in this mode belongs to one colonist
+            // (CompAssignableToPawn_ShiftStand.SingleOwnerOnly), so a group
+            // list has nothing left to do. Said out loud, because a list of
+            // owners vanishing on a mode switch would otherwise read as a bug.
+            int cleared = parent.TryGetComp<CompAssignableToPawn_ShiftStand>()?.ClearGroupList() ?? 0;
+            if (cleared > 0)
+            {
+                Messages.Message("ShiftChange.ExcludedOwnersCleared".Translate(parent.LabelCap, cleared),
+                                 parent, MessageTypeDefOf.NeutralEvent, historical: false);
+            }
         }
 
         /// <summary>

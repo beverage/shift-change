@@ -25,9 +25,9 @@ namespace ShiftChange
     /// <summary>
     /// Harness cases for who a stand serves: owner lists, the owner dialog's
     /// filter, the copy of the owner list in another mod's assignable and the
-    /// one-time reconcile that set it up, the removal flag held off in
-    /// service, and the two gizmo-chain gates that must hand an untouched
-    /// sequence back.
+    /// one-time reconcile that set it up, the one-owner rule on a stand not
+    /// used for shift changes, the removal flag held off in service, and the
+    /// two gizmo-chain gates that must hand an untouched sequence back.
     ///
     /// <para>Split out of <see cref="DebugTools_LifecycleHarness"/> on
     /// 2026-09-15. These are separate TYPES rather than partials on purpose: a
@@ -302,6 +302,67 @@ namespace ShiftChange
                          "after the reconcile, a copy that drifted is rewritten from ours, never adopted");
 
             ours.TryUnassignPawn(a);
+            return ok;
+        }
+
+        /// <summary>
+        /// A stand set to "Not used for shift changes" holds one owner, and a
+        /// stand in shift use still holds a group.
+        ///
+        /// <para>Driven through all three places the rule lives: assigning on
+        /// such a stand replaces the owner, switching a group stand into that
+        /// mode clears the group, and a group list found there on spawn (what
+        /// an older save carries) is cleared by the step that runs the
+        /// reconcile. The control at the top matters as much as the rest: a
+        /// rule that capped every stand at one owner would pass everything
+        /// below it and break the group stands.</para>
+        /// </summary>
+        internal static bool ExcludedStandHoldsOneOwner(Fixture fix)
+        {
+            CompAssignableToPawn_ShiftStand ours =
+                fix.Stand.TryGetComp<CompAssignableToPawn_ShiftStand>();
+            if (ours == null)
+            {
+                return Expect(false, "the stand carries our assignable comp");
+            }
+
+            Pawn a = fix.Pawn;
+            Pawn b = SpawnExtra(fix, Gender.Female, "SoleB");
+            Pawn c = SpawnExtra(fix, Gender.Male, "SoleC");
+
+            fix.Comp.SetAutomatic();
+            ours.TryAssignPawn(a);
+            ours.TryAssignPawn(b);
+            bool ok = Expect(ours.AssignedPawnsForReading.Count == 2,
+                             "a stand in shift use still holds a group (control)")
+                    & Expect(!new Dialog_AssignStandOwners(ours).SingleOwner,
+                             "and its owner dialog is not in one-owner mode");
+
+            fix.Comp.SetExcluded();
+            ok &= Expect(ours.AssignedPawnsForReading.Count == 0,
+                         "switching it out of shift use clears the group");
+
+            ok &= Expect(new Dialog_AssignStandOwners(ours).SingleOwner,
+                         "the owner dialog runs in one-owner mode there");
+            ours.TryAssignPawn(a);
+            ours.TryAssignPawn(c);
+            ok &= Expect(Names(ours, c), "assigning a second colonist replaces the first");
+
+            fix.Comp.SetAutomatic();
+            ok &= Expect(Names(ours, c), "one owner survives going back into shift use");
+            fix.Comp.SetExcluded();
+            ok &= Expect(Names(ours, c), "and leaving it again");
+
+            // What an older save carries: a group already sitting on a stand in
+            // this mode. ForceAddPawn is the unconditional add the load and the
+            // reconcile write through, so it can stage one.
+            ours.ForceAddPawn(a);
+            ok &= Expect(ours.AssignedPawnsForReading.Count == 2,
+                         "a group list can still be staged on such a stand, as a save can carry one (control)");
+            ours.UnifyOwners();
+            ok &= Expect(ours.AssignedPawnsForReading.Count == 0, "and the next spawn clears it");
+
+            fix.Comp.SetAutomatic();
             return ok;
         }
 

@@ -60,7 +60,9 @@ borrower's civvies while they are on shift. Sped up 3–6×.*
      several and it serves that group and nobody outside it. Left unassigned,
      the stand is **shared**: any capable colonist may use whichever stand is
      free, like beds. A kitchen needs one stand per cook working at the
-     same time, not one stand per cook.
+     same time, not one stand per cook. A stand set to "Not used for shift
+     changes" belongs to one colonist instead, and switching a group stand
+     into that mode clears its list.
    - **The stand's switch**, labeled with what it currently dresses for
      ("Shift stand: doctoring", "Shift stand: recreation", "Not used for
      shift changes"), opens the checklist when the room's reading isn't what

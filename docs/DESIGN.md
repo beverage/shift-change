@@ -294,6 +294,17 @@ colonist handed its old owner a one-click vanilla swap there, which took the new
 owner's parked kit, and nothing on the stand could show or clear it. Hiding a
 control is only safe once nothing reads what it edits independently.
 
+**A stand not used for shift changes belongs to one colonist.** In that mode the
+owner drives nothing of ours; it only reaches the other mod's button through the
+copy, and that mod has one owner per stand, so a group list there only ever meant
+nobody got the button. The list therefore holds one colonist: `TryAssignPawn`
+replaces instead of adding, switching a group stand into the mode clears its list
+with a message (`SetExcluded`), and a group list found there on spawn is cleared
+silently. That last check runs on every spawn rather than once, because a save
+made on an earlier build of the copy already carries the reconcile marker. The
+cost is that a group stand switched out of shift use and back loses its group;
+shift stands keep theirs.
+
 Older saves reconcile once per stand, on first spawn, marked by a scribed flag
 (`shiftChangeOwnersUnified`, absent in any save that predates it). If only one
 list names anyone, it becomes the list. If both do and they disagree, the one the

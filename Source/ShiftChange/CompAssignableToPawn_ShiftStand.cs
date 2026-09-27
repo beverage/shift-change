@@ -125,10 +125,63 @@ namespace ShiftChange
         /// </summary>
         internal const int ForeignOwnerErrorKey = 0x53434F50;
 
+        /// <summary>
+        /// Adds an owner, or on a stand that is not used for shift changes
+        /// replaces the one it has (<see cref="SingleOwnerOnly"/>). Enforced
+        /// here rather than in the dialog, so every caller gets the same rule.
+        /// </summary>
         public override void TryAssignPawn(Pawn pawn)
         {
+            if (SingleOwnerOnly)
+            {
+                foreach (Pawn owner in AssignedPawnsForReading.ToList())
+                {
+                    if (owner != pawn)
+                    {
+                        base.TryUnassignPawn(owner);
+                    }
+                }
+            }
             base.TryAssignPawn(pawn);
             SyncForeignOwners();
+        }
+
+        /// <summary>
+        /// A stand set to "Not used for shift changes" belongs to one colonist.
+        ///
+        /// <para>In that mode the owner drives nothing of ours. All it still
+        /// reaches is another mod's per-pawn button through the copy, and
+        /// Outfit Stands Plus has one owner per stand, so a group list there
+        /// only ever meant that nobody got the button. The list therefore
+        /// holds one colonist: assigning replaces (<see cref="TryAssignPawn"/>),
+        /// switching a group stand into the mode clears its list
+        /// (<see cref="CompShiftStand.SetExcluded"/>), and a group list found
+        /// there on spawn, from a save made before the rule, is cleared by
+        /// <see cref="UnifyOwners"/>. Shift stands are untouched: several
+        /// owners there is a group stand, by design.</para>
+        /// </summary>
+        internal bool SingleOwnerOnly => parent.TryGetComp<CompShiftStand>()?.IsExcluded ?? false;
+
+        /// <summary>
+        /// Clears a list of two or more owners and leaves one owner, or none,
+        /// alone. Clears rather than keeping one of them, because a group list
+        /// names nobody in particular, so the player picks.
+        /// </summary>
+        /// <returns>How many owners were cleared.</returns>
+        internal int ClearGroupList()
+        {
+            List<Pawn> owners = AssignedPawnsForReading;
+            if (owners.Count <= 1)
+            {
+                return 0;
+            }
+            int cleared = owners.Count;
+            foreach (Pawn owner in owners.ToList())
+            {
+                base.TryUnassignPawn(owner);
+            }
+            SyncForeignOwners();
+            return cleared;
         }
 
         public override void TryUnassignPawn(Pawn pawn, bool sort = true, bool uninstall = false)
@@ -160,11 +213,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The reconcile if this stand has never had one, then the copy. Every
-        /// spawn comes through here (a load, a reinstall, a gravship landing),
-        /// so a copy that drifted while nothing was watching, whether through
-        /// another mod's own sweep or a save edited by hand, is simply
-        /// rewritten.
+        /// The reconcile if this stand has never had one, the one-owner rule on
+        /// a stand not used for shift changes, then the copy. Every spawn comes
+        /// through here (a load, a reinstall, a gravship landing), so a copy
+        /// that drifted while nothing was watching, whether through another
+        /// mod's own sweep or a save edited by hand, is simply rewritten.
         /// </summary>
         internal void UnifyOwners()
         {
@@ -172,6 +225,15 @@ namespace ShiftChange
             {
                 ReconcileForeignOwners();
                 ownersUnified = true;
+            }
+            // Every spawn, not only the first. A stand switched out of shift
+            // use before the one-owner rule existed kept its group list, and
+            // the reconcile marker cannot tell those stands apart: a save made
+            // on an earlier build of this rule already carries it. Silent,
+            // because in that mode the list drove nothing.
+            if (SingleOwnerOnly)
+            {
+                ClearGroupList();
             }
             SyncForeignOwners();
         }

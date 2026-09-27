@@ -32,6 +32,13 @@ namespace ShiftChange
     /// the hat. Restricting by hand is fine for four colonists and prohibitive
     /// for forty, which is what <see cref="Filter"/> and Assign all shown are
     /// for: two clicks to make a stand the women's stand.</para>
+    ///
+    /// <para><b>One owner on a stand not used for shift changes.</b> There
+    /// the list holds one colonist
+    /// (<see cref="CompAssignableToPawn_ShiftStand.SingleOwnerOnly"/>), so
+    /// Assign replaces the current owner, which the comp enforces, and Assign
+    /// all is not drawn. The gender tabs stay: they still help find one
+    /// colonist in a long list.</para>
     /// </summary>
     public class Dialog_AssignStandOwners : Window
     {
@@ -78,6 +85,10 @@ namespace ShiftChange
                 default: return true;
             }
         }
+
+        /// <summary>The stand holds one owner; see the class summary.</summary>
+        internal bool SingleOwner =>
+            (assignable as CompAssignableToPawn_ShiftStand)?.SingleOwnerOnly ?? false;
 
         internal List<Pawn> Candidates()
         {
@@ -165,6 +176,12 @@ namespace ShiftChange
                 SoundDefOf.Click.PlayOneShotOnCamera();
             }
 
+            // Assigning everyone shown onto a one-owner stand would replace
+            // each owner with the next and leave the last name in the list.
+            if (SingleOwner)
+            {
+                return;
+            }
             string allLabel = "ShiftChange.AssignAllShown".Translate(shown.Count);
             float allWidth = Text.CalcSize(allLabel).x + ButtonPadding;
             Rect all = new Rect(clear.xMin - allWidth - 8f, rect.y, allWidth, 30f);

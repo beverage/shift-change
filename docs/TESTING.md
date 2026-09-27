@@ -185,6 +185,12 @@ drives the one-time reconcile through each arm of its rule, and ends on the arm
 that makes it one-time: once reconciled, a copy that drifted is rewritten, never
 adopted.
 
+One more covers the one-owner rule on a stand not used for shift changes, through
+all three places it lives: assigning there replaces the owner, switching a group
+stand into that mode clears the group, and a group list found there on spawn is
+cleared. A group stand in shift use is the control, since a rule that capped every
+stand at one owner would pass the rest.
+
 **Round-trip cases** save the game, load it back through the engine's own
 synchronous loader, and assert on what came out. There are three: a plain trip
 that carries the owner, the ledger and the forced flags, and that also stages
