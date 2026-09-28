@@ -60,7 +60,11 @@ borrower's civvies while they are on shift. Sped up 3–6×.*
      several and it serves that group and nobody outside it. Left unassigned,
      the stand is **shared**: any capable colonist may use whichever stand is
      free, like beds. A kitchen needs one stand per cook working at the
-     same time, not one stand per cook.
+     same time, not one stand per cook. A stand set to "Not used for shift
+     changes" belongs to one colonist instead: assigning someone there
+     replaces the list. A group stand switched into that mode keeps its group
+     until you assign someone, so switching it back finds the group as you
+     left it.
    - **The stand's switch**, labeled with what it currently dresses for
      ("Shift stand: doctoring", "Shift stand: recreation", "Not used for
      shift changes"), opens the checklist when the room's reading isn't what
@@ -286,14 +290,15 @@ The kid outfit stand (Biotech) is not used, by design.
 ## Mod compatibility
 
 **[Outfit Stands Plus](https://steamcommunity.com/workshop/filedetails/?id=3545172389)**
-works alongside this mod, in either load order (tested with both). The two
-divide a stand cleanly: its mechanized and mending stands are full shift
-stands here (shift changes run at their boosted swap speeds, and the mending
-stand repairs a borrower's parked clothes while they work), and each stand
-shows exactly one Set owner control: this mod's while the stand is in
-service, theirs when the stand is set to "Not used for shift changes". Its
-wardrobe features, its "allow adding items" toggle and its research are all
-untouched.
+works alongside this mod, in either load order (tested with both). Its
+mechanized and mending stands are full shift stands here: shift changes run at
+their boosted swap speeds, and the mending stand repairs a borrower's parked
+clothes while they work. Every stand has one owner list, set with this mod's
+Set owner whether or not the stand is used for shift changes, and Outfit Stands
+Plus follows it. A stand with exactly one owner gives that colonist the Outfit
+Stands Plus button for it (equip outfit, or return to stand); a stand with
+several owners, or none, gives that button to nobody. Its wardrobe features,
+its "allow adding items" toggle and its research are all untouched.
 
 Two of its behaviors are worth knowing about, because they can look like
 faults here: it switches off its own "allow adding items" after a manual

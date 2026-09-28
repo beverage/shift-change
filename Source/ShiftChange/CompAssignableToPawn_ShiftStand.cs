@@ -14,11 +14,22 @@ namespace ShiftChange
     /// and owns its own scribing (see <see cref="PostExposeData"/>: the
     /// base's generic keys collide with Outfit Stands Plus' sibling comp).
     ///
-    /// <c>maxAssignedPawnsCount</c> stays at its default of 1, and that is not
-    /// merely tidiness — <c>Building_OutfitStand.HasRoomForApparelOfDef</c> is a
-    /// conflict check rather than a count (<c>:332-342</c>), so a stand holds
-    /// exactly one outfit's worth. Two owners could not both park their clothes
-    /// in it even if we let them.
+    /// <para><b>One owner list per stand, and it is this one.</b> Another mod's
+    /// assignable comp on the same building (Outfit Stands Plus adds one) used
+    /// to keep a list of its own here. It was hidden behind our Set owner while
+    /// the stand did shift work, but it stayed live everywhere that mod reads
+    /// it: its per-pawn "equip outfit" / "return to stand" button and its
+    /// inspect line. A stale owner there sent a colonist to swap another
+    /// colonist's parked kit, and nothing on the stand could show or clear it.
+    /// So that comp now holds a copy of this list
+    /// (<see cref="SyncForeignOwners"/>), in both modes, and its own Set owner
+    /// is hidden everywhere this comp is present.</para>
+    ///
+    /// <para>The owner list is a SET (the XML raises
+    /// <c>maxAssignedPawnsCount</c> to 1000), but the stand still holds one
+    /// outfit: <c>Building_OutfitStand.HasRoomForApparelOfDef</c> is a conflict
+    /// check rather than a count (<c>:332-342</c>), so owners take turns and the
+    /// ledger has one borrower at a time.</para>
     /// </summary>
     public class CompAssignableToPawn_ShiftStand : CompAssignableToPawn
     {
@@ -31,7 +42,7 @@ namespace ShiftChange
                     return Enumerable.Empty<Pawn>();
                 }
 
-                IEnumerable<Pawn> colonists = parent.Map.mapPawns.FreeColonists;
+                IEnumerable<Pawn> colonists = WithinForeignCandidates(parent.Map.mapPawns.FreeColonists);
                 List<WorkTypeDef> works = parent.TryGetComp<CompShiftStand>()?.WorkTypes;
                 if (works == null || works.Count == 0)
                 {
@@ -91,10 +102,319 @@ namespace ShiftChange
             return false;
         }
 
+        /// <summary>
+        /// Whether this stand's owner list has been reconciled with a foreign
+        /// assignable's since the single-list model arrived. The reconcile runs
+        /// once per stand and never again: after it, this list is the only
+        /// authority, and a foreign list that differs is drift to overwrite
+        /// rather than a player's choice to adopt.
+        ///
+        /// <para>True from construction, so a stand built under this version
+        /// never reconciles; the scribe default is false, so every stand in an
+        /// older save loads needing it. That pairing is the whole migration
+        /// switch. <c>Scribe_Values</c> hands the default back when the node is
+        /// absent and omits the node whenever the value matches it
+        /// (<c>Scribe_Values.cs:70-78,88</c>), so the only value ever written
+        /// is true.</para>
+        /// </summary>
+        internal bool ownersUnified = true;
+
+        /// <summary>
+        /// Keys <c>Log.ErrorOnce</c> per foreign comp type, so a mod whose
+        /// override throws is reported once rather than on every assignment.
+        /// </summary>
+        internal const int ForeignOwnerErrorKey = 0x53434F50;
+
+        /// <summary>
+        /// Adds an owner, in both modes. The base puts a reinstalled stand's
+        /// parked owners back through this call one at a time
+        /// (<c>CompAssignableToPawn.PostSpawnSetup</c>, <c>:208-220</c>), so a
+        /// version that replaced here brought a group kept out of shift use back
+        /// from a move as its last member. The one-owner pick is
+        /// <see cref="AssignSoleOwner"/>.
+        /// </summary>
+        public override void TryAssignPawn(Pawn pawn)
+        {
+            base.TryAssignPawn(pawn);
+            SyncForeignOwners();
+        }
+
+        /// <summary>
+        /// The pick on a stand not used for shift changes:
+        /// <paramref name="pawn"/> becomes the only owner, replacing the whole
+        /// list, a group kept from shift use included. The owner dialog's
+        /// Assign calls it in that mode (<see cref="Dialog_AssignStandOwners.Assign"/>).
+        /// </summary>
+        internal void AssignSoleOwner(Pawn pawn)
+        {
+            foreach (Pawn owner in AssignedPawnsForReading.ToList())
+            {
+                if (owner != pawn)
+                {
+                    base.TryUnassignPawn(owner);
+                }
+            }
+            TryAssignPawn(pawn);
+        }
+
+        /// <summary>
+        /// A stand set to "Not used for shift changes" is assigned to one
+        /// colonist at a time.
+        ///
+        /// <para>In that mode the owner drives nothing of ours. All it still
+        /// reaches is another mod's per-pawn button through the copy, and
+        /// Outfit Stands Plus has one owner per stand, so the owner dialog there
+        /// picks one colonist: its Assign replaces the whole list
+        /// (<see cref="AssignSoleOwner"/>) and Assign all is not drawn.</para>
+        ///
+        /// <para>A group the stand had in shift use is KEPT, because the switch
+        /// is one click, or one untick of the last trigger, away from any
+        /// ordinary edit of a configured group stand. Switching leaves the list
+        /// alone (<see cref="CompShiftStand.SetExcluded"/>), nothing clears it on
+        /// load, and a reinstall puts it back whole, which is why
+        /// <see cref="TryAssignPawn"/> never replaces. While kept, the group fits
+        /// no foreign slot, so the copy is empty and nobody gets the other mod's
+        /// button until the player picks one colonist or puts the stand back
+        /// into shift use. Shift stands are untouched: several owners there is a
+        /// group stand, by design.</para>
+        /// </summary>
+        internal bool SingleOwnerOnly => parent.TryGetComp<CompShiftStand>()?.IsExcluded ?? false;
+
+        public override void TryUnassignPawn(Pawn pawn, bool sort = true, bool uninstall = false)
+        {
+            base.TryUnassignPawn(pawn, sort, uninstall);
+            SyncForeignOwners();
+        }
+
+        public override void ForceAddPawn(Pawn pawn)
+        {
+            base.ForceAddPawn(pawn);
+            SyncForeignOwners();
+        }
+
+        public override void ForceRemovePawn(Pawn pawn)
+        {
+            base.ForceRemovePawn(pawn);
+            SyncForeignOwners();
+        }
+
+        public override void PostSpawnSetup(bool respawningAfterLoad)
+        {
+            // The base restores a reinstalled stand's owners first, through
+            // TryAssignPawn, and SyncForeignOwners stays idle until the
+            // reconcile below has run, so the foreign list is still exactly as
+            // the save left it when the reconcile reads it.
+            base.PostSpawnSetup(respawningAfterLoad);
+            UnifyOwners();
+        }
+
+        /// <summary>
+        /// The reconcile if this stand has never had one, then the copy. Every
+        /// spawn comes through here (a load, a reinstall, a gravship landing),
+        /// so a copy that drifted while nothing was watching, whether through
+        /// another mod's own sweep or a save edited by hand, is simply
+        /// rewritten.
+        /// </summary>
+        internal void UnifyOwners()
+        {
+            if (!ownersUnified)
+            {
+                ReconcileForeignOwners();
+                ownersUnified = true;
+            }
+            SyncForeignOwners();
+        }
+
+        /// <summary>
+        /// The one-time reconcile for a stand from an older save, where the two
+        /// lists were independent. If only one of them has owners, it becomes
+        /// THE list. If both do and they disagree, the one the player could see
+        /// wins: this one on a stand in shift use, where the foreign Set owner
+        /// was hidden, and the foreign one on a stand set to "Not used for
+        /// shift changes", where ours was.
+        ///
+        /// <para>Adopting a foreign owner onto a shift stand whose own list is
+        /// empty turns a pooled stand into an owned one. That owner was already
+        /// live on the other mod's button, so adoption makes it visible and
+        /// editable rather than inventing it. The same rule keeps the
+        /// assignments of anyone who used Outfit Stands Plus before this mod:
+        /// their stands would otherwise load pooled, open to any capable
+        /// colonist while somebody's own clothes sit inside. It also recovers
+        /// the one case the key migration in <see cref="PostExposeData"/> gave
+        /// up on.</para>
+        /// </summary>
+        internal void ReconcileForeignOwners()
+        {
+            List<Pawn> theirs = null;
+            List<ThingComp> comps = parent.AllComps;
+            for (int i = 0; i < comps.Count && theirs == null; i++)
+            {
+                if (comps[i] is CompAssignableToPawn foreign && !(foreign is CompAssignableToPawn_ShiftStand))
+                {
+                    List<Pawn> adoptable = foreign.AssignedPawnsForReading.Where(Adoptable).ToList();
+                    if (adoptable.Count > 0)
+                    {
+                        theirs = adoptable;
+                    }
+                }
+            }
+            if (theirs == null)
+            {
+                return;
+            }
+            List<Pawn> ours = AssignedPawnsForReading;
+            bool agree = ours.Count == theirs.Count && theirs.All(ours.Contains);
+            bool excluded = parent.TryGetComp<CompShiftStand>()?.IsExcluded ?? false;
+            if (agree || (ours.Count > 0 && !excluded))
+            {
+                return;
+            }
+            // Through the overrides rather than the list: they sort as the
+            // base does, and their sync is a no-op until ownersUnified is set.
+            foreach (Pawn pawn in ours.ToList())
+            {
+                ForceRemovePawn(pawn);
+            }
+            foreach (Pawn pawn in theirs)
+            {
+                ForceAddPawn(pawn);
+            }
+        }
+
+        /// <summary>
+        /// Who the reconcile may adopt. Nothing ever reaped a foreign list
+        /// before the copy existed (vanilla's unclaim does not reach stands,
+        /// and our reaper cleared only this comp), so it can still name a
+        /// colonist who has since died or left. Those stay behind.
+        /// </summary>
+        internal static bool Adoptable(Pawn pawn)
+        {
+            return pawn != null && !pawn.Dead && !pawn.Destroyed && pawn.IsColonist;
+        }
+
+        /// <summary>
+        /// Writes this list into every foreign assignable on the stand when it
+        /// fits that comp's capacity, and empties it otherwise.
+        ///
+        /// <para>Through the base class's <c>ForceAddPawn</c> and
+        /// <c>ForceRemovePawn</c>, never the foreign <c>TryAssignPawn</c>:
+        /// Outfit Stands Plus overrides that one with a sweep that unassigns
+        /// the pawn from every other stand on the map, and a colonist here
+        /// routinely owns several. No foreign type is named, so any mod's
+        /// assignable gets the same treatment.</para>
+        ///
+        /// <para>"Fits" is <c>TotalSlots</c>, which Outfit Stands Plus leaves at
+        /// vanilla's default of one. One owner makes a personal stand in that
+        /// mod's model, and its button and inspect line should name that
+        /// owner. A shared or unowned stand has no single owner to name, and an
+        /// empty copy keeps its button off the stand altogether.</para>
+        ///
+        /// <para>Idle until the first-load reconcile has run
+        /// (<see cref="ownersUnified"/>). The base comp restores a reinstalled
+        /// stand's owners through <see cref="TryAssignPawn"/> before
+        /// <see cref="PostSpawnSetup"/> reaches the reconcile, and a copy written
+        /// then would erase the foreign list the reconcile has to read.</para>
+        /// </summary>
+        internal void SyncForeignOwners()
+        {
+            if (!ownersUnified || parent == null)
+            {
+                return;
+            }
+            List<ThingComp> comps = parent.AllComps;
+            for (int i = 0; i < comps.Count; i++)
+            {
+                if (!(comps[i] is CompAssignableToPawn foreign) || foreign is CompAssignableToPawn_ShiftStand)
+                {
+                    continue;
+                }
+                try
+                {
+                    CopyOwnersInto(foreign);
+                }
+                catch (System.Exception e)
+                {
+                    // Their override threw. Our own assignment has already
+                    // happened and stands; a copy that failed only leaves their
+                    // button where it was.
+                    Log.ErrorOnce("[ShiftChange] could not copy a stand's owners into "
+                                  + foreign.GetType().FullName + ": " + e,
+                                  ForeignOwnerErrorKey ^ foreign.GetType().GetHashCode());
+                }
+            }
+        }
+
+        internal void CopyOwnersInto(CompAssignableToPawn foreign)
+        {
+            List<Pawn> ours = AssignedPawnsForReading;
+            bool fits = ours.Count > 0 && ours.Count <= foreign.TotalSlots;
+            List<Pawn> theirs = foreign.AssignedPawnsForReading;
+            List<Pawn> stale = null;
+            for (int i = 0; i < theirs.Count; i++)
+            {
+                if (!fits || !ours.Contains(theirs[i]))
+                {
+                    (stale ?? (stale = new List<Pawn>())).Add(theirs[i]);
+                }
+            }
+            if (stale != null)
+            {
+                for (int i = 0; i < stale.Count; i++)
+                {
+                    foreign.ForceRemovePawn(stale[i]);
+                }
+            }
+            if (!fits)
+            {
+                return;
+            }
+            for (int i = 0; i < ours.Count; i++)
+            {
+                if (!theirs.Contains(ours[i]))
+                {
+                    foreign.ForceAddPawn(ours[i]);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Narrows <paramref name="pawns"/> to the ones every foreign assignable
+        /// on this stand would offer itself. With our Set owner the only one on
+        /// the stand, the other mod's eligibility rules (Outfit Stands Plus keeps
+        /// adult and child stands apart) would otherwise be lost, and the copy
+        /// would hand it an owner it never accepts.
+        /// </summary>
+        internal IEnumerable<Pawn> WithinForeignCandidates(IEnumerable<Pawn> pawns)
+        {
+            List<ThingComp> comps = parent.AllComps;
+            for (int i = 0; i < comps.Count; i++)
+            {
+                if (!(comps[i] is CompAssignableToPawn foreign) || foreign is CompAssignableToPawn_ShiftStand)
+                {
+                    continue;
+                }
+                HashSet<Pawn> allowed;
+                try
+                {
+                    allowed = new HashSet<Pawn>(foreign.AssigningCandidates);
+                }
+                catch (System.Exception e)
+                {
+                    Log.ErrorOnce("[ShiftChange] could not read a stand's candidates from "
+                                  + foreign.GetType().FullName + ": " + e,
+                                  ForeignOwnerErrorKey ^ foreign.GetType().GetHashCode() ^ 1);
+                    continue;
+                }
+                pawns = pawns.Where(allowed.Contains);
+            }
+            return pawns;
+        }
+
         public override void PostExposeData()
         {
             Scribe_Collections.Look(ref assignedPawns, "shiftChangeAssignedPawns", LookMode.Reference);
             Scribe_Collections.Look(ref uninstalledAssignedPawns, "shiftChangeUninstalledAssignedPawns", LookMode.Reference);
+            Scribe_Values.Look(ref ownersUnified, "shiftChangeOwnersUnified", defaultValue: false);
             if (Scribe.mode == LoadSaveMode.LoadingVars)
             {
                 // Decide the migration HERE, and only here. LoadingVars is
@@ -112,11 +432,11 @@ namespace ShiftChange
                 // comp's live data, not our legacy format. Missing prefixed
                 // keys there mean this comp is simply NEW on this stand:
                 // start empty, read nothing, and their comp loads its owner
-                // in peace. (The one edge given up: a save from the four
-                // pre-v1.0.2 days with BOTH mods and an owner set through
-                // us — the foreign comp shows that owner instead, and one
-                // manual re-assign recovers it. Clean first loads for every
-                // adopter outrank it.)
+                // in peace. (The one edge this gives up, a save from the four
+                // pre-v1.0.2 days with BOTH mods and an owner set through us,
+                // is recovered on first spawn anyway: ReconcileForeignOwners
+                // adopts the foreign list when ours is empty, and that list
+                // holds exactly that owner.)
                 bool contested = ForeignAssignableBesideUs();
                 migrateAssigned = assignedPawns == null && !contested;
                 migrateUninstalled = uninstalledAssignedPawns == null && !contested;
@@ -207,17 +527,11 @@ namespace ShiftChange
         /// </summary>
         public override IEnumerable<Gizmo> CompGetGizmosExtra()
         {
-            // One Set owner per stand: a stand declared "Not used for shift
-            // changes" that carries another mod's assignable comp is that
-            // mod's stand — our owner control yields to theirs there, and
-            // Patch_ForeignOwnerGizmos hides theirs on stands declared ours.
-            // The declaration, never a room inference, picks the surface;
-            // without a foreign assignable present nothing is hidden.
-            CompShiftStand shift = parent.TryGetComp<CompShiftStand>();
-            if (shift != null && shift.IsExcluded && ForeignAssignableBesideUs())
-            {
-                yield break;
-            }
+            // One Set owner per stand, and it is this one in both modes. The
+            // list it edits is the stand's only owner list; another mod's
+            // assignable holds a copy of it (SyncForeignOwners), and
+            // Patch_ForeignOwnerGizmos hides that mod's own Set owner wherever
+            // this comp is present, so the two cannot drift apart again.
             foreach (Gizmo gizmo in base.CompGetGizmosExtra())
             {
                 // The base comp hardcodes Misc4 (N) on the assignment gizmo
@@ -261,9 +575,11 @@ namespace ShiftChange
             CompShiftStand shift = parent.TryGetComp<CompShiftStand>();
             if (shift != null && shift.IsExcluded)
             {
-                // Declared not-ours: whatever owner overlay this stand shows
-                // belongs to the mod that owns it now; a dormant name from
-                // our ledger would draw beside it as a second label.
+                // Not used for shift changes, so there is no borrower to name.
+                // Where another mod's assignable shares the stand, it draws the
+                // owner from its copy of this list and ours would print the
+                // same name twice; a stand with no such comp has never had a
+                // label from us in this mode.
                 return;
             }
             Pawn borrower = shift?.Borrower;
@@ -292,12 +608,16 @@ namespace ShiftChange
                 return "ShiftChange.OwnerGizmoLabelMany".Translate(assigned.Count);
             }
             // With pooling off an unassigned stand is not "shared", it is
-            // simply unowned — vanilla's own "Set owner" says that best.
+            // simply unowned — vanilla's own "Set owner" says that best. So is
+            // a stand not used for shift changes, which pools nothing whatever
+            // the setting says; now that the owner control no longer yields to
+            // another mod's there, this is the label a wardrobe stand shows.
             // Inlined rather than base.GetAssignmentGizmoLabel(): the base is
             // PROTECTED (CompAssignableToPawn.cs:154-156), and hot-swapped
             // bodies on the twin type cannot pass the protected-access check
             // — the same failure Window.Margin produced (2026-08-08).
-            return ShiftChangeMod.PoolingEnabled
+            CompShiftStand shift = parent.TryGetComp<CompShiftStand>();
+            return ShiftChangeMod.PoolingEnabled && (shift == null || !shift.IsExcluded)
                 ? "ShiftChange.PoolGizmoLabel".Translate()
                 : "CommandThingSetOwnerLabel".Translate();
         }
@@ -305,6 +625,13 @@ namespace ShiftChange
         protected override string GetAssignmentGizmoDesc()
         {
             CompShiftStand comp = parent.TryGetComp<CompShiftStand>();
+            if (comp != null && comp.IsExcluded)
+            {
+                // Its owners drive nothing of ours in this mode. What they
+                // still reach is another mod's per-pawn buttons, through the
+                // copy, and nothing else on the stand says so.
+                return "ShiftChange.AssignDescExcluded".Translate();
+            }
             // The inert test must match CompInspectStringExtra's: a
             // recreation-only or sleep-only stand has ZERO work types by
             // design (the trigger-only guard in CompShiftStand.WorkTypes), and

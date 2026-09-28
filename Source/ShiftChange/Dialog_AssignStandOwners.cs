@@ -32,6 +32,14 @@ namespace ShiftChange
     /// the hat. Restricting by hand is fine for four colonists and prohibitive
     /// for forty, which is what <see cref="Filter"/> and Assign all shown are
     /// for: two clicks to make a stand the women's stand.</para>
+    ///
+    /// <para><b>One owner on a stand not used for shift changes.</b> There
+    /// Assign is a pick (<see cref="Assign"/>,
+    /// <see cref="CompAssignableToPawn_ShiftStand.SingleOwnerOnly"/>): the
+    /// colonist replaces the whole list, a group kept from shift use included,
+    /// and Assign all is not drawn. Unassign and Remove all owners work as
+    /// anywhere else. The gender tabs stay: they still help find one colonist
+    /// in a long list.</para>
     /// </summary>
     public class Dialog_AssignStandOwners : Window
     {
@@ -76,6 +84,27 @@ namespace ShiftChange
                 case Filter.Male: return pawn.gender == Gender.Male;
                 case Filter.Female: return pawn.gender == Gender.Female;
                 default: return true;
+            }
+        }
+
+        /// <summary>Assign is a pick here; see the class summary.</summary>
+        internal bool SingleOwner =>
+            (assignable as CompAssignableToPawn_ShiftStand)?.SingleOwnerOnly ?? false;
+
+        /// <summary>
+        /// What a row's Assign button does: on a stand not used for shift
+        /// changes, make <paramref name="pawn"/> the only owner; everywhere
+        /// else, add them to the list.
+        /// </summary>
+        internal void Assign(Pawn pawn)
+        {
+            if (SingleOwner)
+            {
+                ((CompAssignableToPawn_ShiftStand)assignable).AssignSoleOwner(pawn);
+            }
+            else
+            {
+                assignable.TryAssignPawn(pawn);
             }
         }
 
@@ -165,6 +194,13 @@ namespace ShiftChange
                 SoundDefOf.Click.PlayOneShotOnCamera();
             }
 
+            // Not drawn where Assign is a pick. A group built out of shift use
+            // would drive nothing of ours and fit no Outfit Stands Plus slot,
+            // so it would reach nobody at all.
+            if (SingleOwner)
+            {
+                return;
+            }
             string allLabel = "ShiftChange.AssignAllShown".Translate(shown.Count);
             float allWidth = Text.CalcSize(allLabel).x + ButtonPadding;
             Rect all = new Rect(clear.xMin - allWidth - 8f, rect.y, allWidth, 30f);
@@ -236,7 +272,7 @@ namespace ShiftChange
                 }
                 else
                 {
-                    assignable.TryAssignPawn(pawn);
+                    Assign(pawn);
                 }
                 SoundDefOf.Click.PlayOneShotOnCamera();
             }

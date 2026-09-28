@@ -1,0 +1,11 @@
+v1.4.7 update:
+
+Fixes Outfit Stands Plus sending a colonist to someone else's stand.
+
+With both mods installed, each stand kept two owner lists, and only one of them had a Set owner button at a time. An owner set through Outfit Stands Plus before the stand went into shift use stayed on its hidden list and kept that mod's "equip outfit" button for the stand. One click swapped out the new owner's parked kit, and nothing on the stand could show or clear the old entry.
+
+Each stand now has one owner list, this mod's, and Outfit Stands Plus follows it. A colonist who is a stand's only owner gets the Outfit Stands Plus button for it; a stand shared by several colonists gives it to nobody. Older saves merge the two lists once when they load, and where they disagreed, the one you could see wins.
+
+On a stand set to "Not used for shift changes", Set owner now picks one colonist. A group stand switched into that mode keeps its owners for when you switch it back.
+
+Without Outfit Stands Plus, that last change is the only difference.

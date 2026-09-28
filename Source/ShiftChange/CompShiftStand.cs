@@ -595,6 +595,13 @@ namespace ShiftChange
             recreationOverride = false;
             restOverride = false;
             workTypeOverrides?.Clear();
+            // Owners are left alone. A group list waits here for the stand to
+            // go back into shift use, and picking one colonist while it is out
+            // of shift use is what replaces it
+            // (CompAssignableToPawn_ShiftStand.SingleOwnerOnly). Unticking the
+            // last work type, Recreation or Sleeping lands here too, so
+            // clearing owners on this path would cost a configured group on an
+            // ordinary edit.
         }
 
         /// <summary>

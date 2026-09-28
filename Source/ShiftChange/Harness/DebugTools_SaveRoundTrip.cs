@@ -194,12 +194,27 @@ namespace ShiftChange
             // Asserted on the file before anything is read back: comp state
             // cannot distinguish a value that scribed correctly from one that
             // never left the object.
+            //
+            // The generic key is not ours to write, but it is not empty either
+            // once another mod's assignable shares the stand (Outfit Stands
+            // Plus puts one on the vanilla stand): that comp saves under it,
+            // and it holds a copy of a single owner. So the owner appears
+            // there once per foreign comp and never more. One more is OUR comp
+            // writing the generic key, which is the regression this guards; on
+            // a list with no foreign assignable the expected count is zero.
+            int foreignCopies = fix.Stand.AllComps.OfType<CompAssignableToPawn>()
+                .Count(c => !(c is CompAssignableToPawn_ShiftStand));
+            int genericHits = NodeBodies(saved, LegacyKey).Count(body => body.Contains(ownerLoadID));
             bool ok = DebugTools_LifecycleHarness.Expect(
                     NodeContains(saved, OurKey, ownerLoadID),
                     "the save carries the owner under " + OurKey)
                 & DebugTools_LifecycleHarness.Expect(
-                    !NodeContains(saved, LegacyKey, ownerLoadID),
-                    "and not under the generic " + LegacyKey);
+                    genericHits == foreignCopies,
+                    foreignCopies == 0
+                        ? "and not under the generic " + LegacyKey
+                        : "and under the generic " + LegacyKey
+                          + " only as the foreign comp's copy (" + genericHits
+                          + " found, " + foreignCopies + " expected)");
 
             SavedGameLoaderNow.LoadGameFromSaveFileNow(SaveName);
 
@@ -342,8 +357,9 @@ namespace ShiftChange
         // ------------------------------------------------------------ leg 3
 
         /// <summary>
-        /// Asserts a stand carrying another mod's assignable comp round-trips
-        /// that mod's owner untouched, and that ours stays empty.
+        /// Asserts a stand from an older save, carrying another mod's assignable
+        /// comp with an owner of its own, round-trips that owner without a
+        /// contest and adopts it into ours.
         ///
         /// <para>Comps scribe flat into the thing's node, so two
         /// <c>CompAssignableToPawn</c> instances on one building write the same
@@ -352,6 +368,13 @@ namespace ShiftChange
         /// to read that key when a foreign assignable is present; this case
         /// asserts declining leaves no trace — no duplicate registration, no
         /// failed take, no unconsumed load-ids.</para>
+        ///
+        /// <para>The save is staged in the shape one from before the copy
+        /// carries: the foreign comp holds an owner ours does not, and our
+        /// reconciled marker is off, so it is never written. On the way back in,
+        /// the first spawn's reconcile finds the foreign list the only one with
+        /// an owner and adopts it, and the copy then leaves the foreign list as
+        /// it was.</para>
         ///
         /// <para><c>ForeignAssignableBesideUs</c> excludes only our own
         /// subclass, so a plain <c>CompAssignableToPawn</c> serves as the
@@ -434,7 +457,12 @@ namespace ShiftChange
                     return false;
                 }
 
+                // An owner set through the foreign comp's own call, which no
+                // override of ours sees, and the reconciled marker switched
+                // off: together, the shape a stand from before the copy loads
+                // with.
                 foreign.TryAssignPawn(fix.Pawn);
+                ours.ownersUnified = false;
                 string ownerLoadID = fix.Pawn.GetUniqueLoadID();
                 IntVec3 standCell = fix.Stand.Position;
 
@@ -498,8 +526,12 @@ namespace ShiftChange
                             && p.GetUniqueLoadID() == ownerLoadID),
                         "their owner survived intact")
                     & DebugTools_LifecycleHarness.Expect(
-                        loadedOurs.AssignedPawnsForReading.Count == 0,
-                        "and ours did not adopt it");
+                        loadedOurs.AssignedPawnsForReading.Any(p => p != null
+                            && p.GetUniqueLoadID() == ownerLoadID),
+                        "and ours adopted it, the only owner either list had")
+                    & DebugTools_LifecycleHarness.Expect(
+                        loadedOurs.ownersUnified,
+                        "and the stand is marked reconciled, so it never adopts again");
             }
             finally
             {

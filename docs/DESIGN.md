@@ -273,6 +273,51 @@ model, and the answer to "a kitchen has eight possible cooks": you need one stan
 per *concurrent* cook. An assigned stand is reserved for its owner. A mod setting
 (default on) turns pooling off globally.
 
+**One owner list per stand, and it is ours.** A stand can carry a second
+`CompAssignableToPawn`: Outfit Stands Plus adds one, and nothing stops another mod
+doing the same. That comp holds a copy of our list, written through the base
+class's `ForceAddPawn` / `ForceRemovePawn` whenever ours changes and on every
+spawn: our owners when they fit its `TotalSlots`, nothing otherwise. Never through
+its `TryAssignPawn`, which Outfit Stands Plus overrides with a sweep that
+unassigns the pawn from every other stand. Its capacity is one slot, so a
+personal stand's single owner gets its per-pawn "equip outfit / return to stand"
+button, and a shared or pooled stand gives that button to nobody. Its own Set
+owner is hidden on every stand carrying our comp, in both modes, and our
+candidate list is narrowed to the pawns its own would offer, which keeps its
+adult/child split.
+
+The copy replaced two independent lists, and why is worth keeping. The foreign
+Set owner used to be hidden only while a stand was in shift use, with its list
+left in place behind the hidden control. That list still drove the other mod's
+button and inspect line. A stale entry on a stand since given to another
+colonist handed its old owner a one-click vanilla swap there, which took the new
+owner's parked kit, and nothing on the stand could show or clear it. Hiding a
+control is only safe once nothing reads what it edits independently.
+
+**A stand not used for shift changes is assigned one colonist at a time.** In
+that mode the owner drives nothing of ours; it only reaches the other mod's button
+through the copy, and that mod has one owner per stand. So the owner dialog there
+picks: its Assign makes the colonist the only owner (`AssignSoleOwner`), and
+Assign all is not drawn. `TryAssignPawn` itself adds in both modes, because the
+base restores a reinstalled stand's parked owners through it one at a time, and a
+replacing override brought a kept group back from a move as its last member.
+
+A group stand switched into that mode keeps its group. The row is one click from
+any configured group stand, and unticking its last work type, Recreation or
+Sleeping lands in the same state, so the first build of this rule, which cleared
+the list there (with a message, plus a silent trim on every spawn), cost a
+configured group on an ordinary edit, and was withdrawn before release (decided
+2026-09-27). While kept, the group fits no foreign slot, so
+the copy is empty and nobody gets the other mod's button until the player picks
+one colonist or switches the stand back.
+
+Older saves reconcile once per stand, on first spawn, marked by a scribed flag
+(`shiftChangeOwnersUnified`, absent in any save that predates it). If only one
+list names anyone, it becomes the list. If both do and they disagree, the one the
+player could see wins: ours on a stand in shift use, theirs on a stand set to
+"Not used for shift changes". After that ours is the only authority, and a copy
+that drifts is rewritten, never adopted.
+
 **The borrower, not the owner, is the ledger's truth.** The comp records, scribed
 by reference: the borrower, the garments they parked, the garments they took, and
 which parked garments were force-worn at check-in. Rebuilding the return trip

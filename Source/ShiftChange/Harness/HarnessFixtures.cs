@@ -41,15 +41,50 @@ namespace ShiftChange
         /// A spare colonist on the pad, registered for teardown. Bare of work
         /// types on purpose: the assignable comp offers every colonist when the
         /// stand has resolved none, which is what these cases want to test.
+        ///
+        /// <para>Retried like a fixture build (<see cref="BuildAttempts"/>), and
+        /// for the same reason: on a large mod list, spawning a fresh pawn
+        /// sometimes throws <c>Collection was modified</c> in
+        /// <c>Pawn_HealthTracker.Notify_Spawned</c>, under third-party postfixes on
+        /// <c>Pawn.SpawnSetup</c>. This runs inside case bodies, where the fixture
+        /// retry never reached, so one such throw failed a whole case on the full
+        /// list. Every retry is printed, so an intermittent fault of our own would
+        /// still show, and the last attempt's exception is left to fail the
+        /// case.</para>
         /// </summary>
         internal static Pawn SpawnExtra(Fixture fix, Gender gender, string nick)
         {
-            Pawn pawn = DebugTools_Fixtures.AveragePawn(gender, nick);
-            pawn.workSettings?.EnableAndInitialize();
-            GenSpawn.Spawn(pawn, fix.Stand.Position + new IntVec3(2, 0, fix.Extras.Count + 1),
-                           fix.Map, Rot4.North);
-            fix.Extras.Add(pawn);
-            return pawn;
+            IntVec3 cell = fix.Stand.Position + new IntVec3(2, 0, fix.Extras.Count + 1);
+            for (int attempt = 1; ; attempt++)
+            {
+                Pawn pawn = DebugTools_Fixtures.AveragePawn(gender, nick);
+                pawn.workSettings?.EnableAndInitialize();
+                try
+                {
+                    GenSpawn.Spawn(pawn, cell, fix.Map, Rot4.North);
+                    fix.Extras.Add(pawn);
+                    return pawn;
+                }
+                catch (Exception e) when (attempt < BuildAttempts)
+                {
+                    Report.Append("    RETRY extra pawn spawn threw on attempt ").Append(attempt)
+                          .Append(" — ").Append(e.GetType().Name).Append(": ")
+                          .AppendLine(e.Message);
+                    try
+                    {
+                        // Half spawned, most likely: out of the way before the
+                        // next one lands on the same cell.
+                        if (!pawn.Destroyed)
+                        {
+                            pawn.Destroy();
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // Teardown clears the pad whatever is left on it.
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -398,6 +433,70 @@ namespace ShiftChange
                 return null;
             }
             return new Fixture { Map = map, Stand = stand, Pawn = pawn, Comp = comp, StoredCount = 0 };
+        }
+
+        /// <summary>
+        /// <see cref="Stage"/>, with a second, foreign assignable comp on the
+        /// stand: the shape Outfit Stands Plus gives the stands it touches.
+        ///
+        /// <para>Reuses one when the mod list already supplies it, for the reason
+        /// <see cref="DebugTools_SaveRoundTrip.ForeignAssignable"/> spells out: a
+        /// second plain comp beside theirs is two foreign comps, and the case
+        /// stops testing ours against theirs. A plain
+        /// <c>CompAssignableToPawn</c> serves otherwise, since the code under
+        /// test names no foreign type.</para>
+        ///
+        /// <para>The comp goes on the DEF, because comps are built from
+        /// <c>def.comps</c> when the thing is made, and the edit is reverted as
+        /// soon as the stand exists. The spawned stand keeps the comp it was
+        /// built with, and nothing made after it, in this case or any later one,
+        /// sees the edit.</para>
+        /// </summary>
+        internal static Fixture StageWithForeignAssignable(Map map, CellRect pad)
+        {
+            ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
+            if (standDef == null)
+            {
+                return null;
+            }
+            CompProperties_AssignableToPawn added = null;
+            if (!standDef.comps.Any(IsForeignAssignableProps))
+            {
+                added = new CompProperties_AssignableToPawn();
+                standDef.comps.Add(added);
+            }
+            try
+            {
+                return Stage(map, pad, StageKit.Displacing);
+            }
+            finally
+            {
+                if (added != null)
+                {
+                    standDef.comps.Remove(added);
+                }
+            }
+        }
+
+        internal static bool IsForeignAssignableProps(CompProperties props)
+        {
+            return props != null && props.compClass != null
+                   && typeof(CompAssignableToPawn).IsAssignableFrom(props.compClass)
+                   && !typeof(CompAssignableToPawn_ShiftStand).IsAssignableFrom(props.compClass);
+        }
+
+        /// <summary>The first assignable comp on the stand that is not ours.</summary>
+        internal static CompAssignableToPawn ForeignAssignableOn(ThingWithComps stand)
+        {
+            return stand?.AllComps.OfType<CompAssignableToPawn>()
+                .FirstOrDefault(c => !(c is CompAssignableToPawn_ShiftStand));
+        }
+
+        /// <summary>The list names exactly these pawns, in any order, and nobody else.</summary>
+        internal static bool Names(CompAssignableToPawn comp, params Pawn[] pawns)
+        {
+            List<Pawn> owners = comp.AssignedPawnsForReading;
+            return owners.Count == pawns.Length && pawns.All(owners.Contains);
         }
 
         /// <summary>

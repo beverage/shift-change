@@ -176,14 +176,35 @@ must have: an assigned pawn leaves the candidate list but stays visible as an
 owner even under a filter that excludes them. A filter that hid the owner you
 wanted to remove would be a trap.
 
+Two more stage a second, foreign assignable beside ours, the shape Outfit Stands
+Plus gives its stands. One asserts the copy follows every way our list changes:
+one owner is copied, a second that does not fit the foreign comp's single slot
+empties the copy rather than truncating it, and the reaper clears it. The same
+case checks that the foreign Set owner stays hidden in both modes. The other
+drives the one-time reconcile through each arm of its rule, and ends on the arm
+that makes it one-time: once reconciled, a copy that drifted is rewritten, never
+adopted.
+
+Three more cover a stand not used for shift changes. The first takes a group stand
+out of shift use by all four ways in (the row itself, and unticking the last work
+type, Recreation or Sleeping, which land in the same state) and asserts the group
+is still listed after each and whole when the stand goes back. The second drives
+the owner dialog's own Assign: in shift use it adds, which is the control, and out
+of it one pick replaces a kept group and the copy then names that colonist. The
+third minifies and relands a stand holding a kept group, and asserts the group
+comes back whole with the copy still empty. That is the trap it was written for:
+vanilla restores parked owners through `TryAssignPawn` one at a time, so an
+override that replaced there returned the group as its last member. The last two
+stage the foreign assignable as well.
+
 **Round-trip cases** save the game, load it back through the engine's own
 synchronous loader, and assert on what came out. There are three: a plain trip
 that carries the owner, the ledger and the forced flags, and that also stages
 the removal flag ON before saving to prove the load sweeps it back off; a
 legacy-key save that
-must migrate its owner and then re-save under the prefixed key; and a stand
-carrying a foreign `CompAssignableToPawn`, whose owner must survive untouched
-while ours stays empty.
+must migrate its owner and then re-save under the prefixed key; and a stand from
+an older save carrying a foreign `CompAssignableToPawn` with an owner of its own,
+which must load without a contest and then be adopted into ours.
 
 Each asserts on the written **file** as well as on the loaded comp state. Comp
 state alone cannot distinguish a value that scribed correctly from one that
