@@ -309,7 +309,7 @@ namespace ShiftChange
             // map. See DebugTools_SaveRoundTrip.
             Case("a save/load round trip keeps the owner and the ledger, and sweeps the removal flag",
                  () => DebugTools_SaveRoundTrip.RoundTrip(map, pad));
-            Case("a legacy-key save migrates its owner and re-saves prefixed",
+            Case("a legacy-key save gets its owner back and re-saves it prefixed",
                  DebugTools_SaveRoundTrip.LegacyMigration);
             Case("an older save's foreign owner round-trips without contest and is adopted",
                  DebugTools_SaveRoundTrip.ForeignAssignable);

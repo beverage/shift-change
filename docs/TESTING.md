@@ -201,10 +201,24 @@ stage the foreign assignable as well.
 synchronous loader, and assert on what came out. There are three: a plain trip
 that carries the owner, the ledger and the forced flags, and that also stages
 the removal flag ON before saving to prove the load sweeps it back off; a
-legacy-key save that
-must migrate its owner and then re-save under the prefixed key; and a stand from
-an older save carrying a foreign `CompAssignableToPawn` with an owner of its own,
-which must load without a contest and then be adopted into ours.
+legacy-key save, which must get its owner back and re-save it under the prefixed
+key; and a stand from an older save carrying a foreign `CompAssignableToPawn`
+with an owner of its own, which must load without a contest and then be adopted
+into ours.
+
+The legacy-key case takes whichever route the loaded stand allows. With no
+foreign assignable on it, the owner arrives by the key migration. With one (and
+Outfit Stands Plus puts one on every vanilla stand) the generic keys belong to
+that comp, so the migration declines them: the case asserts the decline left no
+trace, and that the owner came back through the one-time reconcile instead. The
+four-mod list therefore covers the migration, and the decline needs a list that
+puts a foreign assignable on the stand, such as one carrying Outfit Stands Plus.
+No other case reaches the decline, because the older-save case writes our
+prefixed keys, and a present key turns the migration off before the contest is
+consulted. The rewrite that produces the legacy file also strips the reconciled
+marker: it arrived in v1.4.7, the generic keys were retired in v1.0.2, and no
+save carries both. Left in, it made a file no version ever wrote, and beside a
+foreign assignable that file lost the owner from both lists.
 
 Each asserts on the written **file** as well as on the loaded comp state. Comp
 state alone cannot distinguish a value that scribed correctly from one that

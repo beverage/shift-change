@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using RimWorld;
 using Verse;
 
@@ -82,6 +83,15 @@ namespace ShiftChange
         internal const string LegacyUninstalledKey = "uninstalledAssignedPawns";
 
         /// <summary>
+        /// The reconciled marker (<see cref="CompAssignableToPawn_ShiftStand.ownersUnified"/>),
+        /// and its whole node whatever it holds. It arrived in v1.4.7 and the
+        /// generic keys were retired in v1.0.2, so no save carries both;
+        /// <see cref="LegacyMigration"/> strips it for that reason.
+        /// </summary>
+        internal const string OurMarkerKey = "shiftChangeOwnersUnified";
+        internal const string OurMarkerNode = "<" + OurMarkerKey + ">[^<]*</" + OurMarkerKey + ">";
+
+        /// <summary>
         /// Logged when a reference list registers load-ids during LoadingVars
         /// and does not collect them during ResolvingCrossRefs
         /// (<c>LoadIDsWantedBank.ConfirmClear</c>, <c>:53</c>). A half-consumed
@@ -116,9 +126,9 @@ namespace ShiftChange
         internal const string FinalizeAbort = "Error in Map.FinalizeLoading()";
 
         /// <summary>
-        /// Six assertions in this file test for absence — no unconsumed
+        /// Seven assertions in this file test for absence — no unconsumed
         /// load-ids, no duplicate registration, no failed take. A scanner that
-        /// never matches anything satisfies all six, so one leg logs this
+        /// never matches anything satisfies all seven, so one leg logs this
         /// string and asserts <see cref="Logged"/> finds it.
         /// </summary>
         internal const string Probe = "[ShiftChange] harness log-scanner probe";
@@ -274,18 +284,34 @@ namespace ShiftChange
         // ------------------------------------------------------------ leg 2
 
         /// <summary>
-        /// Rewrites the file leg 1 wrote so the prefixed keys become the
-        /// generic ones an older save carries, loads it, and asserts the owner
-        /// migrates onto the comp.
+        /// Rewrites the file leg 1 wrote into the shape a save from before
+        /// v1.0.2 carries, loads it, and asserts the owner comes back and
+        /// re-saves under the prefixed key.
         ///
         /// <para>The rewrite runs in-process rather than in the shell runner so
         /// the assertion and the artifact it reads cannot drift apart.</para>
         ///
-        /// <para>Three assertions: the owner arrives, the loader reports no
-        /// unconsumed load-ids, and a re-save writes the owner back under the
-        /// prefixed key. The third is what shows the migration collected the
-        /// reference rather than only registering it — an in-memory owner that
-        /// does not scribe satisfies the first two.</para>
+        /// <para><b>Two routes bring the owner back, and the loaded stand picks
+        /// the one under test.</b> With no foreign assignable on it, the key
+        /// migration in <see cref="CompAssignableToPawn_ShiftStand.PostExposeData"/>
+        /// reads the generic keys (<see cref="KeyMigration"/>). With one, those
+        /// keys are that comp's: the migration declines them, and the one-time
+        /// reconcile adopts the owner from the foreign list on first spawn
+        /// (<see cref="DeclinedAndReconciled"/>). Outfit Stands Plus puts a
+        /// foreign assignable on every vanilla stand, so the four-mod list only
+        /// ever takes the first route and a list carrying that mod only the
+        /// second. Nothing else in the harness reaches the decline: leg 3's
+        /// save carries our prefixed keys, and a present key switches the
+        /// migration off before the contest is consulted.</para>
+        ///
+        /// <para><b>The rewrite also strips the reconciled marker.</b> No save
+        /// old enough to carry the generic keys has one (see
+        /// <see cref="OurMarkerKey"/>), and leaving it in made a file no version
+        /// ever wrote. Beside a foreign assignable that file lost the owner
+        /// outright: the stand loaded as already reconciled with an empty list,
+        /// skipped the reconcile, and the copy then emptied the foreign list as
+        /// well. That failed this case with Outfit Stands Plus loaded, found
+        /// 2026-09-29.</para>
         /// </summary>
         internal static bool LegacyMigration()
         {
@@ -296,15 +322,26 @@ namespace ShiftChange
                     "      no round-trip save to rewrite — did the previous case fail?");
                 return false;
             }
+            string source = File.ReadAllText(sourcePath);
+
+            // The owner is read off OUR key, before the rewrite. Afterwards the
+            // stand can carry the generic key twice, and beside a foreign
+            // assignable the first of the two is that comp's copy.
+            string ownerLoadID = FirstListEntry(source, OurKey);
+            if (ownerLoadID == null)
+            {
+                DebugTools_LifecycleHarness.Report.AppendLine(
+                    "      the round-trip save has no owner under " + OurKey);
+                return false;
+            }
 
             // Longest key first: rewriting the short one first would corrupt
             // the long one into "shiftChangeUninstalledassignedPawns".
-            string legacy = File.ReadAllText(sourcePath)
-                .Replace(OurUninstalledKey, LegacyUninstalledKey)
-                .Replace(OurKey, LegacyKey);
-
-            string ownerLoadID = FirstListEntry(legacy, LegacyKey);
-            if (ownerLoadID == null)
+            string legacy = Regex.Replace(source
+                    .Replace(OurUninstalledKey, LegacyUninstalledKey)
+                    .Replace(OurKey, LegacyKey),
+                OurMarkerNode, "");
+            if (!NodeContains(legacy, LegacyKey, ownerLoadID))
             {
                 DebugTools_LifecycleHarness.Report.AppendLine(
                     "      the rewritten save has no owner under " + LegacyKey);
@@ -312,11 +349,15 @@ namespace ShiftChange
             }
             File.WriteAllText(GenFilePaths.FilePathForSavedGame(LegacySaveName), legacy);
 
+            bool ok = DebugTools_LifecycleHarness.Expect(
+                !legacy.Contains(OurMarkerKey),
+                "the rewritten save carries no reconciled marker, as no save that old does");
+
             SavedGameLoaderNow.LoadGameFromSaveFileNow(LegacySaveName);
 
-            bool ok = DebugTools_LifecycleHarness.Expect(
+            ok &= DebugTools_LifecycleHarness.Expect(
                 !Logged(UnconsumedWarning),
-                "the migration consumed every load-id it registered");
+                "the legacy load consumed every load-id it registered");
 
             Building_OutfitStand loaded = FindStandAnywhere();
             if (loaded == null)
@@ -332,7 +373,28 @@ namespace ShiftChange
                 return false;
             }
 
-            ok &= DebugTools_LifecycleHarness.Expect(
+            List<CompAssignableToPawn> foreigners = loaded.AllComps
+                .OfType<CompAssignableToPawn>()
+                .Where(c => !(c is CompAssignableToPawn_ShiftStand))
+                .ToList();
+            return ok & (foreigners.Count == 0
+                ? KeyMigration(assign, ownerLoadID)
+                : DeclinedAndReconciled(assign, foreigners, ownerLoadID));
+        }
+
+        /// <summary>
+        /// Leg 2 with no foreign assignable on the stand: the key migration.
+        ///
+        /// <para>Three assertions, counting the caller's load-id check: the
+        /// owner arrives, the loader reports no unconsumed load-ids, and a
+        /// re-save writes the owner back under the prefixed key. The third is
+        /// what shows the migration collected the reference rather than only
+        /// registering it — an in-memory owner that does not scribe satisfies
+        /// the first two.</para>
+        /// </summary>
+        internal static bool KeyMigration(CompAssignableToPawn_ShiftStand assign, string ownerLoadID)
+        {
+            bool ok = DebugTools_LifecycleHarness.Expect(
                 assign.AssignedPawnsForReading.Any(p => p != null
                     && p.GetUniqueLoadID() == ownerLoadID),
                 "the legacy owner migrated onto the comp");
@@ -354,6 +416,71 @@ namespace ShiftChange
                     "and stops writing the generic " + LegacyKey);
         }
 
+        /// <summary>
+        /// Leg 2 beside a foreign assignable: the route
+        /// <see cref="CompAssignableToPawn_ShiftStand.PostExposeData"/> promises
+        /// a save from before v1.0.2 that carries both mods.
+        ///
+        /// <para>First, the decline leaves no trace. The stand's node carries
+        /// the generic key twice, the foreign comp's and our rewritten one, and
+        /// the loader answers every read of it with the first
+        /// (<c>ScribeLoader.EnterNode</c> looks the child up by name). Had ours
+        /// read it too, the second registration would be refused and the
+        /// matching take would find nothing: the two log lines asserted absent
+        /// here.</para>
+        ///
+        /// <para>Then the owner comes back by the other road. Ours loads empty,
+        /// the foreign list holds the owner (leg 1's copy put it there, the
+        /// shape the <c>PostExposeData</c> comment expects of such a save), and
+        /// the reconcile adopts it. The copy writes it back, so a re-save
+        /// carries it under our key and under the generic key once per foreign
+        /// comp, the count leg 1 makes.</para>
+        /// </summary>
+        internal static bool DeclinedAndReconciled(CompAssignableToPawn_ShiftStand assign,
+                                                   List<CompAssignableToPawn> foreigners,
+                                                   string ownerLoadID)
+        {
+            CompAssignableToPawn foreign = foreigners[0];
+            bool ok = DebugTools_LifecycleHarness.Expect(
+                    foreigners.Count == 1,
+                    "exactly one foreign assignable, so the contest under test "
+                    + "is ours against theirs")
+                & DebugTools_LifecycleHarness.Expect(
+                    !Logged(DuplicateRegistration),
+                    "ours left the generic key to theirs: nothing registered it twice")
+                & DebugTools_LifecycleHarness.Expect(
+                    !Logged(FailedTake),
+                    "no comp asked for load-ids it never registered")
+                & DebugTools_LifecycleHarness.Expect(
+                    foreign.AssignedPawnsForReading.Any(p => p != null
+                        && p.GetUniqueLoadID() == ownerLoadID),
+                    "their owner survived intact")
+                & DebugTools_LifecycleHarness.Expect(
+                    assign.AssignedPawnsForReading.Any(p => p != null
+                        && p.GetUniqueLoadID() == ownerLoadID),
+                    "and ours took it back through the reconcile, the only route "
+                    + "open beside a foreign assignable")
+                & DebugTools_LifecycleHarness.Expect(
+                    assign.ownersUnified,
+                    "and the stand is marked reconciled, so it never adopts again");
+
+            if (!TrySave(ReSaveName, out string resavePath))
+            {
+                return false;
+            }
+            string resaved = File.ReadAllText(resavePath);
+            int genericHits = NodeBodies(resaved, LegacyKey).Count(body => body.Contains(ownerLoadID));
+
+            return ok
+                & DebugTools_LifecycleHarness.Expect(
+                    NodeContains(resaved, OurKey, ownerLoadID),
+                    "re-saving writes the recovered owner under " + OurKey)
+                & DebugTools_LifecycleHarness.Expect(
+                    genericHits == foreigners.Count,
+                    "and under the generic " + LegacyKey + " only as the foreign comp's copy ("
+                    + genericHits + " found, " + foreigners.Count + " expected)");
+        }
+
         // ------------------------------------------------------------ leg 3
 
         /// <summary>
@@ -361,13 +488,22 @@ namespace ShiftChange
         /// comp with an owner of its own, round-trips that owner without a
         /// contest and adopts it into ours.
         ///
-        /// <para>Comps scribe flat into the thing's node, so two
-        /// <c>CompAssignableToPawn</c> instances on one building write the same
-        /// generic key.
-        /// <see cref="CompAssignableToPawn_ShiftStand.PostExposeData"/> declines
-        /// to read that key when a foreign assignable is present; this case
-        /// asserts declining leaves no trace — no duplicate registration, no
-        /// failed take, no unconsumed load-ids.</para>
+        /// <para>Comps scribe flat into the thing's node, so every
+        /// <c>CompAssignableToPawn</c> on one building that uses the generic key
+        /// reads and writes the same node. This case asserts the load leaves no
+        /// trace of a contest over it — no duplicate registration, no failed
+        /// take, no unconsumed load-ids.</para>
+        ///
+        /// <para>It does not reach the decline in
+        /// <see cref="CompAssignableToPawn_ShiftStand.PostExposeData"/>. This
+        /// save carries our prefixed keys, empty, and a present key turns the
+        /// migration off before the contest is consulted: with the guard
+        /// removed, this case's own load logged no contest at all (measured
+        /// 2026-09-30, Outfit Stands Plus loaded). The decline is covered by
+        /// <see cref="LegacyMigration"/> beside a foreign assignable, and it is
+        /// that leg's lines, found by the whole-queue scan in
+        /// <see cref="Logged"/>, that would fail this case's absence assertions
+        /// too.</para>
         ///
         /// <para>The save is staged in the shape one from before the copy
         /// carries: the foreign comp holds an owner ours does not, and our
