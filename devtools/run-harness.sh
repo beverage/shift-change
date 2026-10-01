@@ -4,6 +4,10 @@
 #
 #   devtools/run-harness.sh          # a four-mod list — the iteration loop
 #   devtools/run-harness.sh --full   # your own mod list, copied — the release gate
+#   devtools/run-harness.sh --with=khamenman.outfitstandsplus
+#                                    # the four, plus one mod a case needs
+#   devtools/run-harness.sh --with-after=khamenman.outfitstandsplus
+#                                    # the same mod, loaded after this one
 #
 # Builds Release, launches RimWorld with -quicktest -shiftchange-harness against
 # a throwaway save-data folder, waits for the game to run every case and quit
@@ -121,6 +125,18 @@ MINIMAL_MODS=(
   mrbeverage.shiftchange
 )
 
+# --with=<packageId>, repeatable: a mod added to the minimal list, for a case
+# that tests us against it and is a known gap without it. It goes in ahead of
+# this mod, which sorts after the mods it patches (About.xml's loadAfter). Not
+# with --full, whose list is yours as it stands. Its own dependencies are not
+# followed, so name those too.
+EXTRA_MODS=()
+
+# --with-after=<packageId>, repeatable: the same, but loaded after this mod,
+# against its loadAfter. loadAfter only warns, so a hand-sorted list can load
+# them this way round; this is how a case shows it works in both orders.
+EXTRA_AFTER=()
+
 FULL=0
 ALONGSIDE=0
 for arg in "$@"
@@ -128,11 +144,16 @@ do
   case "$arg" in
     --full) FULL=1 ;;
     --alongside) ALONGSIDE=1 ;;
-    *) printf 'unknown option: %s (--full | --alongside)\n' "$arg" >&2; exit 2 ;;
+    --with=?*) EXTRA_MODS+=("${arg#--with=}") ;;
+    --with-after=?*) EXTRA_AFTER+=("${arg#--with-after=}") ;;
+    *) printf 'unknown option: %s (--full | --alongside | --with=<packageId> | --with-after=<packageId>)\n' "$arg" >&2; exit 2 ;;
   esac
 done
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
+
+[ "$FULL" = "0" ] || [ "$(( ${#EXTRA_MODS[@]} + ${#EXTRA_AFTER[@]} ))" = "0" ] \
+  || die "--with and --with-after add to the minimal list, and --full does not use it"
 
 # WHAT THE STALL LOOKED LIKE, PRINTED RATHER THAN ASSERTED.
 #
@@ -313,14 +334,26 @@ else
     printf '%s\n  <activeMods>\n' "$version"
     for mod in "${MINIMAL_MODS[@]}"
     do
+      if [ "$mod" = "mrbeverage.shiftchange" ]
+      then
+        for extra in ${EXTRA_MODS[@]+"${EXTRA_MODS[@]}"}
+        do
+          printf '    <li>%s</li>\n' "$extra"
+        done
+      fi
       printf '    <li>%s</li>\n' "$mod"
+    done
+    for extra in ${EXTRA_AFTER[@]+"${EXTRA_AFTER[@]}"}
+    do
+      printf '    <li>%s</li>\n' "$extra"
     done
     printf '  </activeMods>\n  <knownExpansions>\n'
     printf '    <li>ludeon.rimworld.odyssey</li>\n'
     printf '  </knownExpansions>\n</ModsConfigData>\n'
   } > "$TESTDATA/Config/ModsConfig.xml"
   xmllint --noout "$TESTDATA/Config/ModsConfig.xml" || die "generated mod list is not well-formed"
-  printf 'mod list: minimal (%s mods, isolated)\n' "${#MINIMAL_MODS[@]}"
+  printf 'mod list: minimal (%s mods, isolated)\n' \
+    "$(( ${#MINIMAL_MODS[@]} + ${#EXTRA_MODS[@]} + ${#EXTRA_AFTER[@]} ))"
 fi
 
 # SEED Prefs.xml, AND THE REASON IS THE STALL.

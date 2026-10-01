@@ -24,12 +24,23 @@ decompilation.
 devtools/run-harness.sh              # a four-mod list — the iteration loop
 devtools/run-harness.sh --full       # your own mod list — the release gate
 devtools/run-harness.sh --alongside  # a second instance beside a live game
+devtools/run-harness.sh --with=khamenman.outfitstandsplus   # the four, plus one
+devtools/run-harness.sh --with-after=khamenman.outfitstandsplus   # loaded after us
 ```
 
 Builds Release, launches with `-quicktest -shiftchange-harness`, waits for the
 game to run every case and quit itself, prints the report, exits non-zero on any
 failure. By hand: dev mode → **Shift Change** → **Run lifecycle harness**, then
 click a clear 7×7 area.
+
+`--with=<packageId>` adds a mod to the minimal list, ahead of this one, for a
+case that tests against that mod and is a known gap without it. It can be given
+more than once; the mod's own dependencies are not followed, so name those too.
+It is not a compatibility run: the rest of the list stays minimal.
+`--with-after=<packageId>` does the same with the mod loaded after this one.
+That is the order `loadAfter` in About.xml warns against, and a warning is all
+it is: the game loads whatever order the mod list says. So a case that depends
+on another mod runs both ways before it is trusted.
 
 **The window does not need focus.** An unfocused instance used to stall on its
 loading screen: the log froze around line 49, the process sat near 0% CPU, and
@@ -197,6 +208,29 @@ vanilla restores parked owners through `TryAssignPawn` one at a time, so an
 override that replaced there returned the group as its last member. The last two
 stage the foreign assignable as well.
 
+**An interop case** covers code of ours that runs inside another mod's: the
+Outfit Stands Plus stand button (see
+[DESIGN.md](DESIGN.md#outfit-stands-plus-stand-button)). It needs that mod
+loaded, so on the default list it is a known gap and `--with=` runs it.
+
+It checks the patch first: the walk is in their original IL once, and what
+runs calls the stand list in its place. Then it builds a world in which either
+half going wrong would show. The fixture's stand belongs to a second colonist.
+The owner gets a mechanized stand of theirs and then a second vanilla one,
+spawned in that order, plus a third stand that names the owner but belongs to
+no faction. Owners go straight into their lists through the base class, so the
+case asserts the lookup, not how our copy fills them.
+
+Their method runs with the switch off and then on, and both answers must match
+the world and each other, in order. That is asserted twice: as spawned, and
+after the mechanized stand changes hands and comes back, which moves it to the
+end of the colony building list and so tests the list's upkeep. The case also
+checks that the owner's two buttons really merge into one, which is why order
+is asserted at all. And it asks the list directly whether the switch hands back
+the walk when off. Together with the IL check, that is what shows the off arm
+was their walk; without it, a list answering both arms would compare equal to
+itself.
+
 **Round-trip cases** save the game, load it back through the engine's own
 synchronous loader, and assert on what came out. There are three: a plain trip
 that carries the owner, the ledger and the forced flags, and that also stages
@@ -261,7 +295,9 @@ green log out of a suite that checks nothing.
 - **Mod compatibility.** `--full` proves the suite passes with one large mod
   list loaded — whichever one is active on the machine that ran it. It proves
   nothing about correct interaction with any particular mod, and nothing at all
-  about a mod that was not installed.
+  about a mod that was not installed. Two cases reach further when Outfit
+  Stands Plus is loaded: the interop case asserts against it, and the
+  legacy-key case takes the branch that declines the generic keys to its comp.
 - **UI.** No case draws a gizmo, opens the work-type dialog, or reads an inspect
   string.
 - **Trade.** No case opens a trade session or builds a `TradeDeal`, so the

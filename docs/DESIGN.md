@@ -698,6 +698,75 @@ dressing again after — two wardrobe walks for a job needing no suit. Changing
 is the expensive part, not the wearing, and that is the general principle this
 list encodes.
 
+### Outfit Stands Plus' stand button
+
+Not a table, and not a Shift Change feature either. Outfit Stands Plus puts a
+use-stand button on every pawn, and finds the stands for it by walking every
+building the player owns (`ListerBuildings.AllBuildingsColonistOfClass`) with a
+type test on each, each time a selected pawn's command bar is gathered, which
+vanilla does every frame. On a colony of about nine thousand buildings and 48
+stands that measured 0.82 ms per selected pawn per frame. The cost follows how
+much has been built, not how many stands there are.
+
+`Patch_OutfitStandsPlusUseButton` is a transpiler on the method making that
+call, which is their iterator's `MoveNext`, since the method itself only
+builds the iterator. It swaps the one call for `Stands`, which returns the
+colony's stands from a list kept per map. Their owner test, their command and
+anything they add to the method later still run.
+
+It lives here rather than in a mod of its own because this mod already decides
+what that button offers: every stand carrying our comp holds a copy of our
+owner list in theirs (see [Ownership and the ledger](#ownership-and-the-ledger)).
+The patch changes how fast the button finds its stands, never which ones, and
+never in what order.
+
+**The order is behaviour.** A colonist who owns two stands gets two of their
+buttons, and `Command.GroupsWith` merges them into one, since the label, icon,
+hotkey and group key all match. A click on the merged button runs every grouped
+command's input and the drawn one's last (`GizmoGridDrawer.cs:338-350`), so the
+colonist walks to the stand whose button came first. Their walk yields stands
+in the colony building list's order, and the stand list keeps that order:
+
+- It is built once from `allBuildingsColonist`, the first time a map's button
+  is gathered.
+- It is kept current from `ListerBuildings.Add` and `Remove`, the only two
+  places the engine changes that list. `Add` appends a building only if it is
+  the player's, and `Building.SetFaction` takes a building out of the lister
+  and puts it back (`Building.cs:330-344`), so a stand that changes hands moves
+  to the end of both lists.
+- Each read sweeps out anything no longer spawned or no longer the player's,
+  in case another mod changed one some other way.
+
+The per-def thing lists (`ListerThings.ThingsOfDef`, `ListerThings.cs:52-74`)
+would need no upkeep at all, and were the first answer here, but they lose the
+order across defs: a mechanized stand built before a vanilla one comes out
+second.
+
+The lists live in a `ConditionalWeakTable` keyed by the map's
+`ListerBuildings`, so each goes with its map, and a loaded game, whose listers
+are new, never sees an old one's. Nothing is keyed on ids or ticks, so nothing
+goes through `SessionGuard`, and nothing is saved.
+
+**Whether to apply is the call itself.** At startup the patch reads their
+method's original IL. If the walk is there it patches, and the startup line
+names the method and how many calls it replaced (one, today); if not, it
+leaves the button alone and logs why. So a fix on their side retires this
+without a release of ours, and any other change to their method runs as they
+wrote it. Load order does not enter into it: the patch runs from a startup
+static constructor, after every mod's assembly has loaded, and reads their
+original IL, which no load order changes.
+Replacing their whole method instead would need a gate that turns off on any
+change at all, which is the job a hash of their IL would do, and that hash
+also turns off for a different compiler or a Debug build of the same code. A
+transpiler also sits beside other mods' patches on the method: one that skips
+their method skips this with it, and if another transpiler has already
+replaced the call, this finds nothing to replace and says so.
+
+**It falls back rather than fails.** A sixth `[TweakValue]`,
+`Patch_OutfitStandsPlusUseButton.Enabled`, hands the call back to their walk,
+for a report that might be ours, and an exception while reading the list does
+the same until the game restarts.
+
 ## The recreation branch
 
 Work jobs name their purpose through `workGiverDef.workType`; recreation jobs
@@ -1171,11 +1240,13 @@ harness's `[DebugAction]`; `DebugTools_Fixtures` sits under `SCENES || HARNESS`
 because both dev-only callers build their fixtures from it. A shipped build
 registers no debug actions at all, so the "Shift Change" category never renders.
 
-**The five `[TweakValue]` fields do still ship**, and that is not an
+**The six `[TweakValue]` fields do still ship**, and that is not an
 inconsistency. The bar here is destructiveness, not reachability: a TweakValue
 moves a number and resets at the next launch, and they are how a player gets
 walked through a report — turn `Enabled` off to see whether this mod is
-involved, turn `Verbose` on to get a log saying why a stand did nothing.
+involved, turn `Verbose` on to get a log saying why a stand did nothing, turn
+`Patch_OutfitStandsPlusUseButton.Enabled` off to hand Outfit Stands Plus its
+own button back.
 
 What the harness covers, and the rather larger list of what it does not, is in
 [TESTING.md](TESTING.md).
