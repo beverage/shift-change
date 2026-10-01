@@ -23,6 +23,7 @@ using Verse.AI;
 // method names — that list is the ORDER authority and has to stay legible.
 using static ShiftChange.HarnessFixtures;
 using static ShiftChange.HarnessGates;
+using static ShiftChange.HarnessInterop;
 using static ShiftChange.HarnessLifecycle;
 using static ShiftChange.HarnessOwnership;
 using static ShiftChange.HarnessScoring;
@@ -230,6 +231,9 @@ namespace ShiftChange
                  StageWithForeignAssignable, PickReplacesAKeptGroup);
             Case(map, pad, "a kept group reaches nobody through the copy and survives a move",
                  StageWithForeignAssignable, KeptGroupSurvivesAMove);
+            // A known gap unless Outfit Stands Plus is loaded (--with=).
+            Case(map, pad, "Outfit Stands Plus' stand button offers what its own walk would, in order",
+                 (m, p) => Stage(m, p, StageKit.Displacing), OutfitStandsPlusButtonMatchesTheirs);
             Case(map, pad, "a joy job in the stand's room dresses",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  JoyJobInTheRoomDresses);

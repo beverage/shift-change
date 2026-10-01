@@ -56,7 +56,7 @@ shipped so the gate could assert against the literal dll players install.
 absence in the artifact, so breaking either is a failed check rather than a
 surprise at the next release.
 
-**The five `[TweakValue]` fields also ship, on purpose.** The bar is
+**The six `[TweakValue]` fields also ship, on purpose.** The bar is
 destructiveness, not reachability: they are how a player is walked through
 diagnosing a report. Do not "clean them up".
 
@@ -69,6 +69,8 @@ One exception, and it is narrow — the lifecycle harness:
 ```bash
 devtools/run-harness.sh          # ~20s, a four-mod list, no hands
 devtools/run-harness.sh --full   # whatever mod list is active; run before a release
+devtools/run-harness.sh --with=khamenman.outfitstandsplus   # the four, plus one mod a case needs
+devtools/run-harness.sh --with-after=khamenman.outfitstandsplus   # the same, loaded after us
 ```
 
 It asserts where the ledger lands after each despawn/death/banishment event, by
@@ -77,10 +79,11 @@ if a case fails. Touch `PostDeSpawn`, `PostSwapMap`, `ReleaseBorrower`,
 `AbandonLedger` or `Patch_UnclaimStands` and run it.
 
 A harness pass is not a play observation, and a `GAP` line is a known failure
-being tracked, not a pass. **Two gaps are expected on the default list**: the
+being tracked, not a pass. **Three gaps are expected on the default list**: the
 Rimatomics table and marker cases skip themselves when Rimatomics is not
-loaded, so a clean run reads `0 failed, 2 known gaps` and exits 0. Any other
-gap, or any failure, is real. It does now run
+loaded, and the Outfit Stands Plus button case when that mod is not, so a clean
+run reads `0 failed, 3 known gaps` and exits 0. Any other gap, or any failure,
+is real. It does now run
 `JobDriver_SwapAtStand` for real, through the pawn's own tracker, so "the
 driver builds a correct ledger" is covered, and the player-facing rules have
 functional cases. Save/load round trips are covered by three cases that load
@@ -154,6 +157,18 @@ which is a pawn walking between the stand and the work forever.
 and rebuilds a set and a list on every call, and `WorkTypes` — which
 `RoomContentsWork` feeds — is read every frame to draw a gizmo label. Cache on
 room ID plus a tick interval, as `CompShiftStand.AutomaticWorkTypes` does.
+
+**The Outfit Stands Plus button patch changes one call, and keeps its
+order.** `Patch_OutfitStandsPlusUseButton` is a transpiler on their stand
+button's iterator body: it swaps their
+`AllBuildingsColonistOfClass<Building_OutfitStand>()` walk for `Stands`, and
+applies only while their original IL still makes that call. Keep it that
+narrow. Replacing their whole method would need a gate that turns off on any
+change they make; this one retires itself when the call goes. And keep the
+stand list in the colony building list's order: a colonist's two buttons
+merge into one, and a click sends them to whichever stand came first. After
+touching it, run the harness with `--with=khamenman.outfitstandsplus` and again
+with `--with-after=`, since `loadAfter` cannot make players load it after OSP.
 
 **Never patch a `[MustTranslate]` field on another mod's def.** Def patches
 apply while defs load; `InjectIntoData_AfterImpliedDefs`

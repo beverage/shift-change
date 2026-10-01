@@ -26,7 +26,12 @@ namespace ShiftChange
     {
         static HarmonyInit()
         {
-            new Harmony("MrBeverage.ShiftChange").PatchAll();
+            Harmony harmony = new Harmony("MrBeverage.ShiftChange");
+            harmony.PatchAll();
+            // By hand rather than by attribute: its target is in another mod
+            // that may not be installed, and it decides at startup whether to
+            // apply at all.
+            Patch_OutfitStandsPlusUseButton.TryApply(harmony);
 #if DEBUG
             // ECR hot reload is compiled into Debug builds only — see
             // docs/DEVELOPMENT.md. Route its logging into the dev
