@@ -1,0 +1,9 @@
+v1.4.8 update:
+
+With Outfit Stands Plus installed, having a colonist selected costs less on a large colony.
+
+That mod gives every colonist a button for their outfit stand, and to find which stands a colonist owns, it went through every building you had built, every frame the colonist stayed selected. On a colony of about 9,000 buildings that came to 0.8 ms per selected colonist per frame. It now goes through the outfit stands only.
+
+The button works as before, with the same stands in the same order. If Outfit Stands Plus ever changes how it finds them, Shift Change leaves the button alone.
+
+Without Outfit Stands Plus, nothing changes.
