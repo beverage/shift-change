@@ -260,6 +260,10 @@ they were already wearing. A shared sleeping room takes the switch by hand.
   whites to reach a chair, which is the walk this mod exists to prevent.
   A sleeping stand does not take that exception, because a colonist wakes up
   standing beside it, so changing first costs them no walking at all.
+- **Fetching a meal for a patient or a prisoner changes nothing.** The job
+  starts wherever the meal is stored, so it used to read as leaving the
+  hospital or the cell. A doctor in scrubs or a warden in uniform now keeps it
+  on for the trip, and nobody is dressed for one.
 - If a stand frees up while someone is already working in its room out of
   uniform, they'll step over and change, unless they're mid-treatment on a
   patient.

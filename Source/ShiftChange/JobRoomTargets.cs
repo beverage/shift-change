@@ -5,8 +5,9 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// How this mod reads another mod's jobs: which end of a job is the place
-    /// it happens, and which jobs are not ours to act on at all.
+    /// How this mod reads jobs whose targets would mislead it: which end of a
+    /// job is the place it happens, and which jobs are not ours to act on at
+    /// all. Mostly other mods' jobs, plus vanilla's feeding givers.
     ///
     /// <para>Jobs whose location is their <c>targetB</c> rather than their
     /// <c>targetA</c>.
@@ -113,11 +114,40 @@ namespace ShiftChange
         /// <para>The rods themselves are unaffected. <c>LoadSpentFuel</c>'s
         /// other giver is not listed, so carrying spent fuel still dresses at
         /// the rod exactly as before.</para>
+        ///
+        /// <para><b>Vanilla's six feeding givers are here for the same reason,
+        /// and they are the only official rows.</b> Feeding a patient, feeding
+        /// or delivering food to a prisoner, and the two hemogen equivalents all
+        /// build their job with the FOOD in targetA and the patient or prisoner
+        /// in targetB (<c>WorkGiver_FeedPatient.JobOnThing</c>,
+        /// <c>WorkGiver_Warden_Feed</c>, <c>WorkGiver_Warden_DeliverFood</c>,
+        /// <c>Workgiver_AdministerHemogen</c>,
+        /// <c>WorkGiver_Warden_DeliverHemogen</c>). So the job reads as
+        /// happening wherever the meal is stored, which is the freezer and not
+        /// the hospital or the cell: a doctor in scrubs changed out to fetch a
+        /// meal and back in for the next tend, and a warden did the same with a
+        /// stand in the cell. Delivering food can never read as the cell at
+        /// all, because its giver refuses food already stored there.</para>
+        ///
+        /// <para>Reading targetB instead was the other option, and it is worse:
+        /// it puts the job where the meal ends up, so a bare doctor would dress
+        /// before a trip whose first leg goes to the freezer. A meal run needs
+        /// no uniform either way, so the uniform rides along and nobody is
+        /// dressed for one. Vanilla also feeds animals and hands out hemogen
+        /// under Doctor, which is why those rows are here beside the patient's.
+        /// FeedHemogen and DeliverHemogenToPrisoner are Biotech's and simply
+        /// never match without it.</para>
         /// </summary>
         internal static readonly HashSet<string> IgnoredGivers =
             new HashSet<string>
             {
                 "LoadProcChemFuel",
+                "DoctorFeedHumanlikes",
+                "DoctorFeedAnimals",
+                "FeedHemogen",
+                "FeedPrisoner",
+                "DeliverFoodToPrisoner",
+                "DeliverHemogenToPrisoner",
             };
 
         /// <summary>Whether this giver's jobs are invisible to the mod.</summary>

@@ -303,6 +303,20 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// <see cref="Diverts"/>, then drop whatever it queued. A divert
+        /// enqueues the deferred job WITH its reservations held, so a meal or a
+        /// patient reserved by one probe would fail the next probe's dry run,
+        /// and a case would then report as a refusal what was really a
+        /// reservation clash.
+        /// </summary>
+        internal static bool Probe(Fixture fix, Job job, JobTag? tag = null)
+        {
+            bool diverted = Diverts(fix, job, tag);
+            fix.Pawn.jobs.ClearQueuedJobs();
+            return diverted;
+        }
+
+        /// <summary>
         /// A job of the given work type, targeted where the pawn stands — so
         /// it reads as work done in the stand's own room.
         /// </summary>

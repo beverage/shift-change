@@ -403,15 +403,29 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// <see cref="JobRoomTargets"/> holds two lists of another mod's
-        /// defNames. Both are ALLOWED to miss — that is what a compat table is
-        /// — so the standing assertions are structural, and the resolution
-        /// assertions only fire when the mod is actually loaded.
+        /// The official givers <see cref="JobRoomTargets.IgnoredGivers"/>
+        /// carries ON PURPOSE, and the only ones it may: vanilla's six feeding
+        /// givers, whose jobs put the meal in targetA
+        /// (<see cref="HarnessRideAlong.FeedingRidesAlong"/> has the reason). Any
+        /// other official giver on the list fails the guard below.
+        /// </summary>
+        internal static readonly HashSet<string> DeliberatelyIgnoredOfficialGivers =
+            new HashSet<string>(HarnessRideAlong.FeedPatientGivers.Concat(HarnessRideAlong.DeliverFoodGivers));
+
+        /// <summary>
+        /// <see cref="JobRoomTargets"/> holds two lists, mostly of another
+        /// mod's defNames. Those rows are ALLOWED to miss — that is what a
+        /// compat table is — so the standing assertions are structural, and the
+        /// resolution assertions only fire when the mod is actually loaded.
         ///
         /// <para>The load-bearing one is the official-def guard. Retargeting a
         /// vanilla job to its targetB, or making the mod ignore a vanilla work
         /// giver, would change core behaviour for everyone and there is no
-        /// symptom that points at a table.</para>
+        /// symptom that points at a table. Since the feeding fix some official
+        /// rows are deliberate, so the guard names them: an official def on a
+        /// list passes only if it is one of those, and each of those must still
+        /// resolve, since a renamed vanilla def would drop its row with no
+        /// error anywhere.</para>
         /// </summary>
         internal static bool JobTablesHold()
         {
@@ -434,10 +448,22 @@ namespace ShiftChange
             foreach (WorkGiverDef giver in DefDatabase<WorkGiverDef>.AllDefsListForReading)
             {
                 if (giver.modContentPack != null && giver.modContentPack.IsOfficialMod
-                    && JobRoomTargets.IgnoredGivers.Contains(giver.defName))
+                    && JobRoomTargets.IgnoredGivers.Contains(giver.defName)
+                    && !DeliberatelyIgnoredOfficialGivers.Contains(giver.defName))
                 {
                     ok &= Expect(false, "official giver " + giver.defName + " is NOT ignored");
                 }
+            }
+            foreach (string name in DeliberatelyIgnoredOfficialGivers)
+            {
+                WorkGiverDef giver = DefDatabase<WorkGiverDef>.GetNamedSilentFail(name);
+                bool biotech = name.Contains("Hemogen");
+                if (giver == null && biotech && !ModsConfig.BiotechActive)
+                {
+                    continue;
+                }
+                ok &= Expect(giver != null && JobRoomTargets.Ignored(giver),
+                             "vanilla's " + name + " resolves and is ignored");
             }
 
             if (!RimatomicsLoaded)
@@ -453,6 +479,10 @@ namespace ShiftChange
             }
             foreach (string name in JobRoomTargets.IgnoredGivers)
             {
+                if (DeliberatelyIgnoredOfficialGivers.Contains(name))
+                {
+                    continue;
+                }
                 ok &= Expect(DefDatabase<WorkGiverDef>.GetNamedSilentFail(name) != null,
                              "giver " + name + " resolves");
             }

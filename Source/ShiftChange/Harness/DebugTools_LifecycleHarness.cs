@@ -26,6 +26,7 @@ using static ShiftChange.HarnessGates;
 using static ShiftChange.HarnessInterop;
 using static ShiftChange.HarnessLifecycle;
 using static ShiftChange.HarnessOwnership;
+using static ShiftChange.HarnessRideAlong;
 using static ShiftChange.HarnessScoring;
 using static ShiftChange.HarnessSwap;
 using static ShiftChange.HarnessTables;
@@ -292,6 +293,8 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  FreedStandCatchesUp);
+            Case(map, pad, "feeding a patient or a prisoner neither dresses nor undresses anyone",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), FeedingRidesAlong);
             // The pair, and it only means anything as a pair: the refusal that
             // stops a checked-out pawn re-arming from the spare pile, and the
             // release that lets them shop once their parked kit is worn out.

@@ -698,6 +698,21 @@ dressing again after — two wardrobe walks for a job needing no suit. Changing
 is the expensive part, not the wearing, and that is the general principle this
 list encodes.
 
+The list also carries vanilla's six feeding givers, the only official rows on
+it: feeding patients and animals, feeding prisoners and delivering their food,
+and the two hemogen equivalents. Every one builds its job with the FOOD in
+targetA and the patient or prisoner in targetB (`WorkGiver_FeedPatient`,
+`WorkGiver_Warden_Feed`, `WorkGiver_Warden_DeliverFood`,
+`Workgiver_AdministerHemogen`, `WorkGiver_Warden_DeliverHemogen`), so the job
+read as happening wherever the meal was stored. A doctor in scrubs changed out
+to fetch a meal from the freezer and back in for the next tend; a warden did the
+same with a stand in the cell, where delivering food can never read as the
+cell at all, because its giver refuses food already stored there. Reading
+targetB instead would put the job where the meal ends up and dress a bare
+doctor before a trip whose first leg is the freezer. A meal run needs no
+uniform, so it rides along. The harness names these six as the deliberate
+official rows and fails on any other.
+
 ### Outfit Stands Plus' stand button
 
 Not a table, and not a Shift Change feature either. Outfit Stands Plus puts a

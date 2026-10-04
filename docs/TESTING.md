@@ -95,7 +95,7 @@ does.
 
 ## What the cases assert
 
-Thirty-eight cases, in seven kinds.
+Fifty-seven cases.
 
 **Regression cases** guard a bug that happened. A stand whose stock shares no
 apparel layer with what the pawn wears once donated its uniform permanently and
@@ -230,6 +230,13 @@ is asserted at all. And it asks the list directly whether the switch hands back
 the walk when off. Together with the IL check, that is what shows the off arm
 was their walk; without it, a list answering both arms would compare equal to
 itself.
+
+**Ride-along cases** cover the jobs a uniform stays on for, each one a
+change-out the return trip used to make for nothing. Feeding drives every
+vanilla feeding giver with the meal stored in the stand's room, where nobody may
+be dressed for it, and in storage elsewhere, where nobody may be changed out for
+it, each beside the same job under a giver that is not on the list, which still
+dresses and still changes them back.
 
 **Round-trip cases** save the game, load it back through the engine's own
 synchronous loader, and assert on what came out. There are three: a plain trip
