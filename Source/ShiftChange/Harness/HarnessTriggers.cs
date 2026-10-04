@@ -874,6 +874,57 @@ namespace ShiftChange
                 & Expect(!RoomWorkTypes.RestForRole(null),
                          "and neither does an unroled room");
         }
+
+        /// <summary>
+        /// FISHING IS TICKABLE AND NEVER DRESSES: a known gap, kept on purpose.
+        ///
+        /// <para>Odyssey's Fish giver (work type Fishing) hands its jobs out
+        /// from <c>WorkGiver_Fish.NonScanJob</c> only, and <c>JobGiver_Work</c>
+        /// stamps <c>workGiverDef</c> on its scanner paths alone, so a fishing
+        /// job arrives with no giver and the work arm never sees it. The fix is
+        /// the shape medical bed rest already uses, a job-to-work-type row for
+        /// an unstamped non-scan job, and it is not made here.</para>
+        ///
+        /// <para>The reason is where fishing happens. Its target is the water,
+        /// which is outdoors on almost every map, and every outdoor cell is one
+        /// map-wide room. So the only stand the row could reach today is one
+        /// standing in the open, which would then dress for every fishing spot
+        /// on the map, while a stand in a hut by the lake, the layout a player
+        /// would build, stays inert. That fix belongs with the release that
+        /// gives a stand a boundary beyond its room.</para>
+        ///
+        /// <para>The control is the same job carrying its giver, which dresses:
+        /// the stand, the room and the work type are not the problem, the
+        /// missing stamp is.</para>
+        /// </summary>
+        internal static bool FishingNeverDresses(Fixture fix)
+        {
+            WorkTypeDef fishing = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Fishing");
+            WorkGiverDef fishGiver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("Fish");
+            JobDef fish = JobDefOf.Fish;
+            if (fishing == null || fishGiver == null || fish == null)
+            {
+                return Expect(false, "Odyssey's fishing work type, giver and job resolve");
+            }
+            fix.Comp.ToggleWork(fishing);
+            MakeCalm(fix.Map);
+
+            // The shape WorkGiver_Fish.NonScanJob builds: the fishing cell in A,
+            // the cell to stand on in B. Both inside the room here, so the room
+            // is not what decides it.
+            IntVec3 spot = fix.Stand.Position + new IntVec3(3, 0, 3);
+            IntVec3 standOn = fix.Stand.Position + new IntVec3(3, 0, 2);
+            Job stamped = JobMaker.MakeJob(fish, spot, standOn);
+            stamped.workGiverDef = fishGiver;
+
+            bool ok = Expect(fix.Comp.HandlesWork(fishing), "the stand is ticked for fishing")
+                    & Expect(Probe(fix, stamped, JobTag.Fieldwork),
+                             "a fishing job carrying its giver would dress (control)");
+            return ok & ExpectKnownGap(Probe(fix, JobMaker.MakeJob(fish, spot, standOn), JobTag.Fieldwork),
+                "a fishing job as Odyssey hands it out dresses",
+                "it arrives with no giver; the fix waits for stand boundaries beyond the room, "
+                + "since fishing water is outdoors and the outdoors is one map-wide room");
+        }
     }
 }
 #endif

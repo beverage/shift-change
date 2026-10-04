@@ -97,7 +97,7 @@ does.
 
 ## What the cases assert
 
-Sixty-six cases.
+Sixty-seven cases.
 
 **Regression cases** guard a bug that happened. A stand whose stock shares no
 apparel layer with what the pawn wears once donated its uniform permanently and
@@ -390,9 +390,12 @@ diagnosed in one run each because of it; a bare "timed out" would have cost
 several ten-minute cycles apiece.
 
 **Count known gaps apart from failures.** A case can be marked `GAP` with its
-reason recorded — it still runs, and reports `FIXED` if it starts passing. There
-are none today. The mechanism exists because a suite that always prints one
-failure is ignored within a week.
+reason recorded — it still runs, and reports `FIXED` if it starts passing. Most
+gaps are a case whose mod is not on the list. One is a real gap, kept on purpose
+on every list: fishing never dresses, because Odyssey hands fishing out with no
+giver, and the fix waits for stands that can serve beyond their room. Its
+control, the same job carrying its giver, does dress. The mechanism exists
+because a suite that always prints one failure is ignored within a week.
 
 ## Two engine traps
 
