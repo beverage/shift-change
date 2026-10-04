@@ -306,6 +306,15 @@ namespace ShiftChange
                  StandOutsideTheAreaKeepsTheOutfitOn);
             Case(map, pad, "feeding a patient or a prisoner neither dresses nor undresses anyone",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), FeedingRidesAlong);
+            Case(map, pad, "an errand queued ahead of work the stand serves keeps the uniform on",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 DetourAheadOfServedWorkKeepsTheUniform);
+            Case(map, pad, "and so does vanilla's own opportunistic haul on the way to a bill",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Hauling")),
+                 VanillaOpportunisticHaulKeepsTheUniform);
+            // A known gap unless the mod is loaded (--with=).
+            Case(map, pad, "Common Sense's bill haul keeps a cook in uniform",
+                 StageWithDoorway, CommonSenseBillHaulKeepsTheUniform);
             // The pair, and it only means anything as a pair: the refusal that
             // stops a checked-out pawn re-arming from the spare pile, and the
             // release that lets them shop once their parked kit is worn out.
@@ -436,6 +445,14 @@ namespace ShiftChange
 
             /// <summary>Extra pawns a case spawned; swept by <see cref="Teardown"/>.</summary>
             internal List<Pawn> Extras = new List<Pawn>();
+
+            /// <summary>
+            /// The strip of open ground outside the door that
+            /// <see cref="HarnessFixtures.StageWithDoorway"/> cuts into the west
+            /// wall. Empty for every other fixture. <see cref="Teardown"/>
+            /// clears it along with the pad.
+            /// </summary>
+            internal CellRect Outside = CellRect.Empty;
         }
 
         /// <summary>

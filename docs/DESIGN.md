@@ -207,6 +207,44 @@ Ingest-family jobs are therefore identified by driver class and bypass the room
 test: food already on the pawn means no divert, eat as-is; anything else means
 change out first, wherever the food is stored.
 
+### Errands queued ahead of work
+
+A job with no giver arriving while the head of the queue is work the pawn's
+stand serves, in the stand's room, is an errand slotted in ahead of that work.
+The pawn is coming straight back, so the return trip lets the uniform ride
+along instead of changing them out first.
+
+Two things build that shape, and neither is ours. Vanilla does, for any job
+whose def allows an opportunistic prefix, `DoBill` among them: `StartJob` puts
+the work job at the front of the queue and starts a haul in its place
+(`Pawn_JobTracker.cs:338-347`). Common Sense does, for bills, with its "haul
+ingredients over doing bills" setting on, which is how it ships. Its own
+`StartJob` prefix takes a bill that arrives with an empty queue, and when an
+ingredient lies outside the bench's room and its storage is nearer the cook
+than the bench is, it queues the haul and then the bill and skips the start.
+Neither haul carries a giver. Judged on its own target, the haul read as leaving
+the room, so a cook in whites changed out to fetch an ingredient and changed
+back in for the bill.
+
+Common Sense's prefix always runs before ours, whatever the load order. It
+patches from its `Mod` constructor and we patch from a static constructor, so
+it is registered first at equal priority, and a bool prefix that returns false
+makes Harmony skip every later bool prefix (`MethodCreator.AddPrefixes` tests
+the run-original flag before each one). So the haul is the first job of the
+pair we see, and it reaches us from the queue at the next job boundary.
+
+The signal, exactly: the incoming job has no `workGiverDef`; the queue's head
+has one, its work type is one the stand serves, and it is not on the
+ignored-giver list; and the head resolves to the stand's room through the same
+resolver both directions use. Whether the incoming job came off the queue or
+was started from inside `StartJob` makes no difference. Our own swap never
+counts as the head, since it carries no giver.
+
+It governs staying dressed and nothing else. It is asked on the return trip
+only, so a pawn not on shift is dressed when the queued work itself starts,
+never for the errand in front of it. It sits below the meal branch, which keeps
+its own policy, and recreation and sleep jobs are excluded.
+
 ### Allowed areas
 
 A stand outside a pawn's allowed area is unavailable to that pawn, in both

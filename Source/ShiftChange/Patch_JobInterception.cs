@@ -786,6 +786,19 @@ namespace ShiftChange
                     // Staying dressed is the safe answer either way.
                     return false;
                 }
+                // An errand slotted in AHEAD of this stand's own work: they are
+                // coming straight back to it, so changing out first is a round
+                // trip to the stand for nothing. Below the meal branch on
+                // purpose, which keeps its own policy. See QueuedAheadOfServedWork.
+                if (QueuedAheadOfServedWork(job, tracker, onShift, standRoom, map))
+                {
+                    if (Verbose)
+                    {
+                        Log.Message($"[ShiftChange] {pawn.LabelShort} keeps the outfit on for " +
+                                    $"{job.def.defName}: {onShift.parent.LabelShort}'s work is queued next");
+                    }
+                    return false;
+                }
                 return Insert(pawn, tracker, onShift, job, tag, "return");
             }
 
@@ -1670,6 +1683,60 @@ namespace ShiftChange
             return stand != null && pawn != null
                    && stand.MapHeld != null && stand.MapHeld == pawn.MapHeld
                    && stand.IsForbidden(pawn);
+        }
+
+        /// <summary>
+        /// This job carries no giver, and the next job in the queue is work this
+        /// on-shift stand serves, in its own room: an errand slotted in ahead of
+        /// the stand's own work, which the pawn is coming straight back to.
+        ///
+        /// <para>Two things build that shape. Vanilla does, for any job whose
+        /// def allows an opportunistic prefix (<c>DoBill</c> among them):
+        /// <c>Pawn_JobTracker.StartJob</c> puts the work job at the front of the
+        /// queue and starts a haul in its place (<c>TryOpportunisticJob</c>).
+        /// Common Sense does, for bills, with "haul ingredients over doing bills"
+        /// on, which is how it ships: its own <c>StartJob</c> prefix queues a
+        /// haul of an ingredient lying outside the bench's room, then the bill,
+        /// and skips the start. Neither haul carries a giver. Judged on its own
+        /// target, the haul read as leaving the room, so a cook in whites changed
+        /// out to fetch an ingredient and changed back in for the bill.</para>
+        ///
+        /// <para><b>The signal, exactly.</b> The incoming job has no
+        /// <c>workGiverDef</c>. The head of the queue has one, its work type is
+        /// one this stand serves, and it is not on the ignored-giver list. And
+        /// that queued job resolves to this stand's room through the same
+        /// resolver both directions use. Whether the incoming job came off the
+        /// queue (Common Sense) or not (vanilla's opportunistic haul, started
+        /// from inside <c>StartJob</c>) makes no difference. Our own swap is
+        /// never the head that counts, since it carries no giver.</para>
+        ///
+        /// <para><b>Staying dressed only, never dressing.</b> It is asked on the
+        /// return trip and nowhere else, so a pawn not on shift is dressed when
+        /// the queued work itself starts, never for the errand ahead of it. Jobs
+        /// with a policy of their own keep it: a meal is decided before this is
+        /// reached, and recreation and sleep are excluded here.</para>
+        /// </summary>
+        internal static bool QueuedAheadOfServedWork(Job job, Pawn_JobTracker tracker,
+                                                     CompShiftStand onShift, Room standRoom, Map map)
+        {
+            if (job.workGiverDef != null || IsRecreationJob(job) || IsRestJob(job))
+            {
+                return false;
+            }
+            JobQueue queue = tracker?.jobQueue;
+            if (queue == null || queue.Count == 0)
+            {
+                return false;
+            }
+            Job next = queue.Peek()?.job;
+            WorkGiverDef giver = next?.workGiverDef;
+            if (giver?.workType == null || JobRoomTargets.Ignored(giver)
+                || !onShift.HandlesWork(giver.workType))
+            {
+                return false;
+            }
+            IntVec3 at = IsRecreationJob(next) ? JoyTargetCell(next, map) : TargetCell(next, map);
+            return at.IsValid && at.GetRoom(map) == standRoom;
         }
 
         /// <summary>

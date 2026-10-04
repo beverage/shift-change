@@ -466,6 +466,65 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// <see cref="Stage"/> in an enclosed room with a door in its west wall,
+        /// beside the stand, and the strip of ground outside that wall cleared,
+        /// floored with soil and unfogged.
+        ///
+        /// <para>For the cases that need a colonist inside the room to REACH
+        /// something outside it. A sealed room is a fine stand-in while nothing
+        /// is walked to, but hauling asks <c>CanReach</c> before it hands out a
+        /// job (<c>HaulAIUtility.PawnCanAutomaticallyHaulFast</c>), and the
+        /// return trip asks it of the stand before it starts a swap. Sealed in,
+        /// neither a haul nor a change-back can happen, and a case would pass
+        /// for that reason instead of ours.</para>
+        ///
+        /// <para>The strip is the pad's one-cell margin, which
+        /// <see cref="Patch_HarnessAutoRun.TryFindPad"/> keeps in bounds and in
+        /// a room. Soil because a quicktest map can put anything there, and
+        /// unfogged because a fogged item is never hauled.</para>
+        /// </summary>
+        internal static Fixture StageWithDoorway(Map map, CellRect pad)
+        {
+            return StageWithDoorway(map, pad, null);
+        }
+
+        /// <summary>
+        /// <see cref="StageWithDoorway(Map, CellRect)"/> with a colonist who can
+        /// do <paramref name="capableOf"/>. Vanilla's opportunistic haul refuses
+        /// anyone whose hauling is disabled, and a generated colonist's
+        /// backstory can disable it.
+        /// </summary>
+        internal static Fixture StageWithDoorway(Map map, CellRect pad, WorkTypeDef capableOf)
+        {
+            Fixture fix = Stage(map, pad, StageKit.Displacing, enclose: true, capableOf: capableOf);
+            if (fix == null)
+            {
+                return null;
+            }
+            CellRect outside = new CellRect(pad.minX - 1, pad.minZ, 1, pad.Height);
+            if (!outside.InBounds(map))
+            {
+                return null;
+            }
+            IntVec3 doorCell = new IntVec3(pad.minX, 0, pad.minZ + 1);
+            Building wall = doorCell.GetEdifice(map);
+            if (wall != null)
+            {
+                wall.Destroy();
+            }
+            DebugTools_Fixtures.Spawn(map, ThingDefOf.Door, ThingDefOf.WoodLog, doorCell, Rot4.North);
+
+            GenDebug.ClearArea(outside, map);
+            foreach (IntVec3 cell in outside)
+            {
+                map.terrainGrid.SetTerrain(cell, TerrainDefOf.Soil);
+                map.fogGrid.Unfog(cell);
+            }
+            fix.Outside = outside;
+            return fix;
+        }
+
+        /// <summary>
         /// <see cref="Stage"/>, with a second, foreign assignable comp on the
         /// stand: the shape Outfit Stands Plus gives the stands it touches.
         ///
@@ -798,6 +857,18 @@ namespace ShiftChange
                 if (fix.Stand != null && !fix.Stand.Destroyed)
                 {
                     fix.Stand.Destroy();
+                }
+                // The doorway fixture's strip lies outside the pad, so the pad
+                // clear below never reaches it. A zone a case left there goes
+                // too: an extra stockpile on the map is a haul destination for
+                // every case after this one.
+                if (fix.Outside.Area > 0)
+                {
+                    foreach (IntVec3 cell in fix.Outside)
+                    {
+                        map.zoneManager.ZoneAt(cell)?.Delete();
+                    }
+                    GenDebug.ClearArea(fix.Outside, map);
                 }
             }
             GenDebug.ClearArea(pad, map);

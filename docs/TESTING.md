@@ -36,7 +36,9 @@ click a clear 7×7 area.
 `--with=<packageId>` adds a mod to the minimal list, ahead of this one, for a
 case that tests against that mod and is a known gap without it. It can be given
 more than once; the mod's own dependencies are not followed, so name those too.
-It is not a compatibility run: the rest of the list stays minimal.
+It is not a compatibility run: the rest of the list stays minimal. Two mods
+have cases waiting for them: `khamenman.outfitstandsplus` and
+`avilmask.commonsense`.
 `--with-after=<packageId>` does the same with the mod loaded after this one.
 That is the order `loadAfter` in About.xml warns against, and a warning is all
 it is: the game loads whatever order the mod list says. So a case that depends
@@ -95,7 +97,7 @@ does.
 
 ## What the cases assert
 
-Sixty cases.
+Sixty-three cases.
 
 **Regression cases** guard a bug that happened. A stand whose stock shares no
 apparel layer with what the pawn wears once donated its uniform permanently and
@@ -236,7 +238,22 @@ change-out the return trip used to make for nothing. Feeding drives every
 vanilla feeding giver with the meal stored in the stand's room, where nobody may
 be dressed for it, and in storage elsewhere, where nobody may be changed out for
 it, each beside the same job under a giver that is not on the list, which still
-dresses and still changes them back.
+dresses and still changes them back. The errand case puts a giver-less haul in
+front of the stand's own work in the queue and asserts the uniform stays on;
+its controls are the narrowness: nothing queued, work the stand does not
+serve, its work in another room, another errand at the head and a meal break
+all still change them back, and the errand never dresses anyone. Vanilla's own
+opportunistic haul makes the same shape, and its case lets the engine make it:
+the bill is started through the pawn's tracker, and vanilla's `StartJob` queues
+it and starts the haul in its place, back through our prefix. Vanilla's detour
+limits leave the layout in the pad's room about 0.4 of a cell to spare, so the
+case asks vanilla's search directly first, and a layout that stops qualifying
+fails there with the positions in the report.
+
+One more runs another mod's real code and is a known gap without it: Common
+Sense's own prefix builds its bill haul through the pawn's tracker and ours then
+judges it, so the case asserts the shape Common Sense produced before asserting
+what we did with it.
 
 **Allowed-area cases** cover a stand outside the colonist's allowed area. It
 dresses nobody, the catch-up interrupts nobody for it, and a shared stand
@@ -314,6 +331,7 @@ green log out of a suite that checks nothing.
   about a mod that was not installed. Two cases reach further when Outfit
   Stands Plus is loaded: the interop case asserts against it, and the
   legacy-key case takes the branch that declines the generic keys to its comp.
+  Common Sense has one case that runs its code.
 - **UI.** No case draws a gizmo or opens a window. One allowed-area case reads
   an inspect string, without drawing it.
 - **Trade.** No case opens a trade session or builds a `TradeDeal`, so the
