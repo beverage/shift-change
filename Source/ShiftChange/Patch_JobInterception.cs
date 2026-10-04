@@ -558,7 +558,10 @@ namespace ShiftChange
             // Some givers are not ours to act on, and for the same reason the
             // uniform rides along here rather than forcing a detour. See
             // JobRoomTargets.IgnoredGivers — keyed on the giver because the
-            // job def cannot always tell two givers apart.
+            // job def cannot always tell two givers apart. Its job-keyed twin,
+            // RidesAlong, covers the giver-less follow-ups a haul leaves behind
+            // (a hauling mod's unload, its next queued haul), which have no
+            // giver to key on.
             //
             // ONE OPT-IN CARVE-OUT, off by default: a player who wants their
             // doctors in scrubs for the call that matters can say so, and then
@@ -573,7 +576,8 @@ namespace ShiftChange
             if (job.playerForced
                 || (job.workGiverDef?.emergency == true
                     && !EmergencyDressingAllowed(job.workGiverDef))
-                || JobRoomTargets.Ignored(job.workGiverDef))
+                || JobRoomTargets.Ignored(job.workGiverDef)
+                || JobRoomTargets.RidesAlong(job))
             {
                 return false;
             }

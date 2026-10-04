@@ -407,6 +407,11 @@ cook fetch an ingredient lying outside the kitchen before starting the bill. A
 cook already in uniform now does that fetch in uniform and goes straight back
 to the bill, instead of changing out for the haul and back in for the bill.
 
+**[Pick Up And Haul](https://steamcommunity.com/sharedfiles/filedetails/?id=1279012058)**
+works alongside this mod as well. A colonist who hauls out of their work room in
+uniform unloads in it too, and changes back on their next ordinary job, rather
+than walking back to the stand with full pockets to change before unloading.
+
 **An apparel mod is worth having.** Not required and not a dependency, but
 vanilla has no scrubs and no chef's whites, and the one lab coat it does have
 is Anomaly's, so in a pure vanilla game there is very little to actually dress

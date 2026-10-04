@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using RimWorld;
 using Verse;
+using Verse.AI;
 
 namespace ShiftChange
 {
@@ -154,6 +155,50 @@ namespace ShiftChange
         internal static bool Ignored(WorkGiverDef giver)
         {
             return giver != null && IgnoredGivers.Contains(giver.defName);
+        }
+
+        /// <summary>
+        /// JobDefs whose jobs ride along when they carry NO giver: the
+        /// follow-ups a haul leaves behind it, which finish the haul rather than
+        /// start anything new. Same answer as <see cref="IgnoredGivers"/>, keyed
+        /// on the job because these have no giver to key on.
+        ///
+        /// <para>Pick Up And Haul hands its haul out through its own work giver,
+        /// and that job is judged at its first item like any haul. Everything it
+        /// queues after that carries no giver. <c>UnloadYourHauledInventory</c>
+        /// is queued at the storage cell when a haul arrives, and on the pawn
+        /// itself by its unload checker; a second <c>HaulToInventory</c> is
+        /// queued by its driver when it spots more to carry nearby. Judged on
+        /// their own targets, both read as leaving the room, so a dressed pawn
+        /// who hauled out of their work room walked back to the stand with full
+        /// pockets, changed, and walked out again to unload.</para>
+        ///
+        /// <para>The giver is what separates the two <c>HaulToInventory</c>
+        /// jobs, which is why the test is "no giver" and not the def alone. One
+        /// handed out by the work giver is a fresh haul and is still judged at
+        /// its first item. One without a giver is a continuation: queued by the
+        /// mod's own driver, or by Common Sense ahead of a bill. The giverless
+        /// paths that hand one out fresh, through <c>JobGiver_Haul</c>, sit in
+        /// the animal, insect and dryad think trees only.</para>
+        ///
+        /// <para>Vanilla's <c>UnloadYourInventory</c> carries no target at all
+        /// (<c>JobGiver_UnloadYourInventory</c>), so it already rode along: an
+        /// unreadable location keeps a pawn dressed. Listed so that stays true
+        /// if anything ever hands it a target.</para>
+        /// </summary>
+        internal static readonly HashSet<string> RideAlongJobs =
+            new HashSet<string>
+            {
+                "UnloadYourHauledInventory",
+                "HaulToInventory",
+                "UnloadYourInventory",
+            };
+
+        /// <summary>Whether this job is a giver-less follow-up the uniform rides along on.</summary>
+        internal static bool RidesAlong(Job job)
+        {
+            return job?.def != null && job.workGiverDef == null
+                   && RideAlongJobs.Contains(job.def.defName);
         }
     }
 }

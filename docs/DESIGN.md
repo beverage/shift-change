@@ -633,7 +633,7 @@ anyone walking in to eat, changes nothing.
 
 ## Mod compatibility
 
-Four tables, each keyed by defName and each allowed to miss. A name no loaded
+Five tables, each keyed by defName and each allowed to miss. A name no loaded
 mod supplies is a mod that is not installed, which is the ordinary case — so
 every lookup is silent-fail and an absent row simply narrows the answer. They
 are separate tables rather than one because they fail differently: a missing
@@ -783,6 +783,20 @@ targetB instead would put the job where the meal ends up and dress a bare
 doctor before a trip whose first leg is the freezer. A meal run needs no
 uniform, so it rides along. The harness names these six as the deliberate
 official rows and fails on any other.
+
+**Jobs that ride along without a giver** (`JobRoomTargets.RideAlongJobs`). The
+giver-keyed list's twin for jobs that have no giver to key on: the follow-ups a
+haul leaves behind it. Pick Up And Haul hands its haul out through its own work
+giver, and that job is judged at its first item like any haul. What it queues
+afterwards carries no giver: `UnloadYourHauledInventory` at the storage cell
+when the haul arrives and on the pawn itself from its unload checker, and a
+further `HaulToInventory` when its driver spots more to carry nearby. Judged on
+their own targets, both read as leaving the room, so a cook who hauled out of
+the kitchen in whites walked back to the stand with full pockets, changed, and
+walked out again to unload. A job on this list rides along only when it carries
+no giver, which is what keeps a freshly handed-out `HaulToInventory` judged at
+its first item as before. Vanilla's `UnloadYourInventory` is on the list too,
+though it already rode along by carrying no target at all, so that it stays so.
 
 ### Outfit Stands Plus' stand button
 

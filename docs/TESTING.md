@@ -36,9 +36,9 @@ click a clear 7×7 area.
 `--with=<packageId>` adds a mod to the minimal list, ahead of this one, for a
 case that tests against that mod and is a known gap without it. It can be given
 more than once; the mod's own dependencies are not followed, so name those too.
-It is not a compatibility run: the rest of the list stays minimal. Two mods
-have cases waiting for them: `khamenman.outfitstandsplus` and
-`avilmask.commonsense`.
+It is not a compatibility run: the rest of the list stays minimal. Three mods
+have cases waiting for them: `khamenman.outfitstandsplus`,
+`avilmask.commonsense` and `mehni.pickupandhaul`.
 `--with-after=<packageId>` does the same with the mod loaded after this one.
 That is the order `loadAfter` in About.xml warns against, and a warning is all
 it is: the game loads whatever order the mod list says. So a case that depends
@@ -97,7 +97,7 @@ does.
 
 ## What the cases assert
 
-Sixty-three cases.
+Sixty-four cases.
 
 **Regression cases** guard a bug that happened. A stand whose stock shares no
 apparel layer with what the pawn wears once donated its uniform permanently and
@@ -250,10 +250,12 @@ limits leave the layout in the pad's room about 0.4 of a cell to spare, so the
 case asks vanilla's search directly first, and a layout that stops qualifying
 fails there with the positions in the report.
 
-One more runs another mod's real code and is a known gap without it: Common
-Sense's own prefix builds its bill haul through the pawn's tracker and ours then
-judges it, so the case asserts the shape Common Sense produced before asserting
-what we did with it.
+Two more run another mod's real code and are known gaps without it. In one,
+Common Sense's own prefix builds its bill haul through the pawn's tracker and
+ours then judges it, so the case asserts the shape Common Sense produced before
+asserting what we did with it. In the other, Pick Up And Haul's three follow-up
+jobs are started from the queue the way its driver hands them over, beside a
+haul from its own work giver, which still changes them back.
 
 **Allowed-area cases** cover a stand outside the colonist's allowed area. It
 dresses nobody, the catch-up interrupts nobody for it, and a shared stand
@@ -331,7 +333,7 @@ green log out of a suite that checks nothing.
   about a mod that was not installed. Two cases reach further when Outfit
   Stands Plus is loaded: the interop case asserts against it, and the
   legacy-key case takes the branch that declines the generic keys to its comp.
-  Common Sense has one case that runs its code.
+  Common Sense and Pick Up And Haul each have one case that runs their code.
 - **UI.** No case draws a gizmo or opens a window. One allowed-area case reads
   an inspect string, without drawing it.
 - **Trade.** No case opens a trade session or builds a `TradeDeal`, so the

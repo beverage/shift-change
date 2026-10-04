@@ -25,7 +25,8 @@ namespace ShiftChange
     /// Harness cases for jobs the uniform RIDES ALONG on: errands that are
     /// part of work already under way, where changing out and back in again
     /// costs two wardrobe walks and buys nothing. Feeding a patient or a
-    /// prisoner, and a haul slotted in ahead of a bill.
+    /// prisoner, a haul slotted in ahead of a bill, and the follow-up jobs a
+    /// hauling mod queues behind its own haul.
     ///
     /// <para>Each one reached this file the same way: the return trip judged
     /// the errand by where its first target stands, which is the storeroom
@@ -419,6 +420,26 @@ namespace ShiftChange
             }
         }
 
+        /// <summary>
+        /// Start the queue's head the way the engine does: end whatever the
+        /// pawn is doing and let the think tree's queue node hand it out. That
+        /// runs every <c>StartJob</c> prefix in the load order, ours and any
+        /// other mod's, in their real order. Returns the def the pawn ended up
+        /// on, then leaves the pawn idle and the queue empty.
+        /// </summary>
+        internal static JobDef StartFromQueue(Fixture fix, Job job, JobTag? tag)
+        {
+            Pawn pawn = fix.Pawn;
+            pawn.jobs.ClearQueuedJobs();
+            pawn.jobs.jobQueue.EnqueueFirst(job, tag);
+            pawn.jobs.EndCurrentJob(JobCondition.InterruptForced, startNewJob: true);
+            JobDef started = pawn.CurJobDef;
+            pawn.jobs.EndCurrentJob(JobCondition.InterruptForced, startNewJob: false);
+            pawn.jobs.ClearQueuedJobs();
+            Patch_JobInterception.LastBlockedTick.Remove(pawn.thingIDNumber);
+            return started;
+        }
+
         /// <summary>The job's first target or its first queued one is this thing.</summary>
         internal static bool Hauls(Job job, Thing thing)
         {
@@ -556,6 +577,107 @@ namespace ShiftChange
             Job lone = HaulAIUtility.HaulToStorageJob(pawn, potatoes, false);
             return ok & Expect(lone != null && Probe(fix, lone),
                                "the same haul with no bill behind it still changes them back (control)");
+        }
+
+        /// <summary>
+        /// PICK UP AND HAUL'S FOLLOW-UP JOBS KEEP THE UNIFORM ON.
+        ///
+        /// <para>Pick Up And Haul hands a haul out at its first item, as any
+        /// haul is, through its own work giver. Everything it queues after
+        /// that carries no giver and is judged on its own target: the unload at
+        /// the end of the haul targets the storage cell
+        /// (<c>JobDriver_HaulToInventory</c>, the last toil), the unload its
+        /// checker queues targets the pawn itself
+        /// (<c>PawnUnloadChecker</c>), and the next haul its driver queues when
+        /// it spots more nearby is judged at that haul's first item. A cook
+        /// who hauled out of the kitchen in whites therefore walked back to the
+        /// stand with full pockets, changed, and walked out again to unload.</para>
+        ///
+        /// <para>Each row is started from the queue through the pawn's own
+        /// tracker, the way the mod's driver hands it over. A known gap without
+        /// the mod.</para>
+        /// </summary>
+        internal static bool PickUpAndHaulFollowUpsKeepTheUniform(Fixture fix)
+        {
+            JobDef unload = DefDatabase<JobDef>.GetNamedSilentFail("UnloadYourHauledInventory");
+            JobDef toInventory = DefDatabase<JobDef>.GetNamedSilentFail("HaulToInventory");
+            WorkGiverDef theirGiver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("HaulToInventory");
+            if (unload == null || toInventory == null || theirGiver == null)
+            {
+                return ExpectKnownGap(false, "Pick Up And Haul's follow-up jobs keep the uniform on",
+                    "Pick Up And Haul is not on this mod list; --with=mehni.pickupandhaul loads it");
+            }
+            WorkTypeDef cooking = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Cooking");
+            ThingDef potatoDef = DefDatabase<ThingDef>.GetNamedSilentFail("RawPotatoes");
+            if (cooking == null || potatoDef == null || fix.Outside.Area == 0)
+            {
+                return Expect(false, "the cooking and potato defs resolve and the doorway fixture staged");
+            }
+            Map map = fix.Map;
+            Pawn pawn = fix.Pawn;
+            fix.Comp.ToggleWork(cooking);
+            MakeCalm(map);
+
+            // Their driver reads its comp off the pawn the moment it starts, so
+            // a pawn without it would throw for a reason that is not ours.
+            if (!Expect(pawn.AllComps.Any(c => c.GetType().Name == "CompHauledToInventory"),
+                        "the colonist carries Pick Up And Haul's inventory comp (control)"))
+            {
+                return false;
+            }
+
+            IntVec3 storeCell = new IntVec3(fix.Outside.minX, 0, fix.Stand.Position.z);
+            IntVec3 itemCell = new IntVec3(fix.Outside.minX, 0, fix.Outside.maxZ - 1);
+            IntVec3 standingOut = new IntVec3(fix.Outside.minX, 0, fix.Outside.maxZ - 3);
+            Thing potatoes = ThingMaker.MakeThing(potatoDef);
+            potatoes.stackCount = 10;
+            GenSpawn.Spawn(potatoes, itemCell, map);
+
+            bool ok = Expect(RunSwap(fix), "dressed for the shift")
+                    & Expect(fix.Comp.OnShift, "and is on shift (control)");
+            if (!fix.Comp.OnShift)
+            {
+                return false;
+            }
+
+            // The haul as their work giver hands it out: stamped, judged at its
+            // first item, outside the kitchen. That has always changed them
+            // back first, and still does.
+            Job handedOut = HaulToInventoryJob(toInventory, potatoes, storeCell);
+            handedOut.workGiverDef = theirGiver;
+            ok &= Expect(Probe(fix, handedOut),
+                         "a haul their work giver hands out, starting outside, changes them back first (control)");
+
+            JobDef started = StartFromQueue(fix, JobMaker.MakeJob(unload, storeCell), JobTag.Misc);
+            ok &= Expect(started == unload,
+                         "the unload queued at the storage keeps the uniform on (started: "
+                         + (started == null ? "nothing" : started.defName) + ")");
+
+            started = StartFromQueue(fix, HaulToInventoryJob(toInventory, potatoes, storeCell), JobTag.Misc);
+            ok &= Expect(started == toInventory,
+                         "the next haul their driver queues keeps the uniform on (started: "
+                         + (started == null ? "nothing" : started.defName) + ")");
+
+            IntVec3 home = pawn.Position;
+            pawn.pather?.StopDead();
+            pawn.Position = standingOut;
+            started = StartFromQueue(fix, JobMaker.MakeJob(unload, pawn), JobTag.Misc);
+            pawn.pather?.StopDead();
+            pawn.Position = home;
+            ok &= Expect(started == unload,
+                         "the unload their checker queues on the pawn, out of the room, keeps it on too (started: "
+                         + (started == null ? "nothing" : started.defName) + ")");
+            return ok & Expect(fix.Comp.OnShift, "and they are still on shift at the end");
+        }
+
+        /// <summary>A Pick Up And Haul haul, shaped the way their giver and driver build one.</summary>
+        internal static Job HaulToInventoryJob(JobDef def, Thing thing, IntVec3 storeCell)
+        {
+            Job job = JobMaker.MakeJob(def, LocalTargetInfo.Invalid, storeCell);
+            job.targetQueueA = new List<LocalTargetInfo> { thing };
+            job.targetQueueB = new List<LocalTargetInfo> { storeCell };
+            job.countQueue = new List<int> { thing.stackCount };
+            return job;
         }
     }
 }

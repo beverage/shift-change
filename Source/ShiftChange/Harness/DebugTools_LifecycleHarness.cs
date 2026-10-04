@@ -312,9 +312,11 @@ namespace ShiftChange
             Case(map, pad, "and so does vanilla's own opportunistic haul on the way to a bill",
                  (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Hauling")),
                  VanillaOpportunisticHaulKeepsTheUniform);
-            // A known gap unless the mod is loaded (--with=).
+            // Known gaps unless the mod is loaded (--with=).
             Case(map, pad, "Common Sense's bill haul keeps a cook in uniform",
                  StageWithDoorway, CommonSenseBillHaulKeepsTheUniform);
+            Case(map, pad, "Pick Up And Haul's follow-up jobs keep the uniform on",
+                 StageWithDoorway, PickUpAndHaulFollowUpsKeepTheUniform);
             // The pair, and it only means anything as a pair: the refusal that
             // stops a checked-out pawn re-arming from the spare pile, and the
             // release that lets them shop once their parked kit is worn out.

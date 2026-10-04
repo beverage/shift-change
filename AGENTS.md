@@ -79,11 +79,12 @@ if a case fails. Touch `PostDeSpawn`, `PostSwapMap`, `ReleaseBorrower`,
 `AbandonLedger` or `Patch_UnclaimStands` and run it.
 
 A harness pass is not a play observation, and a `GAP` line is a known failure
-being tracked, not a pass. **Four gaps are expected on the default list**: the
+being tracked, not a pass. **Five gaps are expected on the default list**: the
 Rimatomics table and marker cases skip themselves when Rimatomics is not
-loaded, and the Outfit Stands Plus and Common Sense cases when their mod is not
-(`--with=` loads each). So a clean default run reads `0 failed, 4 known gaps`
-and exits 0. Any other gap, or any failure, is real. It does now run
+loaded, and the Outfit Stands Plus, Common Sense and Pick Up And Haul cases
+when their mod is not (`--with=` loads each). So a clean default run reads
+`0 failed, 5 known gaps` and exits 0. Any other gap, or any failure, is real.
+It does now run
 `JobDriver_SwapAtStand` for real, through the pawn's own tracker, so "the
 driver builds a correct ledger" is covered, and the player-facing rules have
 functional cases. Save/load round trips are covered by three cases that load

@@ -413,7 +413,14 @@ namespace ShiftChange
             new HashSet<string>(HarnessRideAlong.FeedPatientGivers.Concat(HarnessRideAlong.DeliverFoodGivers));
 
         /// <summary>
-        /// <see cref="JobRoomTargets"/> holds two lists, mostly of another
+        /// The same for <see cref="JobRoomTargets.RideAlongJobs"/>: vanilla's
+        /// target-less unload, and no other official job.
+        /// </summary>
+        internal static readonly HashSet<string> DeliberatelyRiddenOfficialJobs =
+            new HashSet<string> { "UnloadYourInventory" };
+
+        /// <summary>
+        /// <see cref="JobRoomTargets"/> holds three lists, mostly of another
         /// mod's defNames. Those rows are ALLOWED to miss — that is what a
         /// compat table is — so the standing assertions are structural, and the
         /// resolution assertions only fire when the mod is actually loaded.
@@ -431,18 +438,36 @@ namespace ShiftChange
         {
             bool ok = Expect(JobRoomTargets.RoomIsTargetB.Count > 0, "the targetB list is not empty");
             ok &= Expect(JobRoomTargets.IgnoredGivers.Count > 0, "the ignored-giver list is not empty");
+            ok &= Expect(JobRoomTargets.RideAlongJobs.Count > 0, "the ride-along list is not empty");
             ok &= Expect(!JobRoomTargets.RoomIsTargetB.Any(string.IsNullOrEmpty)
-                         && !JobRoomTargets.IgnoredGivers.Any(string.IsNullOrEmpty),
+                         && !JobRoomTargets.IgnoredGivers.Any(string.IsNullOrEmpty)
+                         && !JobRoomTargets.RideAlongJobs.Any(string.IsNullOrEmpty),
                          "no entry is blank");
-            ok &= Expect(!JobRoomTargets.UsesTargetB(null) && !JobRoomTargets.Ignored(null),
+            ok &= Expect(!JobRoomTargets.UsesTargetB(null) && !JobRoomTargets.Ignored(null)
+                         && !JobRoomTargets.RidesAlong(null),
                          "a null def matches nothing");
+
+            // The giver test that separates a fresh haul from a continuation.
+            Job unload = JobMaker.MakeJob(JobDefOf.UnloadYourInventory);
+            ok &= Expect(JobRoomTargets.RidesAlong(unload), "a listed job with no giver rides along");
+            unload.workGiverDef = DefDatabase<WorkGiverDef>.GetNamedSilentFail("HaulGeneral");
+            ok &= Expect(unload.workGiverDef == null || !JobRoomTargets.RidesAlong(unload),
+                         "and the same job carrying a giver does not");
 
             foreach (JobDef job in DefDatabase<JobDef>.AllDefsListForReading)
             {
-                if (job.modContentPack != null && job.modContentPack.IsOfficialMod
-                    && JobRoomTargets.RoomIsTargetB.Contains(job.defName))
+                if (job.modContentPack == null || !job.modContentPack.IsOfficialMod)
+                {
+                    continue;
+                }
+                if (JobRoomTargets.RoomIsTargetB.Contains(job.defName))
                 {
                     ok &= Expect(false, "official job " + job.defName + " is NOT retargeted");
+                }
+                if (JobRoomTargets.RideAlongJobs.Contains(job.defName)
+                    && !DeliberatelyRiddenOfficialJobs.Contains(job.defName))
+                {
+                    ok &= Expect(false, "official job " + job.defName + " does NOT ride along");
                 }
             }
             foreach (WorkGiverDef giver in DefDatabase<WorkGiverDef>.AllDefsListForReading)
@@ -465,6 +490,8 @@ namespace ShiftChange
                 ok &= Expect(giver != null && JobRoomTargets.Ignored(giver),
                              "vanilla's " + name + " resolves and is ignored");
             }
+            ok &= Expect(DefDatabase<JobDef>.GetNamedSilentFail("UnloadYourInventory") != null,
+                         "vanilla's UnloadYourInventory resolves");
 
             if (!RimatomicsLoaded)
             {
