@@ -77,7 +77,7 @@
   <ShiftChange.AssignDescExcluded>Choose the one colonist this stand belongs to. It is not used for shift changes, so nobody is dressed here automatically.\n\nIf it had several owners in shift use, they stay listed for when you put it back, and choosing one colonist here replaces them.\n\nIf Outfit Stands Plus is installed, a single owner also gets the Outfit Stands Plus button for this stand (equip outfit, or return to stand).</ShiftChange.AssignDescExcluded>
 
   <ShiftChange.ChangeBackLabel>Change back</ShiftChange.ChangeBackLabel>
-  <ShiftChange.ChangeBackDesc>Cancel this colonist's orders and send them to {STAND} to change out of their work outfit.\n\nUse this when a raid or emergency starts: they will not change back on their own while the map is under threat.\n\nThey keep working in this room in their own clothes, and will not put the outfit back on until they have left the room and returned. Drafting them clears that straight away.</ShiftChange.ChangeBackDesc>
+  <ShiftChange.ChangeBackDesc>Cancel this colonist's orders and send them to {STAND} to change out of their work outfit.\n\nThey change back on their own once their next job takes them out of this room, raid or no raid. Use this when that is not soon enough: in an emergency, or when the job they are on will take a long time.\n\nThey keep working in this room in their own clothes, and will not put the outfit back on until they have left the room and returned. Drafting them clears that straight away.</ShiftChange.ChangeBackDesc>
   <ShiftChange.ChangeBackUnreachable>Cannot reach {STAND}.</ShiftChange.ChangeBackUnreachable>
   <ShiftChange.ChangeBackUnavailable>This colonist cannot change right now.</ShiftChange.ChangeBackUnavailable>
 
