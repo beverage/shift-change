@@ -317,6 +317,22 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// Put a pawn back where a probe found them: off any swap it started,
+        /// nothing queued, no retry cooldown. For cases that call
+        /// <c>TryInsertSwap</c> directly, because they need to look at what it
+        /// left behind before it is cleared.
+        /// </summary>
+        internal static void Settle(Pawn pawn)
+        {
+            if (pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand)
+            {
+                pawn.jobs.EndCurrentJob(JobCondition.InterruptForced, startNewJob: false);
+            }
+            pawn.jobs.ClearQueuedJobs();
+            Patch_JobInterception.LastBlockedTick.Remove(pawn.thingIDNumber);
+        }
+
+        /// <summary>
         /// A job of the given work type, targeted where the pawn stands — so
         /// it reads as work done in the stand's own room.
         /// </summary>

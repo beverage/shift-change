@@ -409,6 +409,13 @@ namespace ShiftChange
                 {
                     continue;
                 }
+                // Outside this pawn's allowed area, so the swap would die on
+                // its first toil (see StandForbiddenTo). Interrupting them for
+                // it is a detour that ends where it started.
+                if (StandForbiddenTo(parent, pawn))
+                {
+                    continue;
+                }
                 if (!pawn.CanReserveAndReach(parent, PathEndMode.InteractionCell, Danger.Deadly))
                 {
                     continue;
@@ -1039,6 +1046,23 @@ namespace ShiftChange
         internal static bool Insert(Pawn pawn, Pawn_JobTracker tracker, CompShiftStand stand,
                                    Job originalJob, JobTag? tag, string direction)
         {
+            // NEVER WALK A PAWN OUT OF THEIR ALLOWED AREA TO CHANGE. The swap
+            // would not get there anyway: it fails on its first toil, inside
+            // StartJob (see StandForbiddenTo). The dress paths already pass such
+            // a stand over, so in practice this is the RETURN TRIP's gate, meal
+            // breaks included, and the uniform rides along until the stand is
+            // back inside the area. The cooldown is what stops the next job
+            // boundary asking again; the stand's inspect pane says why.
+            if (StandForbiddenTo(stand.parent, pawn))
+            {
+                LastBlockedTick[pawn.thingIDNumber] = Find.TickManager.TicksGame;
+                if (Verbose)
+                {
+                    Log.Message($"[ShiftChange] {direction} wanted for {pawn.LabelShort} but " +
+                                $"{stand.parent.LabelShort} is outside their allowed area");
+                }
+                return false;
+            }
             if (!pawn.CanReserveAndReach(stand.parent, PathEndMode.InteractionCell, Danger.Deadly))
             {
                 LastBlockedTick[pawn.thingIDNumber] = Find.TickManager.TicksGame;
@@ -1576,6 +1600,14 @@ namespace ShiftChange
                     {
                         continue;
                     }
+                    // Outside this pawn's allowed area. The swap could not get
+                    // there (see StandForbiddenTo), and because a personal stand
+                    // outranks a shared one below, leaving it in would let a
+                    // forbidden personal stand beat an allowed one beside it.
+                    if (StandForbiddenTo(thing, pawn))
+                    {
+                        continue;
+                    }
                     // Reservation is part of "available", not a formality to
                     // check after choosing. OnShift only becomes true when a
                     // swap COMPLETES, so a stand someone is currently walking
@@ -1586,8 +1618,8 @@ namespace ShiftChange
                     // the exact concurrency pooling exists to serve — that
                     // degraded pooling to roughly one dress per completed
                     // swap however many stands the room had. Asked last of the
-                    // four gates because it is much the most expensive, and
-                    // it is the same call TryDressMidJob already makes.
+                    // gates because it is much the most expensive, and it is
+                    // the same call TryDressMidJob already makes.
                     if (!pawn.CanReserveAndReach(thing, PathEndMode.InteractionCell, Danger.Deadly))
                     {
                         continue;
@@ -1607,6 +1639,37 @@ namespace ShiftChange
                 }
             }
             return best;
+        }
+
+        /// <summary>
+        /// The stand is off limits to this pawn: outside their allowed area, in
+        /// practice, since an outfit stand has no forbid toggle of its own.
+        ///
+        /// <para>Reaching and reserving ignore allowed areas
+        /// (<c>CanReserveAndReach</c> asks only those two things), but the swap
+        /// driver's <c>FailOnDespawnedNullOrForbidden</c> does not:
+        /// <c>ForbidUtility.IsForbidden</c> asks <c>InAllowedArea</c>. So a stand
+        /// that passed every other gate started a swap that ended Incompletable
+        /// on its first toil, inside <c>StartJob</c>, before the pawn took a
+        /// step, and nothing set the retry cooldown. Better Pawn Control makes it
+        /// routine: its alert mode can switch every colonist's area at
+        /// once.</para>
+        ///
+        /// <para>It is the driver's own predicate, so the two cannot disagree. A
+        /// player-forced swap, which is what the Change back button issues, gets
+        /// <c>ignoreForbidden</c> from <c>StartJob</c> and is untouched by any of
+        /// this.</para>
+        ///
+        /// <para>Same map first. A borrower who left with a caravan keeps their
+        /// ledger, and reading the stand's cell against the area of the map they
+        /// stand on now indexes a grid sized for another map: out of range it
+        /// throws, inside it reads the wrong bit.</para>
+        /// </summary>
+        internal static bool StandForbiddenTo(Thing stand, Pawn pawn)
+        {
+            return stand != null && pawn != null
+                   && stand.MapHeld != null && stand.MapHeld == pawn.MapHeld
+                   && stand.IsForbidden(pawn);
         }
 
         /// <summary>

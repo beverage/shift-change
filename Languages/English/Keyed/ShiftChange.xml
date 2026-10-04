@@ -8,6 +8,11 @@
   <ShiftChange.InspectPool>Shared: any capable colonist may use it.</ShiftChange.InspectPool>
   <ShiftChange.InspectPoolDisabled>Unassigned: shared use is turned off in mod settings.</ShiftChange.InspectPoolDisabled>
   <ShiftChange.InspectOnShift>{0} is wearing this outfit.</ShiftChange.InspectOnShift>
+  <!-- Shown under InspectOnShift while the stand is outside the wearer's
+       allowed area, which is the one time they keep the outfit on without
+       anything else on screen saying so. Change back is an order, and orders
+       ignore allowed areas, so it still works. -->
+  <ShiftChange.InspectOutsideArea>This stand is outside {0}'s allowed area, so they will keep the outfit on. Change back still sends them here.</ShiftChange.InspectOutsideArea>
   <ShiftChange.InspectEmpty>Empty: put an outfit on it.</ShiftChange.InspectEmpty>
   <ShiftChange.InspectExcluded>Not used for shift changes.</ShiftChange.InspectExcluded>
 

@@ -293,6 +293,17 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  FreedStandCatchesUp);
+            Case(map, pad, "a stand outside the colonist's allowed area dresses nobody",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 StandOutsideTheAreaDressesNobody);
+            Case(map, pad, "nor do the recreation and sleep arms send anyone to it",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 StandOutsideTheAreaServesNoRecreationOrSleep);
+            Case(map, pad, "a colonist whose stand is outside their area keeps the outfit on, and the stand says why",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 StandOutsideTheAreaKeepsTheOutfitOn);
             Case(map, pad, "feeding a patient or a prisoner neither dresses nor undresses anyone",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), FeedingRidesAlong);
             // The pair, and it only means anything as a pair: the refusal that

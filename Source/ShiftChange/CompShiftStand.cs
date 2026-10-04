@@ -1265,6 +1265,15 @@ namespace ShiftChange
             if (OnShift && borrower != null)
             {
                 line += "\n" + "ShiftChange.InspectOnShift".Translate(borrower.LabelShort);
+                // The one case where the return trip stands aside on its own
+                // and nothing else on screen says so: the stand is outside the
+                // borrower's allowed area, so they keep the outfit on (see
+                // Patch_JobInterception.StandForbiddenTo). Asked live with the
+                // same predicate, so it disappears the moment the area does.
+                if (Patch_JobInterception.StandForbiddenTo(parent, borrower))
+                {
+                    line += "\n" + "ShiftChange.InspectOutsideArea".Translate(borrower.LabelShort);
+                }
             }
             else if (DepositOnly)
             {

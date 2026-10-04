@@ -264,6 +264,10 @@ they were already wearing. A shared sleeping room takes the switch by hand.
   starts wherever the meal is stored, so it used to read as leaving the
   hospital or the cell. A doctor in scrubs or a warden in uniform now keeps it
   on for the trip, and nobody is dressed for one.
+- **Nobody is walked out of their allowed area to change.** A stand outside a
+  colonist's allowed area is passed over, and a colonist whose stand ends up
+  outside it keeps the outfit on until it is back inside. The stand's inspect
+  pane says so. Change back is an order, so it still works.
 - If a stand frees up while someone is already working in its room out of
   uniform, they'll step over and change, unless they're mid-treatment on a
   patient.

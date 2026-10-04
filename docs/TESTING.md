@@ -95,7 +95,7 @@ does.
 
 ## What the cases assert
 
-Fifty-seven cases.
+Sixty cases.
 
 **Regression cases** guard a bug that happened. A stand whose stock shares no
 apparel layer with what the pawn wears once donated its uniform permanently and
@@ -238,6 +238,15 @@ be dressed for it, and in storage elsewhere, where nobody may be changed out for
 it, each beside the same job under a giver that is not on the list, which still
 dresses and still changes them back.
 
+**Allowed-area cases** cover a stand outside the colonist's allowed area. It
+dresses nobody, the catch-up interrupts nobody for it, and a shared stand
+inside the area beats the colonist's own stand outside it. The recreation and
+sleep arms pass it over as well, through the same search. A colonist already in
+its outfit keeps it on, the retry cooldown is set and an inspect line says why,
+and once the stand is back inside the area the next job out of the room changes
+them back as usual. Every refusal sits beside the same setup with the area
+lifted.
+
 **Round-trip cases** save the game, load it back through the engine's own
 synchronous loader, and assert on what came out. There are three: a plain trip
 that carries the owner, the ledger and the forced flags, and that also stages
@@ -305,8 +314,8 @@ green log out of a suite that checks nothing.
   about a mod that was not installed. Two cases reach further when Outfit
   Stands Plus is loaded: the interop case asserts against it, and the
   legacy-key case takes the branch that declines the generic keys to its comp.
-- **UI.** No case draws a gizmo, opens the work-type dialog, or reads an inspect
-  string.
+- **UI.** No case draws a gizmo or opens a window. One allowed-area case reads
+  an inspect string, without drawing it.
 - **Trade.** No case opens a trade session or builds a `TradeDeal`, so the
   withhold-from-trade postfix is verified in play only. A moved
   `PlayerSellableNow` is at least loud, since Harmony reports a target it cannot
@@ -314,7 +323,8 @@ green log out of a suite that checks nothing.
   contents in the first place, so a route quietly rerouted around the deal would
   take the protection with it and say nothing.
 - **Pooling on and off, the optimizer pause, the recolor guard, `SwapPlan`'s
-  rollback, the change-back latch, the retry cooldown.** No cases yet.
+  rollback, the change-back latch.** No cases yet. The retry cooldown is
+  asserted on the allowed-area path only.
 - **A revert of `StaysInBed` to `pawn.InBed()`** — the specific defect the
   wake-up case was written for. The fixture reaches "on a bed" by assigning
   `Position`, never by running a lay-down driver, so posture stays `NotLaying`

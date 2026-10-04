@@ -207,6 +207,39 @@ Ingest-family jobs are therefore identified by driver class and bypass the room
 test: food already on the pawn means no divert, eat as-is; anything else means
 change out first, wherever the food is stored.
 
+### Allowed areas
+
+A stand outside a pawn's allowed area is unavailable to that pawn, in both
+directions, and nothing walks them out of the area to change.
+
+The swap could never have got there anyway, which is what made this a loop
+rather than a choice. `CanReserveAndReach` asks only whether the stand can be
+reached and reserved, and reaching ignores allowed areas, so every gate let it
+through. The swap driver's `FailOnDespawnedNullOrForbidden` does not ignore
+them: `ForbidUtility.IsForbidden` asks `InAllowedArea`
+(`ForbidUtility.cs:117`, `:163`). The swap was reserved, started, and
+ended Incompletable on its first toil inside `StartJob`, before the pawn took a
+step. Only a failed reach set the retry cooldown, so the next job boundary did
+it again. On the dressing side a pawn's own stand outranks a shared one, so a
+forbidden personal stand also beat an allowed shared stand beside it. Better
+Pawn Control makes all of it routine: its alert mode can switch every
+colonist's area at once.
+
+`StandForbiddenTo` is the driver's own predicate, asked by the selector, the
+mid-job catch-up and `Insert`. The selector and the catch-up pass the stand
+over. `Insert` is where the return trip meets it: the uniform rides along, the
+retry cooldown is set, and the stand's inspect pane says why, since a colonist
+who simply never changes back is otherwise all a player would see. It is asked
+live, so the line and the refusal both lift the moment the area changes.
+
+The same map comes first. A borrower who left with a caravan keeps their
+ledger, and reading the stand's cell against the area of the map they stand on
+now indexes a grid sized for another map.
+
+The Change back button is untouched. It is an order, `StartJob` gives an
+ordered job `ignoreForbidden`, and vanilla lets orders cross allowed areas
+too.
+
 ## Building_OutfitStand
 
 Used as-is, with two comps patched onto its def and its container API called from
