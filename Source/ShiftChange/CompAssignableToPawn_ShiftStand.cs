@@ -554,6 +554,13 @@ namespace ShiftChange
                 if (gizmo is Command_Action assign)
                 {
                     assign.action = () => Find.WindowStack.Add(new Dialog_AssignStandOwners(this));
+                    // One button per stand when several are selected, for the
+                    // reason the stand's switch gives (CompShiftStand): merged,
+                    // every stand's dialog opens and each closes the one before,
+                    // so the button edits one owner list while looking as if it
+                    // edits them all. Shared stands all read "Shared (set
+                    // owners)", so they are the ones that merged.
+                    assign.groupable = false;
                 }
                 yield return gizmo;
             }

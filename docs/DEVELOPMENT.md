@@ -187,7 +187,7 @@ Behaviour is verified in game, on a clean Release restart. Two tools help.
 **The demo stage** is the general fixture — a colony in one click, where a swap
 can be watched end to end.
 
-**The lifecycle harness** covers what the demo stage cannot: sixty-five cases
+**The lifecycle harness** covers what the demo stage cannot: sixty-six cases
 that drive the engine's own entry points and assert where the ledger landed.
 What it covers, what it deliberately does not, the rules it follows and the two
 engine traps it had to pay for are all in [TESTING.md](TESTING.md).
@@ -428,7 +428,7 @@ flowchart LR
 | `SessionGuard.cs` | Clears session-scoped statics when the loaded game changes. Route any new static through it. |
 | `HarmonyInit.cs` | Patch bootstrap. |
 | `DebugTools_Fixtures.cs` | Fixture primitives — make a thing, a pawn, a garment. `SCENES \|\| HARNESS`: both dev-only callers gate independently and both build their fixtures from these. |
-| `Harness/DebugTools_LifecycleHarness.cs` | `HARNESS` only. The test suite: the runner, its assertions, its self-check, and the list that registers all sixty-five cases in the order they run. The other cases' bodies, which drive real engine entry points, live in the files beside it — see [TESTING.md](TESTING.md). Its `[DebugAction]` wrapper is `SCENES` on top of that. |
+| `Harness/DebugTools_LifecycleHarness.cs` | `HARNESS` only. The test suite: the runner, its assertions, its self-check, and the list that registers all sixty-six cases in the order they run. The other cases' bodies, which drive real engine entry points, live in the files beside it — see [TESTING.md](TESTING.md). Its `[DebugAction]` wrapper is `SCENES` on top of that. |
 | `Harness/DebugTools_SaveRoundTrip.cs` | `HARNESS` only. The three save/load cases. Separate file because they replace `Current.Game` and must run last. |
 | `Patch_HarnessAutoRun.cs` | `HARNESS` only. Runs the harness and quits, when launched with `-shiftchange-harness`. Neither it nor the flag exists in a shipping build. |
 | `DebugTools_Menu.cs` | `SCENES` only. The mod's entire debug-menu surface: one "Dev tools…" submenu. Absent in Release, so the category never renders. |

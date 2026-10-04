@@ -1352,6 +1352,12 @@ namespace ShiftChange
                 // configuration gizmo reads as "this stand is disabled".
                 // Zero-art rule: icons come from vanilla's atlas only.
                 icon = TexButton.Rename,
+                // One button per stand when several are selected. Merged, a
+                // click runs every stand's action (GizmoGridDrawer), each opens
+                // a dialog, and opening one closes the last
+                // (Window.onlyOneOfTypeAllowed), so the merged button set up one
+                // stand while looking as if it set them all.
+                groupable = false,
                 action = () => Find.WindowStack.Add(new Dialog_SetStandWorkTypes(this)),
             };
         }

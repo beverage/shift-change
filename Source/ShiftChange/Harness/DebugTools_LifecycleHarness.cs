@@ -320,6 +320,8 @@ namespace ShiftChange
                  StageWithDoorway, PickUpAndHaulFollowUpsKeepTheUniform);
             Case(map, pad, "the stand's switch names what it serves, recreation and sleep included",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), SwitchNamesWhatTheStandServes);
+            Case(map, pad, "selecting several stands shows each stand's own buttons",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), StandButtonsStaySeparate);
             // The pair, and it only means anything as a pair: the refusal that
             // stops a checked-out pawn re-arming from the spare pile, and the
             // release that lets them shop once their parked kit is worn out.

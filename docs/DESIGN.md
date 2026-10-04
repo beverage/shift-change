@@ -632,6 +632,19 @@ a count of the rest, built from the same list as the inspect pane's: work
 types, then recreation, then sleep. It once read the work types alone, so a
 working recreation or sleep stand said "no work here yet" on its button.
 
+It is one button per stand, never merged across a selection, and so is the Set
+owner button. Commands with the same face merge when their owners are selected
+together, and a click on the merged button runs every one of them
+(`GizmoGridDrawer`). Each of ours opens a dialog, and opening a window of a
+type already open closes the earlier one (`Window.onlyOneOfTypeAllowed`,
+`WindowStack.Add`), so the merged button set up one stand while looking as if
+it set them all. Editing every selected stand from one dialog was the other
+way to make it honest, and it is a feature rather than a fix: the dialog shows
+one stand's state, an automatic stand's ticks are seeded from its own room, and
+one set ticked across stands in different rooms would overwrite each room's own
+reading with a custom set — the clobbering that kept stand settings off the
+copy and paste buttons.
+
 The trigger is the **job**, not the doorway: work-type-in-set AND
 job-target-in-room. A doctor crossing the hospital to reach the storeroom, or
 anyone walking in to eat, changes nothing.
