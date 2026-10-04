@@ -60,7 +60,9 @@ assert_game_closed() {
   # RimWorld rewrites ModsConfig.xml when it exits. Swapping underneath a
   # running game means the game's in-memory list wins on quit and silently
   # undoes the swap — or worse, writes the minimal list over the real one.
-  if pgrep -f "RimWorldMac.app/Contents/MacOS/RimWorld" >/dev/null; then
+  # Matched by exact process name: -f would also match any command line that
+  # merely mentions the game, such as another script waiting for it to exit.
+  if pgrep -x "RimWorld by Ludeon Studios" >/dev/null; then
     die "RimWorld is running. Quit it first — it rewrites ModsConfig.xml on exit."
   fi
 }
