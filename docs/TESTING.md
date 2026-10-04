@@ -97,7 +97,7 @@ does.
 
 ## What the cases assert
 
-Sixty-four cases.
+Sixty-five cases.
 
 **Regression cases** guard a bug that happened. A stand whose stock shares no
 apparel layer with what the pawn wears once donated its uniform permanently and
@@ -266,6 +266,10 @@ and once the stand is back inside the area the next job out of the room changes
 them back as usual. Every refusal sits beside the same setup with the area
 lifted.
 
+**Button cases** read the stand's buttons the way the gizmo bar gets them,
+without drawing anything. The switch names what the stand serves, recreation
+and sleep included.
+
 **Round-trip cases** save the game, load it back through the engine's own
 synchronous loader, and assert on what came out. There are three: a plain trip
 that carries the owner, the ledger and the forced flags, and that also stages
@@ -334,8 +338,9 @@ green log out of a suite that checks nothing.
   Stands Plus is loaded: the interop case asserts against it, and the
   legacy-key case takes the branch that declines the generic keys to its comp.
   Common Sense and Pick Up And Haul each have one case that runs their code.
-- **UI.** No case draws a gizmo or opens a window. One allowed-area case reads
-  an inspect string, without drawing it.
+- **UI.** No case draws a gizmo or opens a window. The button cases read
+  gizmo labels, and one allowed-area case reads an inspect string, all without
+  drawing.
 - **Trade.** No case opens a trade session or builds a `TradeDeal`, so the
   withhold-from-trade postfix is verified in play only. A moved
   `PlayerSellableNow` is at least loud, since Harmony reports a target it cannot

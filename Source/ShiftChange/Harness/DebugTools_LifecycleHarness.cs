@@ -25,6 +25,7 @@ using static ShiftChange.HarnessFixtures;
 using static ShiftChange.HarnessGates;
 using static ShiftChange.HarnessInterop;
 using static ShiftChange.HarnessLifecycle;
+using static ShiftChange.HarnessGizmos;
 using static ShiftChange.HarnessOwnership;
 using static ShiftChange.HarnessRideAlong;
 using static ShiftChange.HarnessScoring;
@@ -317,6 +318,8 @@ namespace ShiftChange
                  StageWithDoorway, CommonSenseBillHaulKeepsTheUniform);
             Case(map, pad, "Pick Up And Haul's follow-up jobs keep the uniform on",
                  StageWithDoorway, PickUpAndHaulFollowUpsKeepTheUniform);
+            Case(map, pad, "the stand's switch names what it serves, recreation and sleep included",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), SwitchNamesWhatTheStandServes);
             // The pair, and it only means anything as a pair: the refusal that
             // stops a checked-out pawn re-arming from the spare pile, and the
             // release that lets them shop once their parked kit is worn out.

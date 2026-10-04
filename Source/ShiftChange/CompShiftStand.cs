@@ -727,27 +727,37 @@ namespace ShiftChange
         /// </summary>
         public string WorkTypesLabel()
         {
+            List<string> labels = ServedLabels();
+            return labels.Count == 0 ? (string)"ShiftChange.None".Translate() : labels.ToCommaList();
+        }
+
+        /// <summary>
+        /// One name per thing this stand dresses for: its work types, then
+        /// recreation, then sleep. Empty when it dresses for nothing.
+        ///
+        /// <para>The one list both the inspect pane and the switch's face are
+        /// built from. The face once read the work types alone, so a working
+        /// recreation or sleep stand said "no work here yet" on its button
+        /// while its inspect pane, built from all three, said what it
+        /// served.</para>
+        /// </summary>
+        internal List<string> ServedLabels()
+        {
             List<WorkTypeDef> works = WorkTypes;
-            bool recreation = HandlesRecreation();
-            bool rest = HandlesRest();
-            if (works.Count == 0 && !recreation && !rest)
-            {
-                return "ShiftChange.None".Translate();
-            }
             List<string> labels = new List<string>(works.Count + 1);
             for (int i = 0; i < works.Count; i++)
             {
                 labels.Add(WorkTypeLabels.Of(works[i]));
             }
-            if (recreation)
+            if (HandlesRecreation())
             {
                 labels.Add("ShiftChange.Recreation".Translate().RawText);
             }
-            if (rest)
+            if (HandlesRest())
             {
                 labels.Add("ShiftChange.Rest".Translate().RawText);
             }
-            return labels.ToCommaList();
+            return labels;
         }
 
         /// <summary>Called by SessionGuard when the loaded game changes.</summary>
@@ -1309,11 +1319,12 @@ namespace ShiftChange
             // beside another outfit-stand mod, whose owner control it shows
             // — so its face carries the state instead of a static caption.
             //
-            // ONE work type on the face, "(+N)" for the rest (decided
+            // ONE served purpose on the face, "(+N)" for the rest (decided
             // 2026-08-18): a workshop's four gerunds overflow a gizmo label
-            // into unreadability, and future set-bearing stands (recreation)
-            // only grow the list. The full set stays on the hover desc and
-            // in the inspect pane.
+            // into unreadability. The full set stays on the hover desc and in
+            // the inspect pane. Recreation and sleep count as purposes here
+            // exactly as they do there; the face once read the work types
+            // alone and called a working recreation stand idle.
             string regime;
             if (excluded)
             {
@@ -1321,17 +1332,16 @@ namespace ShiftChange
             }
             else
             {
-                List<WorkTypeDef> effective = WorkTypes;
-                if (effective.Count == 0)
+                List<string> served = ServedLabels();
+                if (served.Count == 0)
                 {
                     regime = "ShiftChange.RegimeIdle".Translate().RawText;
                 }
                 else
                 {
-                    string first = WorkTypeLabels.Of(effective[0]);
-                    regime = effective.Count == 1
-                        ? "ShiftChange.RegimeShift".Translate(first).RawText
-                        : "ShiftChange.RegimeShiftMore".Translate(first, effective.Count - 1).RawText;
+                    regime = served.Count == 1
+                        ? "ShiftChange.RegimeShift".Translate(served[0]).RawText
+                        : "ShiftChange.RegimeShiftMore".Translate(served[0], served.Count - 1).RawText;
                 }
             }
             yield return new Command_Action

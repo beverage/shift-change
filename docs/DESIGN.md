@@ -627,6 +627,11 @@ A per-stand dialog overrides the set, with three canonical states: automatic
 (follows the room), custom set, excluded. A decorative stand in a work room can be
 excluded so it never joins the pool.
 
+The switch that opens it is labelled with the first thing the stand serves and
+a count of the rest, built from the same list as the inspect pane's: work
+types, then recreation, then sleep. It once read the work types alone, so a
+working recreation or sleep stand said "no work here yet" on its button.
+
 The trigger is the **job**, not the doorway: work-type-in-set AND
 job-target-in-room. A doctor crossing the hospital to reach the storeroom, or
 anyone walking in to eat, changes nothing.
