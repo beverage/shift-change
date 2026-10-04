@@ -505,6 +505,12 @@ namespace ShiftChange
             }
         }
 
+        /// <summary>
+        /// The prefix's whole decision, one call per step. The ORDER of the
+        /// calls is behaviour: where a position matters, the note beside the
+        /// call says why. Each step is declared below in the order it runs, so
+        /// "above" and "below" in the steps' comments mean earlier and later.
+        /// </summary>
         /// <returns>true if a swap job was started in place of the incoming one.</returns>
         internal static bool TryInsertSwap(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker)
         {
@@ -514,26 +520,7 @@ namespace ShiftChange
                 throw new Exception("[ShiftChange] injected test fault");
             }
             SessionGuard.Ensure();
-            if (job == null || pawn == null || Current.ProgramState != ProgramState.Playing)
-            {
-                return false;
-            }
-            if (!pawn.Spawned || pawn.Faction != Faction.OfPlayer || !pawn.RaceProps.Humanlike)
-            {
-                return false;
-            }
-            if (job.def == ShiftChangeDefOf.ShiftChange_SwapAtStand)
-            {
-                return false;
-            }
-            // A drafted pawn is being told where to be. Never send them to a
-            // wardrobe, in either direction.
-            if (pawn.Drafted || pawn.Downed || pawn.InMentalState)
-            {
-                return false;
-            }
-
-            Map map = pawn.MapHeld;
+            Map map = MapToDecideOn(job, pawn);
             if (map == null)
             {
                 return false;
@@ -546,6 +533,91 @@ namespace ShiftChange
             // leaving.
             UpdateChangeBackLatch(pawn);
 
+            // The next four gates hold in BOTH directions, which is why they
+            // sit above the return trip. Each lets the job start untouched.
+            if (ExemptInEitherDirection(job))
+            {
+                return false;
+            }
+            if (UnderLordDuty(pawn, job))
+            {
+                return false;
+            }
+            if (MidSwap(pawn, tracker, job))
+            {
+                return false;
+            }
+            if (CoolingDown(pawn))
+            {
+                return false;
+            }
+
+            IntVec3 target = SharedTargetCell(job, map);
+
+            // The return trip. Checked first: a pawn already in uniform who is
+            // leaving should change back whatever the new job is.
+            CompShiftStand onShift = CompShiftStand.OnShiftStandFor(pawn);
+            if (onShift != null)
+            {
+                return ReturnTrip(job, tag, pawn, tracker, onShift, target, map);
+            }
+
+            // BELOW the return trip and above every dress arm: under threat,
+            // nobody changes in, but changing back still happens.
+            if (MapUnderThreat(map))
+            {
+                return false;
+            }
+
+            // The work arm runs first. The sleep arm turns medical lay-downs
+            // away because the work arm has already declined them, and
+            // VisitSickPawn, Doctor work that carries a joyKind, would
+            // otherwise go to the recreation arm.
+            WorkTypeDef work = WorkTypeFor(pawn, job, tag);
+            if (work != null)
+            {
+                return WorkArm(job, tag, pawn, tracker, work, target, map);
+            }
+            if (IsRestJob(job))
+            {
+                return SleepArm(job, tag, pawn, tracker, target, map);
+            }
+            return RecreationArm(job, tag, pawn, tracker, map);
+        }
+
+        /// <summary>
+        /// The map this job boundary is decided on, or null when the job or the
+        /// pawn is not one this mod acts on.
+        /// </summary>
+        internal static Map MapToDecideOn(Job job, Pawn pawn)
+        {
+            if (job == null || pawn == null || Current.ProgramState != ProgramState.Playing)
+            {
+                return null;
+            }
+            if (!pawn.Spawned || pawn.Faction != Faction.OfPlayer || !pawn.RaceProps.Humanlike)
+            {
+                return null;
+            }
+            if (job.def == ShiftChangeDefOf.ShiftChange_SwapAtStand)
+            {
+                return null;
+            }
+            // A drafted pawn is being told where to be. Never send them to a
+            // wardrobe, in either direction.
+            if (pawn.Drafted || pawn.Downed || pawn.InMentalState)
+            {
+                return null;
+            }
+            return pawn.MapHeld;
+        }
+
+        /// <summary>
+        /// The job starts as it is: no dressing for it, and no changing back
+        /// first.
+        /// </summary>
+        internal static bool ExemptInEitherDirection(Job job)
+        {
             // Never divert a direct order or an emergency response — in
             // EITHER direction. A right-click order means "now", and
             // emergency work givers (DoctorTendEmergency) exist precisely
@@ -573,15 +645,19 @@ namespace ShiftChange
             // placement was moved up to close. That is the setting's whole
             // meaning — medical emergencies become ordinary work for dressing
             // purposes — rather than an asymmetry worth hiding in here.
-            if (job.playerForced
-                || (job.workGiverDef?.emergency == true
-                    && !EmergencyDressingAllowed(job.workGiverDef))
-                || JobRoomTargets.Ignored(job.workGiverDef)
-                || JobRoomTargets.RidesAlong(job))
-            {
-                return false;
-            }
+            return job.playerForced
+                   || (job.workGiverDef?.emergency == true
+                       && !EmergencyDressingAllowed(job.workGiverDef))
+                   || JobRoomTargets.Ignored(job.workGiverDef)
+                   || JobRoomTargets.RidesAlong(job);
+        }
 
+        /// <summary>
+        /// A lord or a duty holds the pawn, so neither direction may divert
+        /// them.
+        /// </summary>
+        internal static bool UnderLordDuty(Pawn pawn, Job job)
+        {
             // A PAWN UNDER A LORD DUTY IS SPOKEN FOR, in both directions.
             // Rituals, ceremonies, parties, caravan forming: the lord holds
             // the pawn and reissues their job on its own clock, so a swap we
@@ -635,9 +711,14 @@ namespace ShiftChange
                                 $"({lord?.LordJob?.GetType().Name ?? "no lord"}) — " +
                                 $"not diverted for {job.def.defName}");
                 }
-                return false;
+                return true;
             }
+            return false;
+        }
 
+        /// <summary>The pawn is already on their way to a stand.</summary>
+        internal static bool MidSwap(Pawn pawn, Pawn_JobTracker tracker, Job job)
+        {
             // NEVER STACK A SWAP ON A SWAP. The incoming-job test far above
             // catches our own re-entry; this catches the other direction —
             // the pawn is already walking to a stand and something else has
@@ -659,17 +740,29 @@ namespace ShiftChange
                     Log.Message($"[ShiftChange] {pawn.LabelShort} is mid-swap — " +
                                 $"{job.def.defName} is not deferred on top of it");
                 }
-                return false;
+                return true;
             }
+            return false;
+        }
 
+        /// <summary>
+        /// A swap was wanted for this pawn and could not start, less than
+        /// <see cref="RetryCooldownTicks"/> ago.
+        /// </summary>
+        internal static bool CoolingDown(Pawn pawn)
+        {
             int now = Find.TickManager.TicksGame;
             int blocked;
-            if (LastBlockedTick.TryGetValue(pawn.thingIDNumber, out blocked)
-                && now - blocked < RetryCooldownTicks)
-            {
-                return false;
-            }
+            return LastBlockedTick.TryGetValue(pawn.thingIDNumber, out blocked)
+                   && now - blocked < RetryCooldownTicks;
+        }
 
+        /// <summary>
+        /// Where the job happens, read by job class, so both directions get
+        /// the same answer.
+        /// </summary>
+        internal static IntVec3 SharedTargetCell(Job job, Map map)
+        {
             // ONE room resolver per job class, consumed by BOTH directions.
             // The dress arm reads joy jobs B-first (JoyTargetCell), so the
             // return trip must read them the same way: with split reads, a
@@ -678,134 +771,151 @@ namespace ShiftChange
             // check) makes the two arms disagree about where the job
             // happens, and the pawn ping-pongs dress/undress forever
             // (review, 2026-08-15).
-            IntVec3 target = IsRecreationJob(job) ? JoyTargetCell(job, map) : TargetCell(job, map);
+            return IsRecreationJob(job) ? JoyTargetCell(job, map) : TargetCell(job, map);
+        }
 
-            // The return trip. Checked first: a pawn already in uniform who is
-            // leaving should change back whatever the new job is.
-            CompShiftStand onShift = CompShiftStand.OnShiftStandFor(pawn);
-            if (onShift != null)
+        /// <summary>
+        /// The pawn is on shift at <paramref name="onShift"/>: change them back
+        /// before this job, or let the uniform ride along. True if a swap
+        /// started.
+        /// </summary>
+        internal static bool ReturnTrip(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
+                                        CompShiftStand onShift, IntVec3 target, Map map)
+        {
+            Room standRoom = onShift.parent.GetRoom();
+            if (standRoom == null)
             {
-                Room standRoom = onShift.parent.GetRoom();
-                if (standRoom == null)
-                {
-                    return false;
-                }
-                // NEVER PULL A PAWN OUT OF BED TO CHANGE BACK — but "out of
-                // bed" has to mean the job would take them out of it, not
-                // merely that they are in one. The dress arms have said this
-                // from the start; the return trip never needed to, because
-                // before sleepwear an on-shift pawn in a bed was not a state
-                // the mod could produce. It is now the ordinary one, all
-                // night, every night, and a sleeper is not idle at a job
-                // boundary: vanilla hands out in-bed joy (JobGiver_GetJoyInBed)
-                // and JobInBedUtility.KeepLyingDown re-queues LayDown, each
-                // arriving here as a fresh job whose room can resolve outside
-                // the bedroom. Without a guard, one of them walks the sleeper
-                // to a wardrobe at three in the morning.
-                //
-                // The first version of this was plain pawn.InBed(), which is
-                // false at exactly those boundaries and true at the wake-up —
-                // so it suppressed the change-back at the one moment the pawn
-                // was standing beside their own stand, and every colonist did
-                // the first job of the day in sleepwear before walking back.
-                // See OnABed for why. StaysInBed asks the question that was
-                // meant all along.
-                if (StaysInBed(pawn, job))
-                {
-                    return false;
-                }
-                // Eating cannot use the room test below, because an ingest
-                // job's targetA is the FOOD, while the place the eating
-                // happens — the dining chair — is chosen DURING the job by
-                // Toils_Ingest.CarryIngestibleToChewSpot
-                // (JobDriver_Ingest.cs:165, Toils_Ingest.cs:115) and is not
-                // knowable here. The food's cell misreads the break in both
-                // directions: a packed lunch reads as the pawn's own
-                // position, and a colony's meal stock usually sits in or
-                // near the kitchen, so a cook's meal reads as "in the room"
-                // — and they then carry it across the base to a chair in
-                // uniform, the exact walk this mod exists to prevent.
-                // Policy (decided 2026-08-08): food already on the pawn
-                // means eat as-is; anything else is a sit-down break —
-                // change out first, wherever the meal happens to be stored.
-                if (IsIngestJob(job))
-                {
-                    // Eat-as-is is a WORK and RECREATION rule, and the rest arm
-                    // must not inherit it (found in play 2026-09-17).
-                    // Mid-shift the exemption is right: the pawn is at their
-                    // bench, so changing first is a real detour. At the WAKE-UP
-                    // there is no detour to avoid — they are standing AT the
-                    // stand with their gear inside it, and the exemption sends
-                    // them out in sleepwear to eat and back again to change,
-                    // which is the entire walk the rest arm exists to prevent.
-                    //
-                    // The mod already disagreed with itself here. The same
-                    // breakfast sitting in a STOCKPILE fails FoodSourceIsOnPawn,
-                    // so it reaches Insert and changes them back today, as
-                    // shipped; only the food's location changed the answer. This
-                    // makes the carried case match the stored one rather than
-                    // inventing a third behaviour — which is also why no
-                    // rest-need or timetable heuristic is needed to tell
-                    // breakfast from a 3am snack. That snack already costs two
-                    // wardrobe trips whenever the food is stored, and stored is
-                    // the common case.
-                    //
-                    // Same known limit as the recreation carve-out below: it
-                    // reads the stand's CURRENT config, not why the pawn was
-                    // dressed.
-                    if (FoodSourceIsOnPawn(job, pawn) && !onShift.HandlesRest())
-                    {
-                        return false;
-                    }
-                    // The sit-down-break policy above is a WORK-room rule
-                    // (decided 2026-08-08) and stays exactly as set. A
-                    // recreation stand's room is different: it stores its own
-                    // drinks on purpose, and stripping the robe to fetch a
-                    // beer from the poolside shelf wrapped every drink taken
-                    // inside the room in two wardrobe trips (review,
-                    // 2026-08-15). Same-room food on a rec-capable stand is
-                    // part of the break — stay dressed. Carrying the drink
-                    // OUT in the robe is bounded churn, not a loop, and the
-                    // next job's ordinary return trip still fires. Work and
-                    // recreation are mutually exclusive on a stand
-                    // (2026-08-16), which closes the dual-purpose residual —
-                    // but note this tests the stand's CURRENT config, not
-                    // why the pawn was dressed: re-configure a stand to
-                    // recreation while its WORK uniform is out and the
-                    // borrower's next same-room meal skips the change-out
-                    // once (bounded — the next out-of-room job returns as
-                    // normal). Recording the dress REASON in the ledger is
-                    // the refinement, queued with the full-change ledger work.
-                    if (onShift.HandlesRecreation()
-                        && target.IsValid && target.GetRoom(map) == standRoom)
-                    {
-                        return false;
-                    }
-                    return Insert(pawn, tracker, onShift, job, tag, "return");
-                }
-                if (!target.IsValid || target.GetRoom(map) == standRoom)
-                {
-                    // Still working in the room, or the job's location is
-                    // unreadable (queue-based jobs — hauling, harvesting).
-                    // Staying dressed is the safe answer either way.
-                    return false;
-                }
-                // An errand slotted in AHEAD of this stand's own work: they are
-                // coming straight back to it, so changing out first is a round
-                // trip to the stand for nothing. Below the meal branch on
-                // purpose, which keeps its own policy. See QueuedAheadOfServedWork.
-                if (QueuedAheadOfServedWork(job, tracker, onShift, standRoom, map))
-                {
-                    if (Verbose)
-                    {
-                        Log.Message($"[ShiftChange] {pawn.LabelShort} keeps the outfit on for " +
-                                    $"{job.def.defName}: {onShift.parent.LabelShort}'s work is queued next");
-                    }
-                    return false;
-                }
-                return Insert(pawn, tracker, onShift, job, tag, "return");
+                return false;
             }
+            // NEVER PULL A PAWN OUT OF BED TO CHANGE BACK — but "out of
+            // bed" has to mean the job would take them out of it, not
+            // merely that they are in one. The dress arms have said this
+            // from the start; the return trip never needed to, because
+            // before sleepwear an on-shift pawn in a bed was not a state
+            // the mod could produce. It is now the ordinary one, all
+            // night, every night, and a sleeper is not idle at a job
+            // boundary: vanilla hands out in-bed joy (JobGiver_GetJoyInBed)
+            // and JobInBedUtility.KeepLyingDown re-queues LayDown, each
+            // arriving here as a fresh job whose room can resolve outside
+            // the bedroom. Without a guard, one of them walks the sleeper
+            // to a wardrobe at three in the morning.
+            //
+            // The first version of this was plain pawn.InBed(), which is
+            // false at exactly those boundaries and true at the wake-up —
+            // so it suppressed the change-back at the one moment the pawn
+            // was standing beside their own stand, and every colonist did
+            // the first job of the day in sleepwear before walking back.
+            // See OnABed for why. StaysInBed asks the question that was
+            // meant all along.
+            if (StaysInBed(pawn, job))
+            {
+                return false;
+            }
+            // Eating cannot use the room test below, because an ingest
+            // job's targetA is the FOOD, while the place the eating
+            // happens — the dining chair — is chosen DURING the job by
+            // Toils_Ingest.CarryIngestibleToChewSpot
+            // (JobDriver_Ingest.cs:165, Toils_Ingest.cs:115) and is not
+            // knowable here. The food's cell misreads the break in both
+            // directions: a packed lunch reads as the pawn's own
+            // position, and a colony's meal stock usually sits in or
+            // near the kitchen, so a cook's meal reads as "in the room"
+            // — and they then carry it across the base to a chair in
+            // uniform, the exact walk this mod exists to prevent.
+            // Policy (decided 2026-08-08): food already on the pawn
+            // means eat as-is; anything else is a sit-down break —
+            // change out first, wherever the meal happens to be stored.
+            if (IsIngestJob(job))
+            {
+                return MealBreak(job, tag, pawn, tracker, onShift, standRoom, target, map);
+            }
+            if (!target.IsValid || target.GetRoom(map) == standRoom)
+            {
+                // Still working in the room, or the job's location is
+                // unreadable (queue-based jobs — hauling, harvesting).
+                // Staying dressed is the safe answer either way.
+                return false;
+            }
+            // An errand slotted in AHEAD of this stand's own work: they are
+            // coming straight back to it, so changing out first is a round
+            // trip to the stand for nothing. Below the meal branch on
+            // purpose, which keeps its own policy. See QueuedAheadOfServedWork.
+            if (QueuedAheadOfServedWork(job, tracker, onShift, standRoom, map))
+            {
+                if (Verbose)
+                {
+                    Log.Message($"[ShiftChange] {pawn.LabelShort} keeps the outfit on for " +
+                                $"{job.def.defName}: {onShift.parent.LabelShort}'s work is queued next");
+                }
+                return false;
+            }
+            return Insert(pawn, tracker, onShift, job, tag, "return");
+        }
 
+        /// <summary>
+        /// The return trip for an ingest job: eat in uniform, or change out
+        /// first. True if a swap started.
+        /// </summary>
+        internal static bool MealBreak(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
+                                       CompShiftStand onShift, Room standRoom, IntVec3 target, Map map)
+        {
+            // Eat-as-is is a WORK and RECREATION rule, and the rest arm
+            // must not inherit it (found in play 2026-09-17).
+            // Mid-shift the exemption is right: the pawn is at their
+            // bench, so changing first is a real detour. At the WAKE-UP
+            // there is no detour to avoid — they are standing AT the
+            // stand with their gear inside it, and the exemption sends
+            // them out in sleepwear to eat and back again to change,
+            // which is the entire walk the rest arm exists to prevent.
+            //
+            // The mod already disagreed with itself here. The same
+            // breakfast sitting in a STOCKPILE fails FoodSourceIsOnPawn,
+            // so it reaches Insert and changes them back today, as
+            // shipped; only the food's location changed the answer. This
+            // makes the carried case match the stored one rather than
+            // inventing a third behaviour — which is also why no
+            // rest-need or timetable heuristic is needed to tell
+            // breakfast from a 3am snack. That snack already costs two
+            // wardrobe trips whenever the food is stored, and stored is
+            // the common case.
+            //
+            // Same known limit as the recreation carve-out below: it
+            // reads the stand's CURRENT config, not why the pawn was
+            // dressed.
+            if (FoodSourceIsOnPawn(job, pawn) && !onShift.HandlesRest())
+            {
+                return false;
+            }
+            // The sit-down-break policy above is a WORK-room rule
+            // (decided 2026-08-08) and stays exactly as set. A
+            // recreation stand's room is different: it stores its own
+            // drinks on purpose, and stripping the robe to fetch a
+            // beer from the poolside shelf wrapped every drink taken
+            // inside the room in two wardrobe trips (review,
+            // 2026-08-15). Same-room food on a rec-capable stand is
+            // part of the break — stay dressed. Carrying the drink
+            // OUT in the robe is bounded churn, not a loop, and the
+            // next job's ordinary return trip still fires. Work and
+            // recreation are mutually exclusive on a stand
+            // (2026-08-16), which closes the dual-purpose residual —
+            // but note this tests the stand's CURRENT config, not
+            // why the pawn was dressed: re-configure a stand to
+            // recreation while its WORK uniform is out and the
+            // borrower's next same-room meal skips the change-out
+            // once (bounded — the next out-of-room job returns as
+            // normal). Recording the dress REASON in the ledger is
+            // the refinement, queued with the full-change ledger work.
+            if (onShift.HandlesRecreation()
+                && target.IsValid && target.GetRoom(map) == standRoom)
+            {
+                return false;
+            }
+            return Insert(pawn, tracker, onShift, job, tag, "return");
+        }
+
+        /// <summary>The map is under threat, so no arm dresses anyone.</summary>
+        internal static bool MapUnderThreat(Map map)
+        {
             // No DRESSING while the map is under threat. Vanilla has no
             // precedent to copy here: JobGiver_OptimizeApparel carries no
             // danger check at all, because think-tree position does the work
@@ -829,11 +939,15 @@ namespace ShiftChange
             // driven pawns are untouched in either direction — drafted pawns
             // returned far above, and playerForced/emergency jobs never
             // divert at all.
-            if (map.dangerWatcher.DangerRating != StoryDanger.None)
-            {
-                return false;
-            }
+            return map.dangerWatcher.DangerRating != StoryDanger.None;
+        }
 
+        /// <summary>
+        /// The work type the work arm dresses this job for, or null when the
+        /// work arm does not take the job.
+        /// </summary>
+        internal static WorkTypeDef WorkTypeFor(Pawn pawn, Job job, JobTag? tag)
+        {
             // MEDICAL BED REST ENTERS THE WORK ARM HERE, and it has to be
             // HANDED its work type because it never arrives carrying one. All
             // three patient WorkGivers are NonScanJob overrides, and
@@ -852,47 +966,61 @@ namespace ShiftChange
             // medical case in the harness asserted a negative — that medical
             // rest does not reach the sleep arm, which stayed true the whole
             // time it reached nothing else either.
-            WorkTypeDef work = job.workGiverDef?.workType ?? MedicalRestWorkType(pawn, job, tag);
-            if (work != null)
+            return job.workGiverDef?.workType ?? MedicalRestWorkType(pawn, job, tag);
+        }
+
+        /// <summary>
+        /// Dress for <paramref name="work"/> at a stand in the job's room. True
+        /// if a swap started.
+        /// </summary>
+        internal static bool WorkArm(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
+                                     WorkTypeDef work, IntVec3 target, Map map)
+        {
+            if (!target.IsValid)
             {
-                if (!target.IsValid)
-                {
-                    return false;
-                }
-
-                Room room = target.GetRoom(map);
-                if (room == null)
-                {
-                    return false;
-                }
-
-                // The change-back latch: they were pulled out of this very
-                // room and have not left it since, so dressing again here is
-                // the cycle the player just stopped.
-                if (IsLatchedIn(pawn, room))
-                {
-                    if (Verbose)
-                    {
-                        Log.Message($"[ShiftChange] {pawn.LabelShort} stays changed out — " +
-                                    "not left the room since the change-back order");
-                    }
-                    return false;
-                }
-
-                CompShiftStand stand = FindAvailableStand(room, pawn, work);
-                if (stand == null)
-                {
-                    if (Verbose)
-                    {
-                        Log.Message($"[ShiftChange] no free {work.defName} stand in {room.Role?.defName ?? "unroled"} " +
-                                    $"room for {pawn.LabelShort} ({job.def.defName})");
-                    }
-                    return false;
-                }
-
-                return Insert(pawn, tracker, stand, job, tag, "dress");
+                return false;
             }
 
+            Room room = target.GetRoom(map);
+            if (room == null)
+            {
+                return false;
+            }
+
+            // The change-back latch: they were pulled out of this very
+            // room and have not left it since, so dressing again here is
+            // the cycle the player just stopped.
+            if (IsLatchedIn(pawn, room))
+            {
+                if (Verbose)
+                {
+                    Log.Message($"[ShiftChange] {pawn.LabelShort} stays changed out — " +
+                                "not left the room since the change-back order");
+                }
+                return false;
+            }
+
+            CompShiftStand stand = FindAvailableStand(room, pawn, work);
+            if (stand == null)
+            {
+                if (Verbose)
+                {
+                    Log.Message($"[ShiftChange] no free {work.defName} stand in {room.Role?.defName ?? "unroled"} " +
+                                $"room for {pawn.LabelShort} ({job.def.defName})");
+                }
+                return false;
+            }
+
+            return Insert(pawn, tracker, stand, job, tag, "dress");
+        }
+
+        /// <summary>
+        /// Dress for bed at a sleep stand in the bed's room. True if a swap
+        /// started.
+        /// </summary>
+        internal static bool SleepArm(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
+                                      IntVec3 target, Map map)
+        {
             // The SLEEP arm, the third trigger class. Disjoint from
             // the other two by construction: a lay-down job carries no
             // joyKind so it can never be a recreation job, and the tag test
@@ -900,105 +1028,111 @@ namespace ShiftChange
             // resolver at the top hands rest jobs the A-first TargetCell,
             // which is right — a lay-down job's targetA IS the bed the pawn
             // will occupy, the cleanest target any arm gets.
-            if (IsRestJob(job))
-            {
-                // MEDICAL BED REST IS NOT SLEEPWEAR, and THE TAG is what says
-                // so. All three patient WorkGivers — PatientGoToBedRecuperate,
-                // ...Treatment and ...EmergencyTreatment — carry
-                // <tagToGive>RestingForMedicalReasons</tagToGive>, and
-                // Pawn_JobTracker hands ThinkResult.Tag straight to StartJob,
-                // so every route vanilla has into medical rest arrives here
-                // wearing it.
-                //
-                // REACHING THIS LINE MEANS THE WORK ARM DECLINED IT, which
-                // since 2026-09-23 is a real decision rather than a job the
-                // work arm could not see. MedicalRestWorkType resolved no
-                // work type (the pawn needs a doctor now, or is already on the
-                // bed), or it resolved one and no stand in this room was
-                // ticked for it. Either way a pyjama stand must not then pick
-                // the job up as ordinary sleep: keeping the hospital gown and
-                // the pyjamas separately configurable is what this test has
-                // always been for, and it still does that job.
-                //
-                // The workGiverDef limb is REDUNDANT, kept as a conservative
-                // catch for a modded WorkGiverDef with a null workType: the
-                // work arm above consumes and returns from every job whose
-                // workGiverDef.workType is non-null, so this limb is only
-                // reached once that expression is already null.
-                //
-                // WHAT IS DELIBERATELY NOT HERE: HealthAIUtility.ShouldSeekMedicalRest.
-                // It was added as a third limb to cover
-                // JobInBedUtility.KeepLyingDown, which re-queues a bare
-                // LayDown carrying neither marker — and it was wrong twice
-                // over. The re-queue is already covered: all four
-                // KeepLyingDown registrations are on in-bed drivers, so the
-                // enqueued job is dequeued with the pawn still standing on the
-                // bed cell and the OnABed guard below rejects it. And the
-                // predicate is far broader than the markers it backstopped —
-                // true for any tended healing injury or non-immune disease —
-                // so the only behaviour it uniquely changed was to kill
-                // ordinary bedtime for every wounded or ill colonist,
-                // silently, for the whole recovery. Do not re-add it: a health
-                // predicate cannot tell "going to bed because hurt" from
-                // "going to bed because it is night".
-                //
-                // MedicalRestWorkType's ShouldSeekMedicalRestUrgent is not
-                // that rule coming back. It reads a different predicate, and
-                // it reads it INSIDE the tagged branch, where vanilla has
-                // already told us why the pawn is going to bed — so it only
-                // ever refuses a divert, and can never reach a colonist
-                // turning in for the night.
-                if (job.workGiverDef != null || tag == JobTag.RestingForMedicalReasons)
-                {
-                    return false;
-                }
-                // Never pull a pawn OUT of bed to dress for bed. Past the
-                // obvious, this is what stops the mid-sleep re-trigger: a
-                // sleeper who stirs into LayDownAwake, or whose in-bed job
-                // re-queues LayDown, starts a fresh lay-down job in the same
-                // bed, and each one would otherwise be a fresh dressing
-                // opportunity. OnABed rather than pawn.InBed() because at that
-                // boundary curJob is null and InBed() answers false — see
-                // OnABed.
-                if (OnABed(pawn))
-                {
-                    return false;
-                }
-                if (!target.IsValid)
-                {
-                    return false;
-                }
-                Room bedRoom = target.GetRoom(map);
-                // The recreation arm's outdoor guard, needed for the same
-                // reason: an outdoor cell resolves the one map-spanning,
-                // edge-touching room rather than null, so a sleep stand in
-                // open ground would serve every bedroll on the map.
-                if (bedRoom == null || bedRoom.TouchesMapEdge)
-                {
-                    return false;
-                }
-                if (IsLatchedIn(pawn, bedRoom))
-                {
-                    if (Verbose)
-                    {
-                        Log.Message($"[ShiftChange] {pawn.LabelShort} stays changed out — " +
-                                    "not left the room since the change-back order");
-                    }
-                    return false;
-                }
-                CompShiftStand restStand = FindAvailableStand(bedRoom, pawn, null, StandTrigger.Rest);
-                if (restStand == null)
-                {
-                    if (Verbose)
-                    {
-                        Log.Message($"[ShiftChange] no free sleep stand in {bedRoom.Role?.defName ?? "unroled"} " +
-                                    $"room for {pawn.LabelShort} ({job.def.defName})");
-                    }
-                    return false;
-                }
-                return Insert(pawn, tracker, restStand, job, tag, "dress-rest");
-            }
 
+            // MEDICAL BED REST IS NOT SLEEPWEAR, and THE TAG is what says
+            // so. All three patient WorkGivers — PatientGoToBedRecuperate,
+            // ...Treatment and ...EmergencyTreatment — carry
+            // <tagToGive>RestingForMedicalReasons</tagToGive>, and
+            // Pawn_JobTracker hands ThinkResult.Tag straight to StartJob,
+            // so every route vanilla has into medical rest arrives here
+            // wearing it.
+            //
+            // REACHING THIS LINE MEANS THE WORK ARM DECLINED IT, which
+            // since 2026-09-23 is a real decision rather than a job the
+            // work arm could not see. MedicalRestWorkType resolved no
+            // work type (the pawn needs a doctor now, or is already on the
+            // bed), or it resolved one and no stand in this room was
+            // ticked for it. Either way a pyjama stand must not then pick
+            // the job up as ordinary sleep: keeping the hospital gown and
+            // the pyjamas separately configurable is what this test has
+            // always been for, and it still does that job.
+            //
+            // The workGiverDef limb is REDUNDANT, kept as a conservative
+            // catch for a modded WorkGiverDef with a null workType: the
+            // work arm above consumes and returns from every job whose
+            // workGiverDef.workType is non-null, so this limb is only
+            // reached once that expression is already null.
+            //
+            // WHAT IS DELIBERATELY NOT HERE: HealthAIUtility.ShouldSeekMedicalRest.
+            // It was added as a third limb to cover
+            // JobInBedUtility.KeepLyingDown, which re-queues a bare
+            // LayDown carrying neither marker — and it was wrong twice
+            // over. The re-queue is already covered: all four
+            // KeepLyingDown registrations are on in-bed drivers, so the
+            // enqueued job is dequeued with the pawn still standing on the
+            // bed cell and the OnABed guard below rejects it. And the
+            // predicate is far broader than the markers it backstopped —
+            // true for any tended healing injury or non-immune disease —
+            // so the only behaviour it uniquely changed was to kill
+            // ordinary bedtime for every wounded or ill colonist,
+            // silently, for the whole recovery. Do not re-add it: a health
+            // predicate cannot tell "going to bed because hurt" from
+            // "going to bed because it is night".
+            //
+            // MedicalRestWorkType's ShouldSeekMedicalRestUrgent is not
+            // that rule coming back. It reads a different predicate, and
+            // it reads it INSIDE the tagged branch, where vanilla has
+            // already told us why the pawn is going to bed — so it only
+            // ever refuses a divert, and can never reach a colonist
+            // turning in for the night.
+            if (job.workGiverDef != null || tag == JobTag.RestingForMedicalReasons)
+            {
+                return false;
+            }
+            // Never pull a pawn OUT of bed to dress for bed. Past the
+            // obvious, this is what stops the mid-sleep re-trigger: a
+            // sleeper who stirs into LayDownAwake, or whose in-bed job
+            // re-queues LayDown, starts a fresh lay-down job in the same
+            // bed, and each one would otherwise be a fresh dressing
+            // opportunity. OnABed rather than pawn.InBed() because at that
+            // boundary curJob is null and InBed() answers false — see
+            // OnABed.
+            if (OnABed(pawn))
+            {
+                return false;
+            }
+            if (!target.IsValid)
+            {
+                return false;
+            }
+            Room bedRoom = target.GetRoom(map);
+            // The recreation arm's outdoor guard, needed for the same
+            // reason: an outdoor cell resolves the one map-spanning,
+            // edge-touching room rather than null, so a sleep stand in
+            // open ground would serve every bedroll on the map.
+            if (bedRoom == null || bedRoom.TouchesMapEdge)
+            {
+                return false;
+            }
+            if (IsLatchedIn(pawn, bedRoom))
+            {
+                if (Verbose)
+                {
+                    Log.Message($"[ShiftChange] {pawn.LabelShort} stays changed out — " +
+                                "not left the room since the change-back order");
+                }
+                return false;
+            }
+            CompShiftStand restStand = FindAvailableStand(bedRoom, pawn, null, StandTrigger.Rest);
+            if (restStand == null)
+            {
+                if (Verbose)
+                {
+                    Log.Message($"[ShiftChange] no free sleep stand in {bedRoom.Role?.defName ?? "unroled"} " +
+                                $"room for {pawn.LabelShort} ({job.def.defName})");
+                }
+                return false;
+            }
+            return Insert(pawn, tracker, restStand, job, tag, "dress-rest");
+        }
+
+        /// <summary>
+        /// Dress for recreation at a stand in the room where it happens, if the
+        /// job is recreation at all. True if a swap started.
+        /// </summary>
+        internal static bool RecreationArm(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
+                                           Map map)
+        {
             // The RECREATION arm. Joy jobs carry no workGiverDef, so
             // the two arms are disjoint by construction, and every shared
             // gate above — danger, player-forced, the latch sample, the
