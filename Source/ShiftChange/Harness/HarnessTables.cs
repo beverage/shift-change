@@ -403,42 +403,95 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// <see cref="JobRoomTargets"/> holds two lists of another mod's
-        /// defNames. Both are ALLOWED to miss — that is what a compat table is
-        /// — so the standing assertions are structural, and the resolution
-        /// assertions only fire when the mod is actually loaded.
+        /// The official givers <see cref="JobRoomTargets.IgnoredGivers"/>
+        /// carries ON PURPOSE, and the only ones it may: vanilla's six feeding
+        /// givers, whose jobs put the meal in targetA
+        /// (<see cref="HarnessRideAlong.FeedingRidesAlong"/> has the reason). Any
+        /// other official giver on the list fails the guard below.
+        /// </summary>
+        internal static readonly HashSet<string> DeliberatelyIgnoredOfficialGivers =
+            new HashSet<string>(HarnessRideAlong.FeedPatientGivers.Concat(HarnessRideAlong.DeliverFoodGivers));
+
+        /// <summary>
+        /// The same for <see cref="JobRoomTargets.RideAlongJobs"/>: vanilla's
+        /// target-less unload, and no other official job.
+        /// </summary>
+        internal static readonly HashSet<string> DeliberatelyRiddenOfficialJobs =
+            new HashSet<string> { "UnloadYourInventory" };
+
+        /// <summary>
+        /// <see cref="JobRoomTargets"/> holds three lists, mostly of another
+        /// mod's defNames. Those rows are ALLOWED to miss — that is what a
+        /// compat table is — so the standing assertions are structural, and the
+        /// resolution assertions only fire when the mod is actually loaded.
         ///
         /// <para>The load-bearing one is the official-def guard. Retargeting a
         /// vanilla job to its targetB, or making the mod ignore a vanilla work
         /// giver, would change core behaviour for everyone and there is no
-        /// symptom that points at a table.</para>
+        /// symptom that points at a table. Since the feeding fix some official
+        /// rows are deliberate, so the guard names them: an official def on a
+        /// list passes only if it is one of those, and each of those must still
+        /// resolve, since a renamed vanilla def would drop its row with no
+        /// error anywhere.</para>
         /// </summary>
         internal static bool JobTablesHold()
         {
             bool ok = Expect(JobRoomTargets.RoomIsTargetB.Count > 0, "the targetB list is not empty");
             ok &= Expect(JobRoomTargets.IgnoredGivers.Count > 0, "the ignored-giver list is not empty");
+            ok &= Expect(JobRoomTargets.RideAlongJobs.Count > 0, "the ride-along list is not empty");
             ok &= Expect(!JobRoomTargets.RoomIsTargetB.Any(string.IsNullOrEmpty)
-                         && !JobRoomTargets.IgnoredGivers.Any(string.IsNullOrEmpty),
+                         && !JobRoomTargets.IgnoredGivers.Any(string.IsNullOrEmpty)
+                         && !JobRoomTargets.RideAlongJobs.Any(string.IsNullOrEmpty),
                          "no entry is blank");
-            ok &= Expect(!JobRoomTargets.UsesTargetB(null) && !JobRoomTargets.Ignored(null),
+            ok &= Expect(!JobRoomTargets.UsesTargetB(null) && !JobRoomTargets.Ignored(null)
+                         && !JobRoomTargets.RidesAlong(null),
                          "a null def matches nothing");
+
+            // The giver test that separates a fresh haul from a continuation.
+            Job unload = JobMaker.MakeJob(JobDefOf.UnloadYourInventory);
+            ok &= Expect(JobRoomTargets.RidesAlong(unload), "a listed job with no giver rides along");
+            unload.workGiverDef = DefDatabase<WorkGiverDef>.GetNamedSilentFail("HaulGeneral");
+            ok &= Expect(unload.workGiverDef == null || !JobRoomTargets.RidesAlong(unload),
+                         "and the same job carrying a giver does not");
 
             foreach (JobDef job in DefDatabase<JobDef>.AllDefsListForReading)
             {
-                if (job.modContentPack != null && job.modContentPack.IsOfficialMod
-                    && JobRoomTargets.RoomIsTargetB.Contains(job.defName))
+                if (job.modContentPack == null || !job.modContentPack.IsOfficialMod)
+                {
+                    continue;
+                }
+                if (JobRoomTargets.RoomIsTargetB.Contains(job.defName))
                 {
                     ok &= Expect(false, "official job " + job.defName + " is NOT retargeted");
+                }
+                if (JobRoomTargets.RideAlongJobs.Contains(job.defName)
+                    && !DeliberatelyRiddenOfficialJobs.Contains(job.defName))
+                {
+                    ok &= Expect(false, "official job " + job.defName + " does NOT ride along");
                 }
             }
             foreach (WorkGiverDef giver in DefDatabase<WorkGiverDef>.AllDefsListForReading)
             {
                 if (giver.modContentPack != null && giver.modContentPack.IsOfficialMod
-                    && JobRoomTargets.IgnoredGivers.Contains(giver.defName))
+                    && JobRoomTargets.IgnoredGivers.Contains(giver.defName)
+                    && !DeliberatelyIgnoredOfficialGivers.Contains(giver.defName))
                 {
                     ok &= Expect(false, "official giver " + giver.defName + " is NOT ignored");
                 }
             }
+            foreach (string name in DeliberatelyIgnoredOfficialGivers)
+            {
+                WorkGiverDef giver = DefDatabase<WorkGiverDef>.GetNamedSilentFail(name);
+                bool biotech = name.Contains("Hemogen");
+                if (giver == null && biotech && !ModsConfig.BiotechActive)
+                {
+                    continue;
+                }
+                ok &= Expect(giver != null && JobRoomTargets.Ignored(giver),
+                             "vanilla's " + name + " resolves and is ignored");
+            }
+            ok &= Expect(DefDatabase<JobDef>.GetNamedSilentFail("UnloadYourInventory") != null,
+                         "vanilla's UnloadYourInventory resolves");
 
             if (!RimatomicsLoaded)
             {
@@ -453,6 +506,10 @@ namespace ShiftChange
             }
             foreach (string name in JobRoomTargets.IgnoredGivers)
             {
+                if (DeliberatelyIgnoredOfficialGivers.Contains(name))
+                {
+                    continue;
+                }
                 ok &= Expect(DefDatabase<WorkGiverDef>.GetNamedSilentFail(name) != null,
                              "giver " + name + " resolves");
             }

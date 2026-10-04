@@ -540,6 +540,356 @@ namespace ShiftChange
             return ok & Expect(bare.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
                                "the freed stand interrupted them to dress");
         }
+
+        /// <summary>An automatic doctoring job at a cell, as the work arm sees one.</summary>
+        internal static Job DoctoringAt(WorkGiverDef giver, IntVec3 at)
+        {
+            Job job = JobMaker.MakeJob(JobDefOf.Wait, at);
+            job.workGiverDef = giver;
+            return job;
+        }
+
+        /// <summary>
+        /// Every cell of the stand's room except the stand's own, as an allowed
+        /// area: the work is inside it and the stand is not. What Better Pawn
+        /// Control's alert areas, or any hand-painted area, produce when the
+        /// stand happens to fall outside.
+        /// </summary>
+        internal static Area_Allowed AreaWithoutTheStand(Fixture fix)
+        {
+            Area_Allowed area;
+            if (!fix.Map.areaManager.TryMakeNewAllowed(out area))
+            {
+                return null;
+            }
+            foreach (IntVec3 cell in fix.Stand.GetRoom().Cells)
+            {
+                if (cell != fix.Stand.Position)
+                {
+                    area[cell] = true;
+                }
+            }
+            return area;
+        }
+
+        /// <summary>
+        /// A STAND OUTSIDE THE PAWN'S ALLOWED AREA DRESSES NOBODY, and an
+        /// allowed one is chosen instead.
+        ///
+        /// <para>Reaching and reserving a stand ignore allowed areas, but the
+        /// swap driver's own <c>FailOnDespawnedNullOrForbidden</c> does not:
+        /// <c>ForbidUtility.IsForbidden</c> asks <c>InAllowedArea</c>. So the
+        /// swap was chosen, reserved, started, and ended Incompletable inside
+        /// <c>StartJob</c> before the pawn took a step. Nothing set the retry
+        /// cooldown (only a failed reach does), so the next job boundary did
+        /// the same again.</para>
+        ///
+        /// <para>Three paths dress, and each is driven: the work arm, the
+        /// selector's ranking (a pawn's OWN stand outranks a shared one, so a
+        /// forbidden personal stand used to win over an allowed shared stand
+        /// beside it), and the mid-job catch-up. Every refusal has the same
+        /// setup with the stand allowed beside it as its control.</para>
+        /// </summary>
+        internal static bool StandOutsideTheAreaDressesNobody(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+            ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
+            if (doctor == null || tend == null || standDef == null)
+            {
+                return Expect(false, "the doctor and stand defs resolve");
+            }
+            fix.Comp.ToggleWork(doctor);
+            MakeCalm(fix.Map);
+
+            Pawn pawn = fix.Pawn;
+            Room room = fix.Stand.GetRoom();
+            IntVec3 workAt = fix.Stand.Position + new IntVec3(3, 0, 3);
+            bool ok = Expect(Probe(fix, DoctoringAt(tend, workAt)),
+                             "with no area set, an automatic job in the room dresses (control)");
+
+            Area_Allowed area = AreaWithoutTheStand(fix);
+            if (area == null)
+            {
+                return Expect(false, "an allowed area could be made");
+            }
+            Pawn bare = null;
+            try
+            {
+                pawn.playerSettings.AreaRestrictionInPawnCurrentMap = area;
+                ok &= Expect(fix.Stand.IsForbidden(pawn),
+                             "the area leaves the stand out, so it is forbidden to them (control)")
+                    & Expect(!workAt.IsForbidden(pawn), "while the work is inside it");
+
+                bool inserted = Patch_JobInterception.TryInsertSwap(DoctoringAt(tend, workAt), null,
+                                                                    pawn, pawn.jobs);
+                ok &= Expect(!inserted, "a stand outside their allowed area dresses nobody");
+                if (inserted)
+                {
+                    Report.Append("      a swap was started anyway: still running ")
+                          .Append(pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand)
+                          .Append(", retry cooldown set ")
+                          .Append(Patch_JobInterception.LastBlockedTick.ContainsKey(pawn.thingIDNumber))
+                          .AppendLine();
+                }
+                Settle(pawn);
+
+                // The catch-up: a colonist already doctoring bare in the room,
+                // under the same area. Built like FreedStandCatchesUp's.
+                bare = DebugTools_Fixtures.AveragePawn(Gender.Female, "Bare", doctor);
+                bare.apparel?.DestroyAll();
+                bare.workSettings?.EnableAndInitialize();
+                GenSpawn.Spawn(bare, fix.Stand.Position + new IntVec3(2, 0, 2), fix.Map, Rot4.North);
+                fix.Extras.Add(bare);
+                WearOne(bare, "Apparel_BasicShirt");
+                WearOne(bare, "Apparel_Pants");
+                bare.playerSettings.AreaRestrictionInPawnCurrentMap = area;
+                Job working = JobMaker.MakeJob(JobDefOf.Goto, fix.Stand.Position + new IntVec3(3, 0, 2));
+                working.workGiverDef = tend;
+                // Staged with interception off. The stand is free, so starting
+                // this job with it on would be the very decision under test,
+                // made once already, and the catch-up would then have nothing
+                // left to catch up.
+                bool armed = Patch_JobInterception.Enabled;
+                try
+                {
+                    Patch_JobInterception.Enabled = false;
+                    bare.jobs.StartJob(working, JobCondition.InterruptForced, null,
+                        resumeCurJobAfterwards: false, cancelBusyStances: true, null, null);
+                }
+                finally
+                {
+                    Patch_JobInterception.Enabled = armed;
+                }
+                JobDriver before = bare.jobs.curDriver;
+                ok &= Expect(bare.CurJobDef == JobDefOf.Goto && SwapPlan.WouldDress(bare, fix.Stand),
+                             "a bare colonist is doctoring in the room and could wear the stand's outfit (control)");
+
+                Patch_JobInterception.TryDressMidJob(fix.Comp, null);
+                ok &= Expect(bare.jobs.curDriver == before,
+                             "a freed stand outside their area does not interrupt them to dress");
+
+                bare.playerSettings.AreaRestrictionInPawnCurrentMap = null;
+                Patch_JobInterception.TryDressMidJob(fix.Comp, null);
+                ok &= Expect(bare.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
+                             "with the area lifted, the same freed stand does (control)");
+                Settle(bare);
+
+                // The ranking: their own stand outside the area, a shared one
+                // inside it. A personal stand always wins a tie on everything
+                // else, which is exactly how the forbidden one used to win.
+                Building_OutfitStand shared = DebugTools_Fixtures.Spawn(fix.Map, standDef, ThingDefOf.WoodLog,
+                    fix.Stand.Position + new IntVec3(2, 0, 0), Rot4.North) as Building_OutfitStand;
+                CompShiftStand sharedComp = shared?.TryGetComp<CompShiftStand>();
+                CompAssignableToPawn_ShiftStand mine =
+                    fix.Stand.TryGetComp<CompAssignableToPawn_ShiftStand>();
+                if (sharedComp == null || mine == null || !StockOne(shared, "Apparel_Duster"))
+                {
+                    return ok & Expect(false, "a second, shared stand could be staged");
+                }
+                sharedComp.ToggleWork(doctor);
+                mine.TryAssignPawn(pawn);
+                ok &= Expect(fix.Comp.IsAssignedTo(pawn) && sharedComp.IsPool && !shared.IsForbidden(pawn),
+                             "their own stand is outside the area, a shared one inside it (control)");
+
+                CompShiftStand chosen = Patch_JobInterception.FindAvailableStand(room, pawn, doctor);
+                ok &= Expect(chosen == sharedComp,
+                             "so the shared stand inside the area is chosen over their own (chose "
+                             + (chosen == null ? "nothing" : chosen == fix.Comp ? "their own" : "another")
+                             + ")");
+                bool went = Patch_JobInterception.TryInsertSwap(DoctoringAt(tend, workAt), null, pawn, pawn.jobs)
+                            && pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand
+                            && pawn.CurJob.targetA.Thing == shared;
+                ok &= Expect(went, "and they go to it to dress");
+                Settle(pawn);
+            }
+            finally
+            {
+                pawn.playerSettings.AreaRestrictionInPawnCurrentMap = null;
+                if (bare != null && bare.playerSettings != null)
+                {
+                    bare.playerSettings.AreaRestrictionInPawnCurrentMap = null;
+                }
+                area.Delete();
+            }
+            return ok;
+        }
+
+        /// <summary>
+        /// A COLONIST WHOSE STAND IS OUTSIDE THEIR ALLOWED AREA KEEPS THE OUTFIT
+        /// ON, and the stand says why.
+        ///
+        /// <para>The return trip is where this shipped: an area painted after
+        /// dressing, or switched by Better Pawn Control's alerts, leaves a
+        /// borrower whose stand they may no longer walk to. Every job boundary
+        /// that took them out of the room started a change-back that ended
+        /// before it began. Now the uniform rides along, the retry cooldown is
+        /// set, and the inspect pane names the cause, since otherwise a
+        /// colonist simply never changing back is all a player sees. The Change
+        /// back button is unaffected: it is an order, and orders ignore
+        /// allowed areas in vanilla too.</para>
+        /// </summary>
+        internal static bool StandOutsideTheAreaKeepsTheOutfitOn(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+            ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
+            if (doctor == null || tend == null || mealDef == null)
+            {
+                return Expect(false, "the doctor and meal defs resolve");
+            }
+            fix.Comp.ToggleWork(doctor);
+            MakeCalm(fix.Map);
+
+            Pawn pawn = fix.Pawn;
+            Map map = fix.Map;
+            IntVec3 outside = fix.Stand.Position + new IntVec3(8, 0, 0);
+            if (!outside.InBounds(map) || outside.GetRoom(map) == fix.Stand.GetRoom())
+            {
+                return Expect(false, "a cell outside the stand's room resolves for the test");
+            }
+            Thing meal = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), outside + new IntVec3(0, 0, 1), map);
+            string line = "ShiftChange.InspectOutsideArea".Translate(pawn.LabelShort);
+
+            bool ok = Expect(RunSwap(fix), "dressed for the shift")
+                    & Expect(fix.Comp.OnShift, "and is on shift (control)");
+            if (!fix.Comp.OnShift)
+            {
+                return false;
+            }
+            ok &= Expect(Probe(fix, DoctoringAt(tend, outside)),
+                         "an out-of-room job changes them back while the stand is in their area (control)")
+                & Expect(!fix.Comp.CompInspectStringExtra().Contains(line),
+                         "and the stand says nothing about areas (control)");
+
+            Area_Allowed area = AreaWithoutTheStand(fix);
+            if (area == null)
+            {
+                return Expect(false, "an allowed area could be made");
+            }
+            try
+            {
+                area[outside] = true;
+                area[meal.Position] = true;
+                pawn.playerSettings.AreaRestrictionInPawnCurrentMap = area;
+                ok &= Expect(fix.Stand.IsForbidden(pawn),
+                             "the area leaves the stand out, so it is forbidden to them (control)");
+
+                int now = Find.TickManager.TicksGame;
+                bool inserted = Patch_JobInterception.TryInsertSwap(DoctoringAt(tend, outside), null,
+                                                                    pawn, pawn.jobs);
+                int blocked;
+                bool cooled = Patch_JobInterception.LastBlockedTick.TryGetValue(pawn.thingIDNumber, out blocked)
+                              && blocked == now;
+                ok &= Expect(!inserted, "a colonist whose stand is outside their allowed area keeps the outfit on")
+                    & Expect(cooled, "and the retry cooldown is set, so the next job boundary does not try again")
+                    & Expect(CompShiftStand.OnShiftStandFor(pawn) == fix.Comp, "they are still on shift");
+                if (inserted)
+                {
+                    Report.Append("      a change-back was started anyway: still running ")
+                          .Append(pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand)
+                          .AppendLine();
+                }
+                string inspect = fix.Comp.CompInspectStringExtra() ?? "";
+                ok &= Expect(inspect.Contains(line), "the stand's inspect pane says why: \"" + line + "\"");
+                Settle(pawn);
+
+                ok &= Expect(!Probe(fix, IngestJob(meal)),
+                             "a meal break does not walk them out of their area to change either");
+
+                area[fix.Stand.Position] = true;
+                ok &= Expect(!fix.Stand.IsForbidden(pawn), "the stand is back inside their area (control)")
+                    & Expect(Probe(fix, DoctoringAt(tend, outside)),
+                             "so the next out-of-room job changes them back as usual")
+                    & Expect(!fix.Comp.CompInspectStringExtra().Contains(line), "and the inspect line is gone");
+            }
+            finally
+            {
+                pawn.playerSettings.AreaRestrictionInPawnCurrentMap = null;
+                area.Delete();
+            }
+            return ok;
+        }
+
+        /// <summary>
+        /// THE RECREATION AND SLEEP ARMS PASS OVER A STAND OUTSIDE THE AREA
+        /// TOO.
+        ///
+        /// <para>Neither arm has a gate of its own: both find their stand
+        /// through <see cref="Patch_JobInterception.FindAvailableStand"/>, which
+        /// is where the work arm's gate sits. This pins that they keep sharing
+        /// it. Each arm is asked three times on the same stand: with no area
+        /// (dresses), with the stand left out of the area (does not), and with
+        /// it painted back in (dresses again).</para>
+        ///
+        /// <para>Recreation goes first, while the room has no role. The bed the
+        /// sleep half needs would make it a bedroom, and both triggers are
+        /// switched on explicitly, so the room's role decides nothing here.</para>
+        /// </summary>
+        internal static bool StandOutsideTheAreaServesNoRecreationOrSleep(Fixture fix)
+        {
+            JobDef chess = DefDatabase<JobDef>.GetNamedSilentFail("Play_Chess");
+            JobDef laydown = DefDatabase<JobDef>.GetNamedSilentFail("LayDown");
+            ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Bed");
+            if (chess == null || laydown == null || bedDef == null)
+            {
+                return Expect(false, "the chess, lay-down and bed defs resolve");
+            }
+            MakeCalm(fix.Map);
+            Pawn pawn = fix.Pawn;
+            Room room = fix.Stand.GetRoom();
+
+            fix.Comp.ToggleRecreation();
+            bool ok = Expect(fix.Comp.HandlesRecreation(), "the stand serves recreation (control)")
+                    & Expect(Probe(fix, JoyJob(fix, chess)),
+                             "with no area set, a joy job in the room dresses (control)");
+
+            Area_Allowed area = AreaWithoutTheStand(fix);
+            if (area == null)
+            {
+                return Expect(false, "an allowed area could be made");
+            }
+            try
+            {
+                pawn.playerSettings.AreaRestrictionInPawnCurrentMap = area;
+                ok &= Expect(fix.Stand.IsForbidden(pawn),
+                             "the area leaves the stand out, so it is forbidden to them (control)")
+                    & Expect(Patch_JobInterception.FindAvailableStand(room, pawn, null,
+                                 Patch_JobInterception.StandTrigger.Recreation) == null,
+                             "the recreation arm's search passes the stand over")
+                    & Expect(!Probe(fix, JoyJob(fix, chess)),
+                             "so a joy job in the room does not send them to it");
+                area[fix.Stand.Position] = true;
+                ok &= Expect(Probe(fix, JoyJob(fix, chess)),
+                             "with the stand painted back into the area, the same joy job dresses (control)");
+                area[fix.Stand.Position] = false;
+
+                Building_Bed bed = DebugTools_Fixtures.Spawn(fix.Map, bedDef, ThingDefOf.WoodLog,
+                    fix.Stand.Position + new IntVec3(2, 0, 2), Rot4.North) as Building_Bed;
+                if (bed == null)
+                {
+                    return ok & Expect(false, "a bed spawns in the stand's room");
+                }
+                fix.Comp.ToggleRest();
+                ok &= Expect(fix.Comp.HandlesRest() && !fix.Comp.HandlesRecreation(),
+                             "the stand is switched to sleep (control)")
+                    & Expect(!bed.IsForbidden(pawn), "and the bed is inside their area (control)")
+                    & Expect(Patch_JobInterception.FindAvailableStand(room, pawn, null,
+                                 Patch_JobInterception.StandTrigger.Rest) == null,
+                             "the sleep arm's search passes the stand over")
+                    & Expect(!Probe(fix, JobMaker.MakeJob(laydown, bed)),
+                             "so going to bed in the room does not send them to it");
+                area[fix.Stand.Position] = true;
+                ok &= Expect(Probe(fix, JobMaker.MakeJob(laydown, bed)),
+                             "with the stand painted back into the area, going to bed dresses (control)");
+            }
+            finally
+            {
+                pawn.playerSettings.AreaRestrictionInPawnCurrentMap = null;
+                area.Delete();
+            }
+            return ok;
+        }
     }
 }
 #endif

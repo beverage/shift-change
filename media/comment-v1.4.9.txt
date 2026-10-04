@@ -1,0 +1,9 @@
+v1.4.9 update:
+
+A doctor or warden fetching a meal for a patient or prisoner no longer changes out of uniform for the trip, and nobody is dressed for one.
+
+A stand outside a colonist's allowed area is now passed over. Before, the trip to it was called off before the colonist took a step, then tried again at every job after, so they never changed back. Someone already wearing that stand's outfit now keeps it on until the stand is back inside their area, and the stand's inspect pane says so. Better Pawn Control's alert areas were the easiest way to run into this.
+
+With Common Sense's "haul ingredients over doing bills" setting, which is on by default, a cook fetching an ingredient before a bill now does it in uniform instead of changing out and back. Colonists hauling with Pick Up And Haul now unload in uniform too, rather than walking back to the stand with full pockets.
+
+With several stands selected, each one keeps its own buttons, so setting one up no longer looks as if it set them all. Recreation and sleep stands now name what they serve on their switch, and the Change back tooltip no longer says colonists stay dressed while the map is under threat.

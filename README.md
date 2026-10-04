@@ -260,6 +260,19 @@ they were already wearing. A shared sleeping room takes the switch by hand.
   whites to reach a chair, which is the walk this mod exists to prevent.
   A sleeping stand does not take that exception, because a colonist wakes up
   standing beside it, so changing first costs them no walking at all.
+- **Fetching a meal for a patient or a prisoner changes nothing.** The job
+  starts wherever the meal is stored, so it used to read as leaving the
+  hospital or the cell. A doctor in scrubs or a warden in uniform now keeps it
+  on for the trip, and nobody is dressed for one.
+- **A quick errand before the stand's own work keeps the uniform on.** When
+  the job queued next is work this stand serves, in its room, a haul or
+  similar slotted in ahead of it is done in uniform instead of changing out
+  and back in. Vanilla's "haul something on the way" does this to bills, and
+  so does Common Sense.
+- **Nobody is walked out of their allowed area to change.** A stand outside a
+  colonist's allowed area is passed over, and a colonist whose stand ends up
+  outside it keeps the outfit on until it is back inside. The stand's inspect
+  pane says so. Change back is an order, so it still works.
 - If a stand frees up while someone is already working in its room out of
   uniform, they'll step over and change, unless they're mid-treatment on a
   patient.
@@ -386,6 +399,18 @@ Working the reactor console is the exception, and it is not a gap we can close:
 no work type sits behind it, it arrives as a right-click order, and a shift
 change never interrupts an order you gave. In practice the colonist who loaded
 the fuel is already wearing the suit when you send them to the console.
+
+**[Common Sense](https://steamcommunity.com/sharedfiles/filedetails/?id=1561769193)**
+works alongside this mod, in either load order (tested with both). With its
+"haul ingredients over doing bills" setting on, which is how it ships, it has a
+cook fetch an ingredient lying outside the kitchen before starting the bill. A
+cook already in uniform now does that fetch in uniform and goes straight back
+to the bill, instead of changing out for the haul and back in for the bill.
+
+**[Pick Up And Haul](https://steamcommunity.com/sharedfiles/filedetails/?id=1279012058)**
+works alongside this mod as well. A colonist who hauls out of their work room in
+uniform unloads in it too, and changes back on their next ordinary job, rather
+than walking back to the stand with full pockets to change before unloading.
 
 **An apparel mod is worth having.** Not required and not a dependency, but
 vanilla has no scrubs and no chef's whites, and the one lab coat it does have

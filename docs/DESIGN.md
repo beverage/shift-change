@@ -207,6 +207,77 @@ Ingest-family jobs are therefore identified by driver class and bypass the room
 test: food already on the pawn means no divert, eat as-is; anything else means
 change out first, wherever the food is stored.
 
+### Errands queued ahead of work
+
+A job with no giver arriving while the head of the queue is work the pawn's
+stand serves, in the stand's room, is an errand slotted in ahead of that work.
+The pawn is coming straight back, so the return trip lets the uniform ride
+along instead of changing them out first.
+
+Two things build that shape, and neither is ours. Vanilla does, for any job
+whose def allows an opportunistic prefix, `DoBill` among them: `StartJob` puts
+the work job at the front of the queue and starts a haul in its place
+(`Pawn_JobTracker.cs:338-347`). Common Sense does, for bills, with its "haul
+ingredients over doing bills" setting on, which is how it ships. Its own
+`StartJob` prefix takes a bill that arrives with an empty queue, and when an
+ingredient lies outside the bench's room and its storage is nearer the cook
+than the bench is, it queues the haul and then the bill and skips the start.
+Neither haul carries a giver. Judged on its own target, the haul read as leaving
+the room, so a cook in whites changed out to fetch an ingredient and changed
+back in for the bill.
+
+Common Sense's prefix always runs before ours, whatever the load order. It
+patches from its `Mod` constructor and we patch from a static constructor, so
+it is registered first at equal priority, and a bool prefix that returns false
+makes Harmony skip every later bool prefix (`MethodCreator.AddPrefixes` tests
+the run-original flag before each one). So the haul is the first job of the
+pair we see, and it reaches us from the queue at the next job boundary.
+
+The signal, exactly: the incoming job has no `workGiverDef`; the queue's head
+has one, its work type is one the stand serves, and it is not on the
+ignored-giver list; and the head resolves to the stand's room through the same
+resolver both directions use. Whether the incoming job came off the queue or
+was started from inside `StartJob` makes no difference. Our own swap never
+counts as the head, since it carries no giver.
+
+It governs staying dressed and nothing else. It is asked on the return trip
+only, so a pawn not on shift is dressed when the queued work itself starts,
+never for the errand in front of it. It sits below the meal branch, which keeps
+its own policy, and recreation and sleep jobs are excluded.
+
+### Allowed areas
+
+A stand outside a pawn's allowed area is unavailable to that pawn, in both
+directions, and nothing walks them out of the area to change.
+
+The swap could never have got there anyway, which is what made this a loop
+rather than a choice. `CanReserveAndReach` asks only whether the stand can be
+reached and reserved, and reaching ignores allowed areas, so every gate let it
+through. The swap driver's `FailOnDespawnedNullOrForbidden` does not ignore
+them: `ForbidUtility.IsForbidden` asks `InAllowedArea`
+(`ForbidUtility.cs:117`, `:163`). The swap was reserved, started, and
+ended Incompletable on its first toil inside `StartJob`, before the pawn took a
+step. Only a failed reach set the retry cooldown, so the next job boundary did
+it again. On the dressing side a pawn's own stand outranks a shared one, so a
+forbidden personal stand also beat an allowed shared stand beside it. Better
+Pawn Control makes all of it routine: its alert mode can switch every
+colonist's area at once.
+
+`StandForbiddenTo` is the driver's own predicate, asked by the selector, the
+mid-job catch-up and `Insert`. The selector and the catch-up pass the stand
+over. `Insert` is where the return trip meets it: the uniform rides along, the
+retry cooldown is set, and the stand's inspect pane says why, since a colonist
+who simply never changes back is otherwise all a player would see. It is asked
+live, so the line and the refusal both lift the moment the area changes.
+
+The same map comes first. A borrower who left with a caravan keeps their
+ledger, and reading the stand's cell against the area of the map they stand on
+now indexes a grid sized for another map.
+
+The Change back button is untouched. It is an order, `StartJob` gives an
+ordered job `ignoreForbidden`, and vanilla lets orders cross allowed areas
+too.
+
 ## Building_OutfitStand
 
 Used as-is, with two comps patched onto its def and its container API called from
@@ -556,13 +627,31 @@ A per-stand dialog overrides the set, with three canonical states: automatic
 (follows the room), custom set, excluded. A decorative stand in a work room can be
 excluded so it never joins the pool.
 
+The switch that opens it is labelled with the first thing the stand serves and
+a count of the rest, built from the same list as the inspect pane's: work
+types, then recreation, then sleep. It once read the work types alone, so a
+working recreation or sleep stand said "no work here yet" on its button.
+
+It is one button per stand, never merged across a selection, and so is the Set
+owner button. Commands with the same face merge when their owners are selected
+together, and a click on the merged button runs every one of them
+(`GizmoGridDrawer`). Each of ours opens a dialog, and opening a window of a
+type already open closes the earlier one (`Window.onlyOneOfTypeAllowed`,
+`WindowStack.Add`), so the merged button set up one stand while looking as if
+it set them all. Editing every selected stand from one dialog was the other
+way to make it honest, and it is a feature rather than a fix: the dialog shows
+one stand's state, an automatic stand's ticks are seeded from its own room, and
+one set ticked across stands in different rooms would overwrite each room's own
+reading with a custom set — the clobbering that kept stand settings off the
+copy and paste buttons.
+
 The trigger is the **job**, not the doorway: work-type-in-set AND
 job-target-in-room. A doctor crossing the hospital to reach the storeroom, or
 anyone walking in to eat, changes nothing.
 
 ## Mod compatibility
 
-Four tables, each keyed by defName and each allowed to miss. A name no loaded
+Five tables, each keyed by defName and each allowed to miss. A name no loaded
 mod supplies is a mod that is not installed, which is the ordinary case — so
 every lookup is silent-fail and an absent row simply narrows the answer. They
 are separate tables rather than one because they fail differently: a missing
@@ -697,6 +786,35 @@ very long haul, or, for an already-suited pawn, undressing for the trip and
 dressing again after — two wardrobe walks for a job needing no suit. Changing
 is the expensive part, not the wearing, and that is the general principle this
 list encodes.
+
+The list also carries vanilla's six feeding givers, the only official rows on
+it: feeding patients and animals, feeding prisoners and delivering their food,
+and the two hemogen equivalents. Every one builds its job with the FOOD in
+targetA and the patient or prisoner in targetB (`WorkGiver_FeedPatient`,
+`WorkGiver_Warden_Feed`, `WorkGiver_Warden_DeliverFood`,
+`Workgiver_AdministerHemogen`, `WorkGiver_Warden_DeliverHemogen`), so the job
+read as happening wherever the meal was stored. A doctor in scrubs changed out
+to fetch a meal from the freezer and back in for the next tend; a warden did the
+same with a stand in the cell, where delivering food can never read as the
+cell at all, because its giver refuses food already stored there. Reading
+targetB instead would put the job where the meal ends up and dress a bare
+doctor before a trip whose first leg is the freezer. A meal run needs no
+uniform, so it rides along. The harness names these six as the deliberate
+official rows and fails on any other.
+
+**Jobs that ride along without a giver** (`JobRoomTargets.RideAlongJobs`). The
+giver-keyed list's twin for jobs that have no giver to key on: the follow-ups a
+haul leaves behind it. Pick Up And Haul hands its haul out through its own work
+giver, and that job is judged at its first item like any haul. What it queues
+afterwards carries no giver: `UnloadYourHauledInventory` at the storage cell
+when the haul arrives and on the pawn itself from its unload checker, and a
+further `HaulToInventory` when its driver spots more to carry nearby. Judged on
+their own targets, both read as leaving the room, so a cook who hauled out of
+the kitchen in whites walked back to the stand with full pockets, changed, and
+walked out again to unload. A job on this list rides along only when it carries
+no giver, which is what keeps a freshly handed-out `HaulToInventory` judged at
+its first item as before. Vanilla's `UnloadYourInventory` is on the list too,
+though it already rode along by carrying no target at all, so that it stays so.
 
 ### Outfit Stands Plus' stand button
 

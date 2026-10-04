@@ -409,6 +409,13 @@ namespace ShiftChange
                 {
                     continue;
                 }
+                // Outside this pawn's allowed area, so the swap would die on
+                // its first toil (see StandForbiddenTo). Interrupting them for
+                // it is a detour that ends where it started.
+                if (StandForbiddenTo(parent, pawn))
+                {
+                    continue;
+                }
                 if (!pawn.CanReserveAndReach(parent, PathEndMode.InteractionCell, Danger.Deadly))
                 {
                     continue;
@@ -551,7 +558,10 @@ namespace ShiftChange
             // Some givers are not ours to act on, and for the same reason the
             // uniform rides along here rather than forcing a detour. See
             // JobRoomTargets.IgnoredGivers — keyed on the giver because the
-            // job def cannot always tell two givers apart.
+            // job def cannot always tell two givers apart. Its job-keyed twin,
+            // RidesAlong, covers the giver-less follow-ups a haul leaves behind
+            // (a hauling mod's unload, its next queued haul), which have no
+            // giver to key on.
             //
             // ONE OPT-IN CARVE-OUT, off by default: a player who wants their
             // doctors in scrubs for the call that matters can say so, and then
@@ -566,7 +576,8 @@ namespace ShiftChange
             if (job.playerForced
                 || (job.workGiverDef?.emergency == true
                     && !EmergencyDressingAllowed(job.workGiverDef))
-                || JobRoomTargets.Ignored(job.workGiverDef))
+                || JobRoomTargets.Ignored(job.workGiverDef)
+                || JobRoomTargets.RidesAlong(job))
             {
                 return false;
             }
@@ -777,6 +788,19 @@ namespace ShiftChange
                     // Still working in the room, or the job's location is
                     // unreadable (queue-based jobs — hauling, harvesting).
                     // Staying dressed is the safe answer either way.
+                    return false;
+                }
+                // An errand slotted in AHEAD of this stand's own work: they are
+                // coming straight back to it, so changing out first is a round
+                // trip to the stand for nothing. Below the meal branch on
+                // purpose, which keeps its own policy. See QueuedAheadOfServedWork.
+                if (QueuedAheadOfServedWork(job, tracker, onShift, standRoom, map))
+                {
+                    if (Verbose)
+                    {
+                        Log.Message($"[ShiftChange] {pawn.LabelShort} keeps the outfit on for " +
+                                    $"{job.def.defName}: {onShift.parent.LabelShort}'s work is queued next");
+                    }
                     return false;
                 }
                 return Insert(pawn, tracker, onShift, job, tag, "return");
@@ -1039,6 +1063,23 @@ namespace ShiftChange
         internal static bool Insert(Pawn pawn, Pawn_JobTracker tracker, CompShiftStand stand,
                                    Job originalJob, JobTag? tag, string direction)
         {
+            // NEVER WALK A PAWN OUT OF THEIR ALLOWED AREA TO CHANGE. The swap
+            // would not get there anyway: it fails on its first toil, inside
+            // StartJob (see StandForbiddenTo). The dress paths already pass such
+            // a stand over, so in practice this is the RETURN TRIP's gate, meal
+            // breaks included, and the uniform rides along until the stand is
+            // back inside the area. The cooldown is what stops the next job
+            // boundary asking again; the stand's inspect pane says why.
+            if (StandForbiddenTo(stand.parent, pawn))
+            {
+                LastBlockedTick[pawn.thingIDNumber] = Find.TickManager.TicksGame;
+                if (Verbose)
+                {
+                    Log.Message($"[ShiftChange] {direction} wanted for {pawn.LabelShort} but " +
+                                $"{stand.parent.LabelShort} is outside their allowed area");
+                }
+                return false;
+            }
             if (!pawn.CanReserveAndReach(stand.parent, PathEndMode.InteractionCell, Danger.Deadly))
             {
                 LastBlockedTick[pawn.thingIDNumber] = Find.TickManager.TicksGame;
@@ -1576,6 +1617,14 @@ namespace ShiftChange
                     {
                         continue;
                     }
+                    // Outside this pawn's allowed area. The swap could not get
+                    // there (see StandForbiddenTo), and because a personal stand
+                    // outranks a shared one below, leaving it in would let a
+                    // forbidden personal stand beat an allowed one beside it.
+                    if (StandForbiddenTo(thing, pawn))
+                    {
+                        continue;
+                    }
                     // Reservation is part of "available", not a formality to
                     // check after choosing. OnShift only becomes true when a
                     // swap COMPLETES, so a stand someone is currently walking
@@ -1586,8 +1635,8 @@ namespace ShiftChange
                     // the exact concurrency pooling exists to serve — that
                     // degraded pooling to roughly one dress per completed
                     // swap however many stands the room had. Asked last of the
-                    // four gates because it is much the most expensive, and
-                    // it is the same call TryDressMidJob already makes.
+                    // gates because it is much the most expensive, and it is
+                    // the same call TryDressMidJob already makes.
                     if (!pawn.CanReserveAndReach(thing, PathEndMode.InteractionCell, Danger.Deadly))
                     {
                         continue;
@@ -1607,6 +1656,91 @@ namespace ShiftChange
                 }
             }
             return best;
+        }
+
+        /// <summary>
+        /// The stand is off limits to this pawn: outside their allowed area, in
+        /// practice, since an outfit stand has no forbid toggle of its own.
+        ///
+        /// <para>Reaching and reserving ignore allowed areas
+        /// (<c>CanReserveAndReach</c> asks only those two things), but the swap
+        /// driver's <c>FailOnDespawnedNullOrForbidden</c> does not:
+        /// <c>ForbidUtility.IsForbidden</c> asks <c>InAllowedArea</c>. So a stand
+        /// that passed every other gate started a swap that ended Incompletable
+        /// on its first toil, inside <c>StartJob</c>, before the pawn took a
+        /// step, and nothing set the retry cooldown. Better Pawn Control makes it
+        /// routine: its alert mode can switch every colonist's area at
+        /// once.</para>
+        ///
+        /// <para>It is the driver's own predicate, so the two cannot disagree. A
+        /// player-forced swap, which is what the Change back button issues, gets
+        /// <c>ignoreForbidden</c> from <c>StartJob</c> and is untouched by any of
+        /// this.</para>
+        ///
+        /// <para>Same map first. A borrower who left with a caravan keeps their
+        /// ledger, and reading the stand's cell against the area of the map they
+        /// stand on now indexes a grid sized for another map: out of range it
+        /// throws, inside it reads the wrong bit.</para>
+        /// </summary>
+        internal static bool StandForbiddenTo(Thing stand, Pawn pawn)
+        {
+            return stand != null && pawn != null
+                   && stand.MapHeld != null && stand.MapHeld == pawn.MapHeld
+                   && stand.IsForbidden(pawn);
+        }
+
+        /// <summary>
+        /// This job carries no giver, and the next job in the queue is work this
+        /// on-shift stand serves, in its own room: an errand slotted in ahead of
+        /// the stand's own work, which the pawn is coming straight back to.
+        ///
+        /// <para>Two things build that shape. Vanilla does, for any job whose
+        /// def allows an opportunistic prefix (<c>DoBill</c> among them):
+        /// <c>Pawn_JobTracker.StartJob</c> puts the work job at the front of the
+        /// queue and starts a haul in its place (<c>TryOpportunisticJob</c>).
+        /// Common Sense does, for bills, with "haul ingredients over doing bills"
+        /// on, which is how it ships: its own <c>StartJob</c> prefix queues a
+        /// haul of an ingredient lying outside the bench's room, then the bill,
+        /// and skips the start. Neither haul carries a giver. Judged on its own
+        /// target, the haul read as leaving the room, so a cook in whites changed
+        /// out to fetch an ingredient and changed back in for the bill.</para>
+        ///
+        /// <para><b>The signal, exactly.</b> The incoming job has no
+        /// <c>workGiverDef</c>. The head of the queue has one, its work type is
+        /// one this stand serves, and it is not on the ignored-giver list. And
+        /// that queued job resolves to this stand's room through the same
+        /// resolver both directions use. Whether the incoming job came off the
+        /// queue (Common Sense) or not (vanilla's opportunistic haul, started
+        /// from inside <c>StartJob</c>) makes no difference. Our own swap is
+        /// never the head that counts, since it carries no giver.</para>
+        ///
+        /// <para><b>Staying dressed only, never dressing.</b> It is asked on the
+        /// return trip and nowhere else, so a pawn not on shift is dressed when
+        /// the queued work itself starts, never for the errand ahead of it. Jobs
+        /// with a policy of their own keep it: a meal is decided before this is
+        /// reached, and recreation and sleep are excluded here.</para>
+        /// </summary>
+        internal static bool QueuedAheadOfServedWork(Job job, Pawn_JobTracker tracker,
+                                                     CompShiftStand onShift, Room standRoom, Map map)
+        {
+            if (job.workGiverDef != null || IsRecreationJob(job) || IsRestJob(job))
+            {
+                return false;
+            }
+            JobQueue queue = tracker?.jobQueue;
+            if (queue == null || queue.Count == 0)
+            {
+                return false;
+            }
+            Job next = queue.Peek()?.job;
+            WorkGiverDef giver = next?.workGiverDef;
+            if (giver?.workType == null || JobRoomTargets.Ignored(giver)
+                || !onShift.HandlesWork(giver.workType))
+            {
+                return false;
+            }
+            IntVec3 at = IsRecreationJob(next) ? JoyTargetCell(next, map) : TargetCell(next, map);
+            return at.IsValid && at.GetRoom(map) == standRoom;
         }
 
         /// <summary>

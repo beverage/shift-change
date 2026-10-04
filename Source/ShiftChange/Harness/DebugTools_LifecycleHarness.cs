@@ -25,7 +25,9 @@ using static ShiftChange.HarnessFixtures;
 using static ShiftChange.HarnessGates;
 using static ShiftChange.HarnessInterop;
 using static ShiftChange.HarnessLifecycle;
+using static ShiftChange.HarnessGizmos;
 using static ShiftChange.HarnessOwnership;
+using static ShiftChange.HarnessRideAlong;
 using static ShiftChange.HarnessScoring;
 using static ShiftChange.HarnessSwap;
 using static ShiftChange.HarnessTables;
@@ -292,6 +294,37 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  FreedStandCatchesUp);
+            Case(map, pad, "a stand outside the colonist's allowed area dresses nobody",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 StandOutsideTheAreaDressesNobody);
+            Case(map, pad, "nor do the recreation and sleep arms send anyone to it",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 StandOutsideTheAreaServesNoRecreationOrSleep);
+            Case(map, pad, "a colonist whose stand is outside their area keeps the outfit on, and the stand says why",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 StandOutsideTheAreaKeepsTheOutfitOn);
+            Case(map, pad, "feeding a patient or a prisoner neither dresses nor undresses anyone",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), FeedingRidesAlong);
+            Case(map, pad, "an errand queued ahead of work the stand serves keeps the uniform on",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 DetourAheadOfServedWorkKeepsTheUniform);
+            Case(map, pad, "and so does vanilla's own opportunistic haul on the way to a bill",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Hauling")),
+                 VanillaOpportunisticHaulKeepsTheUniform);
+            // Known gaps unless the mod is loaded (--with=).
+            Case(map, pad, "Common Sense's bill haul keeps a cook in uniform",
+                 StageWithDoorway, CommonSenseBillHaulKeepsTheUniform);
+            Case(map, pad, "Pick Up And Haul's follow-up jobs keep the uniform on",
+                 StageWithDoorway, PickUpAndHaulFollowUpsKeepTheUniform);
+            Case(map, pad, "the stand's switch names what it serves, recreation and sleep included",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), SwitchNamesWhatTheStandServes);
+            Case(map, pad, "selecting several stands shows each stand's own buttons",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), StandButtonsStaySeparate);
+            // A known gap on every list, kept on purpose: see the case.
+            Case(map, pad, "fishing dresses at a stand ticked for it",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), FishingNeverDresses);
             // The pair, and it only means anything as a pair: the refusal that
             // stops a checked-out pawn re-arming from the spare pile, and the
             // release that lets them shop once their parked kit is worn out.
@@ -422,6 +455,14 @@ namespace ShiftChange
 
             /// <summary>Extra pawns a case spawned; swept by <see cref="Teardown"/>.</summary>
             internal List<Pawn> Extras = new List<Pawn>();
+
+            /// <summary>
+            /// The strip of open ground outside the door that
+            /// <see cref="HarnessFixtures.StageWithDoorway"/> cuts into the west
+            /// wall. Empty for every other fixture. <see cref="Teardown"/>
+            /// clears it along with the pad.
+            /// </summary>
+            internal CellRect Outside = CellRect.Empty;
         }
 
         /// <summary>
