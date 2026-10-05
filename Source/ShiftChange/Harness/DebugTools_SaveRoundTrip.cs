@@ -128,7 +128,15 @@ namespace ShiftChange
 
         /// <summary>
         /// Saves a stand carrying an owner and a populated ledger, loads it
-        /// back, and asserts every scribed field survived.
+        /// back, and asserts every scribed field survived, the forced flag
+        /// included.
+        ///
+        /// <para>The stand is also saved with vanilla's removal flag ON, and
+        /// the load must sweep it back off, beside the control that the loaded
+        /// stand is in service; why this case carries that leg is in the
+        /// comment where the flag is staged. This leg also logs
+        /// <see cref="Probe"/>, the control for the file's absence
+        /// assertions.</para>
         /// </summary>
         internal static bool RoundTrip(Map map, CellRect pad)
         {

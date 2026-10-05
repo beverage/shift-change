@@ -696,6 +696,11 @@ namespace ShiftChange
         /// colonist simply never changing back is all a player sees. The Change
         /// back button is unaffected: it is an order, and orders ignore
         /// allowed areas in vanilla too.</para>
+        ///
+        /// <para>The control is the same out-of-room job with the stand inside
+        /// their area, asked before the area is painted and again once the
+        /// stand is back in it: it changes them back as usual, and the inspect
+        /// line is absent.</para>
         /// </summary>
         internal static bool StandOutsideTheAreaKeepsTheOutfitOn(Fixture fix)
         {

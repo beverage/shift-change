@@ -80,6 +80,20 @@ namespace ShiftChange
                          "and neither does an unroled room");
         }
 
+        /// <summary>
+        /// Work and recreation are MUTUALLY EXCLUSIVE on one stand (decided
+        /// 2026-08-16): it holds one outfit, and one outfit serves one purpose.
+        /// The rule and the dialog's side of it: docs/DESIGN.md, "The
+        /// recreation branch".
+        ///
+        /// <para>Asserted in both directions, because the rule is enforced by
+        /// two separate methods that each clear the other's half — and a
+        /// half-applied version of it leaves a stand claiming both, which the
+        /// dialog then cannot render honestly (it hides the work grid while
+        /// recreation is ticked). Each half that must be cleared is asserted
+        /// beside the half just turned on, which is its control, and the case
+        /// ends with both off, which must read as excluded.</para>
+        /// </summary>
         internal static bool WorkAndRecreationAreExclusive(Fixture fix)
         {
             WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
@@ -178,6 +192,12 @@ namespace ShiftChange
         /// PatientBedRest work type quietly stops owning its own jobs: a
         /// pyjama stand starts dressing the wounded, and the checkbox a player
         /// ticked for hospital gowns goes dead with nothing to say so.</para>
+        ///
+        /// <para>It also covers the mid-sleep re-trigger and the wake-up. A
+        /// lay-down re-issued while the pawn is on the bed does not walk them to
+        /// the wardrobe. And on shift and on the bed, a job that leaves the room
+        /// has the change-back inserted first, beside a job that keeps them in
+        /// bed, which does not (the control).</para>
         /// </summary>
         internal static bool SleepJobInTheRoomDresses(Fixture fix)
         {

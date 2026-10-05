@@ -31,16 +31,6 @@ namespace ShiftChange
     internal static class HarnessOwnership
     {
         /// <summary>
-        /// Work and recreation are MUTUALLY EXCLUSIVE on one stand (decided
-        /// 2026-08-16): it holds one outfit, and one outfit serves one purpose.
-        ///
-        /// <para>Asserted in both directions, because the rule is enforced by
-        /// two separate methods that each clear the other's half — and a
-        /// half-applied version of it leaves a stand claiming both, which the
-        /// dialog then cannot render honestly (it hides the work grid while
-        /// recreation is on).</para>
-        /// </summary>
-        /// <summary>
         /// Ownership is a SET. The single-owner model this replaced would pass
         /// the first two assertions and fail every one after them, which is the
         /// point of the case: the danger in going from one owner to many is
