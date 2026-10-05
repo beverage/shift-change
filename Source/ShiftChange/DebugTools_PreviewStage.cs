@@ -54,8 +54,9 @@ namespace ShiftChange
     /// screenshot would make those observations incomparable. This stage
     /// borrows all of its room dressing and changes only the shell.</para>
     ///
-    /// <para>Ships in Release for the same reason the demo stage does: footage
-    /// is filmed on live builds.</para>
+    /// <para>Never in a shipping build, like the demo stage: footage is filmed
+    /// on the Media configuration (docs/DESIGN.md, "Development
+    /// tooling").</para>
     /// </summary>
     internal static class DebugTools_PreviewStage
     {

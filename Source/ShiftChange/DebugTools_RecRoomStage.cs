@@ -2,9 +2,9 @@
 // SCENE and must never reach a player: it clears its footprint (destroying any
 // pawn standing in it), rewrites terrain and roof, unlocks the whole research
 // tree, and leaves permanent player-faction colonists and buildings behind. The
-// fixture primitives live in DebugTools_Fixtures, which always compiles because
-// the harness needs them in Release; SpawnTorch/TopUpNeeds come from
-// DebugTools_DemoStage, which is SCENES-gated too.
+// fixture primitives live in DebugTools_Fixtures, under SCENES || HARNESS;
+// SpawnTorch/TopUpNeeds come from DebugTools_DemoStage, which is SCENES-gated
+// too.
 #if SCENES
 using System.Collections.Generic;
 using RimWorld;

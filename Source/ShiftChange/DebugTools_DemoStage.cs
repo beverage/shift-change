@@ -2,8 +2,7 @@
 // A SCENE and must never reach a player: it clears a 13x16 footprint (which
 // destroys any pawn standing in it), then leaves permanent player-faction
 // colonists, buildings and terrain behind. The fixture primitives it is built
-// from live in DebugTools_Fixtures, which always compiles because the harness
-// needs them in Release.
+// from live in DebugTools_Fixtures, under SCENES || HARNESS.
 #if SCENES
 using System.Collections.Generic;
 using LudeonTK;
@@ -34,9 +33,10 @@ namespace ShiftChange
     /// stays. Ordering between doctor and chef is approximate — the knob is
     /// the surgery-bill count and the starting food levels below.
     ///
-    /// Ships in Release ON PURPOSE: footage is filmed on live builds (see the
-    /// live/lab discipline in docs/DEVELOPMENT.md). Dev mode gates it, and
-    /// requiresOdyssey hides it exactly where the mod itself is inert.
+    /// Never in a shipping build: footage is filmed on the Media configuration,
+    /// Release codegen with the stages present (docs/DESIGN.md, "Development
+    /// tooling"). Where it does exist, dev mode gates it, and requiresOdyssey
+    /// hides it exactly where the mod itself is inert.
     /// </summary>
     internal static class DebugTools_DemoStage
     {

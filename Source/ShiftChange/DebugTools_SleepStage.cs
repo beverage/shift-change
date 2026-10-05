@@ -2,8 +2,8 @@
 // SCENES and must never reach a player: they clear their footprint (destroying
 // any pawn standing in it), rewrite terrain and roof, unlock the whole research
 // tree, and leave permanent player-faction colonists and buildings behind. The
-// fixture primitives live in DebugTools_Fixtures, which always compiles because
-// the harness needs them in Release; UnlockEverything comes from
+// fixture primitives live in DebugTools_Fixtures, under SCENES || HARNESS;
+// UnlockEverything comes from
 // DebugTools_RecRoomStage, SpawnTorch/TopUpNeeds from DebugTools_DemoStage, and
 // the card stage's shell from DebugTools_PreviewStage — all SCENES-gated too.
 #if SCENES

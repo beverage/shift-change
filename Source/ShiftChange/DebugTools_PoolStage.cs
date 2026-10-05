@@ -2,10 +2,10 @@
 // A SCENE and must never reach a player: it clears a 10x8 footprint (which
 // destroys any pawn standing in it), lays 24 cells of shallow water, and
 // leaves a permanent player-faction colonist and buildings behind. The
-// fixture primitives it is built from live in DebugTools_Fixtures, which
-// always compiles because the harness needs them in Release; the three it
-// still takes from DebugTools_DemoStage (SpawnTorch, SpawnStand, TopUpNeeds)
-// resolve because that file is SCENES-gated too.
+// fixture primitives it is built from live in DebugTools_Fixtures, under
+// SCENES || HARNESS; the three it still takes from DebugTools_DemoStage
+// (SpawnTorch, SpawnStand, TopUpNeeds) resolve because that file is
+// SCENES-gated too.
 #if SCENES
 using System.Collections.Generic;
 using LudeonTK;
@@ -25,12 +25,11 @@ namespace ShiftChange
     /// outfit stand by the door holding one white robe, and a swimmer with no
     /// work at all and a drained joy need.
     ///
-    /// TODAY this stages the BASELINE: the swimmer takes vanilla Odyssey
-    /// GoSwimming breaks in their own clothes and the stand does nothing,
-    /// because the interception matches work jobs only. The same
-    /// stage unchanged becomes the acceptance fixture for the recreation
-    /// branch — identical take, but the swimmer dresses at the stand first.
-    /// The comparison is the point: keep the stage stable across that change.
+    /// It staged the baseline before the recreation branch, when the swimmer
+    /// took GoSwimming breaks in their own clothes, and is now that branch's
+    /// acceptance fixture: the same take, with the stand set to recreation
+    /// and the swimmer dressing at it first. Keep the stage stable; the
+    /// comparison across that change is the point.
     ///
     /// The pool is sized for <c>SwimPathFinder</c>, which is all-or-nothing:
     /// it builds exactly 12 hops of 1–3 cells each and FAILS OUTRIGHT if any
@@ -46,7 +45,8 @@ namespace ShiftChange
     /// deep water is Impassable, so SwimPathFinder rejects it as
     /// non-Standable and vanilla swimmers never enter it.
     ///
-    /// Ships in Release like its siblings: footage is filmed on live builds.
+    /// Never in a shipping build, like its siblings (docs/DESIGN.md,
+    /// "Development tooling").
     /// </summary>
     internal static class DebugTools_PoolStage
     {
