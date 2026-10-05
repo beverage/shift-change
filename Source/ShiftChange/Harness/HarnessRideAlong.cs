@@ -31,14 +31,10 @@ namespace ShiftChange
     internal static class HarnessRideAlong
     {
         /// <summary>
-        /// The six vanilla feeding givers, and the job each one builds. Every
-        /// one of them puts the FOOD in targetA and the patient or prisoner in
-        /// targetB (<c>WorkGiver_FeedPatient.JobOnThing</c>,
-        /// <c>WorkGiver_Warden_Feed</c>, <c>WorkGiver_Warden_DeliverFood</c>,
-        /// <c>Workgiver_AdministerHemogen</c>,
-        /// <c>WorkGiver_Warden_DeliverHemogen</c>), so the room the job reads
-        /// as happening in is wherever the meal is stored. The last two rows
-        /// are Biotech's and resolve only with it loaded.
+        /// The six vanilla feeding givers, with <see cref="DeliverFoodGivers"/>
+        /// below. Each builds its job with the FOOD in targetA and the patient
+        /// or prisoner in targetB: docs/DESIGN.md, "Mod compatibility". The
+        /// hemogen givers are Biotech's and resolve only with it loaded.
         /// </summary>
         internal static readonly string[] FeedPatientGivers =
         {
@@ -61,20 +57,9 @@ namespace ShiftChange
 
         /// <summary>
         /// FEEDING RIDES ALONG, in both directions: a meal run neither dresses
-        /// anyone nor sends anyone back to change.
-        ///
-        /// <para>The doctor's half of it: in scrubs, handed a patient to feed,
-        /// they changed out to fetch the meal from the freezer and changed
-        /// back in for the next tend. The warden's half is the same with a
-        /// Warden stand in a prison cell, and delivering food can never read as
-        /// happening in the cell, because its giver refuses food already stored
-        /// there.</para>
-        ///
-        /// <para><b>Why not read targetB instead.</b> That would put the job in
-        /// the patient's room, which is right for where it ends and wrong for
-        /// where it starts: a bare doctor would dress before a trip whose first
-        /// leg goes to the freezer. Ignoring the giver is what the chemfuel row
-        /// in the same table already does, for the same reason.</para>
+        /// anyone nor sends anyone back to change. The doctor's and the
+        /// warden's halves, and why the giver is ignored rather than targetB
+        /// read: docs/DESIGN.md, "Mod compatibility".
         ///
         /// <para>Every refusal is paired with the SAME job shape under a giver
         /// that is not on the list, which still dresses and still changes them
@@ -188,17 +173,9 @@ namespace ShiftChange
         /// <summary>
         /// AN ERRAND SLOTTED IN AHEAD OF WORK THE STAND SERVES KEEPS THE
         /// UNIFORM ON. The shape, with vanilla jobs only, so it runs on every
-        /// mod list.
-        ///
-        /// <para>The shape is a job with no giver arriving while the head of
-        /// the queue is a work job this stand serves, in this stand's room.
-        /// Vanilla makes it itself: <c>Pawn_JobTracker.StartJob</c> puts the
-        /// work job at the front of the queue and starts an opportunistic haul
-        /// in its place (<c>TryOpportunisticJob</c>). Common Sense makes it for
-        /// bills, and its own case below drives that. Either way the colonist
-        /// is coming straight back to the queued work, so the change-out the
-        /// return trip used to insert was a round trip to the stand and back
-        /// for nothing.</para>
+        /// mod list; the two engine-built versions have cases of their own
+        /// below. The shape and why it rides along: docs/DESIGN.md, "Errands
+        /// queued ahead of work".
         ///
         /// <para>The rule is narrow on purpose, and the controls are the
         /// narrowness. Nothing queued, work this stand does not serve, served
@@ -566,22 +543,16 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// PICK UP AND HAUL'S FOLLOW-UP JOBS KEEP THE UNIFORM ON.
-        ///
-        /// <para>Pick Up And Haul hands a haul out at its first item, as any
-        /// haul is, through its own work giver. Everything it queues after
-        /// that carries no giver and is judged on its own target: the unload at
-        /// the end of the haul targets the storage cell
-        /// (<c>JobDriver_HaulToInventory</c>, the last toil), the unload its
-        /// checker queues targets the pawn itself
-        /// (<c>PawnUnloadChecker</c>), and the next haul its driver queues when
-        /// it spots more nearby is judged at that haul's first item. A cook
-        /// who hauled out of the kitchen in whites therefore walked back to the
-        /// stand with full pockets, changed, and walked out again to unload.</para>
+        /// PICK UP AND HAUL'S FOLLOW-UP JOBS KEEP THE UNIFORM ON: the unload at
+        /// the end of the haul (<c>JobDriver_HaulToInventory</c>, the last
+        /// toil), the unload its checker queues (<c>PawnUnloadChecker</c>), and
+        /// the next haul its driver queues. Why they read as leaving the room:
+        /// docs/DESIGN.md, "Mod compatibility".
         ///
         /// <para>Each row is started from the queue through the pawn's own
-        /// tracker, the way the mod's driver hands it over. A known gap without
-        /// the mod.</para>
+        /// tracker, the way the mod's driver hands it over. The control is a
+        /// haul from its own work giver, starting outside, which still changes
+        /// them back first. A known gap without the mod.</para>
         /// </summary>
         internal static bool PickUpAndHaulFollowUpsKeepTheUniform(Fixture fix)
         {

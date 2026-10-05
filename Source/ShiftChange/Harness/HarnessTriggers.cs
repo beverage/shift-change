@@ -484,13 +484,12 @@ namespace ShiftChange
         /// two medical emergencies stop being exempt — and fighting a fire
         /// still does not.
         ///
-        /// <para><b>The firefighting assertion is what earns this case.</b>
-        /// Vanilla sets <c>emergency: true</c> on <c>FightFires</c> as well as
-        /// the two medical givers, so the obvious implementation — relax the
-        /// emergency test whenever the setting is on — walks a colonist to a
-        /// wardrobe while the base burns. The stand is ticked for Firefighter
-        /// here deliberately, so that refusal cannot be explained away as "no
-        /// stand served that work".</para>
+        /// <para><b>The firefighting assertion is what earns this case</b>: a
+        /// setting keyed on the emergency flag alone would walk a colonist to a
+        /// wardrobe while the base burns (docs/DESIGN.md, "The sleep branch").
+        /// The stand is ticked for Firefighter here deliberately, so that
+        /// refusal cannot be explained away as "no stand served that
+        /// work".</para>
         ///
         /// <para>The setting is restored before returning, the same discipline
         /// the known-gap flag keeps: a case that leaves a global flipped makes

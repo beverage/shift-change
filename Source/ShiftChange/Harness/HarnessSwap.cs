@@ -200,16 +200,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Full change must not strip a colonist bare. Today it does.
-        ///
-        /// <para>The deposit path refuses a plan that would leave the pawn
-        /// psychologically nude (<see cref="SwapPlan.WouldBeNude"/>,
-        /// <c>SwapPlan.cs:278</c>). The DRESS path never asks: the driver
-        /// consults a decency predicate only inside
-        /// <c>if (toWear.Count == 0 ...)</c>
-        /// (<c>JobDriver_SwapAtStand.cs:233</c>), so the moment a stand issues
-        /// anything at all the question stops being asked — and full change is
-        /// precisely the flag that then takes everything else off.</para>
+        /// Full change must not strip a colonist bare. Until 2026-09-07 it did,
+        /// because the dress path never asked the deposit path's question:
+        /// docs/DESIGN.md, "The dress path asks the same question and answers
+        /// it differently".
         ///
         /// <para><b>The garment is deliberately the one the deposit-only case
         /// already uses for its utility-layer trap.</b> A shield belt covers

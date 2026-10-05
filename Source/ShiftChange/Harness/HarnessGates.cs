@@ -231,14 +231,9 @@ namespace ShiftChange
         /// <summary>
         /// The danger gate is ONE-DIRECTIONAL. Under threat a pawn may not
         /// change INTO a uniform, but a pawn already wearing one still changes
-        /// back.
-        ///
-        /// The regression this guards is the shipped one (2026-08-31, found in
-        /// play): the gate sat above BOTH arms, so a raid froze every borrower
-        /// in costume instead of pausing them, and since nothing fires on the
-        /// way back to <c>None</c>, anyone whose next job was a long one wore
-        /// it well past the all-clear. Four colonists spent a raid in evening
-        /// dress with their flak vests parked in a full-change stand.
+        /// back. Its control is the same work job dressing on a calm map. The
+        /// shipped regression it guards (2026-08-31): docs/DESIGN.md, "The
+        /// gates".
         ///
         /// Both halves are asserted against the SAME threat, because the bug
         /// was not either arm in isolation — it was that one gate answered for
@@ -327,14 +322,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// THE DUTY GATE, and it shuts BOTH arms.
-        ///
-        /// <para>Found in play 2026-09-20: a colonist pulled into a modded art
-        /// exhibit stood on "changing clothes" for the whole show. The return
-        /// trip fired as the ritual took her out of her work room, the lord
-        /// replaced the half-finished swap on its next duty update, and the
-        /// fresh duty job arrived at the prefix to be deferred again — 34
-        /// queued jobs, one per programme piece.</para>
+        /// THE DUTY GATE, and it shuts BOTH arms. Each refusal sits beside the
+        /// same job on a free colonist as its control. Found in play
+        /// (2026-09-20): docs/DESIGN.md, "The gates".
         ///
         /// <para>Staged through <c>LordMaker</c> rather than by hand-setting
         /// the fields, because the gate reads what the engine writes and a
@@ -342,11 +332,10 @@ namespace ShiftChange
         /// lord duty reproduces it; this one defends a point, which needs no
         /// ritual, no DLC and no second pawn.</para>
         ///
-        /// <para>The RELEASE half matters as much as the refusal. duty and
-        /// lord are cleared together on every path a lord can end
-        /// (<c>Cleanup</c>, <c>RemovePawn</c>, <c>RemoveAllPawns</c>), so the
-        /// gate cannot latch a colonist out of the mod for the rest of the
-        /// save — the case asserts that it opens again.</para>
+        /// <para>The RELEASE half matters as much as the refusal: the case
+        /// asserts the gate opens again the moment the duty ends, so it cannot
+        /// latch a colonist out of the mod, and that a bare duty with no lord
+        /// holds it shut too.</para>
         /// </summary>
         internal static bool DutyGateShutsBothArms(Fixture fix)
         {
@@ -419,13 +408,9 @@ namespace ShiftChange
 
         /// <summary>
         /// A JOB HANDED TO A PAWN MID-SWAP IS NOT DEFERRED ON TOP OF THE SWAP.
-        ///
-        /// <para>The second guard from the same case, and the general one: the
-        /// duty gate names the cause that was found, this names the shape.
-        /// Whatever pre-empts a swap in flight — a lord's duty update, another
-        /// mod's think node, a job a player queued — deferring the replacement
-        /// starts a second swap and pushes the first one's displaced job
-        /// deeper, which is how one pre-emption becomes a stack of them.</para>
+        /// The duty case names the cause that was found; this names the
+        /// general shape (docs/DESIGN.md, "The gates"). Its control is the
+        /// same work job before the swap starts and after it ends.
         ///
         /// <para>The pawn is put on a real swap job through their own tracker,
         /// because <c>Diverts</c> reads <c>curJob</c> from exactly there.</para>

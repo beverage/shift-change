@@ -44,10 +44,6 @@ namespace ShiftChange
     /// Comp state alone cannot distinguish a value that scribed correctly from
     /// one that never left the object. Mechanisms:
     /// <c>rimworld-docs/gamedata/scribe-system.md</c>.</para>
-    ///
-    /// <para>This body ships in no configuration, like the rest of the
-    /// harness: it is behind <c>#if HARNESS</c>, and a plain Release build
-    /// does not define it.</para>
     /// </summary>
     internal static class DebugTools_SaveRoundTrip
     {

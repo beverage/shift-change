@@ -23,13 +23,12 @@ namespace ShiftChange
     /// had quietly crossed owners over many days. Nothing about that is
     /// catchable by looking.</para>
     ///
-    /// <para><b>The second case is the load-bearing one.</b> A refusal keyed
-    /// on "you already own one of these" would be wrong, and would look
-    /// perfectly healthy in the first case. A pawn whose parked garment is
-    /// worn through SHOULD go and find another, and loadout mods already
-    /// implement exactly that through their own item filters. So the pair is
-    /// the assertion: refuse while the parked kit is sound, allow once it is
-    /// not. Delete either half and the other stops meaning anything.</para>
+    /// <para><b>The second case is the load-bearing one.</b> The rule is a
+    /// comparison, never an equivalence test (the patch says why), and an
+    /// equivalence test would look perfectly healthy in the first case. So
+    /// the pair is the assertion: refuse while the parked kit is sound, allow
+    /// once it is not. Delete either half and the other stops meaning
+    /// anything.</para>
     ///
     /// <para><b>Nothing is spawned.</b> <c>ApparelScoreRaw</c> reads def
     /// stats, hit points, quality and stuff, and never asks where a garment

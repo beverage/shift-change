@@ -28,14 +28,11 @@ namespace ShiftChange
     internal static class HarnessLifecycle
     {
         /// <summary>
-        /// The gravship case, and the reason the harness exists.
-        ///
-        /// A launch despawns everything aboard with
-        /// <c>DestroyMode.WillReplace</c> (<c>GravshipUtility.cs:389,397</c>)
-        /// and <c>Building_OutfitStand.DeSpawn</c> deliberately KEEPS its
-        /// contents in that mode (<c>:392</c>), so the stand, the parked
-        /// civvies and the borrower all survive the flight. The ledger must
-        /// survive with them or the pawn lands in a uniform with no way out.
+        /// The gravship case, and the reason the harness exists. The stand,
+        /// the parked civvies and the borrower all survive a launch's
+        /// <c>WillReplace</c> despawn; the ledger must survive with them, or
+        /// the pawn lands in a uniform with no way out. Why the stand keeps
+        /// its contents in that mode: <see cref="CompShiftStand.PostDeSpawn"/>.
         /// </summary>
         internal static bool GravshipFlight(Fixture fix)
         {
@@ -332,15 +329,13 @@ namespace ShiftChange
         /// <summary>
         /// The fault latch, driven by real throws through the real
         /// <see cref="Patch_JobInterception.Prefix"/> catch block rather than
-        /// by calling the counter directly — the same rule as every other case
-        /// here. A test that pokes <c>NoteFault</c> would prove the arithmetic
-        /// and nothing about whether an exception in interception reaches it.
+        /// by calling the counter directly (why:
+        /// <see cref="Patch_JobInterception.injectFaults"/>).
         ///
-        /// Three claims, and the third is the bug this was written for. Until
-        /// 2026-08-14 a single throw disabled the mod for the whole PROCESS —
-        /// through a save load, a new colony, everything, until RimWorld was
-        /// restarted — and said nothing to the player, because
-        /// <c>Log.Error</c> does not open the log window outside dev mode.
+        /// Three claims: throws below the limit are counted and the mod keeps
+        /// serving, the limit latches it off, and a game change re-arms it. The
+        /// third is the bug this was written for
+        /// (<see cref="Patch_JobInterception.faulted"/>).
         ///
         /// The one thing this cannot do is load an actual save; it changes the
         /// game reference under <see cref="SessionGuard"/> instead, which is

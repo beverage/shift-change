@@ -39,12 +39,9 @@ namespace ShiftChange
 
         /// <summary>
         /// THE SWITCH NAMES WHAT THE STAND SERVES, recreation and sleep
-        /// included.
-        ///
-        /// <para>Its face was built from the work types alone, so a working
-        /// recreation or sleep stand read "Shift stand (no work here yet)" while
-        /// its inspect pane, built from all three triggers, said what it served.
-        /// The README already promised "Shift stand: recreation".</para>
+        /// included. Its controls are an idle stand, a doctoring one and an
+        /// excluded one, each reading as it always has. Why it once did not:
+        /// docs/DESIGN.md, "Rooms to work types".
         /// </summary>
         internal static bool SwitchNamesWhatTheStandServes(Fixture fix)
         {
@@ -80,15 +77,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// SELECTING SEVERAL STANDS SHOWS EACH STAND'S OWN BUTTONS.
-        ///
-        /// <para>Commands with the same label and icon merge into one button
-        /// when their owners are selected together, and a click on it runs
-        /// every one of them (<c>GizmoGridDrawer</c>). Each of ours opens a
-        /// dialog, and a window of a type already open closes the earlier one
-        /// (<c>Window.onlyOneOfTypeAllowed</c>, <c>WindowStack.Add</c>), so the
-        /// merged button configured one stand while looking like it configured
-        /// them all. The Set owner button did the same for shared stands.</para>
+        /// SELECTING SEVERAL STANDS SHOWS EACH STAND'S OWN BUTTONS, the switch
+        /// and Set owner alike. Why a merged button set up one stand while
+        /// looking as if it set them all: docs/DESIGN.md, "Rooms to work
+        /// types".
         ///
         /// <para>The control is two plain commands built to the same face,
         /// which do merge: the fixture's two stands are alike enough to have

@@ -641,7 +641,8 @@ excluded so it never joins the pool.
 The switch that opens it is labelled with the first thing the stand serves and
 a count of the rest, built from the same list as the inspect pane's: work
 types, then recreation, then sleep. It once read the work types alone, so a
-working recreation or sleep stand said "no work here yet" on its button.
+working recreation or sleep stand said "no work here yet" on its button, though
+the README already promised "Shift stand: recreation".
 
 It is one button per stand, never merged across a selection, and so is the Set
 owner button. Commands with the same face merge when their owners are selected
