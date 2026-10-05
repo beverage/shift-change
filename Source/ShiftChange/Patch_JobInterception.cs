@@ -16,20 +16,10 @@ namespace ShiftChange
     /// back onto the queue and sends them to change clothes first. The same
     /// hook runs the return trip when a job takes them out of the room.
     ///
-    /// <b>Why here.</b> Spiked in play 2026-08-07: <c>workGiverDef</c> is
-    /// populated at this point, <c>targetA</c> resolves to the work's room, and
-    /// <c>playerForced</c> is readable — everything the decision needs. The
-    /// obvious alternative, <c>TryOpportunisticJob</c>, is a trap: vanilla
-    /// bails out of it for drafted pawns (<c>Pawn_JobTracker.cs:628</c>) and
-    /// unless the job def sets <c>allowOpportunisticPrefix</c> (<c>:657</c>),
-    /// which <c>TendPatient</c> does not — so the headline doctoring case could
-    /// never fire through it.
-    ///
-    /// <b>The insertion is vanilla's own.</b> <c>Pawn_JobTracker.cs:338-347</c>
-    /// enqueues the incoming job first and starts a different one instead; we
-    /// do the same, without going through the gated method. Because we start a
-    /// job from inside a StartJob prefix, the call re-enters this patch —
-    /// hence <see cref="inserting"/>.
+    /// Starting the swap from inside a StartJob prefix re-enters this patch,
+    /// hence <see cref="inserting"/>. Why StartJob rather than
+    /// <c>TryOpportunisticJob</c>, and why the insertion copies vanilla's own:
+    /// docs/DESIGN.md, "Interception".
     /// </summary>
     [HarmonyPatch(typeof(Pawn_JobTracker), nameof(Pawn_JobTracker.StartJob))]
     public static class Patch_JobInterception
@@ -52,22 +42,11 @@ namespace ShiftChange
         /// adding hooks: ask "does this ACT on its own, or protect something
         /// already in progress?"
         /// </summary>
-        // These five TweakValues SHIP, deliberately (decided 2026-08-17),
-        // and the sweep of the debug menu explicitly does not extend to
-        // them. They were gated behind SCENES for one afternoon on the
-        // reasoning that the Tweak values window is "the same player-facing
-        // surface" as the debug actions menu. It is the same surface and that
-        // is the POINT — it is how a player is walked through diagnosing a
-        // report: turn Enabled off to establish whether this mod is even
-        // involved, turn Verbose on to get a log that says why a stand did
-        // nothing.
-        //
-        // The distinction that matters is not who can reach a thing, it is
-        // what happens when they do. A debug action here clears 200+ cells and
-        // vanishes any pawn standing in them; a TweakValue moves a number and
-        // resets at the next launch. Non-destructive and non-persistent is
-        // exactly the right shape for a diagnostic, and the wrong shape for a
-        // setting — a real player-facing toggle would still mean mod settings.
+        // These five TweakValues SHIP, deliberately (decided 2026-08-17), and
+        // the sweep of the debug menu does not extend to them: the bar is
+        // destructiveness, not reachability, and they are how a player is
+        // walked through diagnosing a report. docs/DESIGN.md, "Development
+        // tooling".
         [TweakValue("ShiftChange")]
         public static bool Enabled = true;
 
@@ -182,22 +161,14 @@ namespace ShiftChange
         /// room; it drops the moment they are seen starting a job anywhere
         /// else, and drafting drops it outright.
         ///
-        /// It is positional rather than a countdown because the thing that
-        /// must not cycle is the CHANGING, not the work (decided
-        /// 2026-08-09): counting jobs either spends the block on an
-        /// unrelated errand — leaving the next room job free to re-dress
-        /// them a second after the player pulled them out — or holds it
-        /// through a long trip that plainly should have ended it. "Have they
-        /// left the room yet" is the question the player is actually asking,
-        /// and it answers itself from position.
-        ///
         /// The STAND is stored, not the Room, so the room is re-derived live
         /// on both sides of every comparison and a rebuilt wall cannot leave
         /// a stale Room object behind. Keyed by Pawn reference rather than
         /// thingIDNumber on purpose: an object reference cannot collide
         /// across a save load the way a recycled ID can, so a stale entry is
         /// inert rather than wrong. SessionGuard still clears it so old-game
-        /// pawns don't leak.
+        /// pawns don't leak. Why positional rather than a countdown:
+        /// docs/DESIGN.md, "Change back".
         /// </summary>
         internal static readonly Dictionary<Pawn, Thing> ChangedBackAt = new Dictionary<Pawn, Thing>();
 
@@ -246,11 +217,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Called by SessionGuard when the loaded game changes. This map is
-        /// keyed by thingIDNumber and stamped with TicksGame — both restart
-        /// per save, so stale entries are not merely leaked but WRONG: an
-        /// old entry can sit in the future and block a same-ID pawn from
-        /// swapping until the new game's clock catches up.
+        /// Called by SessionGuard when the loaded game changes. A stale
+        /// <see cref="LastBlockedTick"/> entry is WRONG in the new game, not
+        /// merely leaked: docs/DESIGN.md, "State across save, load and
+        /// uninstall".
         /// </summary>
         internal static void ResetSessionState()
         {
@@ -270,18 +240,11 @@ namespace ShiftChange
 
         /// <summary>
         /// A stand just returned to availability. If a colonist is ALREADY
-        /// working bare in its room — because they took the job while every
-        /// stand was checked out — interrupt them to change now, resuming the
-        /// job afterwards (found in play, 2026-08-08: two benches, two pawns,
-        /// two stands; the second pawn starts seconds before a stand frees).
-        ///
-        /// The interrupt is vanilla's own detour shape (the vomit pattern):
-        /// StartJob with resumeCurJobAfterwards suspends the current job when
-        /// its def allows (Pawn_JobTracker.cs:293-296) and resumes it from
-        /// the queue. Gated on suspendable AND casualInterruptible — both
-        /// default true (JobDef.cs:24-26) and both are false on TendPatient,
-        /// so bills and research are caught up while a doctor mid-treatment
-        /// is never yanked away from a patient to fetch scrubs.
+        /// working bare in its room, because they took the job while every
+        /// stand was checked out, interrupt them to change now and resume the
+        /// job afterwards. Only a job whose def is both suspendable and
+        /// casually interruptible, which leaves a doctor mid-treatment alone.
+        /// docs/DESIGN.md, "The mid-job catch-up".
         /// </summary>
         public static void Notify_StandFreed(CompShiftStand stand, Pawn except)
         {
@@ -1041,8 +1004,9 @@ namespace ShiftChange
             // since 2026-09-23 is a real decision rather than a job the
             // work arm could not see. MedicalRestWorkType resolved no
             // work type (the pawn needs a doctor now, or is already on the
-            // bed), or it resolved one and no stand in this room was
-            // ticked for it. Either way a pyjama stand must not then pick
+            // bed); a job it does resolve never gets here, because the
+            // work arm returns whether or not a stand in its room is
+            // ticked for it. A pyjama stand must not then pick
             // the job up as ordinary sleep: keeping the hospital gown and
             // the pyjamas separately configurable is what this test has
             // always been for, and it still does that job.
@@ -1225,32 +1189,16 @@ namespace ShiftChange
                 return false;
             }
 
-            // Reserve the deferred job's targets NOW — this is vanilla
-            // parity, not an extra. Vanilla reserves at StartJob
-            // (TryMakePreToilReservations), and its own opportunistic
-            // deferral reserves FIRST, then enqueues the job and starts the
-            // other one (Pawn_JobTracker.cs:331-347; ClearDriver never
-            // releases). Our prefix skips the original StartJob entirely, so
-            // without this the patient or bench sits unreserved for the
-            // whole walk-and-change and any other pawn can take it — found
-            // in play 2026-08-08 as a distant doctor dressing for a patient
-            // a nearer doctor had already tended, then changing straight
-            // back. Safe to hold while queued: every queue-clearing path
-            // releases via QueuedJob.Cleanup → ClearReservationsForJob
-            // (QueuedJob.cs:26), and the queued start re-reserves its own
-            // claims idempotently.
-            // The dry-run must reproduce vanilla's calling context: StartJob
-            // assigns curJob BEFORE calling TryMakePreToilReservations, and
-            // drivers rely on it — vanilla's JobDriver_SocialRelax reserves
-            // its seat against pawn.CurJob, not its own job field
-            // (JobDriver_SocialRelax.cs:30), and FE's served social driver
-            // mirrors it. With curJob unset, that reserve sees a null job and
-            // returns false (ReservationManager.cs:306-309, one "without a
-            // valid job" warning per attempt), so the divert silently
-            // degraded to ride-along — found in play 2026-08-09 as a crafter
-            // drinking at the bar in uniform. MakeDriver sets the driver's
-            // own job field (Job.cs:606), which is why only CurJob-reading
-            // drivers ever noticed the difference.
+            // Reserve the deferred job's targets NOW, as vanilla's own
+            // opportunistic deferral does: our prefix skips the original
+            // StartJob, so nothing else would, and another pawn could take
+            // the patient or bench during the walk-and-change. Safe to hold
+            // while queued, since every queue-clearing path releases them.
+            // The dry run must run with curJob set to the deferred job, as
+            // StartJob would have it: drivers such as JobDriver_SocialRelax
+            // reserve against pawn.CurJob, and with it unset the reserve fails
+            // and the divert silently degrades to ride-along. Both found in
+            // play; docs/DESIGN.md, "Deferred jobs carry their reservations".
             JobDriver reservationDriver = originalJob.MakeDriver(pawn);
             Job prevCurJob = tracker.curJob;
             bool reserved;
@@ -1274,15 +1222,10 @@ namespace ShiftChange
 
             Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, stand.parent);
 
-            // Start the swap BEFORE enqueueing the displaced job. Vanilla's
-            // own pattern (Pawn_JobTracker.cs:338-347) enqueues first, but it
-            // runs inside StartJob where nothing can fail between the two
-            // calls. Out here, if StartJob threw after the enqueue, the
-            // prefix's fail-open catch would let the original StartJob
-            // proceed while the same Job object also sat in the queue — one
-            // job, two places, and the tracker chokes on it. StartJob never
-            // consults the queue, so enqueueing after is equivalent on
-            // success and strictly safer on failure.
+            // Start the swap BEFORE enqueueing the displaced job, the reverse
+            // of vanilla's order: if StartJob threw after an enqueue, the
+            // fail-open catch would leave one Job object in two places.
+            // docs/DESIGN.md, "Inserting a job ahead of another".
             // InterruptForced, not None. When a pawn already has a job — which
             // is every override path, and most of them in play —
             // Pawn_JobTracker warns "starting job ... without a specific job
@@ -1350,23 +1293,13 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A recreation job the room trigger can honestly serve: it
-        /// carries a <c>joyKind</c> — the marker every driver-ticked joy job
-        /// must carry (<c>JoyGiverDef</c> config-errors on a mismatch,
-        /// <c>JoyUtility.JoyTickCheckEnd</c> warns on its absence) — and is
-        /// not a late-room class. Consumption never reaches here at all:
-        /// Ingest carries no joyKind, its joy lives on the thing and lands in
-        /// <c>Thing.Ingested</c>. Reading DOES carry one but picks its
-        /// reading spot mid-job (<c>CarryToReadingSpot</c>), so it is
-        /// excluded by driver class: at StartJob its target is the BOOK,
-        /// wherever that is shelved, and dressing for the shelf's room is the
-        /// packed-lunch misread with a cover on.
-        ///
-        /// This classifies the JOB CLASS, not which arm serves it: the ARMS
-        /// are chosen by workGiverDef, and VisitSickPawn — Doctor work whose
-        /// JobDef carries joyKind Social, the one vanilla overlap — is
-        /// deliberately in-class here so that every room-resolver site reads
-        /// it B-first (the visitor's chair) and agrees with every other.
+        /// A recreation job the room trigger can honestly serve: it carries a
+        /// <c>joyKind</c>, and its driver is not a reading driver, which
+        /// picks its spot mid-job. This classifies the JOB CLASS, not the arm
+        /// that serves it, so VisitSickPawn (Doctor work with joyKind Social)
+        /// is in class and every room-resolver site reads it B-first. Why
+        /// joyKind, and why consumption and reading stay outside:
+        /// docs/DESIGN.md, "The recreation branch".
         ///
         /// <para><b>The reading exclusion is NARROWER than the principle behind
         /// it, and knowingly so.</b> What disqualifies reading is not that it
@@ -1401,15 +1334,11 @@ namespace ShiftChange
 
         /// <summary>
         /// A sleep job the room trigger can honestly serve: a lay-down job
-        /// whose target is an actual BED.
-        ///
-        /// <para>The bed test is doing more than it looks. It is what excludes
-        /// <c>Wait_Asleep</c> — ground sleep, same <see cref="JobDriver_LayDown"/>
-        /// driver, no bed and usually no valid target at all — along with mech
-        /// dormancy and Odyssey's deactivation, both of which subclass the same
-        /// driver. It is also the reason this arm needs none of the late-room
-        /// caution the joy classes need: a bed does not move, and targetA is
-        /// already pointing at it when StartJob runs.</para>
+        /// whose target is an actual BED. The bed test is what keeps ground
+        /// sleep (no bed, and usually no valid target at all), mech dormancy
+        /// and Odyssey's deactivation out, since all three run the same
+        /// <see cref="JobDriver_LayDown"/> family: docs/DESIGN.md, "The sleep
+        /// branch".
         ///
         /// <para>By driver class rather than by JobDef, matching
         /// <see cref="IsIngestJob"/>, so a modded sleep job that reuses
@@ -1427,35 +1356,19 @@ namespace ShiftChange
 
         /// <summary>
         /// The work type a medical lay-down should be charged to, or null when
-        /// this job is not one or must not divert.
+        /// this job is not one or must not divert. This is the whole of the
+        /// hospital-gown trigger: the patient givers' jobs arrive with no
+        /// giver, so the <c>RestingForMedicalReasons</c> tag is what it
+        /// resolves from.
         ///
-        /// <para>This is the whole of the hospital-gown trigger. Vanilla's
-        /// patient WorkGivers produce their jobs from <c>NonScanJob</c>, and
-        /// <c>JobGiver_Work</c> stamps <c>workGiverDef</c> only on its scanner
-        /// paths, so the job that arrives at <c>StartJob</c> names no giver and
-        /// no work type. The tag is the only thing on it that says why the pawn
-        /// is going to bed, so the tag is what we resolve from.</para>
-        ///
-        /// <para><b>Urgent cases never divert</b>, and that is the same rule
-        /// the emergency gate states further up rather than a new one. Vanilla
-        /// splits the two itself: <c>WorkGiver_PatientGoToBedTreatment</c>
-        /// gates on <see cref="HealthAIUtility.ShouldSeekMedicalRestUrgent"/>
-        /// and covers the colonist who is downed, bleeding, awaiting surgery or
-        /// in labour, while <c>...Recuperate</c> takes everyone else. Reading
-        /// the same predicate puts the gown on the recovering and leaves the
-        /// bleeding alone, and it means a colonist who needs a doctor now is
-        /// never sent to a wardrobe first. The <c>Patient</c> work type is
-        /// therefore never returned, and its row in the stand dialog stays
-        /// inert — the same as every other emergency giver.</para>
-        ///
-        /// <para><b>The bed guard is not optional.</b> Vanilla reissues the
-        /// patient job at a pawn already lying in the bed — after a tend, most
-        /// obviously — and without <see cref="OnABed"/> that reissue is a fresh
-        /// dressing opportunity every time, which is a patient climbing out of
-        /// a sickbed to visit a wardrobe on a loop. The sleep arm paid for this
-        /// one in play when the trigger shipped; the work arm has no equivalent
-        /// guard of its own, because no other work job can start from a
-        /// bed.</para>
+        /// <para>Two refusals, both load-bearing. An urgent case (vanilla's
+        /// own split, <see cref="HealthAIUtility.ShouldSeekMedicalRestUrgent"/>)
+        /// never diverts unless the medical-emergency setting is on. And a
+        /// pawn already on a bed never diverts: the work arm has no bed guard
+        /// of its own, because no other work job can start from a bed. Only
+        /// <c>PatientBedRest</c> is ever returned, so the <c>Patient</c> row in
+        /// the stand dialog stays inert. The argument, and the known cost of
+        /// the urgent refusal: docs/DESIGN.md, "The sleep branch".</para>
         /// </summary>
         internal static WorkTypeDef MedicalRestWorkType(Pawn pawn, Job job, JobTag? tag)
         {
@@ -1481,26 +1394,12 @@ namespace ShiftChange
 
         /// <summary>
         /// Work types whose emergencies the medical-emergency setting covers.
-        ///
-        /// <para><b>A switch keyed on <c>emergency</c> alone would walk
-        /// colonists to a wardrobe while the base burns.</b> Vanilla sets that
-        /// flag on exactly three givers — <c>FightFires</c>,
-        /// <c>DoctorTendEmergency</c> and
-        /// <c>PatientGoToBedEmergencyTreatment</c> — so the flag does not mean
-        /// "medical", and the setting has to name the work types it covers.
-        /// Firefighting is the one this list exists to leave out.</para>
-        ///
-        /// <para>The FSF names are [FSF] Complex Jobs, and they are BELT AND
-        /// BRACES rather than load-bearing (checked against 2069684319 on
-        /// 2026-09-23). That mod repoints vanilla WorkGiverDefs at its own
-        /// finer-grained types rather than adding work, but it leaves both
-        /// types this list needs where they are: its `PatientBedRest` patch
-        /// file is empty, and `DoctorTendEmergency` keeps `Doctor` — its
-        /// priority list annotates every giver it moves, and that one carries
-        /// no annotation. The names are here so a future repoint does not
-        /// silently switch the setting off for the players who ticked it. Same
-        /// silent-fail contract as <see cref="RoomWorkTypes.CompatDefaults"/> —
-        /// an absent name is a mod that is not installed.</para>
+        /// Named, because <c>emergency</c> alone would include firefighting and
+        /// walk colonists to a wardrobe while the base burns; the [FSF] Complex
+        /// Jobs names are belt and braces against a future repoint. Same
+        /// silent-fail contract as <see cref="RoomWorkTypes.CompatDefaults"/>:
+        /// an absent name is a mod that is not installed. docs/DESIGN.md,
+        /// "The sleep branch".
         /// </summary>
         internal static readonly string[] MedicalWorkTypeNames =
         {
@@ -1545,18 +1444,11 @@ namespace ShiftChange
         /// Is this pawn physically on a bed right now?
         ///
         /// <para><b>Not <c>pawn.InBed()</c>, and the difference is the whole
-        /// point.</b> <c>RestUtility.CurrentBed</c> bails on
-        /// <c>p.CurJob == null</c> (<c>RestUtility.cs:505</c>), and
-        /// <c>Pawn_JobTracker.CleanupCurrentJob</c> nulls <c>curJob</c> BEFORE
-        /// <c>EndCurrentJob</c> reaches <c>TryFindAndStartJob</c>
-        /// (<c>:501</c>) — so at an ordinary job boundary <c>InBed()</c> reads
-        /// FALSE for a colonist lying in their own bed. It reads true only
-        /// when a job starts while <c>curJob</c> is still live, which is
-        /// <c>Toils_LayDown</c>'s <c>CheckForJobOverride()</c> every 211 ticks
-        /// (<c>Toils_LayDown.cs:74</c>) — the WAKE-UP. Every guard here was
-        /// written meaning "they are asleep, leave them alone" and got the
-        /// exact opposite: silent at 3am, loud at breakfast (adversarial
-        /// review, 2026-09-03).</para>
+        /// point.</b> At an ordinary job boundary it reads FALSE for a colonist
+        /// lying in their own bed, and true only at the wake-up, the opposite
+        /// of what every guard here means (<c>RestUtility.cs:505</c>,
+        /// <c>Pawn_JobTracker.cs:501</c>, <c>Toils_LayDown.cs:74</c>).
+        /// docs/DESIGN.md, "The sleep branch".</para>
         ///
         /// <para>Position answers the question <c>curJob</c> cannot. A pawn
         /// merely walking across a bed tile also passes, which is why the
@@ -1583,28 +1475,15 @@ namespace ShiftChange
 
         /// <summary>
         /// The pawn is on a bed AND this incoming job is one they can do
-        /// without getting off it.
-        ///
-        /// <para><c>Job.CanBeginNow(pawn, whileLyingDown: true)</c> defers to
-        /// <c>JobDriver.CanBeginNowWhileLyingDown()</c>, which returns false on
-        /// the base class (<c>JobDriver.cs:303-306</c>) and is overridden by
-        /// exactly seven drivers in 1.6: LayDown, Lovin, WatchBuilding,
-        /// RelaxAlone, Reign, Breastfeed and Deathrest. That is the line the
-        /// return trip needs — staying in bed means stay dressed, getting up
-        /// means change back, and the change-back then happens while the pawn
-        /// is still beside their own stand rather than a job later from
-        /// wherever they walked to.</para>
-        ///
-        /// <para><b>The override list is incomplete, which is why the second
-        /// test exists.</b> <c>JobDriver_Meditate</c> is NOT among the seven,
-        /// so in-bed meditation — which vanilla issues from inside its own
-        /// must-keep-lying-down branch — reads as "getting up"; nor is
-        /// <c>JobDriver_Ingest</c>, so eating in bed reads the same way. A job
-        /// whose own target IS the bed the pawn is lying on is staying, whatever
-        /// its driver forgot to say, so <see cref="TargetsBedUnder"/> catches
-        /// both without a hardcoded driver list that the next DLC invalidates.
-        /// (Eating still reaches the ingest branch further down, which has its
-        /// own deliberate policy; this only stops the return trip firing first.)</para>
+        /// without getting off it: <c>Job.CanBeginNow(pawn, whileLyingDown:
+        /// true)</c> (false on the base driver, <c>JobDriver.cs:303-306</c>),
+        /// or a job whose own target is the bed under them
+        /// (<see cref="TargetsBedUnder"/>), because the drivers' own list is
+        /// incomplete. Staying in bed means stay dressed; getting up means
+        /// change back while still beside the stand. docs/DESIGN.md, "The
+        /// sleep branch". (Eating still reaches the ingest branch further
+        /// down, which has its own deliberate policy; this only stops the
+        /// return trip firing first.)
         ///
         /// <para>It caches a driver on the job (<c>Job.GetCachedDriver</c>),
         /// which is what vanilla's own callers do and what <see cref="Insert"/>
@@ -1645,14 +1524,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Where a recreation job happens: <c>targetB</c> FIRST, then the
-        /// work-style fallback. For the sit-and-play classes B is the cell
-        /// the pawn occupies while the joy ticks — the chair at the chess
-        /// table, the watch cell in front of the TV — and A is the venue
-        /// building; where B is unset (swimming's water cell, a gather spot,
-        /// art, a grave) A is already the venue. The work arm keeps its
-        /// A-first <see cref="TargetCell"/> untouched: work jobs put the pawn
-        /// at A.
+        /// Where a recreation job happens: <c>targetB</c> FIRST, the cell the
+        /// pawn occupies while the joy ticks, then the work-style
+        /// <see cref="TargetCell"/>, since where B is unset A is already the
+        /// venue. docs/DESIGN.md, "The recreation branch".
         /// </summary>
         internal static IntVec3 JoyTargetCell(Job job, Map map)
         {
@@ -1684,19 +1559,6 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The stand this pawn should use, or null if there isn't one.
-        ///
-        /// An unassigned stand is a POOL stand: any capable pawn may claim it,
-        /// so a kitchen needs one stand per CONCURRENT cook rather than one per
-        /// cook who might ever cook. A stand assigned to this pawn always wins
-        /// over a pool stand — a personal kit is personal — and among equals
-        /// the nearest is taken, or two cooks walk past a closer one to reach
-        /// the same far one.
-        ///
-        /// No free stand simply means no swap. Never queue for one: this is a
-        /// nicety and must not become a bottleneck on the work itself.
-        /// </summary>
-        /// <summary>
         /// Which of the three triggers a stand is being asked to serve. One
         /// value rather than a row of bools, because "recreation and sleep
         /// both true" is not a state any caller is allowed to hold — the
@@ -1723,6 +1585,19 @@ namespace ShiftChange
             }
         }
 
+        /// <summary>
+        /// The stand this pawn should use, or null if there isn't one.
+        ///
+        /// An unassigned stand is a POOL stand: any capable pawn may claim it,
+        /// so a kitchen needs one stand per CONCURRENT cook rather than one per
+        /// cook who might ever cook. A stand assigned to this pawn always wins
+        /// over a pool stand — a personal kit is personal — and among equals
+        /// the nearest is taken, or two cooks walk past a closer one to reach
+        /// the same far one.
+        ///
+        /// No free stand simply means no swap. Never queue for one: this is a
+        /// nicety and must not become a bottleneck on the work itself.
+        /// </summary>
         internal static CompShiftStand FindAvailableStand(Room room, Pawn pawn, WorkTypeDef work,
             StandTrigger trigger = StandTrigger.Work)
         {
@@ -1795,26 +1670,11 @@ namespace ShiftChange
         /// <summary>
         /// The stand is off limits to this pawn: outside their allowed area, in
         /// practice, since an outfit stand has no forbid toggle of its own.
-        ///
-        /// <para>Reaching and reserving ignore allowed areas
-        /// (<c>CanReserveAndReach</c> asks only those two things), but the swap
-        /// driver's <c>FailOnDespawnedNullOrForbidden</c> does not:
-        /// <c>ForbidUtility.IsForbidden</c> asks <c>InAllowedArea</c>. So a stand
-        /// that passed every other gate started a swap that ended Incompletable
-        /// on its first toil, inside <c>StartJob</c>, before the pawn took a
-        /// step, and nothing set the retry cooldown. Better Pawn Control makes it
-        /// routine: its alert mode can switch every colonist's area at
-        /// once.</para>
-        ///
-        /// <para>It is the driver's own predicate, so the two cannot disagree. A
-        /// player-forced swap, which is what the Change back button issues, gets
-        /// <c>ignoreForbidden</c> from <c>StartJob</c> and is untouched by any of
-        /// this.</para>
-        ///
-        /// <para>Same map first. A borrower who left with a caravan keeps their
-        /// ledger, and reading the stand's cell against the area of the map they
-        /// stand on now indexes a grid sized for another map: out of range it
-        /// throws, inside it reads the wrong bit.</para>
+        /// It is the swap driver's own predicate, so the two cannot disagree;
+        /// <c>CanReserveAndReach</c> ignores allowed areas, and the driver
+        /// does not. Same map first: another map's area grid throws out of
+        /// range and reads the wrong bit inside it. docs/DESIGN.md, "Allowed
+        /// areas".
         /// </summary>
         internal static bool StandForbiddenTo(Thing stand, Pawn pawn)
         {
@@ -1827,32 +1687,12 @@ namespace ShiftChange
         /// This job carries no giver, and the next job in the queue is work this
         /// on-shift stand serves, in its own room: an errand slotted in ahead of
         /// the stand's own work, which the pawn is coming straight back to.
-        ///
-        /// <para>Two things build that shape. Vanilla does, for any job whose
-        /// def allows an opportunistic prefix (<c>DoBill</c> among them):
-        /// <c>Pawn_JobTracker.StartJob</c> puts the work job at the front of the
-        /// queue and starts a haul in its place (<c>TryOpportunisticJob</c>).
-        /// Common Sense does, for bills, with "haul ingredients over doing bills"
-        /// on, which is how it ships: its own <c>StartJob</c> prefix queues a
-        /// haul of an ingredient lying outside the bench's room, then the bill,
-        /// and skips the start. Neither haul carries a giver. Judged on its own
-        /// target, the haul read as leaving the room, so a cook in whites changed
-        /// out to fetch an ingredient and changed back in for the bill.</para>
-        ///
-        /// <para><b>The signal, exactly.</b> The incoming job has no
-        /// <c>workGiverDef</c>. The head of the queue has one, its work type is
-        /// one this stand serves, and it is not on the ignored-giver list. And
-        /// that queued job resolves to this stand's room through the same
-        /// resolver both directions use. Whether the incoming job came off the
-        /// queue (Common Sense) or not (vanilla's opportunistic haul, started
-        /// from inside <c>StartJob</c>) makes no difference. Our own swap is
-        /// never the head that counts, since it carries no giver.</para>
-        ///
-        /// <para><b>Staying dressed only, never dressing.</b> It is asked on the
-        /// return trip and nowhere else, so a pawn not on shift is dressed when
-        /// the queued work itself starts, never for the errand ahead of it. Jobs
-        /// with a policy of their own keep it: a meal is decided before this is
-        /// reached, and recreation and sleep are excluded here.</para>
+        /// Vanilla's opportunistic haul and Common Sense's ingredient haul both
+        /// build that shape. Asked on the return trip only, so it keeps a
+        /// uniform on and never dresses anyone; recreation and sleep are
+        /// excluded here, and a meal is decided before this is reached. The
+        /// signal, exactly, and both sources: docs/DESIGN.md, "Errands queued
+        /// ahead of work".
         /// </summary>
         internal static bool QueuedAheadOfServedWork(Job job, Pawn_JobTracker tracker,
                                                      CompShiftStand onShift, Room standRoom, Map map)

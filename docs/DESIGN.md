@@ -58,7 +58,9 @@ A Harmony prefix on `Pawn_JobTracker.StartJob`.
 The decision needs three facts: the job's **work type**, whether it was
 **player-forced**, and its **target location**. All three are readable at
 `StartJob` — the assigning code has already attached the `WorkGiverDef` (whose
-`workType` field is the work type), the `playerForced` flag and the targets.
+`workType` field is the work type), the `playerForced` flag and the targets. A
+spike in play confirmed all three on 2026-08-07, before anything was built on
+them.
 
 ```mermaid
 sequenceDiagram
@@ -102,10 +104,13 @@ starts the other job and puts the displaced job at the front of the pawn's queue
 
 Two details matter:
 
-- **Start the swap first, enqueue second.** If starting the swap throws and the
-  original were already queued, the fail-open catch would let the original also
-  start, putting one Job object in two places. `StartJob` never reads the queue,
-  so enqueueing after is equivalent on success and safer on failure.
+- **Start the swap first, enqueue second.** That is the reverse of vanilla's
+  order (`:341`, then `:345`), which is safe for vanilla only because it runs
+  inside `StartJob`, where nothing can fail between the two calls. If starting
+  the swap throws and the original were already queued, the fail-open catch
+  would let the original also start, putting one Job object in two places.
+  `StartJob` never reads the queue, so enqueueing after is equivalent on
+  success and safer on failure.
 - **Re-entrancy.** Starting a job from inside a `StartJob` prefix re-enters the
   prefix. A static guard makes the inner call pass through.
 
@@ -113,9 +118,9 @@ Two details matter:
 
 Vanilla reserves a job's targets inside `StartJob`, and the prefix skips the
 original. Without more, the deferred job's targets sit unreserved for the whole
-walk-and-change and another pawn's work scan can take them. In play this looked
-like a distant doctor dressing for a patient a nearer doctor had already tended,
-then changing straight back.
+walk-and-change and another pawn's work scan can take them. In play
+(2026-08-08) this looked like a distant doctor dressing for a patient a nearer
+doctor had already tended, then changing straight back.
 
 Vanilla's opportunistic path reserves first, then enqueues, and does not release
 (`Pawn_JobTracker.cs:331-347`). Shift Change does the same: build the deferred
@@ -131,7 +136,10 @@ rely on it: `JobDriver_SocialRelax` reserves its seat against `pawn.CurJob`, not
 its own job field (`JobDriver_SocialRelax.cs:30`). With `curJob` unset the
 reserve sees a null job, fails with a "without a valid job" warning
 (`ReservationManager.cs:306-309`), and the divert silently degrades into
-ride-along. In play, a crafter drank at a bar in uniform.
+ride-along. In play (2026-08-09), a crafter drank at a bar in uniform.
+`MakeDriver` sets the driver's own job field (`Job.cs:606`), which is why only
+drivers that reserve against `pawn.CurJob` ever noticed the difference; Fine
+Establishments' served social driver is another.
 
 ### The gates
 
@@ -577,11 +585,14 @@ in the wardrobe they were not allowed to walk to.
 
 A press sets a **room-exit latch**: that pawn will not dress again *in that room*
 until they have left it. Positional rather than a countdown, because it is the
-changing that must not cycle, not the work. They keep working in the room in
-civvies, and a job in a different room dresses them normally, since that is a
-different uniform and they are leaving anyway. Both dress paths honour the latch,
-including the mid-job catch-up, or a stand returning to the pool would re-dress
-the pawn the player just pulled out.
+changing that must not cycle, not the work (decided 2026-08-09). Counting jobs
+would either spend the block on an unrelated errand, leaving the next job in the
+room free to re-dress them a second after the player pulled them out, or hold it
+through a long trip that plainly should have ended it. They keep working in the
+room in civvies, and a job in a different room dresses them normally, since that
+is a different uniform and they are leaving anyway. Both dress paths honour the
+latch, including the mid-job catch-up, or a stand returning to the pool would
+re-dress the pawn the player just pulled out.
 
 The latch stores the **stand**, not the `Room`, so both sides are re-derived live
 and a rebuilt wall cannot strand a stale reference. It is keyed by pawn reference,
@@ -1001,9 +1012,10 @@ Two refusals are folded into that resolver, and both are load-bearing.
 `HealthAIUtility.ShouldSeekMedicalRestUrgent` is vanilla's own split between
 `WorkGiver_PatientGoToBedTreatment` and `...Recuperate`, so reading it charges
 the gown to recuperation and leaves the bleeding, the pre-surgical and the
-labouring alone. `OnABed` is the same guard the sleep arm needs and for the same
-reason: vanilla reissues the patient job at a pawn already lying in the bed, and
-without it every reissue is a fresh trip to the wardrobe.
+labouring alone. `OnABed` is the same guard the sleep arm needs, which it learned
+in play when the sleep trigger shipped, and for the same reason: vanilla reissues
+the patient job at a pawn already lying in the bed, after a tend most obviously,
+and without it every reissue is a fresh trip to the wardrobe.
 
 **The known cost of the urgent refusal**, stated rather than discovered later: a
 colonist wounded in a raid is urgent on the walk to the bed, gets tended there,
@@ -1076,12 +1088,12 @@ it the hard way.** `RestUtility.CurrentBed` bails on `CurJob == null`, and
 their own bed. It answers true at exactly one moment: a job started while
 `curJob` is still live, which is `Toils_LayDown`'s `CheckForJobOverride()`
 every 211 ticks — the wake-up. Guards written to mean "they are asleep, leave
-them alone" therefore did the precise opposite: silent at three in the
-morning, loud at breakfast, suppressing the change-back at the one boundary
-where the pawn was standing beside their own stand, and sending them out to do
-the first job of the day in sleepwear before walking back to change. Position
-answers what `curJob` cannot, so the arms ask `OnABed` — is there a
-`Building_Bed` on this pawn's cell.
+them alone" therefore did the precise opposite (adversarial review,
+2026-09-03): silent at three in the morning, loud at breakfast, suppressing the
+change-back at the one boundary where the pawn was standing beside their own
+stand, and sending them out to do the first job of the day in sleepwear before
+walking back to change. Position answers what `curJob` cannot, so the arms ask
+`OnABed` — is there a `Building_Bed` on this pawn's cell.
 
 The return trip needs the finer question, because "in bed" is not "staying in
 bed". `StaysInBed` pairs `OnABed` with
@@ -1091,10 +1103,11 @@ by exactly seven drivers in 1.6: LayDown, Lovin, WatchBuilding, RelaxAlone,
 Reign, Breastfeed and Deathrest. Staying in bed means stay dressed; getting up
 means change back, while the pawn is still beside the stand. That list is
 incomplete, and knowingly so — `JobDriver_Meditate` is not on it and neither is
-`JobDriver_Ingest`, so vanilla's own in-bed meditation and in-bed meals read as
-"getting up" — so a job whose own target IS the bed under the pawn counts as
-staying too. A target test rather than a hardcoded driver list, because the
-next DLC invalidates a list.
+`JobDriver_Ingest`, so vanilla's own in-bed meditation (issued from inside its
+own must-keep-lying-down branch) and in-bed meals read as "getting up" — so a
+job whose own target IS the bed under the pawn counts as staying too. A target
+test rather than a hardcoded driver list, because the next DLC invalidates a
+list.
 
 **Deposit only** is the sleep trigger's own mode, and the trigger is what makes
 it safe. Such a stand hands nothing out and simply takes in what its storage
@@ -1265,7 +1278,7 @@ through to excluded, and Automatic put the room's default straight back.
 
 With two workstations and two stands, a pawn can start working bare because both
 stands were checked out at the moment their job started, then a stand frees up
-seconds later.
+seconds later. Found in play, 2026-08-08.
 
 When a stand returns to the pool, scan for a colonist already doing matching work
 in its room and interrupt them to change, resuming their job afterwards. The
@@ -1364,7 +1377,11 @@ moves a number and resets at the next launch, and they are how a player gets
 walked through a report — turn `Enabled` off to see whether this mod is
 involved, turn `Verbose` on to get a log saying why a stand did nothing, turn
 `Patch_OutfitStandsPlusUseButton.Enabled` off to hand Outfit Stands Plus its
-own button back.
+own button back. Decided 2026-08-17, after they spent one afternoon gated behind
+`SCENES` on the argument that the Tweak values window is the same player-facing
+surface as the debug actions menu. It is, and that is the point. Non-destructive
+and non-persistent is the right shape for a diagnostic and the wrong one for a
+setting: a toggle a player should keep belongs in mod settings.
 
 What the harness covers, and the rather larger list of what it does not, is in
 [TESTING.md](TESTING.md).
