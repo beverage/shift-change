@@ -119,7 +119,7 @@ namespace ShiftChange
                 // PawnCanWear and so admitted garments vanilla's Wear() then
                 // refused for want of a body part or a biocode — after the
                 // stand had already let go of them. Wearability lives in
-                // SwapPlan and nowhere else (SwapPlan.cs:17); this line was
+                // SwapPlan and nowhere else (its class doc); this line was
                 // the one place that had quietly grown a second opinion.
                 if (apparel != null && apparel.ParentHolder == Stand && SwapPlan.CanWear(pawn, apparel))
                 {

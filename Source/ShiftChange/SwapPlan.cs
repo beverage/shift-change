@@ -5,14 +5,9 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// What a swap at a given stand would actually move, for a given pawn.
-    ///
-    /// This exists as one shared function because it was briefly two, and they
-    /// disagreed: the stand selector asked "does this hold any apparel?" while
-    /// the job driver asked the real questions, so a rack holding a garment
-    /// this particular pawn could not wear was selected, walked to, and swapped
-    /// with — moving nothing. From the player's side that is indistinguishable
-    /// from a pawn swapping at an empty rack (found in play, 2026-08-07).
+    /// What a swap at a given stand would actually move, for a given pawn: one
+    /// function for the stand selector and the job driver both, because as two
+    /// they disagreed (docs/DESIGN.md, "Wearability: one authority").
     ///
     /// Any predicate about wearability belongs here and nowhere else.
     /// </summary>
@@ -145,13 +140,11 @@ namespace ShiftChange
             //
             // Gated on toWear being non-empty: a stand that would issue NOTHING
             // must still decline, so the selector never sends a pawn on a trip
-            // that cannot dress them.
-            //
-            // This is not the guard that keeps anyone clothed — DoTransfer
-            // refuses independently, returning before a garment comes off when
-            // the incoming set is empty in the dress direction. Undressing into
-            // a rack is a coherent action, but not one any pawn should reach by
-            // deciding to go do some hauling; it would need its own trigger.
+            // that cannot dress them. Undressing into a rack with nothing
+            // issued is deposit-only's plan (BuildDeposit, behind the sleep
+            // trigger), never a side effect of this pass, and DoTransfer
+            // refuses on its own anyway, before a garment comes off, when a
+            // dress trip's incoming set is empty.
             //
             // IsLocked is the one garment that stays, matching the conflict
             // pass above and vanilla's own stand driver
@@ -169,11 +162,9 @@ namespace ShiftChange
             }
 
             // LAST, so it sees the finished plan — the conflict pass and the
-            // full-change pass both feed it. This is not a full-change guard:
-            // an ordinary swap can strip a colonist too, when the garment an
-            // incoming one displaces covered MORE than the incoming one does
-            // (a Shell robe covering torso and legs, displaced by a Shell
-            // jacket covering only the torso).
+            // full-change pass both feed it. Not a full-change guard: an
+            // ordinary swap can strip a colonist too (docs/DESIGN.md, "The
+            // dress path asks the same question and answers it differently").
             if (!KeepThemDecent(pawn, toWear, toStore))
             {
                 toWear.Clear();
@@ -210,25 +201,10 @@ namespace ShiftChange
         /// The plan for a stand that hands nothing out: the pawn parks the
         /// garments this stand's STORAGE FILTER accepts and keeps the rest on.
         ///
-        /// <para><b>The filter is the whole control surface</b>, deliberately.
-        /// The case this exists for is "park the power armour before bed"
-        /// (decided 2026-09-02), and "which garments" is a question vanilla
-        /// already asks on every outfit stand, with a UI the player knows. A
-        /// second mod-side list would be the same question asked twice, and
-        /// the two would drift.</para>
-        ///
-        /// <para><b>A fresh stand accepts almost everything, so the filter is
-        /// something the player must NARROW, not something they must fill in.</b>
-        /// This comment claimed the opposite until 2026-09-03, and the claim
-        /// was checked against <c>Building_OutfitStand</c>'s own def rather
-        /// than its parent: <c>OutfitStandBase</c> carries a
-        /// <c>defaultStorageSettings</c> allowing the whole Apparel category
-        /// minus ApparelUtility and Weapons, and <c>PostMake</c> copies it.
-        /// The safety of this path therefore rests ENTIRELY on
-        /// <see cref="WouldBeNude"/> below, not on an empty filter — an
-        /// out-of-the-box deposit-only stand would otherwise take a
-        /// colonist's shirt, trousers and armour and leave them in the shield
-        /// belt its default filter happens to exclude.</para>
+        /// <para>The filter is the whole control surface, and a fresh stand's
+        /// filter accepts almost everything worn, so the safety of this path
+        /// rests ENTIRELY on <see cref="WouldBeNude"/> below (docs/DESIGN.md,
+        /// "The sleep branch").</para>
         ///
         /// <para>Conflicts with whatever the stand already holds are NOT
         /// resolved here, matching the dress path: the driver calls
@@ -275,19 +251,12 @@ namespace ShiftChange
 
             // NEVER STRIP THEM BARE. The standing rule on every path through
             // this file is that the worst case is a pawn in the WRONG clothes,
-            // never a pawn without them.
-            //
-            // This asked "is ANY garment left on?" until 2026-09-03, and a
-            // garment count is the wrong question: utility apparel — a shield
-            // belt, a smokepop belt, a jump pack — covers no body part at all,
-            // and is exactly what the stand's DEFAULT filter excludes. So a
-            // marine in armour, helmet and shield belt satisfied the old test
-            // with the belt alone and went to bed in nothing else.
-            //
-            // Declining outright rather than holding a garment back is still
-            // deliberate: which garment to keep is a judgment this code has no
-            // basis to make, and a stand that quietly deposits all-but-one is
-            // harder to diagnose than one that plainly does nothing.
+            // never a pawn without them. Asked by coverage, not by counting
+            // garments: utility apparel (a shield belt, a smokepop belt, a jump
+            // pack) covers neither Torso nor Legs, and is exactly what the
+            // stand's DEFAULT filter excludes. Declining outright rather than
+            // holding a garment back is deliberate, unlike the dress path.
+            // Both: docs/DESIGN.md, "The sleep branch".
             if (WouldBeNude(pawn, toStore))
             {
                 toStore.Clear();
@@ -303,12 +272,8 @@ namespace ShiftChange
         /// <para>A transcription of <c>Pawn_ApparelTracker.PsychologicallyNude</c>
         /// (<c>:186-228</c>) and the <c>HasBasicApparel</c> it calls
         /// (<c>:667-688</c>), evaluated against the apparel that would REMAIN
-        /// rather than against what is worn now. Vanilla's own standard is
-        /// used rather than a stricter one on purpose — requiring both a
-        /// covered torso and covered legs would refuse the ordinary case of a
-        /// man in trousers and armour, which vanilla is perfectly happy with,
-        /// and a rule that blocks the feature's main use case is not a safety
-        /// rule.</para>
+        /// rather than against what is worn now. Vanilla's standard, not a
+        /// stricter one: docs/DESIGN.md, "The sleep branch".</para>
         ///
         /// <para>Transcribed rather than called because the engine's version
         /// asks about <c>wornApparel</c> and the question here is
@@ -322,14 +287,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The same question, asked about a plan that ALSO puts garments on.
-        ///
-        /// <para>The two-argument form above answers for the deposit path,
-        /// where nothing is issued and the only question is what survives. The
-        /// dress path hands garments out as well, so the set to judge is
-        /// <c>worn - leaving + arriving</c>. Asking the deposit question on a
-        /// dress plan reports every ordinary uniform swap as nudity, because
-        /// the uniform is not on the pawn yet.</para>
+        /// The same question, asked about a plan that ALSO puts garments on:
+        /// the set to judge is <c>worn - leaving + arriving</c>. The deposit
+        /// form above would report every ordinary uniform swap as nudity,
+        /// because the uniform is not on the pawn yet.
         /// </summary>
         internal static bool WouldBeNude(Pawn pawn, List<Apparel> leaving, List<Apparel> arriving)
         {
@@ -418,28 +379,12 @@ namespace ShiftChange
         /// dressed. Returns false only when that is impossible, in which case
         /// the caller must abandon the swap.
         ///
-        /// <para><b>The rule is "never make it worse", not "never nude".</b> A
-        /// colonist who is ALREADY psychologically nude is left alone — the
-        /// swap is not the cause, and refusing there would stop a stand from
-        /// dressing the one pawn who most needs it. Only a plan that takes a
-        /// decent colonist and leaves them indecent is intervened on.</para>
-        ///
-        /// <para><b>Holding back beats declining here, which is the opposite of
-        /// the deposit path's answer</b> (<c>:274-277</c>) — and deliberately
-        /// so. Deposit-only declines outright because it issues nothing, so
-        /// keeping one garment back would be an arbitrary pick among equals.
-        /// The dress path HAS an incoming set: the question is only which of
-        /// their own things stays on underneath it, and that has a
-        /// non-arbitrary answer.</para>
-        ///
-        /// <para><b>The innermost garment wins.</b> Candidates are ordered by
-        /// the lowest <c>ApparelLayerDef.drawOrder</c> they occupy, so a shirt
-        /// is retained before a parka. That is both what a person actually
-        /// keeps on under a uniform and the choice least likely to fight the
-        /// incoming garments — and every candidate is checked against
-        /// <c>CanWearTogether</c> anyway, because a retained garment that
-        /// conflicts with an issued one would be dropped on the floor by
-        /// <c>Wear</c>.</para>
+        /// <para>The rule is "never make it worse": a colonist already nude is
+        /// left alone, and only a plan that takes a decent colonist and leaves
+        /// them indecent is intervened on. The innermost garment is held back,
+        /// rather than the swap declined as the deposit path does; why:
+        /// docs/DESIGN.md, "The dress path asks the same question and answers
+        /// it differently".</para>
         ///
         /// <para>Two passes at most: vanilla asks about exactly two body part
         /// groups, so at most one garment is needed for each.</para>
@@ -512,29 +457,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Is being undressed what this colonist actually wants?
-        ///
-        /// <para><b>Vanilla asks this in exactly one place and we copy it.</b>
-        /// <c>JobGiver_PrisonerGetDressed:15</c> declines to clothe a prisoner
-        /// when <c>CanGetThought(pawn, ClothedNudist, checkIfNullified: true)</c>
-        /// holds — the trait test plus nullification, in one call. That is the
-        /// engine's own answer to "should I put clothes on this pawn", so it is
-        /// the answer used here rather than a hand-rolled trait check.</para>
-        ///
-        /// <para><b>The Ideology half is separate, because the trait test does
-        /// not reach it.</b> A pawn with no Nudist trait in a nudism ideoligion
-        /// gets no <c>ClothedNudist</c> thought; the precepts carry it instead.
-        /// <c>IdeoPrefersNudityForGender</c> is gender-aware, and so is the
-        /// rule it exempts them from — a moral code where the men go bare and
-        /// the women do not is expressible in vanilla, and this reads it per
-        /// pawn rather than per colony.</para>
-        ///
-        /// <para>Vanilla's prisoner check also requires the pawn be warm enough.
-        /// That clause is deliberately NOT copied: it exists because the colony
-        /// is responsible for a prisoner who cannot dress themselves, whereas
-        /// this path is a player who configured a stand on purpose. Holding a
-        /// coat back on a mandatory-nudity colonist to keep them warm would
-        /// trade a temperature problem for a mood one they cannot escape.</para>
+        /// Is being undressed what this colonist actually wants? Vanilla's own
+        /// answer, the trait test <c>JobGiver_PrisonerGetDressed:15</c> uses,
+        /// plus Ideology's nudity precepts, which that test does not reach and
+        /// which are read per pawn, by gender. Why each half, and why vanilla's
+        /// warmth clause is not copied: docs/DESIGN.md, "The dress path asks
+        /// the same question and answers it differently".
         /// </summary>
         internal static bool PrefersNudity(Pawn pawn)
         {

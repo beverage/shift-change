@@ -452,7 +452,7 @@ These were once two implementations and they diverged. The selector asked "does
 the stand hold apparel?", the driver asked whether *this pawn* could wear it. A
 stand holding a garment the pawn could not wear was selected, walked to, and
 swapped with, moving nothing — indistinguishable from a pawn changing at an empty
-rack.
+rack. Found in play, 2026-08-07.
 
 `SwapPlan` builds the plan for both callers, so the selector asks precisely the
 question the driver will answer. `ApparelUtility.CanWearTogether`, `PawnCanWear`,
@@ -1163,10 +1163,14 @@ than trusting the dialog to be its only writer.
 
 The filter is the whole control surface, deliberately: `Building_OutfitStand`
 is an `IStoreSettingsParent`, and "which garments" is a question vanilla
-already asks through a UI players know. **It is a filter to NARROW, not one to
-fill in.** `OutfitStandBase` ships `defaultStorageSettings` allowing the whole
-Apparel category minus ApparelUtility and Weapons, so a stand straight off the
-build menu already accepts nearly everything worn. Safety therefore rests
+already asks through a UI players know. A second, mod-side list would be the
+same question asked twice, and the two would drift. **It is a filter to NARROW,
+not one to fill in.** `OutfitStandBase` ships `defaultStorageSettings` allowing
+the whole Apparel category minus ApparelUtility and Weapons, and `PostMake`
+copies it onto every new stand, so a stand straight off the build menu already
+accepts nearly everything worn. `SwapPlan`'s own comment said the opposite
+until 2026-09-03, having been checked against `Building_OutfitStand`'s def
+rather than its parent's. Safety therefore rests
 entirely on `SwapPlan.WouldBeNude` — a transcription of
 `Pawn_ApparelTracker.PsychologicallyNude` evaluated against the apparel that
 would REMAIN. If the deposit would leave the colonist naked the stand declines
@@ -1174,9 +1178,9 @@ outright for that colonist. Vanilla's own standard rather than a stricter one,
 because requiring both torso and legs covered would refuse a man in trousers
 and armour that vanilla is perfectly happy with, and a rule that blocks the
 feature's main use case is not a safety rule. This counted GARMENTS until an
-adversarial pass caught it: a shield belt is ApparelUtility, precisely what the
-default filter excludes, so it survived the deposit and licensed stripping
-everything that actually covered the pawn.
+adversarial pass caught it (2026-09-03): a shield belt is ApparelUtility,
+precisely what the default filter excludes, so it survived the deposit and
+licensed stripping everything that actually covered the pawn.
 
 **And the stand has to be kept empty, because vanilla works hard to fill it.**
 `OutfitStandBase`'s `defaultStorageSettings` carry priority `Important`, above
@@ -1223,7 +1227,7 @@ handling rest.
 Stands already stocked heal themselves. The patch stops future deliveries and
 moves nothing, so a stand a hauler filled before it stays filled until the next
 sleep change, where `TryDropThingsToMakeRoomForThingOfDef`
-(`JobDriver_SwapAtStand.cs:384`) evicts whatever is in the way of the deposit.
+(from `DoTransfer`) evicts whatever is in the way of the deposit.
 The evicted garment now goes back to a stockpile, rather than straight back onto
 the stand it was dropped from.
 
@@ -1244,7 +1248,9 @@ the torso.
 
 **It holds garments back rather than declining, which is deliberately the
 opposite of the deposit path above.** Deposit-only declines because it issues
-nothing, so keeping one garment would be an arbitrary pick among equals. A dress
+nothing, so keeping one garment would be an arbitrary pick among equals, and a
+stand that quietly deposits all but one is harder to diagnose than one that
+plainly does nothing. A dress
 plan HAS an incoming set: the only question is which of their own things stays
 on underneath it, and that has a non-arbitrary answer. Candidates are ranked by
 the lowest `ApparelLayerDef.drawOrder` they occupy, so a shirt is retained
@@ -1267,7 +1273,8 @@ place the engine itself asks whether to put clothes on someone. Ideology needs
 a second test because the first cannot see it: a pawn with no Nudist trait in a
 nudism ideoligion gets no such thought, the precepts carry it instead, so
 `IdeoPrefersNudityForGender(pawn.gender)` answers that half. Gender-aware, like
-the rule it exempts them from.
+the rule it exempts them from: a moral code where the men go bare and the women
+do not is expressible in vanilla, so it is read per pawn rather than per colony.
 
 Vanilla's prisoner check also demands the pawn be warm enough. That clause is
 deliberately not copied: it is there because the colony is responsible for

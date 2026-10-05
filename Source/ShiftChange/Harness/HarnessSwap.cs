@@ -253,7 +253,7 @@ namespace ShiftChange
             // Clear the duster the fixture stocks and leave exactly one garment
             // on the stand — one covering no group the decency test counts. It
             // covers Waist; "covers nothing" is the loose phrasing that put the
-            // wrong premise into SwapPlan.cs:266-270 in the first place.
+            // wrong premise into a SwapPlan comment in the first place.
             ClearStand(fix.Stand);
             if (!StockOne(fix.Stand, "Apparel_ShieldBelt"))
             {

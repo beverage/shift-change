@@ -694,12 +694,13 @@ namespace ShiftChange
                 & Expect(!fix.Comp.OnShift, "and the stand is free again");
 
             // THE UTILITY-LAYER TRAP, last because it changes what the pawn
-            // wears. A shield belt covers no body part, and ApparelUtility is
-            // precisely what the outfit stand's DEFAULT filter excludes — so a
-            // guard that asked "is ANY garment left on?" was satisfied by the
-            // belt and licensed stripping everything that actually covered the
-            // colonist. Vanilla's nudity test is coverage-based
-            // (Pawn_ApparelTracker.PsychologicallyNude), and so is ours now.
+            // wears. A shield belt covers neither Torso nor Legs, and
+            // ApparelUtility is precisely what the outfit stand's DEFAULT filter
+            // excludes — so a guard that asked "is ANY garment left on?" was
+            // satisfied by the belt and licensed stripping everything that
+            // actually covered the colonist. Vanilla's nudity test is
+            // coverage-based (Pawn_ApparelTracker.PsychologicallyNude), and so
+            // is ours now.
             if (!WearOne(fix.Pawn, "Apparel_ShieldBelt"))
             {
                 return ok & Expect(false, "a shield belt can be worn for the utility-layer case");
