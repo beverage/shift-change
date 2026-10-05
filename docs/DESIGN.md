@@ -878,8 +878,8 @@ use-stand button on every pawn, and finds the stands for it by walking every
 building the player owns (`ListerBuildings.AllBuildingsColonistOfClass`) with a
 type test on each, each time a selected pawn's command bar is gathered, which
 vanilla does every frame. On a colony of about nine thousand buildings and 48
-stands that measured 0.82 ms per selected pawn per frame. The cost follows how
-much has been built, not how many stands there are.
+stands that measured 0.82 ms per selected pawn per frame (2026-09-07). The cost
+follows how much has been built, not how many stands there are.
 
 `Patch_OutfitStandsPlusUseButton` is a transpiler on the method making that
 call, which is their iterator's `MoveNext`, since the method itself only
@@ -1074,7 +1074,9 @@ colonist bleeding out at 10% movement should not stop to change, and will change
 on their next trip to bed anyway.
 
 **`medicalEmergenciesChangeFirst` relaxes it for players who want the opposite**,
-shipped in the same release and OFF by default. It is the one place the mod's
+shipped in the same release and OFF by default, for the same distribution reason
+as the decency guard: changing how a colony's doctors answer a bleeding colonist
+is not ours to flip on its players' behalf. It is the one place the mod's
 "emergencies are never delayed" rule bends, and it bends only for medical work.
 
 The switch cannot key on `emergency`. Vanilla sets that flag on exactly three

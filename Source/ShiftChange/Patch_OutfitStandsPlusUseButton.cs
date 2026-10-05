@@ -13,53 +13,16 @@ namespace ShiftChange
 {
     /// <summary>
     /// Lets Outfit Stands Plus' per-colonist stand button find its stands
-    /// without walking every building the player owns.
-    ///
-    /// <para>Their <c>OutfitStandsPlusUseCommandsComp</c> sits on every pawn,
-    /// and its <c>CompGetGizmosExtra</c> runs each time a selected pawn's
-    /// command bar is gathered, which vanilla does every frame. It gets the
-    /// stands from <c>ListerBuildings.AllBuildingsColonistOfClass</c>, a walk
-    /// over every player building with a type test on each, then keeps the
-    /// ones whose owner list names the pawn. The cost follows how much has
-    /// been built, not how many stands there are: 0.82 ms per selected pawn
-    /// per frame on a colony of about nine thousand buildings and 48 stands
-    /// (measured 2026-09-07).</para>
-    ///
-    /// <para>A transpiler changes that one call and nothing else: their method
-    /// asks <see cref="Stands"/> instead, which answers from a list of the
-    /// colony's stands. Their owner test, their command, and anything they add
-    /// to the method later all still run.</para>
-    ///
-    /// <para><b>The list keeps the walk's order, because the order is
-    /// behaviour.</b> A colonist who owns two stands gets two buttons with the
-    /// same label and icon, vanilla merges them into one
-    /// (<c>Command.GroupsWith</c>), and a click on it sends the colonist to
-    /// the stand whose button came first. So the list is built once from the
-    /// colony building list and then kept current from <c>ListerBuildings.Add</c>
-    /// and <c>Remove</c>, the only two places the engine changes that list.
-    /// <c>Add</c> appends, and <c>Building.SetFaction</c> goes through both,
-    /// so a stand that changes hands moves to the end of both lists. Reads
-    /// sweep out anything no longer spawned or no longer the player's, in case
-    /// another mod changed one some other way.</para>
-    ///
-    /// <para>The lists live in a <c>ConditionalWeakTable</c> keyed by the map's
-    /// <c>ListerBuildings</c>, so each goes with its map and a loaded game never
-    /// sees an old one's. Nothing is keyed on ids or ticks, which is why this
-    /// does not go through <see cref="SessionGuard"/>, and nothing is
-    /// saved.</para>
-    ///
-    /// <para><b>Applying it.</b> The patch goes on only if the original IL of
-    /// their method still makes the call. If they fix the lookup, the call is
-    /// gone and nothing is patched; if they change the rest of the method, the
-    /// change runs as written. One log line says which. With the mod absent
-    /// this does nothing and logs nothing. Being a transpiler, it also sits
-    /// beside other mods' patches on the method: one that skips their method
-    /// skips this with it.</para>
+    /// without walking every building the player owns, every frame: a
+    /// transpiler swaps that one call for <see cref="Stands"/>, a per-map list
+    /// kept in the walk's order, because the order is behaviour. Why, how the
+    /// list stays current, and when the patch applies: docs/DESIGN.md,
+    /// "Outfit Stands Plus' stand button".
     ///
     /// <para><see cref="Enabled"/> off, or an exception while reading the list,
     /// hands the call back to the walk. <see cref="HarmonyInit"/> applies all
     /// of it by hand rather than by attribute, because its target may not
-    /// exist.</para>
+    /// exist; with the mod absent this does nothing and logs nothing.</para>
     /// </summary>
     public static class Patch_OutfitStandsPlusUseButton
     {

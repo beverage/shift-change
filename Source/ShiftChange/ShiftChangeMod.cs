@@ -21,21 +21,11 @@ namespace ShiftChange
         /// for and deposits the rest. When false a stand does exactly what its
         /// settings say, which is how every version up to v1.3.0 behaved.
         ///
-        /// <para><b>OFF by default, permanently, and that is a distribution
-        /// decision rather than a view about which behaviour is better</b>
-        /// (settled 2026-09-12, replacing the 2026-09-08 intent to revisit it
-        /// at the next minor). Most of this mod's players meet it inside a mod
-        /// pack: they did not choose it, they will not read a change note, and
-        /// a default that changes how their colonists undress is not ours to
-        /// flip on their behalf. That reasoning does not expire with a version
-        /// bump, so there is no version at which this becomes on. Do not
-        /// re-open it as release sequencing; it is not waiting for a bump.</para>
-        ///
-        /// <para>The cost, stated plainly and accepted: the guard covers a case
-        /// the player cannot see coming, and while it is off it covers only the
-        /// players who found the checkbox. The README and the setting
-        /// description therefore both lead with the default rather than burying
-        /// it, which is the whole mitigation.</para>
+        /// <para><b>OFF by default, permanently</b> (settled 2026-09-12): a
+        /// distribution decision, not a default waiting for the right release,
+        /// so do not re-open it as release sequencing. The reasoning, and the
+        /// cost accepted with it: docs/DESIGN.md, "The dress path asks the same
+        /// question and answers it differently".</para>
         ///
         /// <para>Individual nudists and nudism ideoligions are exempt either
         /// way (<see cref="SwapPlan.PrefersNudity"/>) — that detection is not
@@ -47,27 +37,15 @@ namespace ShiftChange
         /// When true, a MEDICAL emergency no longer exempts a colonist from
         /// dressing: a doctor takes an emergency tend in scrubs, and a patient
         /// in critical condition stops for the gown on the way to bed. Off by
-        /// default, which is the behaviour every version up to now had.
+        /// default, which is the behaviour every version up to now had, on the
+        /// same distribution reasoning as <see cref="keepColonistsDecent"/>.
         ///
-        /// <para><b>Firefighting is never covered, and that is why this is not
-        /// simply "ignore the emergency flag".</b> Vanilla sets
-        /// <c>emergency: true</c> on <c>FightFires</c> as well as the two
-        /// medical givers, so a switch keyed on the flag would send colonists
-        /// to a wardrobe while the base burns. The covered work types are
-        /// named in <see cref="Patch_JobInterception.MedicalWorkTypeNames"/>.</para>
-        ///
-        /// <para>OFF by default on the same distribution reasoning recorded
-        /// for <see cref="keepColonistsDecent"/>: most of this mod's players
-        /// meet it inside a mod pack, they did not choose it and will not read
-        /// a change note, and changing how their doctors answer a bleeding
-        /// colonist is not ours to flip on their behalf.</para>
-        ///
-        /// <para>The cost of turning it on, stated rather than buried: the
-        /// emergency exemption is one test covering both directions, so a
-        /// doctor in another room's uniform may now change BACK before
-        /// answering the call as well as changing into scrubs. That is the
-        /// setting meaning what it says — medical emergencies become ordinary
-        /// work for dressing purposes.</para>
+        /// <para>Never firefighting, though vanilla flags that an emergency
+        /// too, which is why the covered work types are named in
+        /// <see cref="Patch_JobInterception.MedicalWorkTypeNames"/>; and it
+        /// relaxes both directions, so a doctor in another room's uniform may
+        /// change BACK first as well. Both: docs/DESIGN.md, "The sleep
+        /// branch".</para>
         /// </summary>
         public bool medicalEmergenciesChangeFirst = false;
 
