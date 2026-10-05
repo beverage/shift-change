@@ -128,18 +128,9 @@ namespace ShiftChange
             }
         }
 
-        // Royal titles and ideology roles can REQUIRE a garment, and nothing in
-        // vanilla stops a stand swap removing it — JobGiver_OptimizeApparel
-        // only scores requirements (×25/×10) and vanilla's own stand driver
-        // checks the much narrower IsLocked. We deliberately do not guard it
-        // (decided 2026-08-07). Blocking could only ever mean
-        // refusing the uniform, since the guard's lever is "don't remove the
-        // robe" — so a titled pawn would silently never change, which is worse
-        // than the mood hit. Nor do we warn: assigning this pawn to this stand
-        // and stocking it are deliberate player acts, and vanilla already
-        // surfaces the consequence where a player would look for it, via
-        // ThoughtWorker_RoyalTitleApparelRequirementNotMet and
-        // Thought_IdeoRoleApparelRequirementNotMet.
+        // Royal titles and ideology roles can REQUIRE a garment, and this swap
+        // may remove one: deliberately neither guarded nor warned about
+        // (docs/DESIGN.md, "The forced-apparel lifecycle").
 
         protected override IEnumerable<Toil> MakeNewToils()
         {
@@ -147,9 +138,9 @@ namespace ShiftChange
             // releases this job's reservations at
             // Pawn_JobTracker.CleanupCurrentJob:492 and only then runs the
             // driver's global finish actions at :497
-            // (JobDriver.Cleanup:274-280). A toil finish action runs earlier
-            // still, from TryActuallyStartNextToil, so anything announced there
-            // is announced while this pawn still holds the stand.
+            // (JobDriver.Cleanup:274-280); a toil finish action runs earlier
+            // still, while this pawn holds the stand (docs/DESIGN.md, "The
+            // mid-job catch-up").
             //
             // Registered here rather than in Notify_Starting because
             // SetupToils re-enumerates this on load, and a swap interrupted by

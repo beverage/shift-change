@@ -5,41 +5,12 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// Keeps a shift stand's contents out of trade windows.
-    ///
-    /// <para><b>Vanilla puts them there, by two separate routes.</b> An orbital
-    /// ship's goods come from <c>TradeUtility.AllLaunchableThingsForTrade</c>,
-    /// which special-cases <c>Building_OutfitStand</c> and yields its
-    /// <c>HeldItems</c> (<c>TradeUtility.cs:123</c>). A visiting caravan's come
-    /// from <c>Pawn_TraderTracker.ColonyThingsWillingToBuy</c>, which walks
-    /// <c>AllColonistBuildingsOfType&lt;IHaulSource&gt;()</c> and yields
-    /// everything each one directly holds
-    /// (<c>Pawn_TraderTracker.cs:123-134</c>). Neither consults
-    /// <c>allowRemovingItems</c>: the lister keys on TYPE, so a stand whose
-    /// <c>HaulSourceEnabled</c> is false is enumerated anyway, and
-    /// <see cref="Patch_AllowRemovingToggle"/>'s enforcement — which does hold
-    /// the optimizer off — is simply not in this story.</para>
-    ///
-    /// <para><b>One choke point serves both.</b> Every route funnels into
-    /// <c>TradeDeal.AddAllTradeables</c>, which re-tests each candidate with
-    /// <c>PlayerSellableNow</c> and drops it on false (<c>TradeDeal.cs:46-50</c>)
-    /// — before the item ever becomes a <c>Tradeable</c>, so it does not appear
-    /// greyed, it does not appear at all. Patching there rather than at the two
-    /// collectors also covers gift mode, which shares the same deal.</para>
-    ///
-    /// <para><b>Nothing outside trade sees this.</b> Every caller of
-    /// <c>PlayerSellableNow</c> in the engine is trade-side (the two collectors
-    /// above and the deal itself); the def-level <c>EverPlayerSellable</c>, which
-    /// <c>StatWorker</c> and <c>Dialog_SellableItems</c> use, is a different
-    /// method and is untouched. Caravan packing, hauling, raider theft and the
-    /// outfit optimizer all run through other code entirely — this withholds the
-    /// stand's kit from traders and does nothing else.</para>
-    ///
-    /// <para><b>The failure mode is vanilla.</b> A postfix on a public static
-    /// that has kept this signature across versions, doing nothing unless it
-    /// finds our comp: if the method moves, the patch fails to apply, is logged
-    /// by Harmony, and stands go back to being tradeable — which is exactly
-    /// where they started.</para>
+    /// Keeps a shift stand's contents out of trade windows, by refusing them at
+    /// <c>PlayerSellableNow</c>: <c>TradeDeal.AddAllTradeables</c> re-tests
+    /// every candidate from both of vanilla's trade routes there, so they are
+    /// absent rather than greyed, and nothing outside trade calls it. The two
+    /// routes, why the removal flag is no defence, and why the failure mode is
+    /// vanilla: docs/DESIGN.md, "Withholding from trade".
     /// </summary>
     [HarmonyPatch(typeof(TradeUtility), nameof(TradeUtility.PlayerSellableNow))]
     public static class Patch_WithholdFromTrade

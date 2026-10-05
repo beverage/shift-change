@@ -8,25 +8,13 @@ namespace ShiftChange
 {
     /// <summary>
     /// When vanilla unclaims everything a lost pawn owned, unclaim their
-    /// stands too — assigned AND borrowed.
-    ///
-    /// This has to exist because <c>Pawn_Ownership.UnclaimAll()</c> clears a
-    /// HARDCODED list — bed, grave, throne, deathrest casket
-    /// (<c>Pawn_Ownership.cs:286-292</c>). It does not walk
-    /// <c>CompAssignableToPawn</c> buildings, so our stand would otherwise stay
-    /// assigned to a corpse. Hooking the same method means we inherit vanilla's
-    /// notion of when ownership ends rather than inventing one: it is called
-    /// from <c>Pawn.Destroy</c> (<c>Pawn.cs:2341</c>), the left-map path
-    /// (<c>:2565</c>), <c>PreTraded</c> (<c>:2599</c>) and <c>PreKidnapped</c>
-    /// (<c>:2645</c>) — exactly the set players already expect from beds.
-    ///
-    /// The borrowed half is a separate job since pooling landed: a pawn who
-    /// borrowed an unassigned stand was never assigned to anything, so
-    /// unassignment alone would miss them entirely and their clothes would
-    /// hold a pool stand hostage forever. Their garments stay in the stand as
-    /// ordinary contents, and vanilla's
-    /// <c>TryDropThingsToMakeRoomForThingOfDef</c> evicts whatever conflicts the
-    /// first time someone else claims it. No reclaim logic of our own.
+    /// stands too — assigned AND borrowed. <c>Pawn_Ownership.UnclaimAll()</c>
+    /// clears a hardcoded list no stand is on, and hooking it inherits
+    /// vanilla's notion of when ownership ends (death, trade, kidnap, map exit)
+    /// rather than inventing one. A pool borrower was never assigned to
+    /// anything, so the borrowed half is its own sweep. The engine's call
+    /// sites, and why no reclaim logic is needed: docs/DESIGN.md, "Ownership
+    /// and the ledger".
     /// </summary>
     [HarmonyPatch(typeof(Pawn_Ownership), nameof(Pawn_Ownership.UnclaimAll))]
     public static class Patch_UnclaimStands

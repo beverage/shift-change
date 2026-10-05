@@ -8,44 +8,13 @@ namespace ShiftChange
 {
     /// <summary>
     /// The abort button: a gizmo on any colonist currently in a stand's
-    /// uniform that cancels their orders and sends them to change back.
-    ///
-    /// It exists because the automatic return trip is a PULL, not a push: it
-    /// fires at a job boundary, when the pawn's own next job takes them out
-    /// of the room. A pawn caught in whites the moment a raid lands is not at
-    /// a job boundary and may not reach one for hours — sleep is the longest
-    /// job in the game — so without this button their way out is the player
-    /// finding the right stand and issuing a manual order. The stand is
-    /// exactly what the player should not have to hunt for, since the ledger
-    /// already knows it.
-    ///
-    /// <b>The danger gate no longer suppresses the return</b> (decided
-    /// 2026-08-31). It once gated both arms, which is why this button was
-    /// originally described as existing *because of* it; now it gates
-    /// dressing only (<see cref="Patch_JobInterception"/>), so a pawn left to
-    /// themselves does change back during a raid — at their own next job
-    /// boundary, on their own errand. That narrows this button's job to what
-    /// it was always best at: changing back NOW, on the player's timing
-    /// rather than the think tree's.
-    ///
-    /// <b>Deliberately not automatic.</b> No auto-change on raid, and
-    /// nothing here reacts to drafting: a player may well want a pawn
-    /// drafted in uniform. Direct orders are never second-guessed.
-    /// The button is the whole of the feature.
-    ///
-    /// <b>The room-exit latch.</b> Changing back is pointless if the think
-    /// tree hands the pawn the same room job a moment later and the dress
-    /// trigger fires again — the pawn would cycle at the stand while the
-    /// player is still reaching for the draft key. So a press latches them
-    /// out of THAT ROOM until they have actually left it
-    /// (<see cref="Patch_JobInterception.ChangedBackAt"/>), which is the
-    /// question the player is really asking and needs no counting. They keep
-    /// working in the room meanwhile — it is the changing that must not
-    /// cycle, not the work — and a job in a DIFFERENT room dresses them
-    /// normally, because that is a different uniform and they are leaving
-    /// anyway. Drafting drops the latch outright, so
-    /// raid → change back → draft → fight → undraft returns to ordinary
-    /// behaviour with no residue.
+    /// uniform that cancels their orders and sends them to change back NOW,
+    /// on the player's timing rather than at their next job boundary. A press
+    /// latches them out of dressing in that room until they leave it
+    /// (<see cref="Patch_JobInterception.ChangedBackAt"/>), and drafting drops
+    /// the latch. Deliberately not automatic: no auto-change on a raid, and a
+    /// pawn drafted in uniform stays in it. Why each: docs/DESIGN.md, "Change
+    /// back".
     /// </summary>
     [HarmonyPatch(typeof(Pawn), nameof(Pawn.GetGizmos))]
     public static class Patch_ChangeBackGizmo

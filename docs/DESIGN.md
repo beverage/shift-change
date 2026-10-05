@@ -488,9 +488,12 @@ A deliberate non-feature: royal titles and ideology roles can *require* apparel,
 and nothing in vanilla stops a swap removing a required garment. The optimizer
 only scores requirements (×25 and ×10, `JobGiver_OptimizeApparel.cs:360-398`) and
 the stand driver checks only the narrower `IsLocked`. This mod does not block it
-either. The only available lever is refusing the uniform, so a titled pawn would
-silently never change, which is worse than a mood penalty the player already sees
-in the needs tab. Assigning the stand was a deliberate act.
+either (decided 2026-08-07). The only available lever is refusing the uniform,
+so a titled pawn would silently never change, which is worse than a mood penalty
+the player already sees in the needs tab. Nor does it warn: assigning the stand
+was a deliberate act, and vanilla already surfaces the consequence where a player
+looks, through `ThoughtWorker_RoyalTitleApparelRequirementNotMet` and
+`Thought_IdeoRoleApparelRequirementNotMet`.
 
 ## Pausing the wardrobe optimizer
 
@@ -561,8 +564,9 @@ is tradeable whatever the flag says — and the dialog's `ModeOnly` return alrea
 hides the row for exactly those stands. One condition, not two that can drift
 apart.
 
-The failure mode is vanilla. A postfix on a public static that does nothing
-unless it finds our comp: if Ludeon moves the method, the patch fails to apply,
+The failure mode is vanilla. A postfix on a public static, whose signature has
+held across versions, that does nothing unless it finds our comp: if Ludeon
+moves the method, the patch fails to apply,
 Harmony logs it, and stands go back to being tradeable, which is where they
 started.
 
@@ -579,9 +583,10 @@ pawn who wants out of whites *now* may not reach a boundary for hours, since
 sleep is the longest job in the game, and without this their only way back is
 the player hunting for the stand the ledger already knows.
 
-The danger gate no longer suppresses that return trip, and this section used to
-say it did. The gate is one-directional: it stops a pawn changing *into* a
-uniform while the map is under threat, and leaves changing *back* alone. It
+The danger gate no longer suppresses that return trip (decided 2026-08-31), and
+this section used to say it did. The gate is one-directional: it stops a pawn
+changing *into* a uniform while the map is under threat, and leaves changing
+*back* alone. It
 once gated both, which froze every borrower in costume for the duration of a
 raid and well past it, and on a full-change stand that meant their armour sat
 in the wardrobe they were not allowed to walk to.
@@ -1360,7 +1365,8 @@ was not designed; it fell out of reading what vanilla declares about its own job
 reservation, and the colonist who just changed back still holds it while their
 swap job's toils finish. `Pawn_JobTracker.CleanupCurrentJob` releases a job's
 reservations (`:492`) before it runs the driver's cleanup, and with it the global
-finish actions (`:497`); a toil's finish actions run earlier than either. So the
+finish actions (`:497`); a toil's finish actions run earlier than either, from
+`TryActuallyStartNextToil`. So the
 swap driver announces a freed stand from a global finish action. It first
 announced from a toil finish action, where every candidate failed
 `CanReserveAndReach` against the departing pawn's reservation, and the catch-up
