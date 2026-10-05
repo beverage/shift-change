@@ -574,15 +574,8 @@ namespace ShiftChange
 
         /// <summary>
         /// A STAND OUTSIDE THE PAWN'S ALLOWED AREA DRESSES NOBODY, and an
-        /// allowed one is chosen instead.
-        ///
-        /// <para>Reaching and reserving a stand ignore allowed areas, but the
-        /// swap driver's own <c>FailOnDespawnedNullOrForbidden</c> does not:
-        /// <c>ForbidUtility.IsForbidden</c> asks <c>InAllowedArea</c>. So the
-        /// swap was chosen, reserved, started, and ended Incompletable inside
-        /// <c>StartJob</c> before the pawn took a step. Nothing set the retry
-        /// cooldown (only a failed reach does), so the next job boundary did
-        /// the same again.</para>
+        /// allowed one is chosen instead. Why it used to: docs/DESIGN.md,
+        /// "Allowed areas".
         ///
         /// <para>Three paths dress, and each is driven: the work arm, the
         /// selector's ranking (a pawn's OWN stand outranks a shared one, so a

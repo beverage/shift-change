@@ -455,25 +455,16 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// COMMON SENSE'S BILL HAUL KEEPS A COOK IN UNIFORM.
-        ///
-        /// <para>With its "haul ingredients over doing bills" setting on, which
-        /// is how it ships, Common Sense's prefix on <c>StartJob</c> takes a
-        /// bill that arrives with an empty queue, and when one of the bill's
-        /// ingredients lies outside the bench's room and can be hauled to
-        /// storage nearer the cook than the bench is, it queues the haul and
-        /// then the bill, and skips the start. The haul carries no giver. Its
-        /// prefix runs before ours on any load order: it patches from its
-        /// <c>Mod</c> constructor, ours from a static constructor, and a bool
-        /// prefix that returns false makes Harmony skip every later one.</para>
-        ///
-        /// <para>So a cook already in whites took the haul at the next job
-        /// boundary, was judged leaving the kitchen, changed out, fetched the
-        /// ingredient, and changed back in for the bill.</para>
+        /// COMMON SENSE'S BILL HAUL KEEPS A COOK IN UNIFORM. As it ships, Common
+        /// Sense queues a haul of an out-of-room ingredient, with no giver,
+        /// ahead of the bill. Why that changed a cook out, and why its prefix
+        /// always runs before ours: docs/DESIGN.md, "Errands queued ahead of
+        /// work".
         ///
         /// <para>Driven end to end through the pawn's own tracker, so Common
         /// Sense's real prefix builds the queue and ours then judges the haul
-        /// it hands out. A known gap without the mod.</para>
+        /// it hands out. The control is the same haul with no bill behind it,
+        /// which still changes them back. A known gap without the mod.</para>
         /// </summary>
         internal static bool CommonSenseBillHaulKeepsTheUniform(Fixture fix)
         {
