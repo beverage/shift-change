@@ -97,230 +97,155 @@ does.
 
 ## What the cases assert
 
-Sixty-seven cases.
+Sixty-seven cases. This section is a map: the detail lives with each case, in
+the comment on its method under `Source/ShiftChange/Harness/`, and the report
+prints the cases in the order `DebugTools_LifecycleHarness.Run` registers them.
 
-**Regression cases** guard a bug that happened. A stand whose stock shares no
-apparel layer with what the pawn wears once donated its uniform permanently and
-emptied itself forever; a gravship flight released every ledger aboard and
-inverted uniform and civvies; banishment never reached the reaper because
-`PawnBanishUtility.Banish` never reaches `UnclaimAll`; a single exception
-disabled interception for the whole process; the freed-stand announcement
-fired before the tracker released the pawn's reservation, so the mid-job
-catch-up could never fire at all; and a stand that reached service with
-vanilla's removal flag already on stayed open to every colonist's optimizer,
-because refusing the toggle's transition never emptied the state behind it.
-Each has a case that fails without its fix.
+Most guard a bug that happened, and fail without its fix. Some instead assert a
+rule the store description promises players. That kind exists because all
+three descriptions once said eating in a room changed nothing, while the code
+had always done the opposite on purpose, and nothing caught it until
+`MealBreakChangesOut` was written. The table and classifier cases are a third
+kind: facts about the def database, most likely to fail on a game update rather
+than on an edit.
 
-That last one carries a second job. Its closing assertions read
-`ApparelSourceEnabled` and `HaulSourceEnabled` off the stand directly, pinning
-the engine fact that both are the same field. The decision not to patch the
-optimizer's gate rests on that being true, so if Ludeon ever decouples them the
-case fails and names the decision that needs revisiting, instead of the
-protection quietly evaporating.
+**Lifecycle** (`HarnessLifecycle`). Engine events fired at a hand-assembled,
+checked-out stand, asserting where the ledger lands: a gravship flight with the
+borrower aboard and without (`GravshipFlight`, `GravshipFlightLeftBehind`),
+teardown (`TeardownReleases`), a reinstall, which must keep the ledger and the
+return trip (`ReinstallKeepsTheLedger`) and the stand's owner, mode and flag
+(`ReinstallKeepsConfiguration`), and the borrower's death and banishment
+(`DeathReaps`, `BanishmentReaps`). `FaultLatchRecovers` drives real throws
+through the interception prefix until the fault latch trips, then re-arms it
+the way a load does.
 
-**Driver cases** prove the ledger is built correctly in the first place. They
-stage an undressed pawn and run `JobDriver_SwapAtStand` for real through the
-pawn's own tracker, both legs. This is where the forced-apparel lifecycle is
-verified: `Pawn_ApparelTracker.Notify_ApparelRemoved` clears the forced flag on
-every removal, so the driver captures it before removing and restores it after,
-and nothing else exercises that path.
+**The swap** (`HarnessSwap`). These stage an undressed pawn, and every one but
+`DecencyGuardIsOptIn` runs `JobDriver_SwapAtStand` for real, through the pawn's
+own tracker. `DriverRoundTrip` checks that the driver builds a correct ledger
+and gives everything back, and it is the one case that drives the driver's
+capture and restore of forced flags. `NonDisplacingReturns` checks the same for
+a stand whose stock displaces nothing. Full change has a pair: the swap, and
+the refusal to strip a colonist bare (`FullChangeSwapsEverything`,
+`FullChangeRefusesToStripThemBare`). Four cases decide what a stand may take
+for decency. Trousers alone leave a man decent and a woman not, so
+`LegsOnlyStandLeavesAManDecent` is the control for
+`LegsOnlyStandStripsAWoman`; a nudist is exempt (`NudistIsExemptFromDecency`);
+and the guard ships off, and turning it on takes effect
+(`DecencyGuardIsOptIn`).
 
-**Functional cases** assert the rules the store description promises players —
-automatic work only, emergencies never delayed, drafted pawns left alone, work
-the stand does not serve ignored, and the meal-break policy in both directions.
-That last one is the reason this kind exists: all three descriptions claimed
-eating in a room changed nothing, while the code had always done the opposite
-deliberately, and nothing caught it until this case was written.
+**Recreation and sleep** (`HarnessTriggers`). Both classifiers are asserted as
+tables against the def database, with no map (`RecreationClassifierHolds`,
+`RestClassifierHolds`). A real joy job in the stand's room dresses
+(`JoyJobInTheRoomDresses`), and work and recreation clear each other on one
+stand (`WorkAndRecreationAreExclusive`). `SleepJobInTheRoomDresses` puts a bed
+in the stand's room and covers going to bed there, every refusal, the mid-sleep
+re-trigger and the wake-up.
 
-**Recreation cases** cover the joy arm, which shares everything downstream
-with the work arm and nothing upstream. One asserts the classifier itself — a
-plain joy job carries a `joyKind` and is diverted, reading is excluded by driver
-class, and a job that is both work and joy resolves the same way from either
-side. One drives a real joy job in a stand's room and asserts the swap. A third
-asserts that recreation and work types clear each other on the same stand,
-because the exclusivity is what makes the dual-purpose stand unreachable from
-the UI rather than merely discouraged.
+**Bed rest, deposit only and fishing** (`HarnessTriggers` too). A stand ticked
+for vanilla's bed-rest work type dresses a patient going to recuperate, never
+one who needs a doctor first (`MedicalBedRestDressesAtAGownStand`), and the
+medical emergency setting covers doctors and patients but never firefighting
+(`MedicalEmergencySettingCoversTheRightWork`). A deposit-only stand parks what
+its filter accepts and hands it back (`DepositOnlyParksAndReturns`), and
+`StoreUtility`'s own search walks haulers past it while an ordinary stand still
+takes deliveries (`DepositOnlyStandIsNoHaulTarget`). `FishingNeverDresses` is a
+known gap on every list, kept on purpose (see
+[Rules the suite follows](#rules-the-suite-follows)).
 
-**Sleep cases** cover the third arm, and lean heavily on negatives because
-ordinary sleep and MEDICAL bed rest share one driver class and one JobDef. One
-asserts the classifier and the room table against the def database — that
-`Wait_Asleep` still runs the same driver as `LayDown`, which is why the
-classifier demands a bed; that `PatientBedRest` is still a visible WorkTypeDef
-whose giver still reports it, which is what keeps the two controls from merging;
-and that Bedroom dresses for sleep while a rec room does not, so the three role
-tables stay disjoint. The other drives the arm for real: a bed is spawned into
-the pad, and the case asserts the stand picks up sleep from the room's role
-rather than declaring it — because a single unowned humanlike bed scores the
-room as a Bedroom at 100000, so calling `ToggleRest()` here would turn the
-trigger OFF and fall through to excluded. It then walks every refusal (ground
-sleep, both medical routes, player-forced), the mid-sleep re-trigger, and the
-WAKE-UP end to end: an on-shift pawn on a bed must have the change-back
-inserted BEFORE a job that leaves the room, and must not for one that keeps
-them in it.
+**Gates** (`HarnessGates`). `PromisesHold` is the decision table for the
+promises: automatic work only, emergencies never delayed, drafted pawns left
+alone, work the stand does not serve ignored. The meal-break policy has a case
+on a work stand and one on a sleep stand, where a meal already in the pawn's
+inventory gets the opposite answer (`MealBreakChangesOut`,
+`SleepwearMealBreakChangesOut`). Under threat a colonist may change back but
+not in (`DangerGateIsOneDirectional`); a lord duty shuts both arms until it
+ends (`DutyGateShutsBothArms`); a job handed to a pawn mid-swap is not deferred
+on top of it (`MidSwapJobIsNotDeferredAgain`); and a freed stand catches up a
+colonist already working bare in its room (`FreedStandCatchesUp`).
 
-A third covers **deposit only** — that a freshly built stand's filter accepts
-ordinary apparel out of the box (the fact the whole safety story rests on), that
-a narrowed filter parks exactly what it names and issues nothing, that the trip
-claims the stand so a return exists, that the parked gear comes back, and that a
-deposit which would leave a colonist in nothing but a shield belt is refused.
+**Allowed areas** (`HarnessGates` too). A stand outside the colonist's allowed
+area dresses nobody by any of the three paths that dress, and an allowed shared
+stand beats their own stand outside it (`StandOutsideTheAreaDressesNobody`).
+The recreation and sleep arms pass it over through the same search
+(`StandOutsideTheAreaServesNoRecreationOrSleep`). A colonist already in its
+outfit keeps it on, with the retry cooldown set and an inspect line saying why
+(`StandOutsideTheAreaKeepsTheOutfitOn`). Every refusal sits beside the same
+setup with the stand inside the area.
 
-Its neighbour covers **hauling into** such a stand, and drives `StoreUtility`'s
-own search rather than reading our flag back, because the claim is "a hauler
-does not come" and not "the flag is set". It stages a SECOND, ordinary stand
-further from the garment, so the assertion can be that the hauler switches to it
-rather than merely that it stops choosing the first — "nowhere to put it" is a
-result a broken search produces too, and it has to fail. Three states in the one
-run: an empty ordinary stand outbids a Normal stockpile and is chosen, the same
-stand set to deposit only is walked past while still ACCEPTING the garment (the
-narrowing is the destination flag and nothing else, so a deposit and a
-right-click delivery are untouched), and a stand already holding a conflicting
-garment refuses it by vanilla's own `HasRoomForApparelOfDef`. That last is the
-state that made the bug so hard to see in play: three identically configured
-stands, and only the deposit-only one afflicted, because only its resting state
-is empty.
+**Ownership** (`HarnessOwnership`). The owner list is a set:
+`OwnerListRestricts` walks a stand from pool to one owner, two and back.
+`OwnerFilterOffersTheRightPawns` drives the owner dialog's candidate list,
+which must never hide a current owner. Two cases stage a foreign assignable
+beside ours, the shape Outfit Stands Plus gives its stands: the copy follows
+every change to our list (`ForeignOwnersCopyOurs`), and the one-time reconcile
+for older saves keeps the list the player could see
+(`ReconcileKeepsTheVisibleList`). Three cover a stand not used for shift
+changes: a group stand keeps its owners whichever of four ways it leaves shift
+use (`GroupSurvivesLeavingShiftUse`), one pick there replaces a kept group
+(`PickReplacesAKeptGroup`), and a kept group reaches nobody through the copy
+and survives a move (`KeptGroupSurvivesAMove`).
 
-**Ownership cases** guard the owner list, which went from one pawn to a set.
-One walks a stand through pool, one owner, two owners and back, asserting who
-may claim it at each step; its load-bearing assertion is the SECOND owner,
-because a single-owner reader passes everything before that and fails from
-there. The other drives the owner dialog's candidate list through all three
-filter states without opening a window, and asserts the one property a filter
-must have: an assigned pawn leaves the candidate list but stays visible as an
-owner even under a filter that excludes them. A filter that hid the owner you
-wanted to remove would be a trap.
+**The removal flag and the gizmo gates** (`HarnessOwnership` too).
+`RemovalFlagHeldOffInService` holds vanilla's removal flag off through every
+entry into service, the invariant the contents protection rests on, and pins
+the engine fact that the optimizer's gate is that same field. Three cases cover
+the gizmo postfixes, which must hand the upstream sequence back untouched when
+they have nothing to add (`ChangeBackGateHandsTheChainBack`,
+`RemovalToggleGateLeavesForeignStandsAlone`), and still add the change-back
+button for a pawn in uniform, even with interception latched off
+(`ChangeBackGateStillAppends`).
 
-Two more stage a second, foreign assignable beside ours, the shape Outfit Stands
-Plus gives its stands. One asserts the copy follows every way our list changes:
-one owner is copied, a second that does not fit the foreign comp's single slot
-empties the copy rather than truncating it, and the reaper clears it. The same
-case checks that the foreign Set owner stays hidden in both modes. The other
-drives the one-time reconcile through each arm of its rule, and ends on the arm
-that makes it one-time: once reconciled, a copy that drifted is rewritten, never
-adopted.
+**Riding along** (`HarnessRideAlong`). Jobs a uniform stays on for, each one a
+change-out the return trip used to make for nothing: feeding a patient or a
+prisoner (`FeedingRidesAlong`), an errand queued ahead of work the stand serves
+(`DetourAheadOfServedWorkKeepsTheUniform`), and vanilla's own opportunistic
+haul on the way to a bill, which the engine builds
+(`VanillaOpportunisticHaulKeepsTheUniform`). Two run another mod's real code
+and are known gaps without it: Common Sense's bill haul
+(`CommonSenseBillHaulKeepsTheUniform`) and Pick Up And Haul's follow-up jobs
+(`PickUpAndHaulFollowUpsKeepTheUniform`).
 
-Three more cover a stand not used for shift changes. The first takes a group stand
-out of shift use by all four ways in (the row itself, and unticking the last work
-type, Recreation or Sleeping, which land in the same state) and asserts the group
-is still listed after each and whole when the stand goes back. The second drives
-the owner dialog's own Assign: in shift use it adds, which is the control, and out
-of it one pick replaces a kept group and the copy then names that colonist. The
-third minifies and relands a stand holding a kept group, and asserts the group
-comes back whole with the copy still empty. That is the trap it was written for:
-vanilla restores parked owners through `TryAssignPawn` one at a time, so an
-override that replaced there returned the group as its last member. The last two
-stage the foreign assignable as well.
+**Interop** (`HarnessInterop`). `OutfitStandsPlusButtonMatchesTheirs` covers
+code of ours that runs inside another mod: Outfit Stands Plus' stand button,
+reading our stand list, must offer what its own walk would, in the same order
+(see [DESIGN.md](DESIGN.md#outfit-stands-plus-stand-button)). It is a known
+gap until `--with=` loads that mod.
 
-**An interop case** covers code of ours that runs inside another mod's: the
-Outfit Stands Plus stand button (see
-[DESIGN.md](DESIGN.md#outfit-stands-plus-stand-button)). It needs that mod
-loaded, so on the default list it is a known gap and `--with=` runs it.
+**Buttons and spares.** `HarnessGizmos` reads the stand's buttons the way the
+gizmo bar gets them, without drawing: the switch names what the stand serves
+(`SwitchNamesWhatTheStandServes`), and stands selected together keep their own
+buttons (`StandButtonsStaySeparate`). `HarnessScoring` is a pair that only
+means anything as one: a checked-out pawn refuses a spare duplicating the kit
+parked in their stand (`ParkedKitRefusesSpares`), and takes one once that kit
+is worn through (`WornOutParkedKitStillGoesShopping`).
 
-It checks the patch first: the walk is in their original IL once, and what
-runs calls the stand list in its place. Then it builds a world in which either
-half going wrong would show. The fixture's stand belongs to a second colonist.
-The owner gets a mechanized stand of theirs and then a second vanilla one,
-spawned in that order, plus a third stand that names the owner but belongs to
-no faction. Owners go straight into their lists through the base class, so the
-case asserts the lookup, not how our copy fills them.
+**Tables and rooms** (`HarnessTables`). Three cases need no map and check that
+the static tables still match the def database, where every lookup is
+silent-fail and a renamed def empties its row with no error: the room-role
+table (`RoomRoleTableResolves`), the job-target and ignored-giver tables
+(`JobTablesHold`) and the room-contents markers (`ContentsMarkersHold`). The
+last two check Rimatomics' names only when it is loaded, and count as known
+gaps without it. A fourth asserts the arithmetic that sizes the work-type
+dialog's body (`WorkTypeDialogBodyRectFitsTheBody`). Two need a map and resolve
+a work target's room: one with no room of its own
+(`SolidTargetResolvesARoom`), and one in an exterior wall, from either side
+(`ExteriorWallTargetResolvesTheRoom`).
 
-Their method runs with the switch off and then on, and both answers must match
-the world and each other, in order. That is asserted twice: as spawned, and
-after the mechanized stand changes hands and comes back, which moves it to the
-end of the colony building list and so tests the list's upkeep. The case also
-checks that the owner's two buttons really merge into one, which is why order
-is asserted at all. And it asks the list directly whether the switch hands back
-the walk when off. Together with the IL check, that is what shows the off arm
-was their walk; without it, a list answering both arms would compare equal to
-itself.
+**Round trips** (`DebugTools_SaveRoundTrip`). Save, load back through the
+engine's own synchronous loader, and assert on the written file as well as on
+the loaded state: a plain trip, which also sweeps vanilla's removal flag
+(`RoundTrip`); a save from before v1.0.2, with the legacy keys
+(`LegacyMigration`); and an older save whose stand carries a foreign assignable
+with an owner of its own (`ForeignAssignable`). On the four-mod list the
+legacy-key case takes the key migration, and beside a foreign assignable it
+takes the decline and the reconcile instead; no other case reaches the
+decline. These cases replace `Current.Game`, so they run last among the map
+cases; the class doc says what else follows from that.
 
-**Ride-along cases** cover the jobs a uniform stays on for, each one a
-change-out the return trip used to make for nothing. Feeding drives every
-vanilla feeding giver with the meal stored in the stand's room, where nobody may
-be dressed for it, and in storage elsewhere, where nobody may be changed out for
-it, each beside the same job under a giver that is not on the list, which still
-dresses and still changes them back. The errand case puts a giver-less haul in
-front of the stand's own work in the queue and asserts the uniform stays on;
-its controls are the narrowness: nothing queued, work the stand does not
-serve, its work in another room, another errand at the head and a meal break
-all still change them back, and the errand never dresses anyone. Vanilla's own
-opportunistic haul makes the same shape, and its case lets the engine make it:
-the bill is started through the pawn's tracker, and vanilla's `StartJob` queues
-it and starts the haul in its place, back through our prefix. Vanilla's detour
-limits leave the layout in the pad's room about 0.4 of a cell to spare, so the
-case asks vanilla's search directly first, and a layout that stops qualifying
-fails there with the positions in the report.
-
-Two more run another mod's real code and are known gaps without it. In one,
-Common Sense's own prefix builds its bill haul through the pawn's tracker and
-ours then judges it, so the case asserts the shape Common Sense produced before
-asserting what we did with it. In the other, Pick Up And Haul's three follow-up
-jobs are started from the queue the way its driver hands them over, beside a
-haul from its own work giver, which still changes them back.
-
-**Allowed-area cases** cover a stand outside the colonist's allowed area. It
-dresses nobody, the catch-up interrupts nobody for it, and a shared stand
-inside the area beats the colonist's own stand outside it. The recreation and
-sleep arms pass it over as well, through the same search. A colonist already in
-its outfit keeps it on, the retry cooldown is set and an inspect line says why,
-and once the stand is back inside the area the next job out of the room changes
-them back as usual. Every refusal sits beside the same setup with the area
-lifted.
-
-**Button cases** read the stand's buttons the way the gizmo bar gets them,
-without drawing anything. The switch names what the stand serves, recreation
-and sleep included. Two stands selected together keep separate switches and
-separate Set owner buttons, against two plain commands with the same face,
-which do merge.
-
-**Round-trip cases** save the game, load it back through the engine's own
-synchronous loader, and assert on what came out. There are three: a plain trip
-that carries the owner, the ledger and the forced flags, and that also stages
-the removal flag ON before saving to prove the load sweeps it back off; a
-legacy-key save, which must get its owner back and re-save it under the prefixed
-key; and a stand from an older save carrying a foreign `CompAssignableToPawn`
-with an owner of its own, which must load without a contest and then be adopted
-into ours.
-
-The legacy-key case takes whichever route the loaded stand allows. With no
-foreign assignable on it, the owner arrives by the key migration. With one (and
-Outfit Stands Plus puts one on every vanilla stand) the generic keys belong to
-that comp, so the migration declines them: the case asserts the decline left no
-trace, and that the owner came back through the one-time reconcile instead. The
-four-mod list therefore covers the migration, and the decline needs a list that
-puts a foreign assignable on the stand, such as one carrying Outfit Stands Plus.
-No other case reaches the decline, because the older-save case writes our
-prefixed keys, and a present key turns the migration off before the contest is
-consulted. The rewrite that produces the legacy file also strips the reconciled
-marker: it arrived in v1.4.7, the generic keys were retired in v1.0.2, and no
-save carries both. Left in, it made a file no version ever wrote, and beside a
-foreign assignable that file lost the owner from both lists.
-
-Each asserts on the written **file** as well as on the loaded comp state. Comp
-state alone cannot distinguish a value that scribed correctly from one that
-never left the object, and the migration leg's re-save is what shows the
-reference was collected rather than only registered. They also assert the
-absence of the three engine log lines that mark a contested key — see
-`rimworld-docs/gamedata/scribe-system.md`.
-
-Three things about them differ from every other case, all consequences of the
-load being real. `GameDataSaveLoader.LoadGame` is unusable here: it queues an
-async long event and disposes the game, so control never returns to an
-assertion. `SavedGameLoaderNow.LoadGameFromSaveFileNow` is the synchronous
-primitive underneath it, and runs both scribe passes inline. These cases
-therefore **replace `Current.Game`**, so they run last among the map cases and
-register without a fixture — a teardown would clear a pad on a disposed map.
-And `Game.LoadGame` ends in `FinalizeInit`, which `Patch_HarnessAutoRun`
-postfixes, so a one-shot latch there prevents a nested harness run.
-
-Two further cases cover neither the mod's behaviour nor a past bug, and need no
-map at all. One walks the room-role table and asserts every `RoomRoleDef` and
-`WorkTypeDef` it names still resolves — the lookups are silent-fail, so a
-renamed def empties the table and the mod does nothing at all with no error
-anywhere. That table now carries recreation rows as well, including two
-third-party pool roles, so the same silence would take the joy arm with it. The
-other asserts the harness's own accounting: `Expect` reports and returns, `Case` counts, and a
-known gap is counted apart from a failure. Without it the runner can grep a
-green log out of a suite that checks nothing.
+**The harness itself.** `HarnessAccounting`, registered last, asserts that
+`Expect` reports and returns, that `Case` counts, and that a known gap is
+counted apart from a failure. Without it the runner can grep a green log out of
+a suite that checks nothing.
 
 ## What is not covered
 
