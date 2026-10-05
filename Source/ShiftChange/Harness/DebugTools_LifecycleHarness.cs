@@ -1,12 +1,7 @@
-// HARNESS only — see the configuration table in ShiftChange.csproj. The
-// harness is dev tooling and does not ship: a Release build compiles this
-// file out entirely, and devtools/run-harness.sh asks for it back with
-// -p:Harness=true on top of Release codegen.
-//
-// The guard is whole-file, always. Never put an #if HARNESS inside a file
-// that ships — a shipping build and a harness build must differ by the
-// presence of these types and by nothing else, or a harness run stops saying
-// anything about the assembly that goes out. check-invariants.py enforces it.
+// HARNESS only: dev tooling, compiled out of a plain Release build (the
+// configuration table is in ShiftChange.csproj). The guard is whole-file,
+// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
+// "Development tooling".
 #if HARNESS
 using System;
 using System.Collections.Generic;
@@ -21,6 +16,9 @@ using Verse.AI;
 // The case bodies live in sibling TYPES under Harness/ (split 2026-09-15).
 // Imported statically so the registration list in Run() below reads as plain
 // method names — that list is the ORDER authority and has to stay legible.
+// Types rather than partials because the harness still shipped then, and a
+// decompiler merges partials back into one class: the shipped dll would have
+// read exactly as it did before.
 using static ShiftChange.HarnessFixtures;
 using static ShiftChange.HarnessGates;
 using static ShiftChange.HarnessInterop;
@@ -59,13 +57,10 @@ namespace ShiftChange
     /// this harness drives. It is the half that has actually been wrong.</para>
     ///
     /// <para><b>The one rule that keeps it honest: call the engine's own entry
-    /// points.</b> Every case below goes through <c>Thing.DeSpawn</c>,
-    /// <c>GenSpawn.Spawn</c>, <c>Pawn.Kill</c>, <c>PawnBanishUtility.Banish</c>
-    /// — never our <c>PostDeSpawn</c> directly. The engine's comp dispatch,
-    /// its ordering and its own side effects then run for real, and only the
-    /// ORCHESTRATION around them is simulated. A harness that hand-rolls the
-    /// call sequence tests the author's model of the engine and certifies
-    /// whatever that model got wrong.</para>
+    /// points</b>, never our handlers directly, so the engine's comp dispatch,
+    /// its ordering and its own side effects run for real and only the
+    /// ORCHESTRATION around them is simulated. docs/TESTING.md, "Rules the
+    /// suite follows".</para>
     ///
     /// <para><b>Two kinds of fixture.</b> The lifecycle cases hand-assemble a
     /// checked-out state (<see cref="Build"/> moves apparel and calls
@@ -77,12 +72,10 @@ namespace ShiftChange
     /// the first place — which nothing covered until 2026-08-14, and which is
     /// where B1 lived.</para>
     ///
-    /// <para><b>Two engine traps the driver cases had to pay for</b>, both
-    /// invisible from the API surface and both recorded at their call sites:
-    /// pathfinding in 1.6 is ASYNCHRONOUS, so ticking one pawn never completes
-    /// a walk (hence staging on the interaction cell); and Jobs are POOLED, so
-    /// a Job reference held across its own completion silently becomes the
-    /// pawn's next job (hence watching the driver, not the job).</para>
+    /// <para><b>Two engine traps the driver cases had to pay for</b>, recorded
+    /// at their call sites: pathfinding is asynchronous (hence staging on the
+    /// interaction cell), and Jobs are pooled (hence watching the driver, not
+    /// the job). docs/TESTING.md, "Two engine traps".</para>
     ///
     /// <para>Save/load round trips run in-process through the engine's
     /// synchronous loader, as the last map cases, since they replace the whole
@@ -95,24 +88,9 @@ namespace ShiftChange
     /// a player's install. <c>run-harness.sh</c> asks for them with
     /// <c>-p:Harness=true</c> on top of Release codegen, and sweeps
     /// <c>Assemblies/</c> back to the shipping dll when it is done. The
-    /// <c>[DebugAction]</c> wrapper remains SCENES only on top of that.
-    ///
-    /// Two earlier rationales sat here and are both superseded. The first —
-    /// "ships in Release, dev-mode gated, like the other two debug tools" —
-    /// was wrong because the debug actions menu is a surface players genuinely
-    /// use. The second — "the BODY ships, because a gate is only worth running
-    /// if it asserts against the literal dll players install" — was right
-    /// about what it wanted and paid for it in the wrong currency. The thing
-    /// it was protecting is that no shipping code path differs between the
-    /// build under test and the build that goes out, and that is now a rule
-    /// with a check behind it: HARNESS is only ever a whole-file guard
-    /// (<c>check-invariants.py</c>), so the two builds differ by the presence
-    /// of these types and by nothing else.
-    ///
-    /// What survives from both: a test you have to switch build
-    /// configurations to run is a test that stops being run. Nobody switches
-    /// configurations here either — <c>run-harness.sh</c> passes the property
-    /// itself, and the command is the same one it always was.</para>
+    /// <c>[DebugAction]</c> wrapper remains SCENES only on top of that. The
+    /// two earlier rationales this replaced, and why: docs/DESIGN.md,
+    /// "Development tooling".</para>
     ///
     /// <para><b>First run, 2026-08-14</b>, clean Release restart on the ~100-mod
     /// profile, quicktest map: 4 passed, 0 failed, 1 known gap. The gravship

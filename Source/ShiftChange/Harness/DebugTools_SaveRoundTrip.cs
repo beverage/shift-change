@@ -1,12 +1,7 @@
-// HARNESS only — see the configuration table in ShiftChange.csproj. The
-// harness is dev tooling and does not ship: a Release build compiles this
-// file out entirely, and devtools/run-harness.sh asks for it back with
-// -p:Harness=true on top of Release codegen.
-//
-// The guard is whole-file, always. Never put an #if HARNESS inside a file
-// that ships — a shipping build and a harness build must differ by the
-// presence of these types and by nothing else, or a harness run stops saying
-// anything about the assembly that goes out. check-invariants.py enforces it.
+// HARNESS only: dev tooling, compiled out of a plain Release build (the
+// configuration table is in ShiftChange.csproj). The guard is whole-file,
+// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
+// "Development tooling".
 #if HARNESS
 using System;
 using System.Collections.Generic;

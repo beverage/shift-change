@@ -1364,7 +1364,10 @@ shipping code path changes shape between the build the harness asserts against
 and the build that goes out, which is what the second argument actually wanted.
 `devtools/check-invariants.py` enforces the guard's shape;
 `devtools/check-shipped-dll.py` enforces the absence in the artifact, in CI and
-again inside `publish-workshop.sh` against the staged copy.
+again inside `publish-workshop.sh` against the staged copy. One thing survives
+from the old arrangement: a test you have to switch build configurations to run
+stops being run, so nobody does. `run-harness.sh` passes `-p:Harness=true`
+itself, and the command is the one it always was.
 
 `SCENES` (Debug and Media, never Release) still carries the stage files and the
 harness's `[DebugAction]`; `DebugTools_Fixtures` sits under `SCENES || HARNESS`
