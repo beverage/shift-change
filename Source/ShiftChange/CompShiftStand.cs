@@ -95,11 +95,9 @@ namespace ShiftChange
         ///
         /// <para><b>Only meaningful on a sleep stand</b>, and
         /// <see cref="DepositOnly"/> enforces that rather than trusting the
-        /// dialog to hide the row. Undressing into a rack is a coherent
-        /// action but "not one any pawn should reach by deciding to go do some
-        /// hauling" (SwapPlan.cs) — the sleep trigger is what makes it safe,
-        /// so a stand switched back to work must not carry the flag with
-        /// it.</para>
+        /// dialog to hide the row: the sleep trigger is what makes the mode
+        /// safe, so a stand switched back to work must not carry the flag with
+        /// it (docs/DESIGN.md, "The sleep branch").</para>
         ///
         /// <para>Stored raw and gated on read, not cleared on a mode switch,
         /// so a player who flips a stand to work and back finds their setting
@@ -135,32 +133,10 @@ namespace ShiftChange
         internal bool fullChange;
 
         /// <summary>
-        /// Keep this stand's contents out of trade windows.
-        ///
-        /// <para><b>Vanilla offers them, and the removal flag is no defence.</b>
-        /// <c>TradeUtility.AllLaunchableThingsForTrade</c> carries an explicit
-        /// <c>Building_OutfitStand</c> branch that yields <c>HeldItems</c>
-        /// (<c>TradeUtility.cs:123</c>) for orbital ships, and
-        /// <c>Pawn_TraderTracker.ColonyThingsWillingToBuy</c> walks
-        /// <c>AllColonistBuildingsOfType&lt;IHaulSource&gt;()</c> and yields
-        /// everything they directly hold (<c>Pawn_TraderTracker.cs:123-134</c>)
-        /// for visiting caravans. That second one enumerates by TYPE, so
-        /// <c>HaulSourceEnabled</c> — the one thing <c>allowRemovingItems</c>
-        /// actually gates — is never consulted, and
-        /// <see cref="Patch_AllowRemovingToggle"/>'s enforcement buys nothing
-        /// here. <c>TradeDeal.InSellablePosition</c> then whitelists
-        /// <c>ParentHolder is Building_OutfitStand</c> so the unspawned held
-        /// items sail through the position check (<c>TradeDeal.cs:85</c>). The
-        /// result is a uniform in active rotation — and the owner's own clothes
-        /// parked beside it — listed for sale to the next trader who walks in.</para>
-        ///
-        /// <para><b>Defaults ON, and saves that predate it adopt it.</b> A stand
-        /// in service holds kit the colony is using, so the safe state is the
-        /// default state; that is the same call as
-        /// <see cref="EnforceRemovalFlag"/>, and for the same reason — the
-        /// exposure is invisible from the inspect pane, so a player cannot
-        /// audit it by eye and will not go looking for a switch they do not
-        /// know they need.</para>
+        /// Keep this stand's contents out of trade windows. Vanilla lists them
+        /// to orbital ships and caravans whatever the removal flag says, so
+        /// this defaults ON, and saves that predate it adopt it: why on both
+        /// counts, docs/DESIGN.md, "Withholding from trade".
         ///
         /// <para>Read through <see cref="BlocksTrade"/>, never directly: that
         /// property folds in <see cref="excluded"/>, because a stand declared
@@ -183,19 +159,11 @@ namespace ShiftChange
         /// This stand has something out on a pawn, so the return trip has
         /// work to do.
         ///
-        /// <para>EITHER half of the ledger counts, not just the issued one. A
-        /// deposit-only stand issues nothing at all — the whole point — and
-        /// keying this on <see cref="issuedUniform"/> alone would leave it
-        /// unclaimed: no borrower, no entry in <see cref="OnShiftStands"/>, no
-        /// return trip, and a colonist's power armour locked in a rack that
-        /// still advertised itself as free to the next pawn.</para>
-        ///
-        /// <para>Widening it is safe for every pre-existing state because the
-        /// combination it newly admits — nothing issued, something stored —
-        /// could not be recorded before: <c>DoTransfer</c> re-dresses the pawn
-        /// and returns without calling <see cref="NotifyDressed"/> whenever a
-        /// dress trip issues nothing. Deposit-only is the first path that
-        /// reaches it deliberately.</para>
+        /// <para>EITHER half of the ledger counts, not just the issued one: a
+        /// deposit-only stand issues nothing, and keyed on
+        /// <see cref="issuedUniform"/> alone it would never be claimed, so
+        /// nothing would hand its contents back. Why the widening is safe for
+        /// every older save: docs/DESIGN.md, "The sleep branch".</para>
         /// </summary>
         public bool OnShift => issuedUniform.Count > 0 || storedOwnerApparel.Count > 0;
 
@@ -524,13 +492,11 @@ namespace ShiftChange
         /// The player has EXPLICITLY put this stand on the recreation or sleep
         /// trigger, as opposed to the room's role having done it for them.
         ///
-        /// <para>The dialog needs the distinction: it hides the work grid while
-        /// a trigger is on, and hiding it on an AUTOMATIC stand left a bedroom
-        /// stand with no reachable path to a work type at all — the grid was
-        /// hidden, unticking the Sleeping row fell through to excluded, and
-        /// clicking Automatic put the room's default straight back (adversarial
-        /// review, 2026-09-03). An automatic stand's trigger is a suggestion
-        /// from the room and must stay overridable in one click.</para>
+        /// <para>The dialog hides the work grid only for an explicit trigger,
+        /// because an automatic stand's trigger is a suggestion from the room
+        /// and must stay overridable in one click; hiding it on any active
+        /// trigger once left a bedroom stand no path to a work type
+        /// (docs/DESIGN.md, "The sleep branch").</para>
         /// </summary>
         public bool IsTriggerOverridden => !excluded && (recreationOverride || restOverride);
 
@@ -564,11 +530,9 @@ namespace ShiftChange
 
         /// <summary>
         /// The question <see cref="Patch_WithholdFromTrade"/> asks. Keyed on the
-        /// DECLARATION rather than on resolved work types, exactly like the
-        /// removal-flag disable: a declared stand sitting in a roleless room is
-        /// "ours, currently idle" and its uniform deserves the same cover,
-        /// while an excluded stand is somebody's display piece and stays
-        /// vanilla — flag or no flag.
+        /// DECLARATION rather than on resolved work types, like the
+        /// removal-flag disable, so an excluded stand stays vanilla whatever
+        /// the flag says (docs/DESIGN.md, "Withholding from trade").
         /// </summary>
         public bool BlocksTrade => !excluded && withholdFromTrade;
 
@@ -640,11 +604,13 @@ namespace ShiftChange
         /// wherever the stand currently is: toggling while automatic seeds the
         /// custom set from the room's defaults first, toggling while excluded
         /// starts a fresh set, and emptying the custom set collapses back to
-        /// excluded so the states stay canonical. Work and recreation are
-        /// mutually exclusive (decided 2026-08-16), so touching any work
-        /// type also drops the recreation trigger — the dialog hides this
-        /// list while recreation is on, so reaching here from a rec stand is
-        /// a deliberate switch, not a surprise.
+        /// excluded so the states stay canonical. Work types, recreation and
+        /// sleep are mutually exclusive (decided 2026-08-16), so touching any
+        /// work type also drops the recreation and sleep triggers. The dialog
+        /// hides this list while either trigger is ticked, so reaching here
+        /// from such a stand is a deliberate switch; on an automatic stand the
+        /// list stays reachable on purpose (see
+        /// <see cref="IsTriggerOverridden"/>).
         /// </summary>
         public void ToggleWork(WorkTypeDef work)
         {
@@ -736,10 +702,8 @@ namespace ShiftChange
         /// recreation, then sleep. Empty when it dresses for nothing.
         ///
         /// <para>The one list both the inspect pane and the switch's face are
-        /// built from. The face once read the work types alone, so a working
-        /// recreation or sleep stand said "no work here yet" on its button
-        /// while its inspect pane, built from all three, said what it
-        /// served.</para>
+        /// built from, so the two cannot disagree again (docs/DESIGN.md, "Rooms
+        /// to work types").</para>
         /// </summary>
         internal List<string> ServedLabels()
         {
@@ -1130,16 +1094,11 @@ namespace ShiftChange
             storedForcedApparel.Clear();
             borrower = null;
             OnShiftStands.Remove(pawn);
-            // NOT Notify_StandFreed. The stand is free in the ledger, but the
-            // pawn who just undressed still holds its maxPawns=1 RESERVATION —
-            // this runs from a toil finish action, and the tracker does not
-            // release reservations until later in the teardown
-            // (Pawn_JobTracker.CleanupCurrentJob:492). Every candidate the
-            // catch-up looked at was rejected by CanReserveAndReach, so it
-            // could never fire on its own trigger.
-            //
-            // JobDriver_SwapAtStand raises it from a GLOBAL finish action
-            // instead, which the tracker runs at :497 — after the release.
+            // NOT Notify_StandFreed: this runs from a toil finish action,
+            // while the pawn who just undressed still holds the stand's
+            // reservation. JobDriver_SwapAtStand announces from a global finish
+            // action instead, after the release (docs/DESIGN.md, "The mid-job
+            // catch-up").
         }
 
         /// <summary>
@@ -1166,11 +1125,9 @@ namespace ShiftChange
         /// <param name="announce">
         /// Raise the catch-up for whoever is working bare in this room. The
         /// reaper paths (death, trade, kidnap, banishment) want this: the
-        /// borrower is gone and their claims went with them. The JOB DRIVER
-        /// does not — it runs from a toil finish action, while the pawn still
-        /// holds the stand's reservation, so an announcement there reaches a
-        /// candidate list that CanReserveAndReach has already emptied. The
-        /// driver defers it to a global finish action instead.
+        /// borrower is gone and their claims went with them. The job driver
+        /// passes false and announces later itself, once the stand's
+        /// reservation is released (docs/DESIGN.md, "The mid-job catch-up").
         /// </param>
         public void AbandonLedger(Pawn formerBorrower, bool announce = true)
         {
@@ -1323,8 +1280,7 @@ namespace ShiftChange
             // 2026-08-18): a workshop's four gerunds overflow a gizmo label
             // into unreadability. The full set stays on the hover desc and in
             // the inspect pane. Recreation and sleep count as purposes here
-            // exactly as they do there; the face once read the work types
-            // alone and called a working recreation stand idle.
+            // exactly as they do there (ServedLabels).
             string regime;
             if (excluded)
             {
@@ -1352,11 +1308,9 @@ namespace ShiftChange
                 // configuration gizmo reads as "this stand is disabled".
                 // Zero-art rule: icons come from vanilla's atlas only.
                 icon = TexButton.Rename,
-                // One button per stand when several are selected. Merged, a
-                // click runs every stand's action (GizmoGridDrawer), each opens
-                // a dialog, and opening one closes the last
-                // (Window.onlyOneOfTypeAllowed), so the merged button set up one
-                // stand while looking as if it set them all.
+                // One button per stand when several are selected: merged, it
+                // set up one stand while looking as if it set them all
+                // (docs/DESIGN.md, "Rooms to work types").
                 groupable = false,
                 action = () => Find.WindowStack.Add(new Dialog_SetStandWorkTypes(this)),
             };

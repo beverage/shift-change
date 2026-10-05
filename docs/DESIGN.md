@@ -414,7 +414,10 @@ stateDiagram-v2
 
 `Free` means the ledger is empty and the stand is claimable. `OnShift` means it
 holds a borrower, the parked civvies, the taken uniform, and the forced-flag
-snapshot.
+snapshot. When the stand itself despawns, the mode decides: a gravship flight
+and a minify keep the ledger, because the stand keeps its contents, and a
+teardown releases it. The reasoning for each is on `CompShiftStand.PostDeSpawn`,
+beside the branches.
 
 **Ownership must end when vanilla thinks it ends.** `Pawn_Ownership.UnclaimAll()`
 is called on death, trade, kidnap and map exit (`Pawn.cs:2341, :2565, :2599,
@@ -524,7 +527,7 @@ check (`TradeDeal.cs:85`). What ends up on the trader's list is the uniform in
 active rotation and, if anyone is on shift, their own clothes parked beside it.
 
 **`allowRemovingItems` is not in this story at all**, which is worth saying out
-loud, because the section above spends a page on that flag. The caravan lister
+loud, because it is the nearest thing the stand has to a lock. The caravan lister
 keys on **type**: a stand whose `HaulSourceEnabled` is false is enumerated
 anyway, and `Patch_AllowRemovingToggle`'s enforcement — which does hold the
 optimizer off — buys nothing here. A player who read the removal toggle's
@@ -1292,6 +1295,16 @@ The eligibility gate is `suspendable && casualInterruptible`. Both default true
 are caught up while a doctor mid-treatment is never pulled off a patient. Crafting
 progress lives in the unfinished thing on the bench, so nothing is lost. The gate
 was not designed; it fell out of reading what vanilla declares about its own jobs.
+
+**The announcement waits for the stand to be let go.** A stand takes one
+reservation, and the colonist who just changed back still holds it while their
+swap job's toils finish. `Pawn_JobTracker.CleanupCurrentJob` releases a job's
+reservations (`:492`) before it runs the driver's cleanup, and with it the global
+finish actions (`:497`); a toil's finish actions run earlier than either. So the
+swap driver announces a freed stand from a global finish action. It first
+announced from a toil finish action, where every candidate failed
+`CanReserveAndReach` against the departing pawn's reservation, and the catch-up
+never fired at all.
 
 ## State across save, load and uninstall
 
