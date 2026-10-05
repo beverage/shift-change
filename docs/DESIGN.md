@@ -786,15 +786,21 @@ elsewhere.
 
 **Jobs that name their destination first** (`JobRoomTargets`). `TargetCell`
 reads targetA because that is where vanilla puts the place the work happens, in
-both shapes that matter: a bill's targetA is the workbench, and a haul's
-targetA is the thing being carried, whose cell is where the pawn starts. Either
-way targetA is where the pawn first puts their hands on the job.
+both shapes that matter: a bill's targetA is the workbench (`JobDriver_DoBill`
+keeps its ingredients in `targetQueueB`), and a haul's targetA is the thing
+being carried (`JobDriver_HaulToCell`, `HaulToContainer`), whose cell is where
+the pawn starts. Either way targetA is where the pawn first puts their hands on
+the job.
 
-Rimatomics inverts that for fuel handling — targetA is the reactor core its
-scanner walks, targetB the rod found separately — while the driver's toils run
-`GotoThing(TargetIndex 2)`, `StartCarryThing`, `GotoThing(TargetIndex 1)`. The
-pawn walks to the fuel first, so targetB is where the exposure begins and
-targetA is a room they only reach already carrying a rod.
+Rimatomics inverts that for fuel handling. Its givers build
+`new Job(def, t, val)` with `t` the destination, the reactor core or plutonium
+processor its scanner walks, and `val` the rod or chemfuel found separately by
+`ClosestThingReachable`, while the driver's toils run `GotoThing(TargetIndex 2)`,
+`StartCarryThing`, `GotoThing(TargetIndex 1)`. The pawn walks to the fuel
+first, so targetB is where the exposure begins and targetA is a room they only
+reach already carrying a rod. Reading targetA sent the mod looking for a stand
+in the reactor hall while the player's suits sat beside the storage pool, and
+nobody ever changed (reported from play, 2026-09-14).
 
 It is a list rather than a rule because "prefer targetB when set" is wrong for
 vanilla hauling, whose targetB is the destination cell. Nothing in a job's
@@ -810,8 +816,9 @@ changing back either. It sits in the same gate as player-forced and emergency
 work, so the uniform rides along and the next ordinary job settles it.
 
 Keyed on the giver because the job def cannot always separate two givers.
-Rimatomics runs two into one `LoadSpentFuel` job: one carries spent rods to the
-plutonium processor, the other carries the CHEMFUEL that goes in with them.
+Rimatomics runs two into one `LoadSpentFuel` job: `WorkGiver_LoadPlutoniumProc`
+carries spent rods to the plutonium processor, and `WorkGiver_LoadPuProcChems`
+the CHEMFUEL that goes in with them.
 Their WorkGiverDefs differ, and `JobGiver_Work` stamps `workGiverDef` on every
 scanner job, so the giver is the only thing that tells them apart.
 
@@ -824,8 +831,9 @@ normal. Same job def, opposite outcomes, and neither table has to know about
 the other.
 
 Chemfuel is inert and lives wherever a colony stores chemfuel, not beside a
-reactor. Treating it as nuclear work meant either a wardrobe detour before a
-very long haul, or, for an already-suited pawn, undressing for the trip and
+reactor: 146 tiles away on the map this was reported from. Treating it as
+nuclear work meant either a wardrobe detour before a very long haul, or, for an
+already-suited pawn, undressing for the trip and
 dressing again after — two wardrobe walks for a job needing no suit. Changing
 is the expensive part, not the wearing, and that is the general principle this
 list encodes.
@@ -856,8 +864,12 @@ their own targets, both read as leaving the room, so a cook who hauled out of
 the kitchen in whites walked back to the stand with full pockets, changed, and
 walked out again to unload. A job on this list rides along only when it carries
 no giver, which is what keeps a freshly handed-out `HaulToInventory` judged at
-its first item as before. Vanilla's `UnloadYourInventory` is on the list too,
-though it already rode along by carrying no target at all, so that it stays so.
+its first item as before. A giverless one is a continuation, queued by the mod's
+own driver or by Common Sense ahead of a bill; the giverless paths that hand one
+out fresh, through `JobGiver_Haul`, sit in the animal, insect and dryad think
+trees only. Vanilla's `UnloadYourInventory` is on the list too, though it
+already rode along by carrying no target at all (`JobGiver_UnloadYourInventory`),
+so that it stays so.
 
 ### Outfit Stands Plus' stand button
 
@@ -1198,11 +1210,22 @@ unconditional `true` (`:100`). That removes the stand from the automatic search
 and touches nothing else: both EXPLICIT player routes, the "put apparel on
 stand" targeter (`Building_OutfitStand.cs:675`) and
 `FloatMenuOptionProvider_DressOtherPawn`, build the `PutApparelOnOutfitStand`
-job directly and never consult it. An ordered delivery still lands. The engine
-reads the property inside its search loop rather than caching it, so ticking the
-mode on or off takes effect on the next haul search with no lister to
-invalidate — which is what lets the answer key on `DepositOnly`, and so unwind
-by itself the moment the stand stops handling rest.
+job directly and never consult it. An ordered delivery still lands; refusing
+those too would have made the stand unstockable by any means, and a player
+asking for a specific garment on a specific stand is not the problem being
+solved. The engine reads the property inside its search loop rather than caching
+it (its only two readers are `StoreUtility.cs:193`, for slot group parents,
+which a stand is not, and `:252`), so ticking the mode on or off takes effect on
+the next haul search with no lister to invalidate — which is what lets the
+answer key on `DepositOnly`, and so unwind by itself the moment the stand stops
+handling rest.
+
+Stands already stocked heal themselves. The patch stops future deliveries and
+moves nothing, so a stand a hauler filled before it stays filled until the next
+sleep change, where `TryDropThingsToMakeRoomForThingOfDef`
+(`JobDriver_SwapAtStand.cs:384`) evicts whatever is in the way of the deposit.
+The evicted garment now goes back to a stockpile, rather than straight back onto
+the stand it was dropped from.
 
 ### The dress path asks the same question and answers it differently
 
