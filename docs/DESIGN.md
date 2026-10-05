@@ -596,7 +596,9 @@ switch they do not know they need — the same reasoning that made the removal
 flag self-enforcing rather than merely documented. `Scribe_Values` writes
 nothing when a value matches its default and hands the default back when the
 node is absent (`Scribe_Values.cs:70-78,88`), so a save predating the flag loads
-protected, and the only thing ever written is a deliberate opt-out.
+protected. It is the only comp field whose default is not the zero value, and
+that has a mirror-image cost: an opt-out is the only state ever written, so a
+stand deliberately left tradeable is the one relying on its node to survive.
 
 Keyed on the **declaration**, like the removal-flag disable. `BlocksTrade` is
 `!excluded && withholdFromTrade`, so a stand set to "Not used for shift changes"
@@ -1445,11 +1447,10 @@ never fired at all.
   Deliberately not a `GameComponent`: a component writes its class name into every
   save, costing players a one-time load error after uninstalling. The guard has
   zero save footprint.
-- **One scribed flag defaults to `true`.** `withholdFromTrade` is the only comp
-  field whose default is not the zero value, and that is what carries the trade
-  protection into saves that predate it: an absent node means on. The cost is
-  the mirror image — an opt-out is the only state that gets written, so a stand
-  deliberately left tradeable is the one relying on its node to survive.
+- **One scribed flag defaults to `true`.** An absent `withholdFromTrade` node
+  means on, so saves that predate the flag load with the trade protection.
+  Why, and what it costs an opt-out: see
+  [Withholding from trade](#withholding-from-trade).
 - **Uninstalling is clean by construction.** Saved state is comp fields inside
   vanilla buildings' nodes, skipped silently when unrecognized, plus vanilla's own
   forced-apparel flags. Removing the mod reverts every stand to plain vanilla
