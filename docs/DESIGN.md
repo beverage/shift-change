@@ -397,6 +397,14 @@ player could see wins: ours on a stand in shift use, theirs on a stand set to
 "Not used for shift changes". After that ours is the only authority, and a copy
 that drifts is rewritten, never adopted.
 
+Adopting a foreign owner onto a shift stand whose own list is empty turns a
+pooled stand into an owned one, and that is deliberate: the owner was already
+live on the other mod's button, so adoption makes it visible and editable rather
+than inventing it. The same rule keeps the assignments of anyone who used Outfit
+Stands Plus before this mod, whose stands would otherwise load pooled, open to
+any capable colonist while somebody's own clothes sit inside. It also recovers
+the one case the key migration declines.
+
 **The borrower, not the owner, is the ledger's truth.** The comp records, scribed
 by reference: the borrower, the garments they parked, the garments they took, and
 which parked garments were force-worn at check-in. Rebuilding the return trip
@@ -628,7 +636,10 @@ Two quirks matter:
   arrives as **Crafting** work (`DoBillsProduceDrugs`, `WorkGivers.xml:1139-1148`).
 
 So a role maps to a **set** of work types, not a scalar. The first design used
-scalars and missed the drug lab entirely.
+scalars and missed the drug lab entirely; sets were decided 2026-08-08. Each row
+is a judgment of the work plausibly done under that role, which the per-stand
+dialog narrows or widens: a barn's sick animals, for one, are tended under
+Doctor, not Handling.
 
 | Role | Work types |
 |---|---|
@@ -681,9 +692,11 @@ it, while a missing modded name means nothing at all.
 **Work types another mod supplies** (`RoomWorkTypes.CompatDefaults`). Complex
 Jobs does not add work so much as MOVE it: it repoints the `workType` field on
 vanilla WorkGiverDefs at finer-grained types, so surgery stops being Doctor
-work and butchering stops being Cooking work. A stand keyed to the vanilla name
-alone then serves part of its room's work and passes over the rest, which reads
-as the stand working intermittently rather than as a missing patch.
+work, butchering stops being Cooking work, and taming and training stop being
+Handling work, each vanilla type left in place but hollowed out. A stand keyed
+to the vanilla name alone then serves part of its room's work and passes over
+the rest, which reads as the stand working intermittently rather than as a
+missing patch.
 
 **Rooms the engine gives no role to** (`RoomContentsWork`). Automatic mode asks
 the room's `RoomRoleDef`, and the two roles that matter are scored by exactly

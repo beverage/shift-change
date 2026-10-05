@@ -15,15 +15,11 @@ namespace ShiftChange
     /// base's generic keys collide with Outfit Stands Plus' sibling comp).
     ///
     /// <para><b>One owner list per stand, and it is this one.</b> Another mod's
-    /// assignable comp on the same building (Outfit Stands Plus adds one) used
-    /// to keep a list of its own here. It was hidden behind our Set owner while
-    /// the stand did shift work, but it stayed live everywhere that mod reads
-    /// it: its per-pawn "equip outfit" / "return to stand" button and its
-    /// inspect line. A stale owner there sent a colonist to swap another
-    /// colonist's parked kit, and nothing on the stand could show or clear it.
-    /// So that comp now holds a copy of this list
-    /// (<see cref="SyncForeignOwners"/>), in both modes, and its own Set owner
-    /// is hidden everywhere this comp is present.</para>
+    /// assignable comp on the same building (Outfit Stands Plus adds one) holds
+    /// a copy of it (<see cref="SyncForeignOwners"/>), in both modes, and its
+    /// own Set owner is hidden everywhere this comp is present. Why the copy
+    /// replaced two independent lists: docs/DESIGN.md, "Ownership and the
+    /// ledger".</para>
     ///
     /// <para>The owner list is a SET (the XML raises
     /// <c>maxAssignedPawnsCount</c> to 1000), but the stand still holds one
@@ -57,22 +53,6 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>
-        /// Scribes the assignment lists under mod-prefixed keys, replacing the
-        /// base comp's scribing entirely — deliberately no base call.
-        ///
-        /// Comps scribe FLAT into their parent thing's save node
-        /// (<c>ThingWithComps.ExposeData</c> just runs each comp in order,
-        /// <c>:237-251</c>), and the base writes the generic
-        /// <c>assignedPawns</c>/<c>uninstalledAssignedPawns</c> keys
-        /// (<c>CompAssignableToPawn.cs:185-195</c>). Outfit Stands Plus puts a
-        /// second <c>CompAssignableToPawn</c> subclass on this same building,
-        /// and duplicate keys do not error on load — BOTH comps read the
-        /// FIRST node under the name, so ownership smears between the two
-        /// mods on every save/load. Unique keys end our half of that; theirs
-        /// then round-trips correctly too, because ours no longer shadows
-        /// its key.
-        /// </summary>
         /// <summary>
         /// Per-load migration decisions, made in LoadingVars and REPLAYED in
         /// ResolvingCrossRefs. Working state, never scribed. Fields, not a
@@ -159,24 +139,13 @@ namespace ShiftChange
 
         /// <summary>
         /// A stand set to "Not used for shift changes" is assigned to one
-        /// colonist at a time.
-        ///
-        /// <para>In that mode the owner drives nothing of ours. All it still
-        /// reaches is another mod's per-pawn button through the copy, and
-        /// Outfit Stands Plus has one owner per stand, so the owner dialog there
-        /// picks one colonist: its Assign replaces the whole list
-        /// (<see cref="AssignSoleOwner"/>) and Assign all is not drawn.</para>
-        ///
-        /// <para>A group the stand had in shift use is KEPT, because the switch
-        /// is one click, or one untick of the last trigger, away from any
-        /// ordinary edit of a configured group stand. Switching leaves the list
-        /// alone (<see cref="CompShiftStand.SetExcluded"/>), nothing clears it on
-        /// load, and a reinstall puts it back whole, which is why
-        /// <see cref="TryAssignPawn"/> never replaces. While kept, the group fits
-        /// no foreign slot, so the copy is empty and nobody gets the other mod's
-        /// button until the player picks one colonist or puts the stand back
-        /// into shift use. Shift stands are untouched: several owners there is a
-        /// group stand, by design.</para>
+        /// colonist at a time: the owner dialog's Assign there replaces the
+        /// whole list (<see cref="AssignSoleOwner"/>) and Assign all is not
+        /// drawn. A group the stand had in shift use is KEPT, so nothing clears
+        /// it on the way in (<see cref="CompShiftStand.SetExcluded"/>) or on
+        /// load, and <see cref="TryAssignPawn"/> never replaces. Shift stands
+        /// are untouched: several owners there is a group stand, by design.
+        /// Why: docs/DESIGN.md, "Ownership and the ledger".
         /// </summary>
         internal bool SingleOwnerOnly => parent.TryGetComp<CompShiftStand>()?.IsExcluded ?? false;
 
@@ -231,17 +200,8 @@ namespace ShiftChange
         /// THE list. If both do and they disagree, the one the player could see
         /// wins: this one on a stand in shift use, where the foreign Set owner
         /// was hidden, and the foreign one on a stand set to "Not used for
-        /// shift changes", where ours was.
-        ///
-        /// <para>Adopting a foreign owner onto a shift stand whose own list is
-        /// empty turns a pooled stand into an owned one. That owner was already
-        /// live on the other mod's button, so adoption makes it visible and
-        /// editable rather than inventing it. The same rule keeps the
-        /// assignments of anyone who used Outfit Stands Plus before this mod:
-        /// their stands would otherwise load pooled, open to any capable
-        /// colonist while somebody's own clothes sit inside. It also recovers
-        /// the one case the key migration in <see cref="PostExposeData"/> gave
-        /// up on.</para>
+        /// shift changes", where ours was. Why adopting is right even onto a
+        /// pooled stand: docs/DESIGN.md, "Ownership and the ledger".
         /// </summary>
         internal void ReconcileForeignOwners()
         {
@@ -294,20 +254,11 @@ namespace ShiftChange
 
         /// <summary>
         /// Writes this list into every foreign assignable on the stand when it
-        /// fits that comp's capacity, and empties it otherwise.
-        ///
-        /// <para>Through the base class's <c>ForceAddPawn</c> and
-        /// <c>ForceRemovePawn</c>, never the foreign <c>TryAssignPawn</c>:
-        /// Outfit Stands Plus overrides that one with a sweep that unassigns
-        /// the pawn from every other stand on the map, and a colonist here
-        /// routinely owns several. No foreign type is named, so any mod's
-        /// assignable gets the same treatment.</para>
-        ///
-        /// <para>"Fits" is <c>TotalSlots</c>, which Outfit Stands Plus leaves at
-        /// vanilla's default of one. One owner makes a personal stand in that
-        /// mod's model, and its button and inspect line should name that
-        /// owner. A shared or unowned stand has no single owner to name, and an
-        /// empty copy keeps its button off the stand altogether.</para>
+        /// fits that comp's capacity (<c>TotalSlots</c>), and empties it
+        /// otherwise; through the base class's <c>ForceAddPawn</c> and
+        /// <c>ForceRemovePawn</c>, never the foreign <c>TryAssignPawn</c>, and
+        /// naming no foreign type. Why each: docs/DESIGN.md, "Ownership and the
+        /// ledger".
         ///
         /// <para>Idle until the first-load reconcile has run
         /// (<see cref="ownersUnified"/>). The base comp restores a reinstalled
@@ -410,6 +361,22 @@ namespace ShiftChange
             return pawns;
         }
 
+        /// <summary>
+        /// Scribes the assignment lists under mod-prefixed keys, replacing the
+        /// base comp's scribing entirely — deliberately no base call.
+        ///
+        /// Comps scribe FLAT into their parent thing's save node
+        /// (<c>ThingWithComps.ExposeData</c> just runs each comp in order,
+        /// <c>:237-251</c>), and the base writes the generic
+        /// <c>assignedPawns</c>/<c>uninstalledAssignedPawns</c> keys
+        /// (<c>CompAssignableToPawn.cs:185-195</c>). Outfit Stands Plus puts a
+        /// second <c>CompAssignableToPawn</c> subclass on this same building,
+        /// and duplicate keys do not error on load — BOTH comps read the
+        /// FIRST node under the name, so ownership smears between the two
+        /// mods on every save/load. Unique keys end our half of that; theirs
+        /// then round-trips correctly too, because ours no longer shadows
+        /// its key.
+        /// </summary>
         public override void PostExposeData()
         {
             Scribe_Collections.Look(ref assignedPawns, "shiftChangeAssignedPawns", LookMode.Reference);

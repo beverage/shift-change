@@ -6,21 +6,10 @@ namespace ShiftChange
 {
     /// <summary>
     /// Maps a room's role to the SET of work types a stand in that room
-    /// dresses for by default.
-    ///
-    /// A set, not a single work type, because rooms host families of work and
-    /// pretending otherwise was a design flaw (decided 2026-08-08): a
-    /// Workshop runs crafting, tailoring, smithing and art; a Laboratory runs
-    /// research AND drug synthesis — which arrives as Crafting work
-    /// (`DoBillsProduceDrugs` is `workType Crafting`, fixed to the DrugLab,
-    /// WorkGivers.xml:1139-1148); a barn's sick animals are tended under
-    /// Doctor, not Handling. The defaults are our judgment of "work plausibly
-    /// done under this role" — the per-stand dialog narrows or widens them.
-    ///
-    /// Deliberately excluded from every set: the base-wide work types that
-    /// merely PASS THROUGH a room — Hauling, Cleaning, Construction,
-    /// Firefighting. A hauler carrying meals into the hospital should not
-    /// scrub in.
+    /// dresses for by default: a set because rooms host families of work
+    /// (decided 2026-08-08), and never the base-wide work that only passes
+    /// through a room. The table and the reasoning behind each row:
+    /// docs/DESIGN.md, "Rooms to work types".
     ///
     /// Resolved by defName rather than through <see cref="RoomRoleDefOf"/>
     /// because <c>Kitchen</c> has no DefOf field even though the def ships in
@@ -50,22 +39,11 @@ namespace ShiftChange
 
         /// <summary>
         /// Work types folded into <see cref="Defaults"/> when another mod
-        /// supplies them. A SEPARATE table, because these are allowed to be
-        /// absent and those are not: missing here is the ordinary case (the
-        /// mod is not installed), missing there means a vanilla def was
-        /// renamed under us. One table cannot say both, and the harness case
-        /// that guards the second meaning is what makes the split load-bearing
-        /// rather than tidy.
-        ///
-        /// <para>Today that is [FSF] Complex Jobs
-        /// (<c>FrozenSnowFox.ComplexJobs</c>), which does not so much add work
-        /// as MOVE it: it repoints the <c>workType</c> field on vanilla
-        /// WorkGiverDefs at its own finer-grained types, leaving the vanilla
-        /// type in place but hollowed out. Surgery stops being Doctor work,
-        /// butchering stops being Cooking work, taming and training stop being
-        /// Handling work. A stand keyed to the vanilla name alone then dresses
-        /// for some of its room's work and silently not the rest — which
-        /// reads as flakiness rather than as a missing mod patch.</para>
+        /// supplies them: today [FSF] Complex Jobs
+        /// (<c>FrozenSnowFox.ComplexJobs</c>), which moves vanilla work onto
+        /// finer types of its own. A SEPARATE table because these may be absent
+        /// and those may not, and the harness guards only the second. Why:
+        /// docs/DESIGN.md, "Mod compatibility".
         ///
         /// <para>A row earns its place only where the type inherits work from
         /// <see cref="Defaults"/> AND that work lands in this role's room,
@@ -240,19 +218,8 @@ namespace ShiftChange
         /// <summary>
         /// Role defNames whose rooms dress for SLEEP by default — the third
         /// trigger's parallel of <see cref="Defaults"/> and
-        /// <see cref="RecreationRoles"/>.
-        ///
-        /// <para>Bedroom only. <c>Barracks</c> is deliberately absent: it
-        /// would make a shared pool stand the default for every colonist
-        /// sleeping in the room, and a barracks of ten cycling through one
-        /// pyjama stand at lights-out is churn rather than charm. Called out
-        /// as a deliberate design-time choice rather than an oversight: a
-        /// player who wants it ticks the row by hand, which is one click and
-        /// states the intent.</para>
-        ///
-        /// <para>Prison roles are absent for the same reason they are absent
-        /// everywhere else here — the interception's faction gate never
-        /// reaches a prisoner, so a row would be decoration.</para>
+        /// <see cref="RecreationRoles"/>. Bedroom only, on purpose; why not
+        /// Barracks or the prison roles: docs/DESIGN.md, "The sleep branch".
         /// </summary>
         internal static readonly string[] RestRoles =
         {
