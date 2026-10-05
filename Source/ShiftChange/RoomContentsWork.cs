@@ -7,61 +7,13 @@ namespace ShiftChange
 {
     /// <summary>
     /// Work types a room earns from WHAT IS STANDING IN IT, for rooms the
-    /// engine gives no useful role to.
-    ///
-    /// <para><b>Why a second source beside <see cref="RoomWorkTypes"/>.</b>
-    /// Automatic mode asks the room's <see cref="RoomRoleDef"/>, and the two
-    /// roles that would matter here — Workshop and Laboratory — are scored by
-    /// exactly one thing: <c>def.building.workTableRoomRole</c>
-    /// (<c>RoomRoleWorker_Workshop.GetScore</c>). It is a declarative opt-in
-    /// and a mod has to set it. Dubs Rimatomics sets it nowhere, so a reactor
-    /// hall scores zero for every role and comes back as the generic
-    /// <c>Room</c>. Verified in game 2026-09-13 against a vanilla control:
-    /// two identical 9x9 rooms, a Rimatomics machining table in one and a
-    /// vanilla one in the other, gave "nothing; the game reads this room as:
-    /// Room" and "crafting, tailoring, smithing, art" respectively.</para>
-    ///
-    /// <para><c>Patches/ShiftChange_Rimatomics.xml</c> hands the two benches the
-    /// role field they are missing, and this class covers them a second time on
-    /// purpose. A room ROLE is winner-take-all, so one of each bench in a room
-    /// resolves to Laboratory and the machining table's Smithing is armed by
-    /// nobody; reading the benches from the contents as well is what makes a
-    /// shared bench room work. The patch still earns its place — it is what
-    /// makes the room READ as a workshop or a laboratory to everything else.</para>
-    ///
-    /// <para>And a reactor hall is the case XML cannot reach at all: it holds no
-    /// work table, so there is no <c>workTableRoomRole</c> to set on anything.
-    /// Nuclear work happens at the cores and the plutonium processor, and those
-    /// are plain buildings.</para>
-    ///
-    /// <para><b>Why we do not ship a RoomRoleDef for it.</b> A new role would
-    /// enter the global <c>MaxBy</c> scoring against every vanilla role and
-    /// change what the game CALLS that room for every other mod reading roles.
-    /// Deciding what a stand dresses for is our business; renaming somebody
-    /// else's architecture is not. Nothing in the UI needs the role either: the
-    /// dialog only names it in the empty case, so a contents-armed stand reads
-    /// "Automatic (from the room): nuclear loading" with no wording change.</para>
-    ///
-    /// <para><b>Detecting by TYPE is the vanilla idiom</b>, not a workaround —
-    /// Storeroom is <c>thing is Building_Storage</c>, Tomb is
-    /// <c>is Building_Sarcophagus</c>, Barn and Bedroom are <c>is Building_Bed</c>
-    /// plus def flags. We key on <c>Rimatomics.IFuelFilter</c>, which their own
-    /// code uses for "this building holds nuclear fuel" and which exactly three
-    /// classes implement: <c>reactorCore</c> (so CoreA, CoreB and CoreC),
-    /// <c>Building_PlutoniumProc</c> and <c>Building_storagePool</c>. Nothing
-    /// else in the mod — not the turbines, not the weapons, not the research
-    /// bench. An interface they maintain beats a def-name list we would have to,
-    /// and it picks up whatever fuel-handling machine they add next.</para>
-    ///
-    /// <para><b>What this deliberately does NOT cover.</b> Operating the reactor
-    /// console is not work. <c>UseReactorConsole</c> is a JobDef with no
-    /// WorkGiverDef anywhere; <c>ReactorControl.GetFloatMenuOptions</c> issues it
-    /// through <c>TryTakeOrderedJob</c>, which sets <c>playerForced</c>
-    /// (Pawn_JobTracker.cs:897), and we skip player-forced jobs on purpose in
-    /// both the interception and the catch-up loop. No room detection can reach
-    /// it, and puncturing the player-forced rule for one mod's job def is not
-    /// worth it — "go do X now" should mean X. In practice the colonist who
-    /// loaded the fuel is already suited when they are sent to the console.</para>
+    /// engine gives no useful role to. A room's role is scored from its work
+    /// tables' <c>workTableRoomRole</c>, which Dubs Rimatomics sets nowhere, so
+    /// a reactor hall reads as the generic <c>Room</c>; and a role is
+    /// winner-take-all, so a room holding both of its benches arms only one
+    /// role's work. Why contents rather than a role or a shipped
+    /// <c>RoomRoleDef</c>, and what is deliberately left out (the reactor
+    /// console): docs/DESIGN.md, "Mod compatibility".
     /// </summary>
     public static class RoomContentsWork
     {
@@ -96,41 +48,15 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Deliberately two entries rather than one, because the two questions
-        /// have different answers per building and a room can want both.
+        /// Four markers rather than one, because the questions have different
+        /// answers per building and a room can want several. Which building
+        /// arms which work type, and the one overreach left in on purpose:
+        /// docs/DESIGN.md, "Mod compatibility".
         ///
-        /// <para><c>IFuelFilter</c> is "holds nuclear fuel": the reactor cores,
-        /// the plutonium processor, the spent fuel pool.
-        /// <c>CompResearchFacility</c> is "Rimatomics research happens here",
-        /// and it is the comp the mod itself keys on — it adds its own parent
-        /// to <c>map.Rimatomics().Facilities</c> on spawn, which is exactly the
-        /// list <c>WorkGiver_SuperviseResearch</c> scans. Four defs carry it:
-        /// the abstract reactor base (so every core), the plutonium processor,
-        /// the research reactor and the weapons bench.</para>
-        ///
-        /// <para>So a reactor hall and a processor room match both and arm both
-        /// work types; a spent fuel pool arms nuclear work only; a research
-        /// reactor or weapons bench arms research only. One combined marker
-        /// could not manage that.</para>
-        ///
-        /// <para>One known overreach, left as it is: a hall holding ONLY cores
-        /// still arms Research, because the cores inherit
-        /// <c>CompResearchFacility</c> from the abstract reactor base — yet the
-        /// only research steps naming a core (<c>BuildReactorCore</c>,
-        /// <c>AdvReactor3</c>) are <c>WorkType Construction</c>, which we leave
-        /// off. So no Research job ever targets a core and nothing misfires;
-        /// the stand simply lists a work type that will never come up. Narrowing
-        /// it means reading their research step table instead of the comp they
-        /// key on themselves, which is a worse dependency than a wrong label.
-        /// Found by an adversarial review of v1.4.0.</para>
-        ///
-        /// <para>Research matters here for the same reason the suits do: the
-        /// steps run at the research reactor and the plutonium processor are
-        /// the ones whose <c>FacilityFailures</c> include
-        /// <c>Failure_RadiationLeak</c>, which sets the facility radiating at
-        /// strength 2 out to 8 cells for up to 2000 ticks, with the researcher
-        /// standing at it. The weapons bench steps fail electrically instead,
-        /// so a stand there is the player's call rather than a hazard.</para>
+        /// <para>The last two overlap <c>Patches/ShiftChange_Rimatomics.xml</c>,
+        /// which gives the same benches a <c>workTableRoomRole</c>, and that is
+        /// deliberate: a room role is winner-take-all, so only reading the
+        /// benches from the contents as well arms both in a shared room.</para>
         /// </summary>
         internal static readonly Marker[] Markers =
         {
@@ -141,14 +67,6 @@ namespace ShiftChange
                        new[] { "Research", "Crafting" }),
         };
 
-        // The last two overlap ShiftChange_Rimatomics.xml, which gives those
-        // same benches a workTableRoomRole, and that is deliberate. Room ROLE
-        // is winner-take-all: RoomRoleWorker_Laboratory scores 60 a bench and
-        // _Workshop 27 a table, so one of each in a room resolves to Laboratory
-        // and the machining table's Smithing is never armed. (Three tables the
-        // other way and the bench's Research is the casualty instead.) Reading
-        // the benches from the room's CONTENTS as well arms both regardless of
-        // which role won the scoring. Shipped wrong in v1.4.0.
         internal static List<Marker> active;
 
         /// <summary>
@@ -190,15 +108,6 @@ namespace ShiftChange
         public static bool Any => Active.Count > 0;
 
         /// <summary>
-        /// Appends the work types this room's contents earn, skipping ones
-        /// already present so a type named by both sources lands once.
-        ///
-        /// <para>CALLERS MUST CACHE. <see cref="Room.ContainedAndAdjacentThings"/>
-        /// clears and rebuilds a set and a list on every single call, and the
-        /// property that wants this answer is read every frame to draw a gizmo
-        /// label. <see cref="CompShiftStand"/> holds the cache.</para>
-        /// </summary>
-        /// <summary>
         /// Whether this DEF declares a comp of the marker type.
         ///
         /// <para>Read off the def's comp properties rather than a spawned
@@ -224,6 +133,15 @@ namespace ShiftChange
             return false;
         }
 
+        /// <summary>
+        /// Appends the work types this room's contents earn, skipping ones
+        /// already present so a type named by both sources lands once.
+        ///
+        /// <para>CALLERS MUST CACHE. <see cref="Room.ContainedAndAdjacentThings"/>
+        /// clears and rebuilds a set and a list on every single call, and the
+        /// property that wants this answer is read every frame to draw a gizmo
+        /// label. <see cref="CompShiftStand"/> holds the cache.</para>
+        /// </summary>
         public static void Collect(Room room, List<WorkTypeDef> into)
         {
             if (room == null || into == null)

@@ -685,24 +685,38 @@ the room's `RoomRoleDef`, and the two roles that matter are scored by exactly
 one thing: `def.building.workTableRoomRole`
 (`RoomRoleWorker_Workshop.GetScore`). It is a declarative opt-in and a mod has
 to set it. Dubs Rimatomics sets it nowhere, so a reactor hall scores zero for
-every role and comes back as the generic `Room`.
+every role and comes back as the generic `Room`. Verified in game 2026-09-13
+against a vanilla control: two identical 9x9 rooms, one holding a Rimatomics
+machining table and one a vanilla table, read "nothing; the game reads this room
+as: Room" and "crafting, tailoring, smithing, art".
 
 A bench that misses the field can be handed it in XML, and `Patches/` does that
 for the two Rimatomics benches. That alone is not enough, because a room role is
 winner-take-all: `RoomRoleWorker_Laboratory` scores 60 a bench and `_Workshop`
 27 a table, so a room holding one of each resolves to Laboratory and the
-machining table's Smithing is armed by nobody. A reactor hall is further out of
-reach again: it holds no work table, so there is no def to hang the field on.
+machining table's Smithing is armed by nobody (three tables the other way, and
+the bench's Research is the casualty instead). v1.4.0 shipped with the patch
+alone. The patch still earns its place: it is what makes the room read as a
+workshop or a laboratory to everything else. A reactor hall is further out of
+reach again: it holds no work table, so there is no def to hang the field on,
+since its nuclear work happens at the cores and the plutonium processor, which
+are plain buildings.
 
 Both are answered by reading the room's **contents**, keyed on markers resolved
 by name. Detecting by type is the vanilla
-idiom rather than a workaround: Storeroom is `thing is Building_Storage` and
-Tomb is `is Building_Sarcophagus`.
+idiom rather than a workaround: Storeroom is `thing is Building_Storage`, Tomb
+is `is Building_Sarcophagus`, and Barn and Bedroom are `is Building_Bed` plus
+def flags.
 
 Four markers, because the questions have different answers per building and a
-room can want several. `Rimatomics.IFuelFilter` is "holds nuclear fuel" and is
-implemented by exactly three classes: the reactor cores, the plutonium
-processor, the spent fuel pool. `Rimatomics.CompResearchFacility` is
+room can want several. `Rimatomics.IFuelFilter` is "holds nuclear fuel", the
+question their own code uses it for, and exactly three classes implement it: the
+reactor cores (`reactorCore`, so CoreA, CoreB and CoreC), the plutonium
+processor (`Building_PlutoniumProc`) and the spent fuel pool
+(`Building_storagePool`); not the turbines, the weapons or the research bench.
+An interface they maintain beats a def-name list this mod would have to, and it
+picks up whatever fuel-handling machine they add next.
+`Rimatomics.CompResearchFacility` is
 "Rimatomics research happens here", and is matched on the **comp** rather than
 the class because that is what the mod itself keys on: the comp adds its own
 parent to `map.Rimatomics().Facilities` on spawn, which is the list
@@ -716,22 +730,36 @@ a shared bench room for both whichever role won the scoring.
 So a reactor hall and a processor room match both markers and arm both work
 types; a spent fuel pool arms nuclear work only; a research reactor or weapons
 bench arms research only. One combined marker could not manage that. One
-overreach is knowingly left in: a hall holding only cores arms Research, because
-the cores inherit the comp from the abstract reactor base, yet the only research
-steps naming a core are Construction work. Nothing misfires, since no Research
-job ever targets a core; the stand just lists a work type that will not come up,
-and narrowing it means depending on their research step table instead of the
-comp they key on themselves. Research earns its place for the
+overreach is knowingly left in, found by an adversarial review of v1.4.0: a hall
+holding only cores arms Research, because the cores inherit the comp from the
+abstract reactor base, yet the only research steps naming a core
+(`BuildReactorCore`, `AdvReactor3`) are Construction work. Nothing misfires,
+since no Research job ever targets a core; the stand just lists a work type that
+will not come up, and narrowing it means depending on their research step table
+instead of the comp they key on themselves. Research earns its place for the
 same reason the suits do: the steps run at the research reactor and the
 plutonium processor are the ones whose `FacilityFailures` include
 `Failure_RadiationLeak`, which sets the facility radiating at strength 2 out to
 8 cells for up to 2000 ticks with the researcher standing at it. The weapons
-bench steps fail electrically instead.
+bench steps fail electrically instead, so a stand there is the player's call
+rather than a hazard.
 
 No `RoomRoleDef` is shipped for it. One would enter the global `MaxBy` scoring
 against every vanilla role and change what the game CALLS that room for every
 other mod reading roles. Deciding what a stand dresses for is this mod's
-business; naming someone else's architecture is not.
+business; naming someone else's architecture is not. Nothing in the UI needs the
+role either: the dialog names the role only in the empty case, so a
+contents-armed stand reads "Automatic (from the room): nuclear loading" with no
+wording change.
+
+**Working the reactor console is deliberately not covered.** `UseReactorConsole`
+is a JobDef with no WorkGiverDef anywhere: `ReactorControl.GetFloatMenuOptions`
+issues it through `TryTakeOrderedJob`, which sets `playerForced`
+(`Pawn_JobTracker.cs:897`), and the interception and the catch-up both skip
+player-forced jobs on purpose. No room detection can reach it, and puncturing
+the player-forced rule for one mod's job def is not worth it: "go do X now"
+should mean X. In practice the colonist who loaded the fuel is already suited
+when sent to the console.
 
 The contents answer is cached per stand, on room ID plus a short interval,
 because `Room.ContainedAndAdjacentThings` clears and rebuilds a set on every
