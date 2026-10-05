@@ -151,7 +151,7 @@ The prefix declines to act when:
 | map danger ≠ None | **dressing only** — see below. No vanilla precedent to copy: `JobGiver_OptimizeApparel` has no danger check; vanilla gets apparel-change safety from think-tree position (`Humanlike.xml:302-306`), and this hook sits downstream of the think tree |
 | `job.playerForced` | direct orders execute immediately, in both directions. A pawn in uniform given a forced order keeps it on and returns it later |
 | `workGiverDef.emergency` | emergency givers exist because something cannot wait (`DoctorTendEmergency`). A bleeding pawn must not wait for a wardrobe trip |
-| `pawn.GetLord()` or `mindState.duty` | a lord holds the pawn and reissues their job on its own clock, so a swap is pre-empted rather than finished. Both directions — see below |
+| `pawn.GetLord()` or `mindState.duty` | a lord (a ritual, a ceremony, a party, a caravan forming) holds the pawn and reissues their job on its own clock, so a swap is pre-empted rather than finished. Both directions — see below |
 | the pawn's current job is the swap | never stack a swap on a swap, whatever handed them the new job |
 
 The forced and emergency exemptions originally gated only the dressing path.
@@ -171,13 +171,15 @@ it declines instead, which is broader than vanilla by one case: a partygoer
 whose duty issues no job could have changed, and left the party doing it, and
 now stays in what they are wearing until the lord ends. One wardrobe trip
 deferred, against the alternative of guessing which lords are safe to walk a
-colonist out of. Found in play
-when a colonist was pulled into a modded art exhibit: the return trip fired as
-the ritual took her out of her work room, the lord replaced the half-finished
-swap on its next duty update, and that fresh duty job arrived at the prefix to
-be deferred again. Thirty-four queued jobs, one per programme piece, and a
-colonist stood on "changing clothes" for the length of the show. The trade was
-never available — a completed change was not on offer, only a stranded pawn.
+colonist out of. Found in play on 2026-09-20, with a verbose repro the next day,
+when colonists were pulled into a modded art exhibit: the return trip fired for
+presenters and spectators alike as the ritual took them out of their work rooms,
+`Insert` enqueued each duty job with its tag preserved, the lord replaced the
+half-finished swap on its next duty update, and that fresh duty job arrived at
+the prefix to be deferred again. Thirty-four queued jobs, one per programme
+piece, and a colonist stood on "changing clothes" for the length of the show.
+The trade was never available — a completed change was not on offer, only a
+stranded pawn.
 
 It cannot latch a colonist out of the mod: `Lord.Cleanup`, `RemovePawn` and
 `RemoveAllPawns` each clear `mindState.duty` and `pawn.lord` together, so the
@@ -186,9 +188,13 @@ lord because a mod can leave one on a pawn with no `Lord` of its own.
 
 The swap-in-progress gate is the general form of the same failure: whatever
 pre-empts a swap in flight, deferring the replacement starts a second swap and
-pushes the first one's displaced job deeper down the queue. `TryDressMidJob`
-carries the duty check too — its job filter rejects a job that is not casually
-interruptible, but a duty job is not obliged to say so.
+pushes the first one's displaced job deeper down the queue. Letting the new job
+through costs at most one abandoned change, which the next ordinary job boundary
+settles, and the gate needs no bookkeeping and no tick bound: whoever pre-empts
+the swap, a lord, a mod's own think node or a player order, the shape is the
+same and so is the answer. `TryDressMidJob` carries the duty check too — its job
+filter rejects a job that is not casually interruptible, but a duty job is not
+obliged to say so.
 
 The danger gate went the other way, and for the same reason: read the
 directions separately. It sat above both arms, which made a raid a freeze
@@ -198,22 +204,48 @@ one wore it well past the all-clear. Found in play: four colonists spent a raid
 in evening dress with their flak vests and helmets parked in a full-change
 recreation stand, and the gate meant to protect them was the reason they could
 not go and get them. It now sits **below the return trip and above both dress
-arms**, so it means "no changing in" rather than "no changing". Changing in is
-a detour nobody should take mid-firefight; changing back is a pawn moving
-toward their own gear. Nothing reacts to danger *starting* — a raid never yanks
-anyone to a wardrobe. `TryDressMidJob` keeps its own copy of the check
-unchanged, being a dress path already.
+arms** (decided 2026-08-31), so it means "no changing in" rather than "no
+changing". Changing in is a detour nobody should take mid-firefight; changing
+back is a pawn moving toward their own gear. Nothing reacts to danger *starting*
+— a raid never yanks anyone to a wardrobe. `TryDressMidJob` keeps its own copy
+of the check unchanged, being a dress path already.
 
 ### Meal breaks
 
 An ingest job's `targetA` is the food, and the chew spot is chosen mid-job
-(`Toils_Ingest.CarryIngestibleToChewSpot`), so the return trip's room test cannot
-see where eating will happen. A cook grabbing a meal stored in the kitchen walked
-to the dining room in whites.
+(`Toils_Ingest.CarryIngestibleToChewSpot`; `JobDriver_Ingest.cs:165`,
+`Toils_Ingest.cs:115`), so the return trip's room test cannot see where eating
+will happen, and the food's cell misreads the break both ways: a packed lunch
+reads as the pawn's own position, and a meal stored in the kitchen reads as "in
+the room". A cook grabbing a meal stored in the kitchen walked to the dining
+room in whites.
 
 Ingest-family jobs are therefore identified by driver class and bypass the room
 test: food already on the pawn means no divert, eat as-is; anything else means
-change out first, wherever the food is stored.
+change out first, wherever the food is stored (decided 2026-08-08).
+
+**Eat-as-is is a work and recreation rule, and a sleep stand does not inherit
+it** (found in play 2026-09-17). Mid-shift the exemption is right: the pawn is
+at their bench, and changing first is a real detour. At the wake-up there is no
+detour to avoid. The pawn is standing at the stand with their gear inside it,
+and the exemption sent them out in sleepwear to eat and back again to change,
+the walk the sleep arm exists to prevent. The mod already disagreed with itself:
+the same breakfast sitting in a stockpile always changed them back first, so the
+carried case now matches the stored one instead of inventing a third behaviour.
+That is also why no rest-need or timetable heuristic is needed to tell breakfast
+from a 3am snack, which already costs two wardrobe trips whenever the food is
+stored, and stored is the common case.
+
+**A recreation stand's own room is part of the break.** It stocks its own
+drinks on purpose, and stripping the robe to fetch a beer from the poolside
+shelf wrapped every drink taken inside the room in two wardrobe trips (review,
+2026-08-15). So same-room food on a stand that serves recreation keeps the pawn
+dressed. Carrying the drink out in the robe is bounded churn, not a loop: the
+next job's ordinary return trip still fires. Both carve-outs read the stand's
+current configuration, not why the pawn was dressed, so re-configuring a stand
+while its uniform is out can skip one change-out, bounded the same way.
+Recording the dress reason in the ledger is the refinement, queued with the
+full-change ledger work.
 
 ### Errands queued ahead of work
 
@@ -995,8 +1027,8 @@ per job class, consumed by both directions — because split reads livelock: a
 vanilla SocialRelax can seat its chair across a held-open door from its
 gather spot (the chair search is line-of-sight only, no same-room check),
 and A-first-out, B-first-in turned that one job into an endless
-dress/undress ping-pong. The work arm keeps its A-first read: work jobs put
-the pawn at A.
+dress/undress ping-pong (review, 2026-08-15). The work arm keeps its A-first
+read: work jobs put the pawn at A.
 
 Outdoor joy is fenced off explicitly, not by accident. Every outdoor cell
 resolves a real Room — the one map-spanning, edge-touching outdoor room, not
@@ -1006,9 +1038,11 @@ catch-up's joy twin) refuses rooms that touch the map edge. A walled but
 roofless yard is its own non-edge room and stays eligible on purpose;
 open-ground service belongs to a future mode that supplies its own
 boundary — a player-drawn zone, or a radius around the stand — done
-deliberately or not at all. The guard is the interim, not the verdict. Two more deliberate refusals: a pawn lying in
-bed is never diverted — vanilla issues in-bed joy precisely so patients stay
-put — and a rec shift's drink from the SAME room does not trigger the
+deliberately or not at all. The guard is the interim, not the verdict (review,
+2026-08-15). Two more deliberate refusals: a pawn lying in bed is never
+diverted — vanilla issues in-bed joy precisely so patients stay put
+(`JobGiver_GetJoyInBed`, `CanDoDuringMedicalRest`; review, 2026-08-15) — and a
+rec shift's drink from the SAME room does not trigger the
 sit-down-break undress: a rec room stocks its own drinks, and the meal
 policy is a work-room rule.
 
@@ -1056,15 +1090,18 @@ there.** Vanilla ships a `PatientBedRest` WorkTypeDef whose gerund label reads
 `tagToGive`, and `Pawn_JobTracker` passes `ThinkResult.Tag` straight into
 StartJob. It is emphatically **not** `workGiverDef` — those WorkGivers are
 `NonScanJob` overrides and `JobGiver_Work` stamps `workGiverDef` only on its
-scanner paths, so a medical lay-down arrives with it null. The `workGiverDef`
-limb survives as a conservative catch for a modded giver with a null workType,
-and is dead for everything vanilla ships.
+scanner paths (the non-scan return at `JobGiver_Work.cs:102` leaves the job
+unstamped; `:240` is where a scanned job gets its giver), so a medical lay-down
+arrives with it null. The `workGiverDef` limb survives as a conservative catch
+for a modded giver with a null workType, and is dead for everything vanilla
+ships.
 
 **That null was a shipped bug for three weeks, and this paragraph is where it
-hid** (reported by a player, 2026-09-23). "Belongs to the work arm" was
-written as a hand-off and implemented as a rejection: the sleep arm turned the
-job away because the work arm owned it, and the work arm never saw it, because
-reading `job.workGiverDef?.workType` on an unstamped job yields null. Both
+hid** (reported by a player who had followed the README exactly, 2026-09-23).
+"Belongs to the work arm" was written as a hand-off and implemented as a
+rejection: the sleep arm turned the job away because the work arm owned it, and
+the work arm never saw it, because reading `job.workGiverDef?.workType` on an
+unstamped job yields null. Both
 patient rows in the dialog did nothing at all from the day the sleep trigger
 shipped. `MedicalRestWorkType` now RESOLVES the work type from the tag rather
 than hoping to find one on the job, and the sleep arm's rejection stayed exactly
@@ -1143,7 +1180,10 @@ the bed cell), and the predicate is true for any tended healing injury or
 non-immune disease. Its only unique effect was to kill ordinary bedtime for
 every wounded colonist, silently, for a whole recovery. A health predicate
 cannot tell "going to bed because hurt" from "going to bed because it is
-night".
+night". `MedicalRestWorkType`'s `ShouldSeekMedicalRestUrgent` is not that rule
+coming back: it reads a different predicate, and reads it inside the tagged
+branch, where vanilla has already said why the pawn is going to bed, so it only
+ever refuses a divert and can never reach a colonist turning in for the night.
 
 **`pawn.InBed()` is unusable in a StartJob prefix, and every guard here learned
 it the hard way.** `RestUtility.CurrentBed` bails on `CurJob == null`, and
@@ -1160,7 +1200,13 @@ walking back to change. Position answers what `curJob` cannot, so the arms ask
 `OnABed` — is there a `Building_Bed` on this pawn's cell.
 
 The return trip needs the finer question, because "in bed" is not "staying in
-bed". `StaysInBed` pairs `OnABed` with
+bed". It never needed a bed guard before sleepwear, when an on-shift pawn in bed
+was not a state the mod could produce; it is now the ordinary state all night,
+and a sleeper is not idle at a job boundary: vanilla's in-bed joy
+(`JobGiver_GetJoyInBed`) and the lay-downs `JobInBedUtility.KeepLyingDown`
+re-queues each arrive as a fresh job whose room can resolve outside the bedroom,
+and without a guard one of them walks the sleeper to a wardrobe at three in the
+morning. `StaysInBed` pairs `OnABed` with
 `Job.CanBeginNow(pawn, whileLyingDown: true)`, which defers to
 `JobDriver.CanBeginNowWhileLyingDown()` — false on the base class, overridden
 by exactly seven drivers in 1.6: LayDown, Lovin, WatchBuilding, RelaxAlone,
