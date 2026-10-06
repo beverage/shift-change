@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+
+  <!-- Odyssey's own stand jobs read "与TargetA交换装备。" and "将TargetA放入
+       TargetB。", so TargetA is left bare and the sentence ends in 。 -->
+  <ShiftChange_SwapAtStand.reportString>在TargetA处更换衣物。</ShiftChange_SwapAtStand.reportString>
+
+</LanguageData>

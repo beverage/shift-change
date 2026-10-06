@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+
+  <!-- Terminology and style are taken from RimWorld's own ChineseSimplified
+       pack rather than chosen freshly, so the mod reads as part of the game.
+       Checked key by key against Core and all five DLC packs, 2026-09-23.
+
+       Terms (vanilla key in brackets):
+         outfit stand          服装架         (Building_OutfitStand.label)
+         Owner / Owners        所属人         (Owner, Owners)
+         Set owner             设定拥有者     (CommandThingSetOwnerLabel)
+         Assign / Unassign     指定 / 解除指定 (BuildingAssign, BuildingUnassign)
+                               — our owner dialog renders these on every row,
+                               so our bulk buttons must use the same verbs
+         Allow removing items  允许移动物品   (CommandAllowRemovingApparel)
+         its eject button      移除按钮       (EjectApparelTooltip: 从服装架上移除此物品)
+         Contents tab          「内容」       (TabCasketContents)
+         Storage tab / filter  「储存筛选」   (TabStorage) — 储存, not 存储
+         trade caravan         商队           (ChooseTraderKind) — a VISITOR
+         caravan               远行队         (LetterLabelCaravanEnteredMap) — the PLAYER's
+         orbital trader        轨道贸易商     (OrbitalTraderSent)
+         ideoligion            文化形态       (ChooseYourIdeoligion) — not 信仰
+         room role             房间类型; a room with none is 未分类 (RoomRoleDef None)
+         cannot reach          无法到达       (CannotReach)
+         resting in bed        休养           (PatientBedRest.gerundLabel)
+         Mod settings          Mod 设置       (ModSettings) — "Mod", never 模组
+         haulers 搬运工, colonist 殖民者, recreation 娱乐, work type 工作类型,
+         drafted 征召, raid 袭击, firefighting 灭火
+
+       Style:
+         - Informal 你, never 您 (582 uses against 6).
+         - 此 for the selected building (将此床, 此区域), 该 for a named
+           colonist; not 这个 (此 340, 该 163, 这个 148).
+         - A tab is 「X」选项卡 (「需求」选项卡, 「健康」选项卡), not 标签页.
+         - Fullwidth colons (：{ 143 against : { 82) and 「」 around in-game
+           UI names.
+         - Options-menu toggles say 启用/禁用 whatever the English verb
+           (VisibleMoodDesc renders "When on" as 如果启用此项). Mod settings
+           live in that menu, and AllowRemovingDesc is appended to vanilla's
+           own 禁用后，… so it keeps that vocabulary too. Gizmo toggles
+           elsewhere mirror the English, so "With this on" stays 开启本项后.
+         - Errors end with 查看错误日志以了解更多信息, vanilla's own idiom.
+
+       Ours, with no vanilla precedent: 换班 "shift change", 换班架 "shift
+       stand", 着装优选 "outfit optimizer", 制服 "uniform" (vanilla never uses
+       the word), 手术服 "scrubs", 病号服 "hospital gown". "Shift Change" stays
+       untranslated as the mod's proper name.
+
+       Keep the literal \n\n escapes, the {0}/{1}/{STAND} placeholders and the
+       <color>/<b> markup exactly as they appear. -->
+
+  <ShiftChange.InspectWork>服装用途：{0}</ShiftChange.InspectWork>
+  <ShiftChange.InspectOwner>所属人：{0}</ShiftChange.InspectOwner>
+  <ShiftChange.InspectOwners>所属人（{0}）：{1}</ShiftChange.InspectOwners>
+  <ShiftChange.InspectOwnersOverflow>{0}，以及另外{1}人</ShiftChange.InspectOwnersOverflow>
+  <ShiftChange.InspectPool>共用：任何能胜任的殖民者都可以使用。</ShiftChange.InspectPool>
+  <ShiftChange.InspectPoolDisabled>未指派：共用功能已在 Mod 设置中禁用。</ShiftChange.InspectPoolDisabled>
+  <ShiftChange.InspectOnShift>{0}正穿着这套服装。</ShiftChange.InspectOnShift>
+  <!-- 允许活动区域 is vanilla's AllowedArea; 「换回原装」 is our own
+       ChangeBackLabel below. -->
+  <ShiftChange.InspectOutsideArea>此服装架位于{0}的允许活动区域之外，因此他们会继续穿着这套服装。使用「换回原装」仍可让他们来此换下。</ShiftChange.InspectOutsideArea>
+  <ShiftChange.InspectEmpty>空置：请在上面放一套服装。</ShiftChange.InspectEmpty>
+  <ShiftChange.InspectExcluded>不用于换班。</ShiftChange.InspectExcluded>
+
+  <ShiftChange.OwnerGizmoLabel>所属人：{0}</ShiftChange.OwnerGizmoLabel>
+  <ShiftChange.OwnerGizmoLabelMany>所属人：{0}</ShiftChange.OwnerGizmoLabelMany>
+  <ShiftChange.FilterAll>全部</ShiftChange.FilterAll>
+  <ShiftChange.FilterMen>男性</ShiftChange.FilterMen>
+  <ShiftChange.FilterWomen>女性</ShiftChange.FilterWomen>
+  <ShiftChange.AssignAllShown>指定全部{0}人</ShiftChange.AssignAllShown>
+  <ShiftChange.ClearOwners>全部解除指定</ShiftChange.ClearOwners>
+  <ShiftChange.PoolGizmoLabel>共用（设定拥有者）</ShiftChange.PoolGizmoLabel>
+
+  <ShiftChange.SetWorkTypeDesc>此服装架服务于：{0}（{1}）。\n\n使用它的殖民者会在本房间内开始上述类型的自动工作或娱乐之前换上这套服装，离开时再换回来。\n\n当你同时装有其他服装架 Mod 时，此开关还决定服装架显示哪个 Mod 的所属人控件：投入换班使用时显示 Shift Change 的，设为不使用时显示另一个 Mod 的。</ShiftChange.SetWorkTypeDesc>
+  <ShiftChange.RegimeShift>换班架：{0}</ShiftChange.RegimeShift>
+  <ShiftChange.RegimeShiftMore>换班架：{0}（+{1}）</ShiftChange.RegimeShiftMore>
+  <ShiftChange.RegimeIdle>换班架（此处尚无工作类型）</ShiftChange.RegimeIdle>
+  <ShiftChange.RegimeOff>不用于换班</ShiftChange.RegimeOff>
+  <ShiftChange.WorkTypesTitle>工作类型</ShiftChange.WorkTypesTitle>
+  <ShiftChange.WorkTypesExplainer>勾选的活动在本房间内进行时，会触发换上此服装架上的服装：</ShiftChange.WorkTypesExplainer>
+  <ShiftChange.NoWorkTypes>没有可勾选的工作类型，这里没有，别处也没有。它们同样从「工作」选项卡中消失了，说明某个重新编排工作分类的 Mod 把它们隐藏了。</ShiftChange.NoWorkTypes>
+  <ShiftChange.UntranslatedWorkTypes>以英文显示的名称来自尚未把工作类型翻译成你所用语言的 Mod：{0}。它们在这里可以照常勾选和使用。</ShiftChange.UntranslatedWorkTypes>
+  <ShiftChange.Recreation>娱乐</ShiftChange.Recreation>
+  <ShiftChange.RecreationRow>娱乐：本房间内的任何娱乐活动</ShiftChange.RecreationRow>
+  <ShiftChange.RecreationExclusiveNote>开启娱乐后，此服装架只服务于娱乐，工作类型不再生效。</ShiftChange.RecreationExclusiveNote>
+  <ShiftChange.Rest>睡眠</ShiftChange.Rest>
+  <ShiftChange.RestRow>睡眠：在本房间内上床就寝</ShiftChange.RestRow>
+  <ShiftChange.RestExclusiveNote>开启睡眠后，此服装架只服务于就寝，工作类型不再生效。因伤病而卧床属于工作类型「休养」，不在此项范围内。</ShiftChange.RestExclusiveNote>
+  <ShiftChange.DepositOnly>仅存放，不发放服装</ShiftChange.DepositOnly>
+  <ShiftChange.DepositOnlyDesc>通常服装架会发放一套服装，并收下被换下的衣物，所以用于睡眠的服装架上应当放睡衣。\n\n开启本项后，它不再发放任何东西。准备就寝的殖民者会把此服装架的储存筛选允许的衣物存放在这里，其余衣物照常穿着，第二天早上再取回。床边那种架子正是这个用途——你的士兵每晚把动力装甲卸在上面。\n\n储存筛选决定哪些衣物会被脱下，你应当把它调窄。新建的服装架几乎接受所有衣物，若不去动它，此服装架会试图取走殖民者身上几乎所有的东西。请在「储存筛选」选项卡中只允许你想存放的装备。\n\n搬运工不会碰仅存放的服装架，所以它只保留所属人放在上面的东西。你仍然可以通过右键点击，亲自把物品搬上去。\n\n它绝不会让殖民者赤身就寝：如果筛选要取走的衣物会让他们失去蔽体衣物，此服装架就会对该殖民者整个跳过。因此，铠甲下面什么都不穿的士兵需要先有一套可换的衣物，或者在里面穿上一层，本项才会对他们起作用。</ShiftChange.DepositOnlyDesc>
+  <ShiftChange.FullChangeDepositNote>此服装架设为仅存放时，本项不起作用。仅存放的服装架不发放服装，也就没有可供更换的整套服装。</ShiftChange.FullChangeDepositNote>
+  <ShiftChange.TriggerFromRoomNote>此服装架的触发条件来自它所在的房间。勾选下方的工作类型即可覆盖。</ShiftChange.TriggerFromRoomNote>
+  <ShiftChange.InspectDepositOnly>仅存放：收下其储存筛选允许的物品</ShiftChange.InspectDepositOnly>
+  <ShiftChange.FullChange>更换整套服装</ShiftChange.FullChange>
+  <ShiftChange.FullChangeDesc>通常殖民者会保留所有与此服装架上的衣物不冲突的部分，制服直接穿在自己的衣服外面。\n\n开启本项后，他们会完全脱下自己的衣物，只穿服装架上的东西。桑拿浴袍就该这样用。来回两趟都会更慢，因为每一件衣物都要脱下再穿回。\n\n他们自己衣物提供的一切也随之失去：保暖、护甲，以及那些衣物附带的任何加成。他们身上就只有服装架提供的东西，别无其他。\n\n若在 Mod 设置中启用了「为殖民者保留蔽体衣物」，则有一个例外：当服装架上的衣物不足以蔽体时，他们会保留最贴身的那几件。该设置默认禁用。</ShiftChange.FullChangeDesc>
+  <ShiftChange.InspectFullChange>更换整套服装</ShiftChange.InspectFullChange>
+  <ShiftChange.WithholdFromTrade>内容物不参与交易</ShiftChange.WithholdFromTrade>
+  <ShiftChange.WithholdFromTradeDesc>商人会买走服装架上的任何东西：制服，以及所属人上班期间寄放在上面的自己的衣物。服装架本身没有任何标记能把它排除在外。「允许移动物品」管不到交易，指派了所属人也一样。\n\n开启本项后，此服装架的内容物永远不会出现在交易窗口里，无论对方是门口的商队还是轨道贸易商。其余一切照旧：殖民者照常往架上补货，换班照常进行，你也仍然可以亲自把这套装备装上远行队。\n\n如果你把某个服装架当作店铺货架，就把本项关掉。</ShiftChange.WithholdFromTradeDesc>
+  <ShiftChange.InspectTradeable>内容物可出售给商人</ShiftChange.InspectTradeable>
+  <ShiftChange.WorkTypeAuto>自动（依据房间）</ShiftChange.WorkTypeAuto>
+  <ShiftChange.WorkTypeNone>不用于换班</ShiftChange.WorkTypeNone>
+  <ShiftChange.RoomReadsAs>游戏将本房间识别为：{0}</ShiftChange.RoomReadsAs>
+  <ShiftChange.NoRoomRole>此处不在有明确类型的房间内</ShiftChange.NoRoomRole>
+
+  <!-- Must lead with 核能 — that is NuclearWork.labelShort, which is what the
+       work tab column shows and therefore the word a player is hunting for.
+       Rimatomics' own gerundLabel is 裝載 ("loading"), the same unfindable
+       split this override exists to fix in English. -->
+  <ShiftChange.WorkTypeLabel.NuclearWork>核能装填</ShiftChange.WorkTypeLabel.NuclearWork>
+  <ShiftChange.FromRoom>依据房间</ShiftChange.FromRoom>
+  <ShiftChange.Manual>手动设置</ShiftChange.Manual>
+  <ShiftChange.Excluded>已排除</ShiftChange.Excluded>
+  <ShiftChange.None>无</ShiftChange.None>
+
+  <ShiftChange.AssignDesc>将此服装架限定给你列出的殖民者。只列一人，它就是那个人的专属装备；列出多人，它就服务于这一组，组外的人不能用。\n\n不指派任何人，它就是共用的：本房间内即将进行{0}的任何殖民者都可以使用当前空闲的任意一个服装架。所以厨房需要的是同时开工的厨师有几位就配几个服装架，而不是每位厨师各配一个。\n\n名单可以按性别筛选，也可以一次指定列出的所有人，所以配置一个只放男装或女装的服装架只需两次点击。</ShiftChange.AssignDesc>
+  <ShiftChange.AssignDescNoPool>将此服装架限定给你列出的殖民者。\n\n未指派服装架的共用功能已在 Mod 设置中禁用，因此只有名单上的所属人才会为了{0}在此服装架换装。</ShiftChange.AssignDescNoPool>
+  <ShiftChange.AssignDescNoWork>将此服装架限定给你列出的殖民者。它目前还没有工作类型：要么把它放进有明确类型的房间，要么手动设置一个。</ShiftChange.AssignDescNoWork>
+
+  <ShiftChange.ChangeBackLabel>换回原装</ShiftChange.ChangeBackLabel>
+  <ShiftChange.ChangeBackDesc>取消该殖民者的当前指令，让他们前往{STAND}脱下工作服装。\n\n下一项工作把他们带离本房间时，他们会自行换回，无论是否遭遇袭击。等不及时就用它：比如发生紧急情况，或者他们手头的工作要很久才能做完。\n\n他们会穿着自己的衣物继续在本房间工作，直到离开房间再回来才会重新穿上那套服装。征召他们可以立即解除这一状态。</ShiftChange.ChangeBackDesc>
+  <ShiftChange.ChangeBackUnreachable>无法到达{STAND}。</ShiftChange.ChangeBackUnreachable>
+  <ShiftChange.ChangeBackUnavailable>该殖民者目前无法换装。</ShiftChange.ChangeBackUnavailable>
+
+  <ShiftChange.SettingPoolUnassigned>未指派的服装架可共用</ShiftChange.SettingPoolUnassigned>
+  <ShiftChange.SettingPoolUnassignedDesc>启用时，放在工作房间里、且没有指派所属人的服装架，可以被任何能胜任该房间工作的殖民者使用。\n\n禁用时，只有明确列出所属人的服装架才会为任何人换装，未指派的服装架则与原版家具完全一样。</ShiftChange.SettingPoolUnassignedDesc>
+  <ShiftChange.SettingKeepDecent>为殖民者保留蔽体衣物</ShiftChange.SettingKeepDecent>
+  <ShiftChange.SettingKeepDecentDesc>默认禁用，所以在你正在进行的殖民地中不会有任何变化。\n\n启用后，服装架不会让殖民者失去蔽体衣物：如果它发放的衣物不足以蔽体，最贴身的那几件会留在身上，换装的其余部分照常进行。这一点主要在勾选了「更换整套服装」时才有意义——否则一个只放着帽子或腰带的服装架会让人几乎一丝不挂地走出去。\n\n裸体主义者，以及文化形态崇尚裸体的殖民者，无论是否启用都不受此限制。</ShiftChange.SettingKeepDecentDesc>
+
+  <!-- 提供紧急治疗 and 去床上接受紧急治疗 are the vanilla WorkGiver labels for
+       the two jobs this setting actually covers (DoctorTendEmergency,
+       PatientGoToBedEmergencyTreatment), so the text names them exactly as the
+       player already sees them elsewhere. 灭火 is Firefighter's own label.
+       手术服 and 病号服 have no vanilla defs behind them — vanilla ships no
+       scrubs, so both are descriptive. -->
+  <ShiftChange.SettingMedicalEmergencies>医疗紧急情况也先换装</ShiftChange.SettingMedicalEmergencies>
+  <ShiftChange.SettingMedicalEmergenciesDesc>默认禁用，所以在你正在进行的殖民地中不会有任何变化。\n\n通常紧急情况绝不会为了换衣服而耽搁。启用后，医疗方面的紧急情况则会：医生前去提供紧急治疗时，会先换上手术服；处于危及生命状况的殖民者，也会在去床上接受紧急治疗的路上先换上病号服。\n\n灭火始终不在此列。无论是否启用，前去灭火的殖民者都会直奔现场。\n\n这是双向的：已经穿着其他房间制服的医生，也可能会先脱下那身制服，再赶去处理。</ShiftChange.SettingMedicalEmergenciesDesc>
+
+  <ShiftChange.AllowRemovingDesc>&lt;color=#E5E54C&gt;&lt;b&gt;Shift Change：此服装架投入换班使用期间保持禁用。&lt;/b&gt;&lt;/color&gt;\n\n无论是否启用，殖民者都会照常往架上补货，换上其服装的过程也完全无视此项设置，所以禁用时换班照样进行。\n\n启用它会把服装架的内容物暴露给每位殖民者的着装优选：只要评分高过他们身上穿的，制服就会被取走，当作日常衣物穿上。</ShiftChange.AllowRemovingDesc>
+
+  <ShiftChange.AllowRemovingDisabled>正投入换班使用，因此本项保持禁用：一旦启用，服装架的内容物就会暴露给每位殖民者的着装优选，指派了所属人也保护不了它们。\n\n要取回某件衣物，请使用「内容」选项卡中的移除按钮。要让搬运工清空此服装架，请先把它设为「不用于换班」。</ShiftChange.AllowRemovingDisabled>
+
+  <ShiftChange.Faulted>Shift Change 连续出错，已在本局游戏中停止为殖民者换装。服装架仍可作为普通家具使用。读取存档会让它重新启动。查看错误日志以了解更多信息。</ShiftChange.Faulted>
+
+</LanguageData>
