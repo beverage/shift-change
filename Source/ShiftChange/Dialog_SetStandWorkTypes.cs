@@ -99,6 +99,16 @@ namespace ShiftChange
 
         internal readonly CompShiftStand comp;
         internal readonly List<WorkTypeDef> works;
+
+        /// <summary>
+        /// Mods above whose work-type names the active language does not
+        /// translate, so the grid shows them in English. Empty in English and
+        /// empty whenever the player's screen is entirely in their own
+        /// language, which is the normal case; see
+        /// <see cref="WorkTypeLabels.UntranslatedSources"/> for why this is
+        /// detected rather than warned about unconditionally.
+        /// </summary>
+        internal readonly List<string> untranslatedSources;
         internal readonly float cellWidth;
         internal readonly int columns;
         internal readonly int rowsPerColumn;
@@ -170,6 +180,12 @@ namespace ShiftChange
             rowsPerColumn = works.Count > 0
                 ? Mathf.Max(1, Mathf.CeilToInt(works.Count / (float)columns))
                 : EmptyNoteRows;
+
+            // Resolved once, not per frame: the body redraws every frame and
+            // this walks every work type doing dictionary lookups. The list it
+            // reads cannot change while the dialog is open — a language switch
+            // needs a restart, and the def database is fixed by now.
+            untranslatedSources = WorkTypeLabels.UntranslatedSources(works);
         }
 
         /// <summary>
@@ -631,6 +647,20 @@ namespace ShiftChange
             {
                 GUI.color = Color.gray;
                 listing.Label("ShiftChange.TriggerFromRoomNote".Translate());
+                GUI.color = Color.white;
+            }
+
+            // Names in the grid belong to the mods that supply them, so a
+            // player whose language one of those mods never translated sees
+            // English rows among their own — in OUR dialog, which reads as our
+            // bug. Say whose they are. Wrapping is free here: measuredBody
+            // feeds the real height back into InitialSize and FitToMode applies
+            // it on the same frame.
+            if (untranslatedSources.Count > 0)
+            {
+                GUI.color = Color.gray;
+                listing.Label("ShiftChange.UntranslatedWorkTypes".Translate(
+                    untranslatedSources.ToCommaList(useAnd: true)));
                 GUI.color = Color.white;
             }
 

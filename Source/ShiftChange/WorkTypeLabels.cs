@@ -107,5 +107,115 @@ namespace ShiftChange
             string label = Of(work);
             return label.NullOrEmpty() ? label : label.CapitalizeFirst();
         }
+
+        /// <summary>
+        /// Names of the mods supplying work types whose shown label the ACTIVE
+        /// language has not translated. First-appearance order, no duplicates,
+        /// empty when every listed type is covered.
+        ///
+        /// <para>Always empty in English, because English def XML IS the source
+        /// text: nothing is injected, so nothing can be missing. An English
+        /// player is told nothing at all.</para>
+        ///
+        /// <para><b>Why detect rather than warn blindly.</b> A work type's name
+        /// belongs to whichever mod supplies it, so a player whose language
+        /// that mod never translated gets English rows mixed into OUR grid,
+        /// which reads as this dialog being broken. It is the failure
+        /// <see cref="Overrides"/> exists for — a row nobody can find reads as
+        /// "this mod is not supported" — except that this one is not ours to
+        /// fix, only to explain. A notice shown to every non-English player
+        /// regardless would greet the majority whose screen is entirely fine,
+        /// and reads as an apology for a fault that is usually not
+        /// occurring.</para>
+        /// </summary>
+        internal static List<string> UntranslatedSources(List<WorkTypeDef> works)
+        {
+            List<string> sources = new List<string>();
+            if (works == null)
+            {
+                return sources;
+            }
+
+            LoadedLanguage active = LanguageDatabase.activeLanguage;
+            if (active == null || active == LanguageDatabase.defaultLanguage)
+            {
+                return sources;
+            }
+
+            DefInjectionPackage package = null;
+            for (int i = 0; i < active.defInjections.Count; i++)
+            {
+                if (active.defInjections[i].defType == typeof(WorkTypeDef))
+                {
+                    package = active.defInjections[i];
+                    break;
+                }
+            }
+
+            for (int i = 0; i < works.Count; i++)
+            {
+                WorkTypeDef work = works[i];
+                if (work == null || Translated(package, work))
+                {
+                    continue;
+                }
+                string source = work.modContentPack == null
+                    ? null
+                    : work.modContentPack.Name;
+                if (source.NullOrEmpty())
+                {
+                    source = work.defName;
+                }
+                if (!sources.Contains(source))
+                {
+                    sources.Add(source);
+                }
+            }
+            return sources;
+        }
+
+        /// <summary>
+        /// Whether the active language supplies the name we actually show for
+        /// this work type.
+        ///
+        /// <para>Tests the field <see cref="Of"/> would read, not a fixed one:
+        /// a type with no gerund shows labelShort, and one with neither shows
+        /// its raw defName, which no translation can reach. An injection that
+        /// failed to apply, or that is a translator's placeholder stub, leaves
+        /// the English text on screen and so counts as untranslated.</para>
+        ///
+        /// <para>A row we override answers for itself, on the same
+        /// <see cref="Renderable"/> test <see cref="Of"/> uses to decide it. The
+        /// gap that leaves — one of OUR keys missing from a language we ship —
+        /// is ours, and is caught by checking key parity against the English
+        /// file, not by this notice.</para>
+        /// </summary>
+        internal static bool Translated(DefInjectionPackage package, WorkTypeDef work)
+        {
+            string ours;
+            if (Overrides.TryGetValue(work.defName, out ours) && Renderable(ours))
+            {
+                return true;
+            }
+
+            string field = null;
+            if (work.gerundLabel != null)
+            {
+                field = "gerundLabel";
+            }
+            else if (work.labelShort != null)
+            {
+                field = "labelShort";
+            }
+            if (field == null || package == null)
+            {
+                return false;
+            }
+
+            DefInjectionPackage.DefInjection injection;
+            return package.injections.TryGetValue(work.defName + "." + field, out injection)
+                && injection.injected
+                && !injection.isPlaceholder;
+        }
     }
 }

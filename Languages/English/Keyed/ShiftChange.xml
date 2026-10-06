@@ -38,6 +38,11 @@
   <ShiftChange.WorkTypesTitle>Work types</ShiftChange.WorkTypesTitle>
   <ShiftChange.WorkTypesExplainer>Ticked activities, done in this room, trigger a change into this stand's outfit:</ShiftChange.WorkTypesExplainer>
   <ShiftChange.NoWorkTypes>No work types exist to tick, here or anywhere. They are gone from the work tab as well, so a mod that rearranges work categories has hidden them.</ShiftChange.NoWorkTypes>
+  <!-- Shown only when at least one listed work type really is untranslated in
+       the active language, and never in English. {0} names the mods that
+       supplied them, so "this mod is broken" becomes something the player can
+       act on. -->
+  <ShiftChange.UntranslatedWorkTypes>Names shown in English come from mods that have not translated their work types into your language: {0}. They tick and work here normally.</ShiftChange.UntranslatedWorkTypes>
   <ShiftChange.Recreation>recreation</ShiftChange.Recreation>
   <ShiftChange.RecreationRow>Recreation: any joy activity in this room</ShiftChange.RecreationRow>
   <ShiftChange.RecreationExclusiveNote>While recreation is on, this stand serves recreation only; work types do not apply.</ShiftChange.RecreationExclusiveNote>
