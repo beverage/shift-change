@@ -289,7 +289,7 @@ broke that way once; the rest block a failure that would land silently.
 | Check | Catches |
 |---|---|
 | `xmllint` well-formedness | malformed XML. Runs under `pipefail`, or a `find` that fails on a renamed directory drops a whole tree from validation with a green tick. |
-| `devtools/check-invariants.py` | hot-reload hazards, translation keys in both directions, XML-to-C# type bindings, the `<Patch>` root walk, and the Workshop preview size. Runs locally too — see [TESTING.md](TESTING.md). |
+| `devtools/check-invariants.py` | hot-reload hazards, translation keys in both directions, XML-to-C# type bindings, the `<Patch>` root walk, the Workshop preview size, and Workshop comments over Steam's 1,000-character limit. Runs locally too — see [TESTING.md](TESTING.md). |
 | `devtools/bbcode-preview.py` | an unclosed tag in the store description, which makes Steam render the rest of the page as literal text |
 | Committed dll is uninstrumented, and alone | an instrumented Debug build reaching the mod's load path |
 | `devtools/check-shipped-dll.py` | a `SCENES` build shipping the destructive scene builders, a `-p:Harness=true` build shipping the harness and its launch flag, and the opposite failure — over-gating that leaves the feature surface out. Run against the committed dll and again against the fresh Release build. |
