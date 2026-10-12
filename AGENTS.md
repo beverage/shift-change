@@ -139,12 +139,16 @@ future and silently block a pawn.
 settings copy, settings paste and forbid. The trap is inherited: vanilla's
 `CompAssignableToPawn` hardcodes `Misc4` (N), so a subclass has to strip it.
 
-**Comp and `JobDriver` class names are scribed into save files.** Renaming one
-breaks every existing save. Harmony patch classes carry no such constraint and
-rename freely.
+**A `JobDriver`'s class name is scribed into the save; a comp's is not.** A
+pawn saved mid-job records its driver by class name, so renaming the driver
+costs any such pawn that job on the next load, with errors in the player's log,
+and nothing more. Comps are rebuilt from the def on load and read back only
+their scribed keys, so a comp class renames freely but a renamed key loses its
+value. Harmony patch classes carry no constraint and rename freely.
 
 **A patch file's root element is `<Patch>`, singular.** The plural form
-silently discards every operation in the file, and `xmllint` still passes.
+discards every operation in the file with a single load error that is easy to
+miss, and `xmllint` still passes.
 
 **Never hot reload defs.** Vanilla's own command and the community mod both
 corrupt live state. Restart the game.
