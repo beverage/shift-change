@@ -272,6 +272,9 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  FreedStandCatchesUp);
+            Case(map, pad, "Change back holds the room until they leave it, and drafting drops it",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 ChangeBackLatchHoldsUntilTheyLeave);
             Case(map, pad, "a stand outside the colonist's allowed area dresses nobody",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),

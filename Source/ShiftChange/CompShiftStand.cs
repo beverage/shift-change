@@ -419,6 +419,28 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// Whether a job at <paramref name="cell"/> is inside this stand's
+        /// catchment, the cells it dresses for and keeps a uniform on in: the
+        /// stand's own room. Both directions ask this, so they cannot disagree
+        /// about where the stand's work is.
+        ///
+        /// <para>False for any map but the stand's own, before anything else
+        /// is read: a borrower who left with a caravan keeps the ledger, and
+        /// their job boundaries on another map must not be measured against
+        /// this one.</para>
+        /// </summary>
+        internal bool Covers(IntVec3 cell, Map map)
+        {
+            if (map == null || !parent.Spawned || parent.Map != map
+                || !cell.IsValid || !cell.InBounds(map))
+            {
+                return false;
+            }
+            Room room = parent.GetRoom();
+            return room != null && cell.GetRoom(map) == room;
+        }
+
+        /// <summary>
         /// Whether this stand dresses for recreation — the joy-branch
         /// parallel of <see cref="HandlesWork"/>. Excluded wins; a
         /// custom set (either half non-empty) answers from its own bool;

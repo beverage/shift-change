@@ -348,16 +348,14 @@ namespace ShiftChange
                 {
                     continue;
                 }
-                // Resolve by job CLASS, not by which arm matched — the same
-                // rule as TryInsertSwap's shared resolver, and it must be:
+                // The shared resolver, not one picked by which arm matched:
                 // VisitSickPawn is the one vanilla job that is BOTH (Doctor
                 // work with joyKind Social), and resolving it A-first here
                 // while StartJob resolved it B-first re-opened a bounded
                 // dress/undress churn per stand-freed event (fix-verify,
                 // 2026-08-15). Every site answers "where does this job
                 // happen" identically or the two answers fight.
-                IntVec3 target = IsRecreationJob(job) ? JoyTargetCell(job, map) : TargetCell(job, map);
-                if (!target.IsValid || target.GetRoom(map) != room)
+                if (!stand.Covers(SharedTargetCell(job, map), map))
                 {
                     continue;
                 }
@@ -545,7 +543,7 @@ namespace ShiftChange
             {
                 return SleepArm(job, tag, pawn, tracker, target, map);
             }
-            return RecreationArm(job, tag, pawn, tracker, map);
+            return RecreationArm(job, tag, pawn, tracker, target, map);
         }
 
         /// <summary>
@@ -700,20 +698,20 @@ namespace ShiftChange
             // breaks").
             if (IsIngestJob(job))
             {
-                return MealBreak(job, tag, pawn, tracker, onShift, standRoom, target, map);
+                return MealBreak(job, tag, pawn, tracker, onShift, target, map);
             }
-            if (!target.IsValid || target.GetRoom(map) == standRoom)
+            if (!target.IsValid || onShift.Covers(target, map))
             {
-                // Still working in the room, or the job's location is
-                // unreadable (queue-based jobs — hauling, harvesting).
-                // Staying dressed is the safe answer either way.
+                // Still working inside the stand's catchment, or the job's
+                // location is unreadable (queue-based jobs — hauling,
+                // harvesting). Staying dressed is the safe answer either way.
                 return false;
             }
             // An errand slotted in AHEAD of this stand's own work: they are
             // coming straight back to it, so changing out first is a round
             // trip to the stand for nothing. Below the meal branch on
             // purpose, which keeps its own policy. See QueuedAheadOfServedWork.
-            if (QueuedAheadOfServedWork(job, tracker, onShift, standRoom, map))
+            if (QueuedAheadOfServedWork(job, tracker, onShift, map))
             {
                 if (Verbose)
                 {
@@ -730,7 +728,7 @@ namespace ShiftChange
         /// first. True if a swap started.
         /// </summary>
         internal static bool MealBreak(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
-                                       CompShiftStand onShift, Room standRoom, IntVec3 target, Map map)
+                                       CompShiftStand onShift, IntVec3 target, Map map)
         {
             // Eat-as-is is a WORK and RECREATION rule, and a sleep stand must
             // not inherit it: at the wake-up the pawn is standing at the
@@ -745,8 +743,7 @@ namespace ShiftChange
             // that serves recreation is part of the break: stay dressed. Both
             // carve-outs read the stand's CURRENT configuration, not why the
             // pawn was dressed (docs/DESIGN.md, "Meal breaks").
-            if (onShift.HandlesRecreation()
-                && target.IsValid && target.GetRoom(map) == standRoom)
+            if (onShift.HandlesRecreation() && onShift.Covers(target, map))
             {
                 return false;
             }
@@ -895,11 +892,12 @@ namespace ShiftChange
         /// job is recreation at all. True if a swap started.
         /// </summary>
         internal static bool RecreationArm(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
-                                           Map map)
+                                           IntVec3 target, Map map)
         {
             // The RECREATION arm. Joy jobs carry no workGiverDef, so it is
-            // disjoint from the work arm by construction; the room is read
-            // B-first (JoyTargetCell), where the pawn will sit.
+            // disjoint from the work arm by construction. The shared resolver
+            // has already read the room B-first (JoyTargetCell), where the
+            // pawn will sit, because this is a recreation job.
             if (!IsRecreationJob(job))
             {
                 return false;
@@ -911,12 +909,11 @@ namespace ShiftChange
             {
                 return false;
             }
-            IntVec3 joyTarget = JoyTargetCell(job, map);
-            if (!joyTarget.IsValid)
+            if (!target.IsValid)
             {
                 return false;
             }
-            Room joyRoom = joyTarget.GetRoom(map);
+            Room joyRoom = target.GetRoom(map);
             // Outdoor cells resolve the one map-spanning room, never null, so
             // without this a stand in open ground would serve every outdoor
             // joy job on the map. A walled roofless yard is its own room and
@@ -1474,8 +1471,9 @@ namespace ShiftChange
 
         /// <summary>
         /// This job carries no giver, and the next job in the queue is work this
-        /// on-shift stand serves, in its own room: an errand slotted in ahead of
-        /// the stand's own work, which the pawn is coming straight back to.
+        /// on-shift stand serves, inside its catchment: an errand slotted in
+        /// ahead of the stand's own work, which the pawn is coming straight back
+        /// to.
         /// Vanilla's opportunistic haul and Common Sense's ingredient haul both
         /// build that shape. Asked on the return trip only, so it keeps a
         /// uniform on and never dresses anyone; recreation and sleep are
@@ -1484,7 +1482,7 @@ namespace ShiftChange
         /// ahead of work".
         /// </summary>
         internal static bool QueuedAheadOfServedWork(Job job, Pawn_JobTracker tracker,
-                                                     CompShiftStand onShift, Room standRoom, Map map)
+                                                     CompShiftStand onShift, Map map)
         {
             if (job.workGiverDef != null || IsRecreationJob(job) || IsRestJob(job))
             {
@@ -1502,8 +1500,7 @@ namespace ShiftChange
             {
                 return false;
             }
-            IntVec3 at = IsRecreationJob(next) ? JoyTargetCell(next, map) : TargetCell(next, map);
-            return at.IsValid && at.GetRoom(map) == standRoom;
+            return onShift.Covers(SharedTargetCell(next, map), map);
         }
 
         /// <summary>
