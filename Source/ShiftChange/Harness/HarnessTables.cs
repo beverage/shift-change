@@ -397,18 +397,38 @@ namespace ShiftChange
         /// The official givers <see cref="JobRoomTargets.IgnoredGivers"/>
         /// carries ON PURPOSE, and the only ones it may: vanilla's six feeding
         /// givers, whose jobs put the meal in targetA
-        /// (<see cref="HarnessRideAlong.FeedingRidesAlong"/> has the reason). Any
-        /// other official giver on the list fails the guard below.
+        /// (<see cref="HarnessRideAlong.FeedingRidesAlong"/> has the reason),
+        /// and the seed planter, whose job puts the seed there. Any other
+        /// official giver on the list fails the guard below.
         /// </summary>
         internal static readonly HashSet<string> DeliberatelyIgnoredOfficialGivers =
-            new HashSet<string>(HarnessRideAlong.FeedPatientGivers.Concat(HarnessRideAlong.DeliverFoodGivers));
+            new HashSet<string>(HarnessRideAlong.FeedPatientGivers.Concat(HarnessRideAlong.DeliverFoodGivers)
+                                                                  .Concat(new[] { "PlantSeed" }));
+
+        /// <summary>
+        /// The official givers <see cref="JobRoomTargets.DeliveryGivers"/>
+        /// ignores by class: Core's four construction deliveries and its
+        /// replanting giver, which derives from the same class. An official
+        /// giver joining the class later fails the guard below, since the
+        /// class takes it without a row anyone reviewed.
+        /// </summary>
+        internal static readonly HashSet<string> OfficialDeliveryGivers =
+            new HashSet<string>
+            {
+                "ConstructDeliverResourcesToFrames",
+                "ConstructDeliverResourcesToBlueprints",
+                "DeliverResourcesToFrames",
+                "DeliverResourcesToBlueprints",
+                "Replant",
+            };
 
         /// <summary>
         /// The same for <see cref="JobRoomTargets.RideAlongJobs"/>: vanilla's
-        /// target-less unload, and no other official job.
+        /// target-less unload and the job tracker's pause between jobs, and no
+        /// other official job.
         /// </summary>
         internal static readonly HashSet<string> DeliberatelyRiddenOfficialJobs =
-            new HashSet<string> { "UnloadYourInventory" };
+            new HashSet<string> { "UnloadYourInventory", "Wait_MaintainPosture" };
 
         /// <summary>
         /// <see cref="JobRoomTargets"/> holds three lists, mostly of another
@@ -444,6 +464,8 @@ namespace ShiftChange
             unload.workGiverDef = DefDatabase<WorkGiverDef>.GetNamedSilentFail("HaulGeneral");
             ok &= Expect(unload.workGiverDef == null || !JobRoomTargets.RidesAlong(unload),
                          "and the same job carrying a giver does not");
+            ok &= Expect(JobRoomTargets.RidesAlong(JobMaker.MakeJob(JobDefOf.Wait_MaintainPosture, 1)),
+                         "the job tracker's one-tick pause between jobs rides along, as it builds it");
 
             foreach (JobDef job in DefDatabase<JobDef>.AllDefsListForReading)
             {
@@ -483,6 +505,24 @@ namespace ShiftChange
             }
             ok &= Expect(DefDatabase<JobDef>.GetNamedSilentFail("UnloadYourInventory") != null,
                          "vanilla's UnloadYourInventory resolves");
+
+            // The delivery ignore goes by class, so it is held to its named
+            // official givers the same way.
+            foreach (WorkGiverDef giver in JobRoomTargets.DeliveryGivers)
+            {
+                if (giver.modContentPack != null && giver.modContentPack.IsOfficialMod
+                    && !OfficialDeliveryGivers.Contains(giver.defName))
+                {
+                    ok &= Expect(false, "official giver " + giver.defName + " is NOT ignored as a delivery");
+                }
+            }
+            foreach (string name in OfficialDeliveryGivers)
+            {
+                WorkGiverDef giver = DefDatabase<WorkGiverDef>.GetNamedSilentFail(name);
+                ok &= Expect(giver != null && JobRoomTargets.DeliveryGivers.Contains(giver)
+                             && JobRoomTargets.Ignored(giver),
+                             "vanilla's " + name + " resolves and is ignored as a delivery");
+            }
 
             if (!RimatomicsLoaded)
             {

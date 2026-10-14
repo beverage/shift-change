@@ -155,65 +155,161 @@ namespace ShiftChange
         internal static readonly Dictionary<int, int> LastBlockedTick = new Dictionary<int, int>();
 
         /// <summary>
-        /// Pawn → the stand they were changed back at by the change-back
-        /// button (<see cref="Patch_ChangeBackGizmo"/>): the ROOM-EXIT LATCH.
-        /// While it holds, that pawn will not dress again in that stand's
-        /// room; it drops the moment they are seen starting a job anywhere
-        /// else, and drafting drops it outright.
+        /// Pawn → the latch the change-back button set
+        /// (<see cref="Patch_ChangeBackGizmo"/>). While it holds, the stand
+        /// they changed back at does not dress them again, and nor does any
+        /// stand with the same trigger whose catchment covers it
+        /// (<see cref="LatchBlocks"/>). It drops when they are seen starting
+        /// a job outside that stand's catchment, or waking, and drafting drops
+        /// it outright.
         ///
-        /// The STAND is stored, not the Room, so the room is re-derived live
-        /// on both sides of every comparison and a rebuilt wall cannot leave
-        /// a stale Room object behind. Keyed by Pawn reference rather than
-        /// thingIDNumber on purpose: an object reference cannot collide
+        /// The STAND is stored, not its room, so the catchment is re-derived
+        /// live on both sides of every comparison and a rebuilt wall cannot
+        /// leave a stale Room object behind. Keyed by Pawn reference rather
+        /// than thingIDNumber on purpose: an object reference cannot collide
         /// across a save load the way a recycled ID can, so a stale entry is
         /// inert rather than wrong. SessionGuard still clears it so old-game
-        /// pawns don't leak. Why positional rather than a countdown:
-        /// docs/DESIGN.md, "Change back".
+        /// pawns don't leak. Why positional rather than a countdown, and why
+        /// waking: docs/DESIGN.md, "Change back".
         /// </summary>
-        internal static readonly Dictionary<Pawn, Thing> ChangedBackAt = new Dictionary<Pawn, Thing>();
+        internal static readonly Dictionary<Pawn, ChangeBackLatch> ChangedBackAt =
+            new Dictionary<Pawn, ChangeBackLatch>();
+
+        /// <summary>One press of Change back: the stand, and whether the pawn has lain down since.</summary>
+        internal sealed class ChangeBackLatch
+        {
+            internal readonly Thing Stand;
+
+            /// <summary>
+            /// Set at the first lay-down after the press, so the first job
+            /// after that is the waking. Counted from the press: a Change back
+            /// that wakes a sleeper is not itself the waking.
+            /// </summary>
+            internal bool LaidDown;
+
+            internal ChangeBackLatch(Thing stand)
+            {
+                Stand = stand;
+            }
+        }
 
         /// <summary>
-        /// Drops the latch as soon as the pawn is starting a job while
-        /// standing outside the room they were changed out of. Called at the
-        /// top of every interception, so it samples at every job boundary
-        /// for every pawn — no tick hook needed. (A doorway is its own Room,
-        /// <c>Room.IsDoorway</c>, so a pawn caught mid-door reads as "left":
-        /// a hair early, and they are in fact leaving.)
+        /// Drops the latch when the pawn starts a job outside the latched
+        /// stand's catchment, or wakes: starts the first job after a lay-down.
+        /// Called at the top of every interception, so it samples at every
+        /// job boundary for every pawn, with no tick hook. (A doorway is its
+        /// own Room, <c>Room.IsDoorway</c>, so in room mode a pawn caught
+        /// mid-door reads as "left": a hair early, and they are in fact
+        /// leaving.)
         /// </summary>
-        internal static void UpdateChangeBackLatch(Pawn pawn)
+        internal static void UpdateChangeBackLatch(Pawn pawn, Job job)
         {
-            Thing stand;
-            if (!ChangedBackAt.TryGetValue(pawn, out stand))
+            ChangeBackLatch latch;
+            if (!ChangedBackAt.TryGetValue(pawn, out latch))
             {
                 return;
             }
-            if (stand == null || !stand.Spawned)
+            CompShiftStand stand = latch.Stand != null && latch.Stand.Spawned
+                ? latch.Stand.TryGetComp<CompShiftStand>()
+                : null;
+            if (stand == null || !stand.Covers(pawn.Position, pawn.MapHeld))
             {
                 ChangedBackAt.Remove(pawn);
                 return;
             }
-            Room standRoom = stand.GetRoom();
-            if (standRoom == null || pawn.GetRoom() != standRoom)
+            // The job tracker's pause between jobs finishes the last one, so
+            // it neither lies down nor wakes anyone.
+            if (JobRoomTargets.RidesAlong(job))
+            {
+                return;
+            }
+            if (IsLyingDown(job))
+            {
+                latch.LaidDown = true;
+            }
+            else if (latch.LaidDown)
             {
                 ChangedBackAt.Remove(pawn);
             }
         }
 
         /// <summary>
-        /// Would dressing in <paramref name="room"/> right now be the very
-        /// re-dress the player just cancelled? Scoped to the latched room on
-        /// purpose: a latched pawn who takes a job in a DIFFERENT room is
-        /// leaving, and the uniform waiting for them there is a different
-        /// uniform — blocking that would strand the feature at one room.
+        /// The latch keeps <paramref name="candidate"/> from dressing this pawn
+        /// for <paramref name="trigger"/>: it is the stand they changed back
+        /// at, or one with the same trigger whose catchment covers that stand.
+        /// Asked per candidate, by the stand search and the catch-up, so every
+        /// other stand dresses them normally: a stand elsewhere holds a
+        /// different uniform, and so does a recreation stand beside a work
+        /// stand.
         /// </summary>
-        internal static bool IsLatchedIn(Pawn pawn, Room room)
+        internal static bool LatchBlocks(Pawn pawn, CompShiftStand candidate, StandTrigger trigger)
         {
-            Thing stand;
-            if (!ChangedBackAt.TryGetValue(pawn, out stand) || stand == null || !stand.Spawned)
+            ChangeBackLatch latch;
+            if (!ChangedBackAt.TryGetValue(pawn, out latch))
             {
                 return false;
             }
-            return stand.GetRoom() == room;
+            Thing latched = latch.Stand;
+            if (latched == null || !latched.Spawned)
+            {
+                return false;
+            }
+            if (candidate.parent == latched)
+            {
+                return true;
+            }
+            CompShiftStand latchedStand = latched.TryGetComp<CompShiftStand>();
+            return latchedStand != null && ServesTrigger(latchedStand, trigger)
+                   && candidate.Covers(latched.Position, latched.Map);
+        }
+
+        /// <summary>
+        /// The job each pawn was last dressed for, deferred behind the swap.
+        /// The return trip lets that one job through, though its target may
+        /// have left the catchment while they changed, as an animal can
+        /// (docs/DESIGN.md, "Catchments"). Taken at the pawn's next decided
+        /// job boundary, used or not, and cleared with the session. Keyed by
+        /// Pawn for the reason <see cref="ChangedBackAt"/> gives.
+        /// </summary>
+        internal static readonly Dictionary<Pawn, DeferredJob> DressedFor = new Dictionary<Pawn, DeferredJob>();
+
+        /// <summary>
+        /// A deferred job, with its def and first target kept beside it: jobs
+        /// are pooled, so a recycled Job object must not pass for the one
+        /// deferred.
+        /// </summary>
+        internal struct DeferredJob
+        {
+            internal readonly Job Job;
+            internal readonly JobDef Def;
+            internal readonly LocalTargetInfo TargetA;
+
+            internal DeferredJob(Job job)
+            {
+                Job = job;
+                Def = job.def;
+                TargetA = job.targetA;
+            }
+
+            internal bool Is(Job job)
+            {
+                return job == Job && job.def == Def && job.targetA == TargetA;
+            }
+        }
+
+        /// <summary>
+        /// Takes the pawn's <see cref="DressedFor"/> record, and says whether
+        /// <paramref name="job"/> is the job it names.
+        /// </summary>
+        internal static bool TakeDressedFor(Pawn pawn, Job job)
+        {
+            DeferredJob deferred;
+            if (!DressedFor.TryGetValue(pawn, out deferred))
+            {
+                return false;
+            }
+            DressedFor.Remove(pawn);
+            return deferred.Is(job);
         }
 
         /// <summary>
@@ -226,6 +322,7 @@ namespace ShiftChange
         {
             LastBlockedTick.Clear();
             ChangedBackAt.Clear();
+            DressedFor.Clear();
             // Re-arm after a fault. Deliberately NOT `Enabled = true`: that
             // flag also carries the hot-reload quarantine, and the wedging
             // twin JobDriver is still loaded after a save load, so re-arming
@@ -271,6 +368,13 @@ namespace ShiftChange
         {
             Thing parent = stand?.parent;
             if (parent == null || !parent.Spawned || stand.OnShift)
+            {
+                return;
+            }
+            // Room stands only. A freed radius stand would pull a bare colonist
+            // off work anywhere in its ring, and the next job boundary catches
+            // them anyway (docs/DESIGN.md, "Catchments").
+            if (stand.serves != CatchmentKind.Room)
             {
                 return;
             }
@@ -366,7 +470,7 @@ namespace ShiftChange
                 // The second dress path, and it needs the same latch: without
                 // it, a stand returning to the pool re-dresses the very pawn
                 // the player just pulled out of this room.
-                if (IsLatchedIn(pawn, room))
+                if (LatchBlocks(pawn, stand, forWork ? StandTrigger.Work : StandTrigger.Recreation))
                 {
                     continue;
                 }
@@ -394,9 +498,17 @@ namespace ShiftChange
                 return;
             }
 
+            Job resumed = best.CurJob;
             Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, parent);
             best.jobs.StartJob(swap, JobCondition.InterruptForced, null,
                 resumeCurJobAfterwards: true, cancelBusyStances: true, null, JobTag.ChangingApparel);
+            // The suspended job goes back on the queue as the same object, and
+            // is the job they were dressed for, as Insert records it.
+            JobQueue queue = best.jobs.jobQueue;
+            if (resumed != null && queue.Count > 0 && queue.Peek()?.job == resumed)
+            {
+                DressedFor[best] = new DeferredJob(resumed);
+            }
             if (Verbose)
             {
                 Log.Message($"[ShiftChange] catch-up: {best.LabelShort} interrupted to dress at {parent.LabelShort}");
@@ -489,10 +601,10 @@ namespace ShiftChange
 
             // Sampled here, above every other gate, so the latch is tested at
             // EVERY job boundary — including jobs that return below (danger,
-            // player-forced, cooldown). Leaving the room is what ends it, and
-            // the pawn must not have to take a dressable job to be noticed
-            // leaving.
-            UpdateChangeBackLatch(pawn);
+            // player-forced, cooldown). Leaving the stand's catchment, or
+            // waking, is what ends it, and the pawn must not have to take a
+            // dressable job to be noticed doing either.
+            UpdateChangeBackLatch(pawn, job);
 
             // The next four gates hold in BOTH directions, which is why they
             // sit above the return trip. Each lets the job start untouched.
@@ -513,6 +625,10 @@ namespace ShiftChange
                 return false;
             }
 
+            // Taken below the gates, so it lasts exactly one decided boundary:
+            // the job tracker's pause between a swap and the job deferred
+            // behind it rides along above without spending it.
+            bool dressedForThis = TakeDressedFor(pawn, job);
             IntVec3 target = SharedTargetCell(job, map);
 
             // The return trip. Checked first: a pawn already in uniform who is
@@ -520,6 +636,17 @@ namespace ShiftChange
             CompShiftStand onShift = CompShiftStand.OnShiftStandFor(pawn);
             if (onShift != null)
             {
+                // Never for the job they were just dressed for, though its
+                // target may have left the catchment while they changed.
+                if (dressedForThis)
+                {
+                    if (Verbose)
+                    {
+                        Log.Message($"[ShiftChange] {pawn.LabelShort} keeps the outfit on for " +
+                                    $"{job.def.defName}: the job they were dressed for");
+                    }
+                    return false;
+                }
                 return ReturnTrip(job, tag, pawn, tracker, onShift, target, map);
             }
 
@@ -581,13 +708,13 @@ namespace ShiftChange
         {
             // Never divert a direct order or an emergency response, in EITHER
             // direction: the uniform rides along and the next ordinary job
-            // settles it. Givers this mod ignores (JobRoomTargets.Ignored) and
-            // the giver-less follow-ups a haul leaves (RidesAlong) pass the
-            // same way. One opt-in carve-out: with the medical emergency
-            // setting on, MEDICAL emergencies stop being exempt, in both
-            // directions, and firefighting never does. Why this sits above the
-            // return trip: docs/DESIGN.md, "The gates"; the setting: "The
-            // sleep branch".
+            // settles it. Givers this mod ignores (JobRoomTargets.Ignored), and
+            // the giver-less follow-ups a haul leaves and the job tracker's
+            // pause between jobs (RidesAlong), pass the same way. One opt-in
+            // carve-out: with the medical emergency setting on, MEDICAL
+            // emergencies stop being exempt, in both directions, and
+            // firefighting never does. Why this sits above the return trip:
+            // docs/DESIGN.md, "The gates"; the setting: "The sleep branch".
             return job.playerForced
                    || (job.workGiverDef?.emergency == true
                        && !EmergencyDressingAllowed(job.workGiverDef))
@@ -691,6 +818,16 @@ namespace ShiftChange
             {
                 return false;
             }
+            // AN URGENT PATIENT GOES STRAIGHT TO BED. The work arm will not
+            // dress one unless the medical emergency setting is on
+            // (MedicalRestWorkType), and the same refusal holds this way
+            // round, or a colonist bleeding out walks to the stand to change
+            // before lying down. The same goes for an errand vanilla slips in
+            // ahead of that lay-down, which it puts back in the queue untagged.
+            if (UrgentPatient(pawn, job, tag) || UrgentPatientNext(pawn, tracker))
+            {
+                return false;
+            }
             // Eating cannot use the room test below: an ingest job's targetA
             // is the FOOD, and the chair is chosen during the job. Food on the
             // pawn means eat as-is; anything else is a sit-down break, so
@@ -700,11 +837,22 @@ namespace ShiftChange
             {
                 return MealBreak(job, tag, pawn, tracker, onShift, target, map);
             }
-            if (!target.IsValid || onShift.Covers(target, map))
+            // Room mode keeps its shipped rule, anything in the room, because
+            // a room limits what can happen inside it. A radius limits
+            // nothing, so there it goes by what the stand is for
+            // (StaysDressed).
+            if (onShift.serves == CatchmentKind.Room)
             {
-                // Still working inside the stand's catchment, or the job's
-                // location is unreadable (queue-based jobs — hauling,
-                // harvesting). Staying dressed is the safe answer either way.
+                if (!target.IsValid || onShift.Covers(target, map))
+                {
+                    // Still inside the stand's room, or the job's location is
+                    // unreadable (queue-based jobs — hauling, harvesting).
+                    // Staying dressed is the safe answer either way.
+                    return false;
+                }
+            }
+            else if (StaysDressed(job, tag, pawn, onShift, target, map))
+            {
                 return false;
             }
             // An errand slotted in AHEAD of this stand's own work: they are
@@ -750,6 +898,105 @@ namespace ShiftChange
             return Insert(pawn, tracker, onShift, job, tag, "return");
         }
 
+        /// <summary>
+        /// For a stand serving a radius: the pawn on shift at it keeps the
+        /// uniform on for this job. What the stand would dress them for,
+        /// inside its catchment, always does. Past that it goes by what the
+        /// stand is for: a work stand also lets through pass-through work with
+        /// every place inside, and the incidental jobs; a recreation stand the
+        /// incidental jobs alone; a sleep stand nothing, since staying in bed
+        /// was settled above (docs/DESIGN.md, "Catchments").
+        /// </summary>
+        internal static bool StaysDressed(Job job, JobTag? tag, Pawn pawn, CompShiftStand onShift,
+                                          IntVec3 target, Map map)
+        {
+            // The dress arms' own classification, in their order. A job this
+            // stand would dress the pawn for must not change them back, or the
+            // next boundary dresses them again.
+            WorkTypeDef work = WorkTypeFor(pawn, job, tag);
+            bool served = work != null
+                ? onShift.HandlesWork(work)
+                : IsRestJob(job)
+                    ? IsOrdinarySleep(pawn, job, tag) && onShift.HandlesRest()
+                    : IsRecreationJob(job) && onShift.HandlesRecreation();
+            if (served)
+            {
+                // An unreadable location stays dressed, as in room mode.
+                return !target.IsValid || onShift.Covers(target, map);
+            }
+            // The first job out of bed changes a sleep stand's pawn back,
+            // wherever it is.
+            if (onShift.HandlesRest())
+            {
+                return false;
+            }
+            if (work != null)
+            {
+                return !onShift.HandlesRecreation() && JobRoomTargets.PassesThrough(work)
+                       && EveryPlaceCovered(job, pawn, onShift, map);
+            }
+            // Idling and the walks are judged where they go, and a wait, which
+            // goes nowhere, where the pawn stands.
+            return JobRoomTargets.IsIncidental(job)
+                   && onShift.Covers(target.IsValid ? target : pawn.Position, map);
+        }
+
+        /// <summary>
+        /// Every place this job names is inside the stand's catchment: its
+        /// three targets and both queues. Pass-through work is judged at both
+        /// ends this way, so a haul to a freezer outside changes the pawn back
+        /// before it, while the stand is still near. A place that cannot be
+        /// read is skipped, as <see cref="TargetCell"/> skips it, and a job
+        /// that names none is judged where the pawn stands.
+        /// </summary>
+        internal static bool EveryPlaceCovered(Job job, Pawn pawn, CompShiftStand stand, Map map)
+        {
+            bool named = false;
+            if (!PlaceCovered(job.targetA, stand, map, ref named)
+                || !PlaceCovered(job.targetB, stand, map, ref named)
+                || !PlaceCovered(job.targetC, stand, map, ref named)
+                || !QueueCovered(job.targetQueueA, stand, map, ref named)
+                || !QueueCovered(job.targetQueueB, stand, map, ref named))
+            {
+                return false;
+            }
+            return named || stand.Covers(pawn.Position, map);
+        }
+
+        /// <summary>
+        /// One place a job names is inside the catchment, or cannot be read.
+        /// Sets <paramref name="named"/> once any place could be.
+        /// </summary>
+        internal static bool PlaceCovered(LocalTargetInfo place, CompShiftStand stand, Map map,
+                                          ref bool named)
+        {
+            IntVec3 cell = place.HasThing ? place.Thing.PositionHeld : place.Cell;
+            if (!cell.IsValid || !cell.InBounds(map))
+            {
+                return true;
+            }
+            named = true;
+            return stand.Covers(cell, map);
+        }
+
+        /// <summary><see cref="PlaceCovered"/> for every entry of a target queue.</summary>
+        internal static bool QueueCovered(List<LocalTargetInfo> queue, CompShiftStand stand, Map map,
+                                          ref bool named)
+        {
+            if (queue == null)
+            {
+                return true;
+            }
+            for (int i = 0; i < queue.Count; i++)
+            {
+                if (!PlaceCovered(queue[i], stand, map, ref named))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         /// <summary>The map is under threat, so no arm dresses anyone.</summary>
         internal static bool MapUnderThreat(Map map)
         {
@@ -790,32 +1037,14 @@ namespace ShiftChange
                 return false;
             }
 
-            Room room = target.GetRoom(map);
-            if (room == null)
-            {
-                return false;
-            }
-
-            // The change-back latch: they were pulled out of this very
-            // room and have not left it since, so dressing again here is
-            // the cycle the player just stopped.
-            if (IsLatchedIn(pawn, room))
-            {
-                if (Verbose)
-                {
-                    Log.Message($"[ShiftChange] {pawn.LabelShort} stays changed out — " +
-                                "not left the room since the change-back order");
-                }
-                return false;
-            }
-
-            CompShiftStand stand = FindAvailableStand(room, pawn, work);
+            // The search holds the change-back latch, per candidate.
+            CompShiftStand stand = FindAvailableStand(target, map, pawn, work);
             if (stand == null)
             {
                 if (Verbose)
                 {
-                    Log.Message($"[ShiftChange] no free {work.defName} stand in {room.Role?.defName ?? "unroled"} " +
-                                $"room for {pawn.LabelShort} ({job.def.defName})");
+                    Log.Message($"[ShiftChange] no free {work.defName} stand for {pawn.LabelShort} " +
+                                $"({job.def.defName}) at {target}, {RoomName(target.GetRoom(map))}");
                 }
                 return false;
             }
@@ -831,16 +1060,16 @@ namespace ShiftChange
                                       IntVec3 target, Map map)
         {
             // The SLEEP arm. Disjoint from the other two by construction: a
-            // lay-down job carries no joyKind, and the tag test below keeps
-            // MEDICAL bed rest out. Reaching it means the work arm declined
-            // the job (MedicalRestWorkType resolved no work type), and a
-            // pyjama stand must not then take it as ordinary sleep. The
-            // workGiverDef limb is a conservative catch for a modded giver
-            // with a null workType. Do not add
+            // lay-down job carries no joyKind, and the tag test in
+            // IsOrdinarySleep keeps MEDICAL bed rest out. Reaching it means the
+            // work arm declined the job (MedicalRestWorkType resolved no work
+            // type), and a pyjama stand must not then take it as ordinary
+            // sleep. Its workGiverDef limb is a conservative catch for a
+            // modded giver with a null workType. Do not add
             // HealthAIUtility.ShouldSeekMedicalRest here: it cannot tell "hurt"
             // from "night", and once killed bedtime for every wounded colonist.
             // Why each: docs/DESIGN.md, "The sleep branch".
-            if (job.workGiverDef != null || tag == JobTag.RestingForMedicalReasons)
+            if (!IsOrdinarySleep(pawn, job, tag))
             {
                 return false;
             }
@@ -856,31 +1085,18 @@ namespace ShiftChange
             {
                 return false;
             }
-            Room bedRoom = target.GetRoom(map);
-            // The recreation arm's outdoor guard, needed for the same
-            // reason: an outdoor cell resolves the one map-spanning,
-            // edge-touching room rather than null, so a sleep stand in
-            // open ground would serve every bedroll on the map.
-            if (bedRoom == null || bedRoom.TouchesMapEdge)
-            {
-                return false;
-            }
-            if (IsLatchedIn(pawn, bedRoom))
-            {
-                if (Verbose)
-                {
-                    Log.Message($"[ShiftChange] {pawn.LabelShort} stays changed out — " +
-                                "not left the room since the change-back order");
-                }
-                return false;
-            }
-            CompShiftStand restStand = FindAvailableStand(bedRoom, pawn, null, StandTrigger.Rest);
+            // The outdoor guard lives in the search now: an outdoor cell
+            // resolves the one map-spanning, edge-touching room rather than
+            // null, so a room stand in open ground would serve every bedroll
+            // on the map, and the search skips such a room for sleep. It holds
+            // the change-back latch too, per candidate.
+            CompShiftStand restStand = FindAvailableStand(target, map, pawn, null, StandTrigger.Rest);
             if (restStand == null)
             {
                 if (Verbose)
                 {
-                    Log.Message($"[ShiftChange] no free sleep stand in {bedRoom.Role?.defName ?? "unroled"} " +
-                                $"room for {pawn.LabelShort} ({job.def.defName})");
+                    Log.Message($"[ShiftChange] no free sleep stand for {pawn.LabelShort} " +
+                                $"({job.def.defName}) at {target}, {RoomName(target.GetRoom(map))}");
                 }
                 return false;
             }
@@ -913,31 +1129,19 @@ namespace ShiftChange
             {
                 return false;
             }
-            Room joyRoom = target.GetRoom(map);
-            // Outdoor cells resolve the one map-spanning room, never null, so
-            // without this a stand in open ground would serve every outdoor
-            // joy job on the map. A walled roofless yard is its own room and
-            // stays eligible (docs/DESIGN.md, "The recreation branch").
-            if (joyRoom == null || joyRoom.TouchesMapEdge)
-            {
-                return false;
-            }
-            if (IsLatchedIn(pawn, joyRoom))
-            {
-                if (Verbose)
-                {
-                    Log.Message($"[ShiftChange] {pawn.LabelShort} stays changed out — " +
-                                "not left the room since the change-back order");
-                }
-                return false;
-            }
-            CompShiftStand recStand = FindAvailableStand(joyRoom, pawn, null, StandTrigger.Recreation);
+            // Outdoor cells resolve the one map-spanning room, never null, so a
+            // room stand in open ground would serve every outdoor joy job on the
+            // map; the search skips such a room for recreation. A walled roofless
+            // yard is its own room and stays eligible, and a radius needs no
+            // guard (docs/DESIGN.md, "The recreation branch"). The search holds
+            // the change-back latch too, per candidate.
+            CompShiftStand recStand = FindAvailableStand(target, map, pawn, null, StandTrigger.Recreation);
             if (recStand == null)
             {
                 if (Verbose)
                 {
-                    Log.Message($"[ShiftChange] no free recreation stand in {joyRoom.Role?.defName ?? "unroled"} " +
-                                $"room for {pawn.LabelShort} ({job.def.defName})");
+                    Log.Message($"[ShiftChange] no free recreation stand for {pawn.LabelShort} " +
+                                $"({job.def.defName}) at {target}, {RoomName(target.GetRoom(map))}");
                 }
                 return false;
             }
@@ -1059,6 +1263,15 @@ namespace ShiftChange
             // The displaced job resumes the moment the pawn finishes changing.
             tracker.jobQueue.EnqueueFirst(originalJob, tag);
 
+            // Behind a dressing swap, the deferred job is let through once on
+            // the return trip (DressedFor). A change back records nothing: cut
+            // short, its job must be judged again. Nobody is on shift until
+            // the swap completes, so this still reads the state before it.
+            if (CompShiftStand.OnShiftStandFor(pawn) == null)
+            {
+                DressedFor[pawn] = new DeferredJob(originalJob);
+            }
+
             if (Verbose)
             {
                 Log.Message($"[ShiftChange] {direction}: {pawn.LabelShort} → {stand.parent.LabelShort} " +
@@ -1141,6 +1354,54 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// A rest job the sleep arm takes: no giver, and not a medical lay-down
+        /// (<see cref="IsMedicalLayDown"/>). Medical bed rest is the work arm's,
+        /// and a giver with no work type is a modded one the sleep arm leaves
+        /// alone (docs/DESIGN.md, "The sleep branch"). The return trip asks it
+        /// too (StaysDressed), so both directions answer alike.
+        /// </summary>
+        internal static bool IsOrdinarySleep(Pawn pawn, Job job, JobTag? tag)
+        {
+            return IsRestJob(job) && job.workGiverDef == null && !IsMedicalLayDown(pawn, job, tag);
+        }
+
+        /// <summary>
+        /// A lay-down in a bed for medical reasons: tagged
+        /// <c>RestingForMedicalReasons</c>, as the patient givers hand it out,
+        /// or the same job put back in the queue with no tag for a patient who
+        /// needs a bed urgently. Vanilla's <c>StartJob</c> drops the tag when it
+        /// slips a haul in ahead of the lay-down
+        /// (<c>Pawn_JobTracker.TryOpportunisticJob</c>). A recuperating
+        /// patient's lay-down put back that way cannot be told from ordinary
+        /// sleep, and reads as sleep.
+        /// </summary>
+        internal static bool IsMedicalLayDown(Pawn pawn, Job job, JobTag? tag)
+        {
+            if (!IsRestJob(job))
+            {
+                return false;
+            }
+            if (tag == JobTag.RestingForMedicalReasons)
+            {
+                return true;
+            }
+            return tag == null && job.workGiverDef == null && !job.playerForced
+                   && pawn != null && HealthAIUtility.ShouldSeekMedicalRestUrgent(pawn);
+        }
+
+        /// <summary>
+        /// A lay-down of any kind, on a bed or the ground: the
+        /// <see cref="JobDriver_LayDown"/> family. What the change-back
+        /// latch counts as sleep, so unlike <see cref="IsRestJob"/> it needs
+        /// no bed.
+        /// </summary>
+        internal static bool IsLyingDown(Job job)
+        {
+            Type driver = job?.def?.driverClass;
+            return driver != null && typeof(JobDriver_LayDown).IsAssignableFrom(driver);
+        }
+
+        /// <summary>
         /// The work type a medical lay-down should be charged to, or null when
         /// this job is not one or must not divert. This is the whole of the
         /// hospital-gown trigger: the patient givers' jobs arrive with no
@@ -1158,7 +1419,7 @@ namespace ShiftChange
         /// </summary>
         internal static WorkTypeDef MedicalRestWorkType(Pawn pawn, Job job, JobTag? tag)
         {
-            if (tag != JobTag.RestingForMedicalReasons || !IsRestJob(job))
+            if (!IsMedicalLayDown(pawn, job, tag))
             {
                 return null;
             }
@@ -1170,12 +1431,42 @@ namespace ShiftChange
             {
                 return null;
             }
-            if (!ShiftChangeMod.MedicalEmergencyDressingEnabled
-                && HealthAIUtility.ShouldSeekMedicalRestUrgent(pawn))
+            if (UrgentPatient(pawn, job, tag))
             {
                 return null;
             }
             return ShiftChangeDefOf.PatientBedRest;
+        }
+
+        /// <summary>
+        /// A medical lay-down (<see cref="IsMedicalLayDown"/>) for a patient
+        /// who needs a bed urgently
+        /// (<see cref="HealthAIUtility.ShouldSeekMedicalRestUrgent"/>), with
+        /// the medical-emergency setting off: nobody is dressed for it, and
+        /// nobody on shift is changed back before it.
+        /// </summary>
+        internal static bool UrgentPatient(Pawn pawn, Job job, JobTag? tag)
+        {
+            return !ShiftChangeMod.MedicalEmergencyDressingEnabled
+                   && IsMedicalLayDown(pawn, job, tag)
+                   && HealthAIUtility.ShouldSeekMedicalRestUrgent(pawn);
+        }
+
+        /// <summary>
+        /// The pawn's next queued job is an urgent patient's lay-down
+        /// (<see cref="UrgentPatient"/>): whatever starts now is an errand
+        /// vanilla slipped in ahead of going to bed, and changing out first
+        /// would delay the patient anyway.
+        /// </summary>
+        internal static bool UrgentPatientNext(Pawn pawn, Pawn_JobTracker tracker)
+        {
+            JobQueue queue = tracker?.jobQueue;
+            if (queue == null || queue.Count == 0)
+            {
+                return false;
+            }
+            QueuedJob head = queue.Peek();
+            return head?.job != null && UrgentPatient(pawn, head.job, head.tag);
         }
 
         /// <summary>
@@ -1344,6 +1635,12 @@ namespace ShiftChange
             return pawn.carryTracker?.CarriedThing == food;
         }
 
+        /// <summary>A room for a verbose line: its role, or that there is none.</summary>
+        internal static string RoomName(Room room)
+        {
+            return room == null ? "no room" : (room.Role?.defName ?? "unroled") + " room";
+        }
+
         /// <summary>
         /// Which of the three triggers a stand is being asked to serve. One
         /// value rather than a row of bools, because "recreation and sleep
@@ -1372,7 +1669,26 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The stand this pawn should use, or null if there isn't one.
+        /// The stand dresses for this trigger at all: any work type, for work.
+        /// What the change-back latch means by "the same trigger".
+        /// </summary>
+        internal static bool ServesTrigger(CompShiftStand comp, StandTrigger trigger)
+        {
+            switch (trigger)
+            {
+                case StandTrigger.Recreation:
+                    return comp.HandlesRecreation();
+                case StandTrigger.Rest:
+                    return comp.HandlesRest();
+                default:
+                    return comp.WorkTypes.Count > 0;
+            }
+        }
+
+        /// <summary>
+        /// The stand this pawn should use for a job at <paramref name="cell"/>,
+        /// or null if there isn't one: the room stands in the cell's room, and
+        /// the radius stands whose catchment covers the cell.
         ///
         /// An unassigned stand is a POOL stand: any capable pawn may claim it,
         /// so a kitchen needs one stand per CONCURRENT cook rather than one per
@@ -1383,74 +1699,118 @@ namespace ShiftChange
         ///
         /// No free stand simply means no swap. Never queue for one: this is a
         /// nicety and must not become a bottleneck on the work itself.
+        ///
+        /// <para>For recreation and sleep, room stands in a room touching the
+        /// map edge are skipped: the outdoor room spans the whole map, so one
+        /// standing in it would serve every outdoor activity. A radius is
+        /// bounded by construction and needs no such guard. Work keeps its
+        /// map-wide outdoor stands, as it always has (docs/DESIGN.md,
+        /// "Catchments").</para>
+        ///
+        /// <para>A candidate the change-back latch holds is passed over
+        /// (<see cref="LatchBlocks"/>), so the latch never hides a stand it
+        /// does not reach.</para>
         /// </summary>
-        internal static CompShiftStand FindAvailableStand(Room room, Pawn pawn, WorkTypeDef work,
-            StandTrigger trigger = StandTrigger.Work)
+        internal static CompShiftStand FindAvailableStand(IntVec3 cell, Map map, Pawn pawn,
+            WorkTypeDef work, StandTrigger trigger = StandTrigger.Work)
         {
             CompShiftStand best = null;
             bool bestIsPersonal = false;
             int bestDistance = int.MaxValue;
 
-            List<ThingDef> defs = StandDefs;
-            for (int i = 0; i < defs.Count; i++)
+            Room room = map != null && cell.IsValid && cell.InBounds(map) ? cell.GetRoom(map) : null;
+            if (room != null && (trigger == StandTrigger.Work || !room.TouchesMapEdge))
             {
-                foreach (Thing thing in room.ContainedThings(defs[i]))
+                List<ThingDef> defs = StandDefs;
+                for (int i = 0; i < defs.Count; i++)
                 {
-                    CompShiftStand comp = thing.TryGetComp<CompShiftStand>();
-                    if (comp == null || comp.OnShift
-                        || !Handles(comp, trigger, work)
-                        || !comp.CanBeClaimedBy(pawn))
+                    foreach (Thing thing in room.ContainedThings(defs[i]))
                     {
-                        continue;
-                    }
-                    // Ask the same question the driver will ask on arrival, not
-                    // a looser one. "Holds some apparel" is not the same as
-                    // "holds something THIS pawn can put on", and the gap sent
-                    // pawns on wasted trips that looked like swapping at an
-                    // empty rack.
-                    if (!SwapPlan.WouldDress(pawn, comp.Stand))
-                    {
-                        continue;
-                    }
-                    // Outside this pawn's allowed area. The swap could not get
-                    // there (see StandForbiddenTo), and because a personal stand
-                    // outranks a shared one below, leaving it in would let a
-                    // forbidden personal stand beat an allowed one beside it.
-                    if (StandForbiddenTo(thing, pawn))
-                    {
-                        continue;
-                    }
-                    // Reservation is part of "available", not a formality to
-                    // check after choosing. OnShift only becomes true when a
-                    // swap COMPLETES, so a stand someone is currently walking
-                    // to still reads as free here — it would win the distance
-                    // tiebreak, fail to reserve back in Insert, and put the
-                    // pawn on cooldown instead of falling through to the stand
-                    // next to it that was genuinely free. On a burst arrival —
-                    // the exact concurrency pooling exists to serve — that
-                    // degraded pooling to roughly one dress per completed
-                    // swap however many stands the room had. Asked last of the
-                    // gates because it is much the most expensive, and it is
-                    // the same call TryDressMidJob already makes.
-                    if (!pawn.CanReserveAndReach(thing, PathEndMode.InteractionCell, Danger.Deadly))
-                    {
-                        continue;
-                    }
-
-                    bool personal = comp.IsAssignedTo(pawn);
-                    int distance = pawn.Position.DistanceToSquared(thing.Position);
-
-                    if (best == null
-                        || (personal && !bestIsPersonal)
-                        || (personal == bestIsPersonal && distance < bestDistance))
-                    {
-                        best = comp;
-                        bestIsPersonal = personal;
-                        bestDistance = distance;
+                        CompShiftStand comp = thing.TryGetComp<CompShiftStand>();
+                        if (comp != null && comp.serves == CatchmentKind.Room)
+                        {
+                            Consider(comp, pawn, work, trigger, ref best, ref bestIsPersonal, ref bestDistance);
+                        }
                     }
                 }
             }
+
+            foreach (CompShiftStand comp in CompShiftStand.CatchmentStands)
+            {
+                Thing thing = comp.parent;
+                if (thing != null && thing.Spawned && thing.Map == map && comp.Covers(cell, map))
+                {
+                    Consider(comp, pawn, work, trigger, ref best, ref bestIsPersonal, ref bestDistance);
+                }
+            }
             return best;
+        }
+
+        /// <summary>
+        /// One candidate through every gate of <see cref="FindAvailableStand"/>,
+        /// kept if it beats the best so far: a personal stand over a shared one,
+        /// then the nearer.
+        /// </summary>
+        internal static void Consider(CompShiftStand comp, Pawn pawn, WorkTypeDef work, StandTrigger trigger,
+            ref CompShiftStand best, ref bool bestIsPersonal, ref int bestDistance)
+        {
+            Thing thing = comp.parent;
+            if (comp.OnShift || !Handles(comp, trigger, work) || !comp.CanBeClaimedBy(pawn))
+            {
+                return;
+            }
+            // The change-back latch: the stand they changed back at, or one
+            // with its trigger covering it, is the cycle the player stopped.
+            if (LatchBlocks(pawn, comp, trigger))
+            {
+                if (Verbose)
+                {
+                    Log.Message($"[ShiftChange] {pawn.LabelShort} stays changed out at " +
+                                $"{thing.LabelShort}: the change-back order still holds");
+                }
+                return;
+            }
+            // Ask the same question the driver will ask on arrival, not a looser
+            // one. "Holds some apparel" is not the same as "holds something THIS
+            // pawn can put on", and the gap sent pawns on wasted trips that looked
+            // like swapping at an empty rack.
+            if (!SwapPlan.WouldDress(pawn, comp.Stand))
+            {
+                return;
+            }
+            // Outside this pawn's allowed area. The swap could not get there (see
+            // StandForbiddenTo), and because a personal stand outranks a shared
+            // one below, leaving it in would let a forbidden personal stand beat
+            // an allowed one beside it.
+            if (StandForbiddenTo(thing, pawn))
+            {
+                return;
+            }
+            // Reservation is part of "available", not a formality to check after
+            // choosing. OnShift only becomes true when a swap COMPLETES, so a
+            // stand someone is currently walking to still reads as free here — it
+            // would win the distance tiebreak, fail to reserve back in Insert, and
+            // put the pawn on cooldown instead of falling through to the stand
+            // next to it that was genuinely free. On a burst arrival — the exact
+            // concurrency pooling exists to serve — that degraded pooling to
+            // roughly one dress per completed swap however many stands the room
+            // had. Asked last of the gates because it is much the most expensive,
+            // and it is the same call TryDressMidJob already makes.
+            if (!pawn.CanReserveAndReach(thing, PathEndMode.InteractionCell, Danger.Deadly))
+            {
+                return;
+            }
+
+            bool personal = comp.IsAssignedTo(pawn);
+            int distance = pawn.Position.DistanceToSquared(thing.Position);
+            if (best == null
+                || (personal && !bestIsPersonal)
+                || (personal == bestIsPersonal && distance < bestDistance))
+            {
+                best = comp;
+                bestIsPersonal = personal;
+                bestDistance = distance;
+            }
         }
 
         /// <summary>

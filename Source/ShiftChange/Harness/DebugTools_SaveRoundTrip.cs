@@ -83,6 +83,15 @@ namespace ShiftChange
         internal const string OurMarkerNode = "<" + OurMarkerKey + ">[^<]*</" + OurMarkerKey + ">";
 
         /// <summary>
+        /// The catchment keys' prefix (<see cref="CompShiftStand.PostExposeData"/>),
+        /// and every node under it, written out or null. They arrived in
+        /// v1.5.0, so <see cref="LegacyMigration"/> strips them too.
+        /// </summary>
+        internal const string CatchmentKeyPrefix = "shiftChangeServe";
+        internal const string CatchmentNodes =
+            "<(" + CatchmentKeyPrefix + @"\w*)>[^<]*</\1>|<" + CatchmentKeyPrefix + @"\w*\b[^>]*/>";
+
+        /// <summary>
         /// Logged when a reference list registers load-ids during LoadingVars
         /// and does not collect them during ResolvingCrossRefs
         /// (<c>LoadIDsWantedBank.ConfirmClear</c>, <c>:53</c>). A half-consumed
@@ -173,6 +182,20 @@ namespace ShiftChange
             fix.Comp.NotifyDressed(fix.Pawn, stored, issued,
                                    new List<Apparel> { stored[0] });
 
+            // The catchment rides in the same save: a radius stand at a radius
+            // that is not the default, so a value that never left the object
+            // cannot pass for one that scribed. A radius needs something
+            // ticked first.
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            if (doctor == null)
+            {
+                DebugTools_LifecycleHarness.Report.AppendLine("      the Doctor work type does not resolve");
+                return false;
+            }
+            fix.Comp.ToggleWork(doctor);
+            fix.Comp.SetServes(CatchmentKind.Radius);
+            fix.Comp.SetServeRadius(9);
+
             // Captured before the load: afterwards these objects belong to a
             // disposed game.
             IntVec3 standCell = fix.Stand.Position;
@@ -223,7 +246,11 @@ namespace ShiftChange
                         ? "and not under the generic " + LegacyKey
                         : "and under the generic " + LegacyKey
                           + " only as the foreign comp's copy (" + genericHits
-                          + " found, " + foreignCopies + " expected)");
+                          + " found, " + foreignCopies + " expected)")
+                & DebugTools_LifecycleHarness.Expect(
+                    saved.Contains("<shiftChangeServes>Radius</shiftChangeServes>")
+                        && saved.Contains("<shiftChangeServeRadius>9</shiftChangeServeRadius>"),
+                    "the save carries the catchment under its prefixed keys");
 
             SavedGameLoaderNow.LoadGameFromSaveFileNow(SaveName);
 
@@ -272,6 +299,12 @@ namespace ShiftChange
                         && a.GetUniqueLoadID() == forcedLoadID),
                     "the force-worn flag came back on the same garment")
                 & DebugTools_LifecycleHarness.Expect(
+                    ledger.serves == CatchmentKind.Radius && ledger.serveRadius == 9,
+                    "the stand still serves a radius of 9")
+                & DebugTools_LifecycleHarness.Expect(
+                    CompShiftStand.CatchmentStands.Contains(ledger),
+                    "and the load put it back in the registry")
+                & DebugTools_LifecycleHarness.Expect(
                     !ledger.IsExcluded,
                     "the loaded stand is in service (control for the sweep below)")
                 & DebugTools_LifecycleHarness.Expect(
@@ -311,6 +344,10 @@ namespace ShiftChange
         /// skipped the reconcile, and the copy then emptied the foreign list as
         /// well. That failed this case with Outfit Stands Plus loaded, found
         /// 2026-09-29.</para>
+        ///
+        /// <para>The catchment keys go for the same reason: the round-trip
+        /// save serves a radius, and no save from before v1.5.0 serves
+        /// anything but its room.</para>
         /// </summary>
         internal static bool LegacyMigration()
         {
@@ -336,10 +373,10 @@ namespace ShiftChange
 
             // Longest key first: rewriting the short one first would corrupt
             // the long one into "shiftChangeUninstalledassignedPawns".
-            string legacy = Regex.Replace(source
+            string legacy = Regex.Replace(Regex.Replace(source
                     .Replace(OurUninstalledKey, LegacyUninstalledKey)
                     .Replace(OurKey, LegacyKey),
-                OurMarkerNode, "");
+                OurMarkerNode, ""), CatchmentNodes, "");
             if (!NodeContains(legacy, LegacyKey, ownerLoadID))
             {
                 DebugTools_LifecycleHarness.Report.AppendLine(
@@ -350,7 +387,10 @@ namespace ShiftChange
 
             bool ok = DebugTools_LifecycleHarness.Expect(
                 !legacy.Contains(OurMarkerKey),
-                "the rewritten save carries no reconciled marker, as no save that old does");
+                "the rewritten save carries no reconciled marker, as no save that old does")
+                & DebugTools_LifecycleHarness.Expect(
+                source.Contains("<" + CatchmentKeyPrefix) && !legacy.Contains("<" + CatchmentKeyPrefix),
+                "nor the catchment keys the round-trip save wrote, as no save that old does");
 
             SavedGameLoaderNow.LoadGameFromSaveFileNow(LegacySaveName);
 

@@ -240,7 +240,7 @@ namespace ShiftChange
                     ? ModeOnlyAllowance
                     : (measuredBody > 0f
                         ? measuredBody
-                        : HeaderAllowance + TriggerRowsAllowance
+                        : HeaderAllowance + TriggerRowsAllowance + ServesAllowance
                             + rowsPerColumn * RowHeight + autoLabelOverflow);
 
                 float height = WindowMargin * 2f + CloseButSize.y + 10f + body;
@@ -409,15 +409,34 @@ namespace ShiftChange
             // underneath it and loses its last few characters. Compose the two
             // halves instead so the label owns a rect the button is not in.
             Rect autoRect = listing.GetRect(autoRowHeight);
+            // Automatic reads the room, so it is room mode only: greyed and
+            // inert while the stand serves a radius, with the reason on hover
+            // (docs/DESIGN.md, "Catchments").
+            bool autoAvailable = comp.serves == CatchmentKind.Room;
+            if (!autoAvailable)
+            {
+                GUI.color = Color.gray;
+            }
             Widgets.Label(new Rect(autoRect.x, autoRect.y,
                                    autoRect.width - RadioButtonWidth, autoRect.height),
                           autoLabel);
-            if (Widgets.RadioButton(autoRect.xMax - 24f,
-                                    autoRect.y + autoRect.height / 2f - 12f,
-                                    comp.IsAutomatic)
-                | Widgets.ButtonInvisible(autoRect))
+            // Disabled for real: the radio draws greyed, and GUI.enabled false
+            // makes both clicks below refuse, so no accept tick plays.
+            bool wasEnabled = GUI.enabled;
+            GUI.enabled = autoAvailable;
+            bool autoClicked = Widgets.RadioButton(autoRect.xMax - 24f,
+                                                   autoRect.y + autoRect.height / 2f - 12f,
+                                                   comp.IsAutomatic, disabled: !autoAvailable)
+                               | Widgets.ButtonInvisible(autoRect);
+            GUI.enabled = wasEnabled;
+            GUI.color = Color.white;
+            if (autoClicked && autoAvailable)
             {
                 comp.SetAutomatic();
+            }
+            if (!autoAvailable)
+            {
+                TooltipHandler.TipRegion(autoRect, "ShiftChange.AutomaticRoomOnly".Translate());
             }
             if (Widgets.RadioButtonLabeled(listing.GetRect(RowHeight),
                     "ShiftChange.WorkTypeNone".Translate(), comp.IsExcluded))
@@ -479,7 +498,7 @@ namespace ShiftChange
             TooltipHandler.TipRegion(tradeRect, "ShiftChange.WithholdFromTradeDesc".Translate());
 
             listing.GapLine();
-            listing.Label("ShiftChange.WorkTypesExplainer".Translate());
+            listing.Label(comp.ByCatchment("ShiftChange.WorkTypesExplainer").Translate());
             listing.Gap(4f);
 
             // Recreation is one trigger, not a work type — the room is the
@@ -490,7 +509,7 @@ namespace ShiftChange
             bool recreationOn = comp.HandlesRecreation();
             bool recreationWas = recreationOn;
             Widgets.CheckboxLabeled(listing.GetRect(RowHeight),
-                "ShiftChange.RecreationRow".Translate(), ref recreationOn);
+                comp.ByCatchment("ShiftChange.RecreationRow").Translate(), ref recreationOn);
             if (recreationOn != recreationWas)
             {
                 comp.ToggleRecreation();
@@ -508,7 +527,7 @@ namespace ShiftChange
             bool restOn = comp.HandlesRest();
             bool restWas = restOn;
             Widgets.CheckboxLabeled(listing.GetRect(RowHeight),
-                "ShiftChange.RestRow".Translate(), ref restOn);
+                comp.ByCatchment("ShiftChange.RestRow").Translate(), ref restOn);
             if (restOn != restWas)
             {
                 comp.ToggleRest();
@@ -559,6 +578,7 @@ namespace ShiftChange
                     ? "ShiftChange.RestExclusiveNote".Translate()
                     : "ShiftChange.RecreationExclusiveNote".Translate());
                 GUI.color = Color.white;
+                DrawServes(listing);
                 float exclusiveHeight = listing.CurHeight;
                 listing.End();
                 return exclusiveHeight;
@@ -634,9 +654,78 @@ namespace ShiftChange
                 GUI.color = Color.white;
             }
 
+            DrawServes(listing);
             float bodyHeight = listing.CurHeight;
             listing.End();
             return bodyHeight;
+        }
+
+        /// <summary>
+        /// The Serves row's height, and the slider's in radius mode, for the
+        /// estimate <see cref="InitialSize"/> uses before the body is first
+        /// measured: a separator, the row, and the slider.
+        /// </summary>
+        internal float ServesAllowance =>
+            12f + RowHeight + (comp.serves == CatchmentKind.Radius ? RowHeight + 8f : 0f);
+
+        /// <summary>
+        /// Where the stand serves, and in radius mode the slider for how far.
+        /// Last in the window, below the triggers, because they come first: a
+        /// stand leaves room mode only with something ticked, so the row is
+        /// greyed until it serves something. Last also means nothing above it
+        /// moves when the slider appears (docs/DESIGN.md, "Catchments").
+        /// </summary>
+        internal void DrawServes(Listing_Standard listing)
+        {
+            listing.GapLine();
+            bool canChoose = comp.ServesSomething;
+            Rect row = listing.GetRect(RowHeight);
+            // ButtonText's active flag only refuses the click: it draws the
+            // button exactly as a live one. The tint is what greys it.
+            if (!canChoose)
+            {
+                GUI.color = Widgets.InactiveColor;
+            }
+            bool clicked = Widgets.ButtonText(row, "ShiftChange.ServesRow".Translate(comp.ServesLabel()),
+                                              active: canChoose);
+            GUI.color = Color.white;
+            if (clicked && canChoose)
+            {
+                Find.WindowStack.Add(new FloatMenu(new List<FloatMenuOption>
+                {
+                    new FloatMenuOption("ShiftChange.ServesOptionRoom".Translate(),
+                                        () => comp.SetServes(CatchmentKind.Room)),
+                    new FloatMenuOption("ShiftChange.ServesOptionRadius".Translate(),
+                                        () => comp.SetServes(CatchmentKind.Radius)),
+                }));
+            }
+            string tip = canChoose
+                ? "ShiftChange.ServesDesc".Translate()
+                : "ShiftChange.ServesNeedsTrigger".Translate();
+            if (canChoose && comp.serves == CatchmentKind.Room && comp.StandsInTheOpen
+                && (comp.HandlesRecreation() || comp.HandlesRest()))
+            {
+                tip += "\n\n" + "ShiftChange.ServesNothingOutdoorsDesc".Translate();
+            }
+            TooltipHandler.TipRegion(row, tip);
+
+            if (comp.serves == CatchmentKind.Radius)
+            {
+                int radius = Mathf.RoundToInt(listing.SliderLabeled(
+                    "ShiftChange.ServeRadius".Translate(comp.serveRadius),
+                    comp.serveRadius, CompShiftStand.MinServeRadius, CompShiftStand.MaxServeRadius));
+                if (radius != comp.serveRadius)
+                {
+                    comp.SetServeRadius(radius);
+                }
+            }
+        }
+
+        /// <summary>The stand's ring, drawn on the map while the window is open.</summary>
+        public override void WindowUpdate()
+        {
+            base.WindowUpdate();
+            comp.DrawCatchment();
         }
     }
 }

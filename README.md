@@ -179,12 +179,12 @@ over ordinary clothes; a sauna robe does not.
   off. The only room known at the start is wherever the book sits on a shelf,
   and dressing them for the library because that is where the novel lives would
   be the wrong room.
-- **Outdoors is excluded, for now.** Every outdoor cell on the map belongs to
-  the same map-spanning room, so a recreation stand in open ground would dress
-  colonists for every walk and every bit of stargazing anywhere on the map. A
-  walled but roofless yard is its own room and still counts. Serving open
-  ground needs a boundary of its own: a zone, or a radius around the stand.
-  That is planned.
+- **Outdoors needs a radius.** Every outdoor cell on the map belongs to the
+  same map-spanning room, so a recreation stand in open ground serving its room
+  would dress colonists for every walk and every bit of stargazing anywhere on
+  the map. Out there it serves nothing until you give it a radius (see
+  [Serving a radius](#serving-a-radius-instead-of-a-room)). A walled but
+  roofless yard is its own room and still counts.
 - **Nobody is pulled out of bed.** Vanilla hands patients recreation they can
   take lying down precisely so they stay put.
 - **A drink from the rec room's own stock does not end the visit.** The
@@ -235,6 +235,39 @@ serves one colonist at a time, so in a ten-bunk barracks the first sleeper to
 reach it would hold it all night and the other nine would go to bed in what
 they were already wearing. A shared sleeping room takes the switch by hand.
 
+## Serving a radius instead of a room
+
+A stand serves its own room unless you tell it otherwise. The **Serves** row at
+the bottom of its settings switches it to **Within a radius**: every cell within
+that many cells of the stand, walls or no walls. That suits a shed in the middle
+of the fields, a changing hut by the pool, or a stand halfway down a corridor of
+workshops. The ring is drawn while the settings are open and whenever the stand
+is selected, and the slider runs from 3 cells to 79.
+
+Tick what the stand is for first. The row stays greyed until something is
+ticked, and Automatic only reads a room, so choosing a radius for an automatic
+stand turns whatever the room gave it into ticks.
+
+A room limits what happens inside it; a radius does not. Inside a ring a
+colonist keeps the outfit on only for:
+
+- whatever the stand serves;
+- idling and wandering, and walking back into their allowed area or out of the
+  heat or cold;
+- at a work stand, hauling, cleaning and building, provided every place the job
+  names is inside the ring. A haul out to a freezer past the ring changes them
+  back before they leave, while the stand is still close.
+
+Anything else sends them back to change first: a meal, bed, recreation at a
+work stand, work the stand does not serve. A sleep stand keeps pyjamas on only
+in bed and on the way to a bed inside its ring, so a marine who parked power
+armor overnight does not spend the next day working without it.
+
+**Construction deliveries change nobody.** A builder fetching steel goes in
+whatever they have on, and the hardhat goes on for the frame. Replanting a tree
+and planting seeds work the same way, since both start wherever the tree or the
+seed is lying. This holds for stands serving a room too.
+
 ## The rules it follows
 
 - **Automatic only**, for work, recreation and sleeping alike. Right-click orders
@@ -265,7 +298,7 @@ they were already wearing. A shared sleeping room takes the switch by hand.
   hospital or the cell. A doctor in scrubs or a warden in uniform now keeps it
   on for the trip, and nobody is dressed for one.
 - **A quick errand before the stand's own work keeps the uniform on.** When
-  the job queued next is work this stand serves, in its room, a haul or
+  the job queued next is work this stand serves, in its room or radius, a haul or
   similar slotted in ahead of it is done in uniform instead of changing out
   and back in. Vanilla's "haul something on the way" does this to bills, and
   so does Common Sense.
@@ -273,9 +306,10 @@ they were already wearing. A shared sleeping room takes the switch by hand.
   colonist's allowed area is passed over, and a colonist whose stand ends up
   outside it keeps the outfit on until it is back inside. The stand's inspect
   pane says so. Change back is an order, so it still works.
-- If a stand frees up while someone is already working in its room out of
-  uniform, they'll step over and change, unless they're mid-treatment on a
-  patient.
+- If a stand serving its room frees up while someone is already working there
+  out of uniform, they'll step over and change, unless they're mid-treatment on
+  a patient. A stand serving a radius waits for their next job instead, since a
+  ring can reach a long way.
 - **Change back** appears on any colonist currently in a uniform, for when you
   want them out of it now rather than at their next job. They will get there on
   their own, raid or no raid, but "on their own next job" can be a long time if
@@ -289,7 +323,7 @@ Three mod settings, under Options → Mod settings:
 - **Medical emergencies change first**, off by default. On, a doctor answering
   an emergency tend puts scrubs on first and a colonist in critical condition
   stops for a gown on the way to bed. Fires are never covered by it. It works
-  in both directions, so a doctor already in another room's uniform may change
+  in both directions, so a doctor already in another stand's uniform may change
   out of it before answering the call as well.
 
 ## Requirements

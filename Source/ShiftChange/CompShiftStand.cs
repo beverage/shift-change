@@ -15,6 +15,17 @@ namespace ShiftChange
     }
 
     /// <summary>
+    /// What a stand's catchment is: its room, or every cell within its radius.
+    /// Scribed by name, so a kind added later loads in older builds' saves.
+    /// docs/DESIGN.md, "Catchments".
+    /// </summary>
+    internal enum CatchmentKind : byte
+    {
+        Room,
+        Radius,
+    }
+
+    /// <summary>
     /// The Shift Change half of a vanilla outfit stand: which work type it
     /// dresses for, and the checkout ledger for whoever currently has its
     /// uniform out.
@@ -143,6 +154,43 @@ namespace ShiftChange
         /// not-ours is untouched vanilla no matter what this flag says.</para>
         /// </summary>
         internal bool withholdFromTrade = true;
+
+        /// <summary>
+        /// Where this stand serves: its room, which is the default and how
+        /// every older save loads, or within <see cref="serveRadius"/> of it.
+        /// Only a stand with something ticked leaves room mode, and leaving
+        /// shift use brings it back (<see cref="SetServes"/>). Written through
+        /// <see cref="ApplyServes"/>, which keeps <see cref="CatchmentStands"/>
+        /// in step. docs/DESIGN.md, "Catchments".
+        /// </summary>
+        internal CatchmentKind serves = CatchmentKind.Room;
+
+        /// <summary>
+        /// The radius, in cells, of a radius catchment. Stored raw and read only
+        /// in radius mode, like <see cref="depositOnly"/>, so switching modes and
+        /// back keeps the number.
+        /// </summary>
+        internal int serveRadius = DefaultServeRadius;
+
+        internal const int DefaultServeRadius = 12;
+        internal const int MinServeRadius = 3;
+
+        /// <summary>
+        /// The largest radius the ring can outline exactly. Past the radial
+        /// pattern's last cell, <c>GenDraw.DrawRadiusRing</c> logs an error and
+        /// draws nothing (<c>GenDraw.cs:455-462</c>), so the slider stops short
+        /// of it and the ring always shows what the stand serves.
+        /// </summary>
+        internal static int MaxServeRadius => Mathf.CeilToInt(GenRadial.MaxRadialPatternRadius) - 1;
+
+        /// <summary>
+        /// Every spawned stand serving a catchment other than its room, so the
+        /// stand search finds them without walking the map. Kept by spawn,
+        /// despawn and <see cref="ApplyServes"/>, and cleared with the session.
+        /// A stand on a map removed without despawning it lingers until then;
+        /// readers check the map, so it is never used.
+        /// </summary>
+        internal static readonly HashSet<CompShiftStand> CatchmentStands = new HashSet<CompShiftStand>();
 
         /// <summary>
         /// Stands that currently have a uniform out on a pawn, so the return
@@ -334,7 +382,9 @@ namespace ShiftChange
                 {
                     return NoWork;
                 }
-                if (!parent.Spawned)
+                // Automatic is the room's reading, and only a stand serving its
+                // room has one (docs/DESIGN.md, "Catchments").
+                if (!parent.Spawned || serves != CatchmentKind.Room)
                 {
                     return NoWork;
                 }
@@ -421,13 +471,18 @@ namespace ShiftChange
         /// <summary>
         /// Whether a job at <paramref name="cell"/> is inside this stand's
         /// catchment, the cells it dresses for and keeps a uniform on in: the
-        /// stand's own room. Both directions ask this, so they cannot disagree
-        /// about where the stand's work is.
+        /// stand's own room, or every cell within its radius. Both directions
+        /// ask this, so they cannot disagree about where the stand's work is.
         ///
         /// <para>False for any map but the stand's own, before anything else
         /// is read: a borrower who left with a caravan keeps the ledger, and
         /// their job boundaries on another map must not be measured against
         /// this one.</para>
+        ///
+        /// <para>A radius is INCLUSIVE, the cells <c>DrawRadiusRing</c>
+        /// outlines. The bill radius compares strictly, and copied here it
+        /// would leave the ring's outermost cells drawn but not served
+        /// (docs/DESIGN.md, "Catchments").</para>
         /// </summary>
         internal bool Covers(IntVec3 cell, Map map)
         {
@@ -435,6 +490,10 @@ namespace ShiftChange
                 || !cell.IsValid || !cell.InBounds(map))
             {
                 return false;
+            }
+            if (serves == CatchmentKind.Radius)
+            {
+                return cell.DistanceToSquared(parent.Position) <= serveRadius * serveRadius;
             }
             Room room = parent.GetRoom();
             return room != null && cell.GetRoom(map) == room;
@@ -457,7 +516,7 @@ namespace ShiftChange
             {
                 return recreationOverride;
             }
-            if (!parent.Spawned)
+            if (!parent.Spawned || serves != CatchmentKind.Room)
             {
                 return false;
             }
@@ -490,7 +549,7 @@ namespace ShiftChange
             {
                 return restOverride;
             }
-            if (!parent.Spawned)
+            if (!parent.Spawned || serves != CatchmentKind.Room)
             {
                 return false;
             }
@@ -572,6 +631,8 @@ namespace ShiftChange
             recreationOverride = false;
             restOverride = false;
             workTypeOverrides?.Clear();
+            // Automatic is a room's reading, so it is room mode.
+            ApplyServes(CatchmentKind.Room);
             EnforceRemovalFlag();
         }
 
@@ -581,6 +642,10 @@ namespace ShiftChange
             recreationOverride = false;
             restOverride = false;
             workTypeOverrides?.Clear();
+            // Back to room mode, so no stand is ever in another catchment with
+            // nothing ticked. The radius is kept for when it comes back
+            // (docs/DESIGN.md, "Catchments").
+            ApplyServes(CatchmentKind.Room);
             // Owners are left alone. A group list waits here for the stand to
             // go back into shift use, and picking one colonist while it is out
             // of shift use is what replaces it
@@ -588,6 +653,141 @@ namespace ShiftChange
             // last work type, Recreation or Sleeping lands here too, so
             // clearing owners on this path would cost a configured group on an
             // ordinary edit.
+        }
+
+        /// <summary>
+        /// Switch where the stand serves. Leaving room mode needs something
+        /// ticked: an automatic stand's set becomes ticks first, so nothing
+        /// visibly changes, and a stand with nothing to tick stays where it is
+        /// (docs/DESIGN.md, "Catchments").
+        /// </summary>
+        internal void SetServes(CatchmentKind kind)
+        {
+            if (kind != CatchmentKind.Room && !HasCustomSet)
+            {
+                if (excluded)
+                {
+                    return;
+                }
+                TickAutomaticSet();
+                if (!HasCustomSet)
+                {
+                    return;
+                }
+            }
+            ApplyServes(kind);
+        }
+
+        /// <summary>
+        /// Turn an automatic stand's reading into explicit ticks: its room's
+        /// work types, or else its recreation or sleep trigger. Asked while the
+        /// stand still serves its room, so the reading is the room's.
+        /// </summary>
+        internal void TickAutomaticSet()
+        {
+            List<WorkTypeDef> automatic = parent.Spawned ? AutomaticWorkTypes : NoWork;
+            if (automatic.Count > 0)
+            {
+                workTypeOverrides = workTypeOverrides ?? new List<WorkTypeDef>();
+                workTypeOverrides.Clear();
+                workTypeOverrides.AddRange(automatic);
+            }
+            else if (HandlesRecreation())
+            {
+                recreationOverride = true;
+            }
+            else if (HandlesRest())
+            {
+                restOverride = true;
+            }
+        }
+
+        /// <summary>Sets the mode and keeps <see cref="CatchmentStands"/> in step.</summary>
+        internal void ApplyServes(CatchmentKind kind)
+        {
+            serves = kind;
+            if (kind != CatchmentKind.Room && parent.Spawned)
+            {
+                CatchmentStands.Add(this);
+            }
+            else
+            {
+                CatchmentStands.Remove(this);
+            }
+        }
+
+        internal void SetServeRadius(int radius)
+        {
+            serveRadius = Mathf.Clamp(radius, MinServeRadius, MaxServeRadius);
+        }
+
+        /// <summary>
+        /// The stand dresses for something: a work type, recreation or sleep.
+        /// The one inert test for the inspect pane, the owner button and the
+        /// Serves row, which stays greyed until it holds.
+        /// </summary>
+        internal bool ServesSomething => WorkTypes.Count > 0 || HandlesRecreation() || HandlesRest();
+
+        /// <summary>
+        /// A keyed string's variant for this stand's catchment: the key itself
+        /// for a room, the key plus "Radius" for a radius. For the strings that
+        /// say where a stand serves (docs/DESIGN.md, "Catchments").
+        /// </summary>
+        internal string ByCatchment(string key)
+        {
+            return serves == CatchmentKind.Radius ? key + "Radius" : key;
+        }
+
+        /// <summary>
+        /// What the settings window's Serves row says the stand covers. A room
+        /// in the open is the one map-wide outdoor room, so there a work stand
+        /// serves everywhere outdoors and a recreation or sleep stand serves
+        /// nothing (the outdoor guard), and the row says which rather than
+        /// "this room".
+        /// </summary>
+        internal string ServesLabel()
+        {
+            if (serves == CatchmentKind.Radius)
+            {
+                return "ShiftChange.ServesRadius".Translate(serveRadius);
+            }
+            if (StandsInTheOpen)
+            {
+                return HandlesRecreation() || HandlesRest()
+                    ? "ShiftChange.ServesNothingOutdoors".Translate()
+                    : "ShiftChange.ServesOutdoors".Translate();
+            }
+            return "ShiftChange.ServesRoom".Translate();
+        }
+
+        /// <summary>The stand's room is the map-wide outdoor one.</summary>
+        internal bool StandsInTheOpen
+        {
+            get
+            {
+                Room room = parent.Spawned ? parent.GetRoom() : null;
+                return room != null && room.TouchesMapEdge;
+            }
+        }
+
+        /// <summary>
+        /// Draws a radius stand's ring: exactly the cells it serves. On
+        /// selection, and while its settings window is open, as a bill's
+        /// ingredient radius is drawn. Nothing for a room stand, whose walls
+        /// are its outline.
+        /// </summary>
+        internal void DrawCatchment()
+        {
+            if (serves == CatchmentKind.Radius && parent.Spawned && parent.Map == Find.CurrentMap)
+            {
+                GenDraw.DrawRadiusRing(parent.Position, serveRadius);
+            }
+        }
+
+        public override void PostDrawExtraSelectionOverlays()
+        {
+            base.PostDrawExtraSelectionOverlays();
+            DrawCatchment();
         }
 
         /// <summary>
@@ -750,6 +950,7 @@ namespace ShiftChange
         internal static void ResetSessionState()
         {
             OnShiftStands.Clear();
+            CatchmentStands.Clear();
         }
 
         public static CompShiftStand OnShiftStandFor(Pawn pawn)
@@ -776,6 +977,10 @@ namespace ShiftChange
         {
             base.PostSpawnSetup(respawningAfterLoad);
             SessionGuard.Ensure();
+            if (serves != CatchmentKind.Room)
+            {
+                CatchmentStands.Add(this);
+            }
 
             // Unconditional, not load-only: this also covers a stand
             // reinstalled from a minified box. A fresh build defaults to the
@@ -855,6 +1060,8 @@ namespace ShiftChange
         public override void PostDeSpawn(Map map, DestroyMode mode = DestroyMode.Vanish)
         {
             base.PostDeSpawn(map, mode);
+            // Off the map whatever the mode; PostSpawnSetup puts it back.
+            CatchmentStands.Remove(this);
             if (mode == DestroyMode.WillReplace)
             {
                 // NOT a teardown — the stand is being lifted to another map and
@@ -1051,6 +1258,10 @@ namespace ShiftChange
             // (:70-78) — so the only thing ever written here is a deliberate
             // opt-out, and a save round trip never manufactures one.
             Scribe_Values.Look(ref withholdFromTrade, "withholdFromTrade", defaultValue: true);
+            // Prefixed, unlike the older keys above: comps scribe flat into the
+            // stand's node, beside any other mod's comp on the same building.
+            Scribe_Values.Look(ref serves, "shiftChangeServes", CatchmentKind.Room);
+            Scribe_Values.Look(ref serveRadius, "shiftChangeServeRadius", DefaultServeRadius);
 
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
@@ -1072,6 +1283,16 @@ namespace ShiftChange
                     workTypeOverrides.Add(workTypeOverrideLegacy);
                 }
                 workTypeOverrideLegacy = null;
+
+                serveRadius = Mathf.Clamp(serveRadius, MinServeRadius, MaxServeRadius);
+                // The same canonical state the setters keep: another catchment
+                // only with something ticked. Reached by a hand-edited save,
+                // or by one whose ticked work types all came from a mod since
+                // removed: their nulls were stripped just above.
+                if (serves != CatchmentKind.Room && (excluded || !HasCustomSet))
+                {
+                    serves = CatchmentKind.Room;
+                }
             }
         }
 
@@ -1209,12 +1430,19 @@ namespace ShiftChange
             {
                 return "ShiftChange.InspectExcluded".Translate();
             }
-            if (WorkTypes.Count == 0 && !HandlesRecreation() && !HandlesRest())
+            if (!ServesSomething)
             {
                 return null;
             }
 
             string line = "ShiftChange.InspectWork".Translate(WorkTypesLabel());
+
+            // Only outside room mode, by the full-change line's rule below:
+            // report what differs from the default.
+            if (serves == CatchmentKind.Radius)
+            {
+                line += "\n" + "ShiftChange.InspectServesRadius".Translate(serveRadius);
+            }
 
             // Say who owns or holds it here as well as on the gizmo: the base
             // comp reports ownership nowhere, and a stand that looks unassigned
@@ -1325,7 +1553,8 @@ namespace ShiftChange
             yield return new Command_Action
             {
                 defaultLabel = regime,
-                defaultDesc = "ShiftChange.SetWorkTypeDesc".Translate(WorkTypesLabel(), source),
+                defaultDesc = ByCatchment("ShiftChange.SetWorkTypeDesc")
+                    .Translate(WorkTypesLabel(), source, serveRadius),
                 // The pencil, not ForbidOff — a forbid glyph on a
                 // configuration gizmo reads as "this stand is disabled".
                 // Zero-art rule: icons come from vanilla's atlas only.

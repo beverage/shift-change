@@ -19,6 +19,7 @@ using Verse.AI;
 // Types rather than partials because the harness still shipped then, and a
 // decompiler merges partials back into one class: the shipped dll would have
 // read exactly as it did before.
+using static ShiftChange.HarnessCatchments;
 using static ShiftChange.HarnessFixtures;
 using static ShiftChange.HarnessGates;
 using static ShiftChange.HarnessInterop;
@@ -275,6 +276,50 @@ namespace ShiftChange
             Case(map, pad, "Change back holds the room until they leave it, and drafting drops it",
                  (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  ChangeBackLatchHoldsUntilTheyLeave);
+            Case(map, pad, "a radius covers its ring, inclusive, and room mode its room",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), RadiusCoversItsRing);
+            Case(map, pad, "a stand leaves room mode only with something ticked, and comes back with nothing",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), CatchmentNeedsSomethingTicked);
+            Case(map, pad, "a freed radius stand interrupts nobody, a room stand still does",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 FreedRadiusStandCatchesNobody);
+            Case(map, pad, "a radius stand dresses within its ring, past its room, and not beyond the ring",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 RadiusStandDressesWithinItsRing);
+            Case(map, pad, "a room stand in the open serves no outdoor recreation, a radius stand does",
+                 StageWithDoorway, RadiusServesOutdoorRecreation);
+            Case(map, pad, "an owned radius stand beats a nearer shared room stand",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 OwnedRadiusStandBeatsANearerSharedOne);
+            Case(map, pad, "a radius work stand keeps the uniform on for its work, pass-through work and idling, and nothing else",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 RadiusWorkStandKeepsTheUniformInItsRing);
+            Case(map, pad, "pass-through work is judged at both ends, and an errand ahead of the stand's work rides along",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 PassThroughWorkIsJudgedAtBothEnds);
+            Case(map, pad, "a radius sleep stand changes them back on the first job out of bed",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 RadiusSleepStandKeepsItOnlyForBed);
+            Case(map, pad, "a radius recreation stand keeps the outfit on for play and idling, not for hauling",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 RadiusRecreationStandKeepsItForPlay);
+            Case(map, pad, "the job a colonist was just dressed for never changes them back, though its target walks away",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 JustDressedForNeverSendsThemBack);
+            Case(map, pad, "the change-back latch holds its stand and trigger only, until they leave the ring",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 LatchHoldsItsStandAndTriggerOnly);
+            Case(map, pad, "at a sleep rack the latch holds through the night and lifts on waking",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 SleepRackLatchLiftsOnWaking);
+            // A known gap unless Complex Jobs is loaded (--with=).
+            Case(map, pad, "a construction delivery changes nobody, in either direction, and the site does",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 DeliveriesChangeNobody);
+            Case(map, pad, "the Serves row, the inspect pane and the switch's tooltip follow the catchment",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 CatchmentWordsFollowTheMode);
             Case(map, pad, "a stand outside the colonist's allowed area dresses nobody",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
@@ -332,12 +377,13 @@ namespace ShiftChange
             Case("an older save's foreign owner round-trips without contest and is adopted",
                  DebugTools_SaveRoundTrip.ForeignAssignable);
 
-            // The two below need no map, so they are unaffected by the game
+            // The cases below need no map, so they are unaffected by the game
             // replacement above.
             Case("the recreation job classifier holds", RecreationClassifierHolds);
             Case("the sleep job classifier holds", RestClassifierHolds);
             Case("the room-role table resolves", RoomRoleTableResolves);
             Case("the job-target and ignored-giver tables hold", JobTablesHold);
+            Case("the pass-through tags and the incidental job list hold", PassThroughAndIncidentalTablesHold);
             Case("the room-contents markers hold", ContentsMarkersHold);
             Case("the work-type dialog never hands its listing a short rect",
                  WorkTypeDialogBodyRectFitsTheBody);

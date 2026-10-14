@@ -31,18 +31,24 @@
        strings. SetWorkTypeLabel is deliberately NOT carried over from the
        branch — main's Regime* keys replaced it. -->
   <ShiftChange.SetWorkTypeDesc>This stand dresses for: {0} ({1}).\n\nWhoever uses it changes into the outfit before starting automatic work or recreation of those kinds in this room, and changes back when they leave.\n\nThis switch also decides which mod's owner control the stand shows when another outfit-stand mod is installed: in service, Shift Change's; not used, the other mod's.</ShiftChange.SetWorkTypeDesc>
+  <!-- Keys ending in Radius are the variants of the same key without it, for a
+       stand serving a radius instead of its room (CompShiftStand.ByCatchment). -->
+  <ShiftChange.SetWorkTypeDescRadius>This stand dresses for: {0} ({1}), within {2} cells of it.\n\nWhoever uses it changes into the outfit before starting automatic work, recreation or sleep of those kinds inside that radius. Inside it the outfit stays on for those, for idling and wandering, and for walking back into their allowed area or out of the heat or cold. At a work stand, hauling, cleaning and building keep it on as well; at a sleep stand, only bed does. Anything else, and anything outside the radius, sends them back to change first.\n\nThis switch also decides which mod's owner control the stand shows when another outfit-stand mod is installed: in service, Shift Change's; not used, the other mod's.</ShiftChange.SetWorkTypeDescRadius>
   <ShiftChange.RegimeShift>Shift stand: {0}</ShiftChange.RegimeShift>
   <ShiftChange.RegimeShiftMore>Shift stand: {0} (+{1})</ShiftChange.RegimeShiftMore>
   <ShiftChange.RegimeIdle>Shift stand (no work here yet)</ShiftChange.RegimeIdle>
   <ShiftChange.RegimeOff>Not used for shift changes</ShiftChange.RegimeOff>
   <ShiftChange.WorkTypesTitle>Work types</ShiftChange.WorkTypesTitle>
   <ShiftChange.WorkTypesExplainer>Ticked activities, done in this room, trigger a change into this stand's outfit:</ShiftChange.WorkTypesExplainer>
+  <ShiftChange.WorkTypesExplainerRadius>Ticked activities, done within its radius, trigger a change into this stand's outfit:</ShiftChange.WorkTypesExplainerRadius>
   <ShiftChange.NoWorkTypes>No work types exist to tick, here or anywhere. They are gone from the work tab as well, so a mod that rearranges work categories has hidden them.</ShiftChange.NoWorkTypes>
   <ShiftChange.Recreation>recreation</ShiftChange.Recreation>
   <ShiftChange.RecreationRow>Recreation: any joy activity in this room</ShiftChange.RecreationRow>
+  <ShiftChange.RecreationRowRadius>Recreation: any joy activity within its radius</ShiftChange.RecreationRowRadius>
   <ShiftChange.RecreationExclusiveNote>While recreation is on, this stand serves recreation only; work types do not apply.</ShiftChange.RecreationExclusiveNote>
   <ShiftChange.Rest>sleep</ShiftChange.Rest>
   <ShiftChange.RestRow>Sleeping: going to bed in this room</ShiftChange.RestRow>
+  <ShiftChange.RestRowRadius>Sleeping: going to bed within its radius</ShiftChange.RestRowRadius>
   <ShiftChange.RestExclusiveNote>While sleeping is on, this stand serves bedtime only; work types do not apply. Bed rest for medical reasons is a work type, 'resting in bed', and is not covered by this row.</ShiftChange.RestExclusiveNote>
   <ShiftChange.DepositOnly>Deposit only, issue no outfit</ShiftChange.DepositOnly>
   <ShiftChange.DepositOnlyDesc>Normally a stand hands out an outfit and takes in whatever it displaces, so a sleeping stand wants pyjamas on it.\n\nWith this on it hands out nothing. A colonist heading for bed parks whatever this stand's storage filter accepts, keeps the rest of their clothes on, and collects it again in the morning. It is the setting for a rack by the bed that your marine drops power armor onto every night.\n\nThe storage filter decides which garments come off, and you will want to NARROW it. A new stand already accepts nearly all clothing, so leave it alone and this stand tries to take almost everything a colonist is wearing. Use the storage tab to allow only the gear you want parked.\n\nHaulers leave a deposit-only stand alone, so it holds what its owner parked there and nothing else. You can still carry something onto it yourself with a right-click order.\n\nIt will never send a colonist to bed naked: if what the filter would take leaves them without basic clothing, the stand is skipped for that colonist entirely. So a soldier who wears nothing under their armor needs something to change into, or a set of clothes underneath, before this will do anything for them.</ShiftChange.DepositOnlyDesc>
@@ -59,6 +65,21 @@
   <ShiftChange.WorkTypeNone>Not used for shift changes</ShiftChange.WorkTypeNone>
   <ShiftChange.RoomReadsAs>the game reads this room as: {0}</ShiftChange.RoomReadsAs>
   <ShiftChange.NoRoomRole>this spot is not in a roled room</ShiftChange.NoRoomRole>
+  <ShiftChange.AutomaticRoomOnly>Automatic reads the stand's room, so it needs Serves: This room. Switch that below first.</ShiftChange.AutomaticRoomOnly>
+
+  <!-- The Serves row, last in the settings window. -->
+  <ShiftChange.ServesRow>Serves: {0}</ShiftChange.ServesRow>
+  <ShiftChange.ServesRoom>this room</ShiftChange.ServesRoom>
+  <ShiftChange.ServesOutdoors>everywhere outdoors</ShiftChange.ServesOutdoors>
+  <ShiftChange.ServesNothingOutdoors>nothing out in the open</ShiftChange.ServesNothingOutdoors>
+  <ShiftChange.ServesRadius>within {0} cells</ShiftChange.ServesRadius>
+  <ShiftChange.ServesOptionRoom>This room</ShiftChange.ServesOptionRoom>
+  <ShiftChange.ServesOptionRadius>Within a radius</ShiftChange.ServesOptionRadius>
+  <ShiftChange.ServesDesc>Where this stand dresses colonists, and where they keep its outfit on.\n\nThis room: the stand's own room. This is the default.\n\nWithin a radius: every cell inside the ring, walls or no walls. The ring is drawn while this window is open and whenever the stand is selected. Inside it a colonist keeps the outfit on for what the stand is for, for idling and wandering, and for walking back into their allowed area or out of the heat or cold. At a work stand, hauling, cleaning and building keep it on as well; at a sleep stand, only bed does. Anything else sends them back to change first.</ShiftChange.ServesDesc>
+  <ShiftChange.ServesNothingOutdoorsDesc>Standing in the open, its room is all the open ground on the map, so a stand for recreation or sleep serves nothing there. Choose Within a radius to serve the ground around it.</ShiftChange.ServesNothingOutdoorsDesc>
+  <ShiftChange.ServesNeedsTrigger>Tick what this stand serves first: a work type, Recreation or Sleeping.</ShiftChange.ServesNeedsTrigger>
+  <ShiftChange.ServeRadius>Radius: {0} cells</ShiftChange.ServeRadius>
+  <ShiftChange.InspectServesRadius>Serves a radius of {0} cells</ShiftChange.InspectServesRadius>
 
   <!-- Work-type names we override, because the mod supplying them fills
        gerundLabel and labelShort with names for different things. Keyed on the
@@ -72,21 +93,23 @@
   <ShiftChange.None>nothing</ShiftChange.None>
 
   <ShiftChange.AssignDesc>Restrict this stand to the colonists you list. Name one and it is their personal kit; name several and it serves that group and nobody outside it.\n\nLeave it unassigned and it is shared: any colonist about to do {0} in this room may use whichever stand is free. A kitchen therefore needs one stand per cook working at once, not one per cook.\n\nThe list filters by gender and can assign everyone shown at once, so a stand holding gendered clothing is two clicks away.</ShiftChange.AssignDesc>
+  <ShiftChange.AssignDescRadius>Restrict this stand to the colonists you list. Name one and it is their personal kit; name several and it serves that group and nobody outside it.\n\nLeave it unassigned and it is shared: any colonist about to do {0} within its radius may use whichever stand is free. A kitchen therefore needs one stand per cook working at once, not one per cook.\n\nThe list filters by gender and can assign everyone shown at once, so a stand holding gendered clothing is two clicks away.</ShiftChange.AssignDescRadius>
   <ShiftChange.AssignDescNoPool>Restrict this stand to the colonists you list.\n\nShared use of unassigned stands is turned off in mod settings, so only a listed owner will change at this stand for {0}.</ShiftChange.AssignDescNoPool>
   <ShiftChange.AssignDescNoWork>Restrict this stand to the colonists you list. It has no work type yet: either put it in a room with a role, or set one manually.</ShiftChange.AssignDescNoWork>
   <ShiftChange.AssignDescExcluded>Choose the one colonist this stand belongs to. It is not used for shift changes, so nobody is dressed here automatically.\n\nIf it had several owners in shift use, they stay listed for when you put it back, and choosing one colonist here replaces them.\n\nIf Outfit Stands Plus is installed, a single owner also gets the Outfit Stands Plus button for this stand (equip outfit, or return to stand).</ShiftChange.AssignDescExcluded>
 
   <ShiftChange.ChangeBackLabel>Change back</ShiftChange.ChangeBackLabel>
-  <ShiftChange.ChangeBackDesc>Cancel this colonist's orders and send them to {STAND} to change out of their work outfit.\n\nThey change back on their own once their next job takes them out of this room, raid or no raid. Use this when that is not soon enough: in an emergency, or when the job they are on will take a long time.\n\nThey keep working in this room in their own clothes, and will not put the outfit back on until they have left the room and returned. Drafting them clears that straight away.</ShiftChange.ChangeBackDesc>
+  <ShiftChange.ChangeBackDesc>Cancel this colonist's orders and send them to {STAND} to change out of their work outfit.\n\nThey change back on their own once their next job takes them out of this room, raid or no raid. Use this when that is not soon enough: in an emergency, or when the job they are on will take a long time.\n\nThey keep working in this room in their own clothes. Neither {STAND} nor another stand in this room serving the same thing (work, recreation or sleep) will dress them again until they have left the room, or slept. Drafting them clears that straight away.</ShiftChange.ChangeBackDesc>
+  <ShiftChange.ChangeBackDescRadius>Cancel this colonist's orders and send them to {STAND} to change out of their work outfit.\n\nThey change back on their own before their next job if it is outside its radius, or is one the stand does not keep them dressed for, raid or no raid. Use this when that is not soon enough: in an emergency, or when the job they are on will take a long time.\n\nThey keep working in their own clothes. Neither {STAND} nor another stand serving the same thing (work, recreation or sleep) whose room or radius takes in {STAND} will dress them again until they have left its radius, or slept. Drafting them clears that straight away.</ShiftChange.ChangeBackDescRadius>
   <ShiftChange.ChangeBackUnreachable>Cannot reach {STAND}.</ShiftChange.ChangeBackUnreachable>
   <ShiftChange.ChangeBackUnavailable>This colonist cannot change right now.</ShiftChange.ChangeBackUnavailable>
 
   <ShiftChange.SettingPoolUnassigned>Unassigned stands are shared</ShiftChange.SettingPoolUnassigned>
-  <ShiftChange.SettingPoolUnassignedDesc>When on, an outfit stand with no assigned owner, standing in a work room, may be used by any colonist capable of that room's work.\n\nWhen off, only stands with an explicit owner list ever dress anyone, and every unassigned stand behaves exactly like vanilla furniture.</ShiftChange.SettingPoolUnassignedDesc>
+  <ShiftChange.SettingPoolUnassignedDesc>When on, an outfit stand with no assigned owner may be used by any colonist about to do what it serves.\n\nWhen off, only stands with an explicit owner list ever dress anyone, and every unassigned stand behaves exactly like vanilla furniture.</ShiftChange.SettingPoolUnassignedDesc>
   <ShiftChange.SettingKeepDecent>Keep colonists decent</ShiftChange.SettingKeepDecent>
   <ShiftChange.SettingKeepDecentDesc>Off by default, so nothing changes in a colony you are already playing.\n\nTurn it on and a stand will not leave a colonist without basic clothing: if what it hands out does not cover them, their innermost garments stay on and the rest of the swap happens as normal. That mostly matters with Change the whole outfit ticked, where a stand holding only a hat or a belt would otherwise send someone out with nothing else on.\n\nNudists, and anyone whose ideoligion prefers nudity, are exempt either way.</ShiftChange.SettingKeepDecentDesc>
   <ShiftChange.SettingMedicalEmergencies>Medical emergencies change first</ShiftChange.SettingMedicalEmergencies>
-  <ShiftChange.SettingMedicalEmergenciesDesc>Off by default, so nothing changes in a colony you are already playing.\n\nNormally an emergency is never delayed for a wardrobe trip. Turn this on and medical ones are: a doctor answering an emergency tend puts scrubs on first, and a colonist in critical condition stops for a hospital gown on the way to bed.\n\nFires are never covered. A colonist fighting one goes straight there whatever this is set to.\n\nIt works both ways round, so a doctor already in another room's uniform may also change out of it before answering the call.</ShiftChange.SettingMedicalEmergenciesDesc>
+  <ShiftChange.SettingMedicalEmergenciesDesc>Off by default, so nothing changes in a colony you are already playing.\n\nNormally an emergency is never delayed for a wardrobe trip. Turn this on and medical ones are: a doctor answering an emergency tend puts scrubs on first, and a colonist in critical condition stops for a hospital gown on the way to bed.\n\nFires are never covered. A colonist fighting one goes straight there whatever this is set to.\n\nIt works both ways round, so a doctor already in another stand's uniform may also change out of it before answering the call.</ShiftChange.SettingMedicalEmergenciesDesc>
 
   <!-- Rich text: Unity IMGUI supports &lt;b&gt;, &lt;i&gt;, &lt;size&gt; and
        &lt;color&gt; — but NOT &lt;u&gt;, which is TextMeshPro only and would

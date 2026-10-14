@@ -603,7 +603,7 @@ namespace ShiftChange
                          "so back inside, the room's work dresses them again (control)");
 
             // Drafting drops it outright.
-            Patch_JobInterception.ChangedBackAt[fix.Pawn] = fix.Stand;
+            Patch_JobInterception.ChangedBackAt[fix.Pawn] = new Patch_JobInterception.ChangeBackLatch(fix.Stand);
             ok &= Expect(!Diverts(fix, WorkJob(fix, tend)),
                          "latched again, the room's work does not dress them");
             if (fix.Pawn.drafter != null)
@@ -620,7 +620,7 @@ namespace ShiftChange
             // would re-dress the colonist the player just pulled out. Goto
             // aimed at another cell in the room, for the reason
             // FreedStandCatchesUp gives.
-            Patch_JobInterception.ChangedBackAt[fix.Pawn] = fix.Stand;
+            Patch_JobInterception.ChangedBackAt[fix.Pawn] = new Patch_JobInterception.ChangeBackLatch(fix.Stand);
             Job working = JobMaker.MakeJob(JobDefOf.Goto, fix.Stand.Position + new IntVec3(3, 0, 2));
             working.workGiverDef = tend;
             fix.Pawn.jobs.StartJob(working, JobCondition.InterruptForced, null,
@@ -782,7 +782,7 @@ namespace ShiftChange
                 ok &= Expect(fix.Comp.IsAssignedTo(pawn) && sharedComp.IsPool && !shared.IsForbidden(pawn),
                              "their own stand is outside the area, a shared one inside it (control)");
 
-                CompShiftStand chosen = Patch_JobInterception.FindAvailableStand(room, pawn, doctor);
+                CompShiftStand chosen = Patch_JobInterception.FindAvailableStand(workAt, fix.Map, pawn, doctor);
                 ok &= Expect(chosen == sharedComp,
                              "so the shared stand inside the area is chosen over their own (chose "
                              + (chosen == null ? "nothing" : chosen == fix.Comp ? "their own" : "another")
@@ -949,7 +949,7 @@ namespace ShiftChange
                 pawn.playerSettings.AreaRestrictionInPawnCurrentMap = area;
                 ok &= Expect(fix.Stand.IsForbidden(pawn),
                              "the area leaves the stand out, so it is forbidden to them (control)")
-                    & Expect(Patch_JobInterception.FindAvailableStand(room, pawn, null,
+                    & Expect(Patch_JobInterception.FindAvailableStand(pawn.Position, fix.Map, pawn, null,
                                  Patch_JobInterception.StandTrigger.Recreation) == null,
                              "the recreation arm's search passes the stand over")
                     & Expect(!Probe(fix, JoyJob(fix, chess)),
@@ -969,7 +969,7 @@ namespace ShiftChange
                 ok &= Expect(fix.Comp.HandlesRest() && !fix.Comp.HandlesRecreation(),
                              "the stand is switched to sleep (control)")
                     & Expect(!bed.IsForbidden(pawn), "and the bed is inside their area (control)")
-                    & Expect(Patch_JobInterception.FindAvailableStand(room, pawn, null,
+                    & Expect(Patch_JobInterception.FindAvailableStand(bed.Position, fix.Map, pawn, null,
                                  Patch_JobInterception.StandTrigger.Rest) == null,
                              "the sleep arm's search passes the stand over")
                     & Expect(!Probe(fix, JobMaker.MakeJob(laydown, bed)),
