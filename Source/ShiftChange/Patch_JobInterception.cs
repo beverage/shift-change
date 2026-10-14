@@ -1137,12 +1137,16 @@ namespace ShiftChange
             // JobGiver_Work stamps workGiverDef only on its scanner paths, so a
             // medical lay-down arrives with none. Reading the giver alone left
             // both patient rows dead from the day the sleep trigger shipped
-            // (docs/DESIGN.md, "The sleep branch").
-            return job.workGiverDef?.workType ?? MedicalRestWorkType(pawn, job, tag);
+            // (docs/DESIGN.md, "The sleep branch"). Fishing is the same shape
+            // (JobRoomTargets.NonScanGivers).
+            return job.workGiverDef?.workType
+                ?? MedicalRestWorkType(pawn, job, tag)
+                ?? JobRoomTargets.NonScanGiver(job, tag)?.workType;
         }
 
         /// <summary>
-        /// Dress for <paramref name="work"/> at a stand in the job's room. True
+        /// Dress for <paramref name="work"/> at a stand whose catchment covers
+        /// the job (<see cref="FindAvailableStand(JobPlace, Map, Pawn, WorkTypeDef, StandTrigger)"/>). True
         /// if a swap started.
         /// </summary>
         internal static bool WorkArm(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,

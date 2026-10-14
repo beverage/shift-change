@@ -154,6 +154,56 @@ namespace ShiftChange
             return giver.defName == SeedPlanter && job.def == JobDefOf.PlantSeed;
         }
 
+        /// <summary>
+        /// Work givers whose jobs come only through <c>NonScanJob</c>, by the
+        /// JobDef they make. <c>JobGiver_Work</c> stamps <c>workGiverDef</c> on
+        /// its scanner paths alone, so these jobs reach <c>StartJob</c> with no
+        /// giver and the work arm never saw them; this hands them back the
+        /// giver, as <c>MedicalRestWorkType</c> does for medical bed rest.
+        /// Matched only with no giver stamped and with the tag the giver's
+        /// non-scan path gives (<c>JobGiver_Work</c> passes the giver's own
+        /// <c>tagToGive</c> along), so the same job ordered from anywhere else
+        /// is left alone. No tag at all matches too: vanilla's
+        /// <c>StartJob</c> puts a job back in the queue with none when it
+        /// slips a haul in ahead of it, so that is how the job starts again
+        /// (<c>Pawn_JobTracker.TryOpportunisticJob</c>). A player-forced job
+        /// never matches. Matched as strings, so a game without the def never
+        /// matches.
+        ///
+        /// <para><c>Fish</c> is Odyssey's fishing (<c>WorkGiver_Fish</c>,
+        /// <c>tagToGive Fieldwork</c>). The zone's own "fish here" order makes
+        /// the same job with <c>JobTag.Misc</c>, player-forced, which no stand
+        /// acts on anyway. Fishing water is outdoors on nearly every map, and
+        /// a room stand in the open serves nothing, so this reaches a radius or
+        /// an area stand by the water, or a room stand by a walled pond:
+        /// docs/DESIGN.md, "Catchments".</para>
+        /// </summary>
+        internal static readonly Dictionary<string, string> NonScanGivers =
+            new Dictionary<string, string>
+            {
+                { "Fish", "Fish" },
+            };
+
+        /// <summary>
+        /// The giver a giver-less <see cref="NonScanGivers"/> job came from, or
+        /// null when this job is not one, the giver's mod is absent or the
+        /// giver is ignored.
+        /// </summary>
+        internal static WorkGiverDef NonScanGiver(Job job, JobTag? tag)
+        {
+            if (job?.def == null || job.workGiverDef != null || job.playerForced
+                || !NonScanGivers.TryGetValue(job.def.defName, out string giverName))
+            {
+                return null;
+            }
+            WorkGiverDef giver = DefDatabase<WorkGiverDef>.GetNamedSilentFail(giverName);
+            if (giver == null || (tag != null && tag != giver.tagToGive) || Ignored(giver))
+            {
+                return null;
+            }
+            return giver;
+        }
+
         internal static HashSet<WorkGiverDef> deliveryGivers;
 
         /// <summary>

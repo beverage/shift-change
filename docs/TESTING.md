@@ -148,9 +148,13 @@ medical emergency setting covers doctors and patients but never firefighting
 (`MedicalEmergencySettingCoversTheRightWork`). A deposit-only stand parks what
 its filter accepts and hands it back (`DepositOnlyParksAndReturns`), and
 `StoreUtility`'s own search walks haulers past it while an ordinary stand still
-takes deliveries (`DepositOnlyStandIsNoHaulTarget`). `FishingNeverDresses` is a
-known gap on every list, kept on purpose (see
-[Rules the suite follows](#rules-the-suite-follows)).
+takes deliveries (`DepositOnlyStandIsNoHaulTarget`). Fishing, which Odyssey
+hands out with no giver, dresses as it is handed out, as the same job carrying
+its giver does (control), but not with a player order's tag; a radius stand by
+the door dresses for fishing out past it, which room mode does not, and not
+past its ring. Untagged, as vanilla puts it back in the queue behind a haul, it
+still dresses, and on shift that haul keeps the uniform on, where the same haul
+with nothing queued changes them back (`FishingDressesAtAStandTickedForIt`).
 
 **Gates** (`HarnessGates`). `PromisesHold` is the decision table for the
 promises: automatic work only, emergencies never delayed, drafted pawns left
@@ -444,11 +448,11 @@ several ten-minute cycles apiece.
 
 **Count known gaps apart from failures.** A case can be marked `GAP` with its
 reason recorded — it still runs, and reports `FIXED` if it starts passing. Most
-gaps are a case whose mod is not on the list. One is a real gap, kept on purpose
-on every list: fishing never dresses, because Odyssey hands fishing out with no
-giver, and the fix waits for stands that can serve beyond their room. Its
-control, the same job carrying its giver, does dress. The mechanism exists
-because a suite that always prints one failure is ignored within a week.
+gaps are a case whose mod is not on the list. Until v1.5.0 one was a real gap,
+kept on purpose on every list: fishing never dressed, because Odyssey hands
+fishing out with no giver, and the fix waited for stands that can serve beyond
+their room. The mechanism exists because a suite that always prints one failure
+is ignored within a week.
 
 ## Two engine traps
 

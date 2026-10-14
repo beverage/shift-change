@@ -408,9 +408,9 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), SwitchNamesWhatTheStandServes);
             Case(map, pad, "selecting several stands shows each stand's own buttons",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), StandButtonsStaySeparate);
-            // A known gap on every list, kept on purpose: see the case.
-            Case(map, pad, "fishing dresses at a stand ticked for it",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), FishingNeverDresses);
+            Case(map, pad, "fishing dresses at a stand ticked for it, and at a radius stand by the shore",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Fishing")),
+                 FishingDressesAtAStandTickedForIt);
             // The pair, and it only means anything as a pair: the refusal that
             // stops a checked-out pawn re-arming from the spare pile, and the
             // release that lets them shop once their parked kit is worn out.

@@ -241,9 +241,11 @@ they were already wearing. A shared sleeping room takes the switch by hand.
 A stand serves its own room unless you tell it otherwise. The **Serves** row at
 the bottom of its settings switches it to **Within a radius**: every cell within
 that many cells of the stand, walls or no walls. That suits a shed in the middle
-of the fields, a changing hut by the pool, or a stand halfway down a corridor of
-workshops. The ring is drawn while the settings are open and whenever the stand
-is selected, and the slider runs from 3 cells to 79.
+of the fields, a changing hut by the pool, a fishing hut on the shore, or a
+stand halfway down a corridor of workshops. The ring is drawn while the settings
+are open and whenever the stand is selected, and the slider runs from 3 cells to
+79. Fishing works now too: ticking it did nothing before v1.5.0, because the
+game hands out fishing differently from other work.
 
 The same menu lists your **allowed areas** in a section of their own, each with
 its colour beside it: the ones you restrict colonists to in the Assign tab.

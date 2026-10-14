@@ -82,13 +82,13 @@ A harness pass is not a play observation, and a `GAP` line is a known failure
 being tracked, not a pass. **Six gaps are expected on the default list**: the
 Rimatomics table and marker cases skip themselves when Rimatomics is not
 loaded, and the Outfit Stands Plus, Common Sense and Pick Up And Haul cases
-when their mod is not (`--with=` loads each). The sixth is fishing, a gap on
-every list until a stand can serve beyond its room: Odyssey hands fishing jobs
-out with no giver. So a clean default run reads `0 failed, 6 known gaps` and
-exits 0. Any other gap, or any failure, is real. It does now run
+when their mod is not (`--with=` loads each). The sixth is Complex Jobs'
+two delivery givers, probed by the delivery case only when that mod is loaded
+(`--with=FrozenSnowFox.ComplexJobs`). So a clean default run reads
+`0 failed, 6 known gaps` and exits 0. Any other gap, or any failure, is real. It does now run
 `JobDriver_SwapAtStand` for real, through the pawn's own tracker, so "the
 driver builds a correct ledger" is covered, and the player-facing rules have
-functional cases. Save/load round trips are covered by three cases that load
+functional cases. Save/load round trips are covered by four cases that load
 through the engine's synchronous loader (`SavedGameLoaderNow`;
 `GameDataSaveLoader.LoadGame` is async and never returns control) and assert on
 the written file as well as the loaded state. They run last, since they replace

@@ -276,12 +276,38 @@ makes Harmony skip every later bool prefix (`MethodCreator.AddPrefixes` tests
 the run-original flag before each one). So the haul is the first job of the
 pair we see, and it reaches us from the queue at the next job boundary.
 
-The signal, exactly: the incoming job has no `workGiverDef`; the queue's head
-has one, its work type is one the stand serves, and it is not on the
-ignored-giver list; and the head resolves inside the stand's catchment
-(`Covers`), through the same resolver both directions use. Whether the incoming job came off the queue or
-was started from inside `StartJob` makes no difference. Our own swap never
-counts as the head, since it carries no giver.
+The signal, exactly: the incoming job has no `workGiverDef`, and the queue's
+head is one of these:
+
+- **The job they were just dressed for** (`DressedFor`, "Catchments"), wherever
+  its target has gone.
+- **A delivery or an ignored giver's job whose work the stand serves and keeps
+  the uniform on for** (`JobRoomTargets.IsDelivery`, `JobRoomTargets.Ignored`;
+  `KeepsTheUniformFor`, "Mod compatibility"): a delivery or a meal run has
+  every site it supplies inside the catchment. A delivery to a site outside
+  does not count, nor does a meal for a patient outside, nor a delivery the
+  return trip keeps on for another stand's work with the whole trip inside
+  (`SiteJobStaysDressed`), as no work the stand does not serve counts. Refusing every ignored
+  giver here, as the rule first did, sent a doctor to change out before the
+  haul vanilla slips in ahead of a meal run (`FeedPatient` and `DeliverFood`
+  allow the prefix), to feed the patient in their own clothes and dress again
+  for the next tend (focused check, 2026-10-14).
+- **Other work the stand serves, inside its catchment** (`Covers`, through the
+  same resolver both directions use). Its work
+  type is read the way the dress arms read it (`WorkTypeFor`), with the queue's
+  own tag, so fishing and medical bed rest count with no giver stamped. Vanilla
+  puts the job back with no tag, and a giver-less fishing job is recognised
+  without one (`JobRoomTargets.NonScanGiver`), as is an urgent patient's bed
+  lay-down (`IsMedicalLayDown`; with the medical emergency setting off, an
+  errand ahead of that lay-down keeps the uniform on whatever the stand serves,
+  `UrgentPatientNext`, "The sleep branch"). Read from the giver alone, as it
+  first was, every haul vanilla slipped ahead of a fishing job changed the
+  fisher out, and they then fished in their own clothes (adversarial review,
+  2026-10-14).
+
+Whether the incoming job came off the queue or was started from inside
+`StartJob` makes no difference. Our own swap never counts as the head, since it
+carries no giver.
 
 It governs staying dressed and nothing else. It is asked on the return trip
 only, so a pawn not on shift is dressed when the queued work itself starts,
@@ -1073,6 +1099,24 @@ raw key in one mode only.
 pull a bare colonist off a frame anywhere in its catchment: most site jobs are
 suspendable, and every meal or bedtime of a dressed builder frees the stand. The
 next job boundary catches the pawn anyway.
+
+**Fishing reaches the work arm through a giver row** (`JobRoomTargets.NonScanGivers`,
+asked by `WorkTypeFor` after `MedicalRestWorkType`). Odyssey's `Fish` giver makes
+its jobs only in `NonScanJob`, and `JobGiver_Work` stamps `workGiverDef` on its
+scanner paths alone, so a fishing job arrived with no giver and Fishing was a
+row in the checklist that did nothing. The row hands the job its giver back,
+matched on the job def, no giver stamped, and the tag the giver's non-scan path
+gives (its own `tagToGive`, `Fieldwork`): the zone's "fish here" order makes the
+same job with `Misc`, player-forced, and a player-forced job never matches. No
+tag at all matches too, because `Fish` allows an opportunistic prefix and
+vanilla puts it back in the queue untagged behind the haul it starts first
+(`Pawn_JobTracker.cs:341`, `JobQueue.EnqueueFirst`'s default). Matched on
+`Fieldwork` alone, the fishing job starting again after that haul read as no
+work at all (adversarial review, 2026-10-14). It waited for catchments because of where
+fishing happens. The job's place is targetA, the water, which is outdoors on
+nearly every map, and a room stand in the open serves nothing, so in room mode
+the row reaches only a stand beside a walled pond. A hut on the shore serving a
+radius, or an area painted over the water, is the setup it was for.
 
 ## Mod compatibility
 
