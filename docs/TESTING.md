@@ -139,11 +139,15 @@ tables against the def database, with no map (`RecreationClassifierHolds`,
 (`JoyJobInTheRoomDresses`), and work and recreation clear each other on one
 stand (`WorkAndRecreationAreExclusive`). `SleepJobInTheRoomDresses` puts a bed
 in the stand's room and covers going to bed there, every refusal, the mid-sleep
-re-trigger and the wake-up.
+re-trigger and the wake-up. It strips anything tendable the colonist arrived
+with first, as the bed-rest case below does: an untagged lay-down by a colonist
+who needs a doctor is medical bed rest, which no sleep stand dresses.
 
 **Bed rest, deposit only and fishing** (`HarnessTriggers` too). A stand ticked
 for vanilla's bed-rest work type dresses a patient going to recuperate, never
-one who needs a doctor first (`MedicalBedRestDressesAtAGownStand`), and the
+one who needs a doctor first (`MedicalBedRestDressesAtAGownStand`, which first
+strips anything tendable the generated colonist arrived with, such as asthma,
+and names it), and the
 medical emergency setting covers doctors and patients but never firefighting
 (`MedicalEmergencySettingCoversTheRightWork`). A deposit-only stand parks what
 its filter accepts and hands it back (`DepositOnlyParksAndReturns`), and
@@ -454,9 +458,9 @@ fishing out with no giver, and the fix waited for stands that can serve beyond
 their room. The mechanism exists because a suite that always prints one failure
 is ignored within a week.
 
-## Two engine traps
+## Three engine traps
 
-Neither is visible from the API surface. Both are recorded at their call sites.
+None is visible from the API surface. All are recorded at their call sites.
 
 **Pathfinding is asynchronous.** `Pawn_PathFollower.PatherTick` waits on a path
 request served by a job system that the game's own update loop drives, not by
@@ -471,6 +475,14 @@ across its own completion silently becomes a different job. The pump watches
 `jobs.curDriver`, which is built per job and never pooled — and it checks the
 `JobCondition` the job ended with, because "the driver changed" is equally true
 of a job that failed its reservations and died before its transfer toil.
+
+**The clock stands still.** The harness runs inside one frame, so `TicksGame`
+never moves while the pump ticks a pawn, and the pawn's own interval gates read
+it (`Pawn.IsHashIntervalTick`). For some pawns the needs then tick on every
+pumped tick instead of once per 150, rest drains in a few hundred ticks, and
+vanilla's involuntary sleep cut a swap short at random: two of three 1.7 runs on
+2026-10-13, in a different case each time. The pump holds the pawn's rest
+full.
 
 ## Static checks
 

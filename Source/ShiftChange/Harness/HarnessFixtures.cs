@@ -629,7 +629,9 @@ namespace ShiftChange
         /// <c>JobDriver.DriverTick</c>, and nothing in this driver reads
         /// <c>TicksGame</c> — so no <c>TickManager</c>, no world tick, and no
         /// other pawn's AI is involved. That is what makes this runnable from
-        /// a debug action at all.</para>
+        /// a debug action at all. The pawn's own interval gates do read the
+        /// clock, which stands still, so the loop holds the pawn's rest
+        /// full.</para>
         ///
         /// <para>Returns false on timeout rather than throwing, and every
         /// caller asserts on it: a pump that gave up must FAIL loudly, not
@@ -707,8 +709,24 @@ namespace ShiftChange
                           .Append(fix.Pawn.GetLord() == null
                                   ? "none" : fix.Pawn.GetLord().LordJob.GetType().Name)
                           .Append(", onShift ").Append(fix.Comp.OnShift)
+                          .Append(", rest ")
+                          .Append(fix.Pawn.needs?.rest == null
+                                  ? "none" : fix.Pawn.needs.rest.CurLevelPercentage.ToStringPercent())
+                          .Append(", ticks at zero rest ")
+                          .Append(fix.Pawn.needs?.rest == null ? -1 : fix.Pawn.needs.rest.TicksAtZero)
                           .AppendLine();
                     return false;
+                }
+                // The game clock stands still while the harness runs, inside one
+                // frame, and the pawn's own interval gates read it
+                // (Pawn.IsHashIntervalTick): for some pawns the needs then
+                // tick on every pumped tick instead of once per 150, rest
+                // drains in a few hundred ticks, and vanilla's involuntary
+                // sleep cuts the swap short at random. Rest is held full.
+                Need_Rest rest = fix.Pawn.needs?.rest;
+                if (rest != null)
+                {
+                    rest.CurLevel = rest.MaxLevel;
                 }
                 // The whole pawn, so a third-party Pawn.Tick postfix can throw
                 // in here. The case-level catch reports that as FAIL threw:

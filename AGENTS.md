@@ -94,12 +94,14 @@ through the engine's synchronous loader (`SavedGameLoaderNow`;
 the written file as well as the loaded state. They run last, since they replace
 `Current.Game`. A real gravship launch is the one thing still out of reach.
 
-**Two engine traps live in the driver cases**, both invisible from the API and
-both already paid for once. Pathfinding in 1.6 is asynchronous, so ticking a
+**Three engine traps live in the driver cases**, all invisible from the API and
+all already paid for once. Pathfinding in 1.6 is asynchronous, so ticking a
 single pawn never completes a walk — fixtures stage the pawn on the stand's
-interaction cell. And Jobs are pooled, so a `Job` reference held across its own
+interaction cell. Jobs are pooled, so a `Job` reference held across its own
 completion silently becomes the pawn's *next* job — watch `jobs.curDriver`,
-never the job.
+never the job. And the clock stands still while the harness runs, so a pumped
+pawn's needs can tick every tick and rest drains to an involuntary sleep — the
+pump holds rest full.
 
 **Every colony exit must reach the reaper.** Vanilla routes death, trade,
 kidnap and map exit through `Pawn_Ownership.UnclaimAll`, which

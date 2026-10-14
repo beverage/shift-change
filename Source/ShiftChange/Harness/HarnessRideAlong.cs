@@ -115,14 +115,18 @@ namespace ShiftChange
                 }
             }
 
-            bool ok = Expect(fix.Comp.HandlesWork(doctor) && fix.Comp.HandlesWork(warden),
-                             "the stand serves doctoring and wardening")
-                    & Expect(rows.Count >= 4, "the four Core feeding givers resolve ("
-                             + rows.Count + " of six; Biotech supplies the hemogen pair)")
-                    & Expect(Patch_JobInterception.TargetCell(
-                                 FeedingJob(JobDefOf.FeedPatient, mealAway, patient, tend), map)
-                             == mealAway.Position,
-                             "a feeding job reads as happening where the FOOD is (the mechanism)");
+            IntVec3 read = Patch_JobInterception.TargetCell(
+                FeedingJob(JobDefOf.FeedPatient, mealAway, patient, tend), map);
+            bool ok = Expect(fix.Comp.HandlesWork(doctor) && fix.Comp.HandlesWork(warden)
+                             && fix.Comp.HandlesWork(handling),
+                             "the stand serves doctoring, wardening and handling")
+                    & Expect(rows.Count >= 5, "the five Core feeding givers resolve ("
+                             + rows.Count + " of seven; Biotech supplies the hemogen pair)")
+                    & Expect(read == mealAway.Position,
+                             "a feeding job reads as happening where the FOOD is (the mechanism)"
+                             + (read == mealAway.Position ? "" : $": read {read}, the meal at {mealAway.Position}"
+                                + $" (spawned at {outside}, {(mealAway.Spawned ? "spawned" : "not spawned")}), there: "
+                                + string.Join(", ", mealAway.Position.GetThingList(map).Select(t => t.def.defName))));
 
             // Not yet dressed. The meal is stored IN the stand's room, so the
             // job reads as this room's doctoring or wardening.

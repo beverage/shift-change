@@ -190,7 +190,7 @@ can be watched end to end.
 **The lifecycle harness** covers what the demo stage cannot: a hundred and four
 cases that drive the engine's own entry points and assert where the ledger
 landed.
-What it covers, what it deliberately does not, the rules it follows and the two
+What it covers, what it deliberately does not, the rules it follows and the three
 engine traps it had to pay for are all in [TESTING.md](TESTING.md).
 
 ```bash

@@ -73,10 +73,11 @@ namespace ShiftChange
     /// the first place — which nothing covered until 2026-08-14, and which is
     /// where B1 lived.</para>
     ///
-    /// <para><b>Two engine traps the driver cases had to pay for</b>, recorded
-    /// at their call sites: pathfinding is asynchronous (hence staging on the
-    /// interaction cell), and Jobs are pooled (hence watching the driver, not
-    /// the job). docs/TESTING.md, "Two engine traps".</para>
+    /// <para><b>Three engine traps the driver cases had to pay for</b>,
+    /// recorded at their call sites: pathfinding is asynchronous (hence
+    /// staging on the interaction cell), Jobs are pooled (hence watching the
+    /// driver, not the job), and the clock stands still (hence holding the
+    /// pumped pawn's rest full). docs/TESTING.md, "Three engine traps".</para>
     ///
     /// <para>Save/load round trips run in-process through the engine's
     /// synchronous loader, as the last map cases, since they replace the whole
