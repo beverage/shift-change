@@ -10,7 +10,8 @@ namespace ShiftChange
     /// The abort button: a gizmo on any colonist currently in a stand's
     /// uniform that cancels their orders and sends them to change back NOW,
     /// on the player's timing rather than at their next job boundary. A press
-    /// latches them out of dressing in that room until they leave it
+    /// latches them out of dressing at that stand, and at stands with its
+    /// trigger that cover it, until they leave its catchment or wake
     /// (<see cref="Patch_JobInterception.ChangedBackAt"/>), and drafting drops
     /// the latch. Deliberately not automatic: no auto-change on a raid, and a
     /// pawn drafted in uniform stays in it. Why each: docs/DESIGN.md, "Change
@@ -78,7 +79,7 @@ namespace ShiftChange
             Command_Action command = new Command_Action
             {
                 defaultLabel = "ShiftChange.ChangeBackLabel".Translate(),
-                defaultDesc = "ShiftChange.ChangeBackDesc".Translate(
+                defaultDesc = stand.ByCatchment("ShiftChange.ChangeBackDesc").Translate(
                     stand.parent.Label.Named("STAND")),
                 // The stand's own build icon — this mod ships no art, and
                 // the picture of the stand is also the clearest statement of
@@ -115,15 +116,17 @@ namespace ShiftChange
             // other right-click order in the game.
             if (pawn.jobs != null && pawn.jobs.TryTakeOrderedJob(swap, JobTag.ChangingApparel))
             {
-                Patch_JobInterception.ChangedBackAt[pawn] = stand.parent;
+                Patch_JobInterception.ChangedBackAt[pawn] =
+                    new Patch_JobInterception.ChangeBackLatch(stand.parent);
             }
         }
     }
 
     /// <summary>
-    /// Drafting drops the room-exit latch, so an undrafted pawn resumes
+    /// Drafting drops the change-back latch, so an undrafted pawn resumes
     /// ordinary shift changes immediately — a fight is a decisive enough
-    /// break that "have they left the room" stops being the useful question.
+    /// break that "have they left the catchment" stops being the useful
+    /// question.
     /// Patching the setter (rather than polling) means the clear happens on
     /// the same frame as the draft, and it fires on UNdrafting too —
     /// harmless, since the latch is only ever set by the button and a second

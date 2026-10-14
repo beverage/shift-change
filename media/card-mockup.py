@@ -93,7 +93,7 @@ ORDER = [
     # banner has no card under it here by design.
     "Banner_WhatItDoes",
     "Banner_HowItWorks",
-    "Card_Gizmos", "Card_Controls", "Card_Removing",
+    "Card_Gizmos", "Card_Controls",
     # The exclusions stayed a plain bullet list in the description: four short
     # negatives are a list, and setting them in a picture would cost a card to
     # say less than the text does. The rules went the same way and further —
@@ -108,7 +108,7 @@ ORDER = [
 
 #: id -> filename. The ids are PascalCase because they read as names in code;
 #: media/ is lowercase-with-dashes and was long before these arrived, so the
-#: files that land beside card-chef.png and card-tooltip.png match those.
+#: files that land beside card-chef.png and card-controls.png match those.
 #:
 #: Written out rather than slugified. A camel-splitter would produce nine of
 #: these correctly and then have an opinion about "FAQ", and the tenth entry is
@@ -125,7 +125,6 @@ ASSET = {
     "Banner_Source": "banner-source",
     "Card_Gizmos": "card-gizmos",
     "Card_Controls": "card-stand-controls",
-    "Card_Removing": "card-removing",
     "Card_FAQ": "card-faq",
 }
 
@@ -244,31 +243,28 @@ CARDS = [
                         "and a room that does two jobs wants two stands.",
             },
             {
+                # At the dialogs' scale, not the card's shot width: the dialog
+                # crops are 418 px shown at SHOT_W (x1.246), so the 213 px menu
+                # goes to 265. At SHOT_W its text would dwarf the dialogs'; at
+                # 213 it reads a size smaller than theirs.
+                "shot": "cards/parts/menu-serves.png",
+                "shotw": 265,
+                "lead": "Serves",
+                "body": "**this room by default.** **Within a radius** reaches every cell "
+                        "within a set distance, walls or no walls, for a shed in the fields "
+                        "or a stand out in the open. An **allowed area** reaches whatever "
+                        "you paint: a farm, a prison block, a build site. **New allowed "
+                        "area** starts one from the stand's room, and **Paint** hands you "
+                        "vanilla's Expand allowed area tool for it. An area that leaves the "
+                        "stand's own cell out is listed faded.",
+            },
+            {
                 "shot": "cards/parts/dlg-owners.png",
                 "lead": "Set owners",
                 "body": "left unassigned a stand is **shared**, and shared works like "
                         "a bed: a kitchen needs one stand per cook working at the same "
                         "time, not one stand per cook. Assign owners to hold a stand "
                         "for a personal kit, or for a group and nobody outside it.",
-            },
-        ],
-    },
-    {
-        "id": "Card_Removing",
-        "kind": "controls",
-        "title": "Allow removing items",
-        "lede": "",
-        "pair": ["cards/parts/giz-removing.png", "cards/parts/tip-text.png"],
-        "entries": [
-            {
-                "body": "This vanilla toggle is **held off while the stand is in "
-                        "service**. Turning it on exposes the stand's contents to every "
-                        "colonist's outfit optimizer, which will take the uniform and "
-                        "wear it as everyday clothes if it outscores what they have on.",
-            },
-            {
-                "body": "To take a garment back, use the **eject button** in the stand's "
-                        "Contents tab.",
             },
         ],
     },
@@ -281,11 +277,15 @@ CARDS = [
             {"q": "Will it interrupt an order I gave?",
              "body": "No. Only automatic work triggers a change, so a direct order is "
                      "never delayed by a wardrobe trip."},
+            # "A rescue is never held up" was wrong from v1.4.6: the medical
+            # emergencies setting covers DoctorRescue, an emergency Doctor job.
             {"q": "What happens in an emergency?",
              "body": "Nobody changes into a uniform while the map is under threat, "
-                     "and firefighting or a rescue is never held up. A colonist "
-                     "already in one still changes back, which on a full-change "
-                     "stand is how they get back to their armor."},
+                     "and firefighting is never held up. Medical emergencies, a "
+                     "rescue included, wait for a change only if you turn on "
+                     "**Medical emergencies change first** in the mod settings. A "
+                     "colonist already in a uniform still changes back, which on a "
+                     "full-change stand is how they get back to their armor."},
             {"q": "Can another colonist take the uniform?",
              "body": "Not from a stand with owners; that one serves only the colonists "
                      "you list. Nobody takes clothes out of a stand somebody else is "
@@ -297,14 +297,15 @@ CARDS = [
              "body": "They wait in the stand while the shift lasts, and come back "
                      "exactly as they were, force-worn markers included."},
             {"q": "Do they change just walking through the room?",
-             "body": "No. Only doing the room's work does it."},
+             "body": "No. Only doing the work a stand serves does it."},
             {"q": "Do they eat in uniform?",
              "body": "No, a meal break gets them changed first, wherever the food is "
                      "stored. Food already in hand they eat where they are."},
             {"q": "What if every stand was busy when they started?",
              "body": "If one frees up while they are working in its room out of uniform, "
                      "they step over and change, unless they are mid-treatment on a "
-                     "patient."},
+                     "patient. A stand serving a radius or an area waits for their "
+                     "next job instead."},
             # NOT "games room": one full of pool tables scores as a rec room and
             # does self-enable, so the old wording asked about a case that never
             # happens, and its own answer then listed the rooms that do not.
@@ -312,6 +313,22 @@ CARDS = [
              "body": "Only a room the game scores as a rec room does that. A throne "
                      "room, a dining room with a chess table in it, and a pool usually "
                      "do not; set those by hand, once."},
+            # The catchment questions, v1.5.0. The first also answers "why did
+            # my stand stop working": the same alert covers a deleted area.
+            {"q": "Can a stand serve the outdoors, or more than one room?",
+             "body": "Yes. Under **Serves** in its settings, pick **Within a radius** "
+                     "or one of your **allowed areas**. A stand out in the open still "
+                     "serving its room, or one whose area was deleted, serves nothing, "
+                     "and an alert lists it."},
+            {"q": "Does an area painted for a stand restrict anyone?",
+             "body": "Only colonists you have restricted to that area yourself. It is "
+                     "an ordinary allowed area, so repainting it changes it for them "
+                     "too."},
+            {"q": "Inside a radius or an area, when does the uniform come off?",
+             "body": "Before most things the stand does not serve, a meal or other "
+                     "work say, and before a haul that leaves it. Idling and wandering "
+                     "inside it keep the uniform on, except at a sleep stand; at a work "
+                     "stand so do hauling, cleaning and building."},
             {"q": "How do I get someone out of a uniform right now?",
              "body": "A **Change back** button appears on any colonist wearing one."},
             {"q": "Can I add it to an existing save?",
@@ -582,11 +599,16 @@ def render_card(c):
 #: scaffolding, and the point of that mode is to see what a player sees.
 SHOW_LABELS = True
 
-BB = re.compile(r"\[(/?)(b|i)\]|\[url=([^\]]+)\]|\[/url\]")
+BB = re.compile(r"\[(/?)(b|i|h1|h2|h3)\]|\[url=([^\]]+)\]|\[/url\]")
+
+#: Where the description's own images live. They are served from main, so a GIF
+#: or card a branch adds does not exist there until it merges; the page preview
+#: reads the branch's local copy instead whenever there is one.
+RAW_MEDIA = "https://raw.githubusercontent.com/beverage/shift-change/main/media/"
 
 
 def bbcode(s):
-    """The tags the description actually uses: b, i, url, list/* and img."""
+    """The tags the description actually uses: b, i, h1-h3, url, list/* and img."""
     if "[list]" in s:
         items = [i.strip() for i in s.split("[*]")[1:]]
         items = [i.replace("[/list]", "").strip() for i in items]
@@ -637,6 +659,9 @@ def render_page(bare_after=None):
             if not bare:
                 out.append(render_card(cards[name]))
         else:
+            local = url[len(RAW_MEDIA):] if url.startswith(RAW_MEDIA) else None
+            if local and os.path.exists(os.path.join(HERE, local)):
+                url = local
             out.append(f'<div class="gif"><img src="{html.escape(url)}" alt=""></div>')
     return out
 

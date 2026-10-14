@@ -220,6 +220,23 @@ namespace ShiftChange
                 return Expect(false, "a bed spawns in the stand's room");
             }
 
+            // A generated colonist can arrive needing a doctor (the birthday
+            // rolls can give asthma), and an untagged lay-down by an urgent
+            // patient is medical bed rest (IsMedicalLayDown), which no sleep
+            // stand dresses. The positive control then fails at random, as it
+            // did once on the Common Sense + Pick Up And Haul list
+            // (2026-10-14). Strip what needs tending, and name it, as the
+            // bed-rest case does.
+            List<string> stripped = new List<string>();
+            foreach (Hediff existing in fix.Pawn.health.hediffSet.hediffs.ToList())
+            {
+                if (existing.TendableNow())
+                {
+                    stripped.Add(existing.LabelCap);
+                    fix.Pawn.health.RemoveHediff(existing);
+                }
+            }
+
             // DO NOT DECLARE THE TRIGGER HERE. Every other case in this file
             // calls a Toggle to opt the pad's roleless room in, and copying
             // that idiom would have inverted this case: a bed is not a chess
@@ -231,7 +248,10 @@ namespace ShiftChange
             // and fall through to SetExcluded(). Assert the automatic default
             // instead; it is the stronger claim anyway, since it exercises the
             // RestRoles table rather than bypassing it.
-            bool ok = Expect(fix.Comp.HandlesRest(),
+            bool ok = Expect(!HealthAIUtility.ShouldSeekMedicalRestUrgent(fix.Pawn),
+                             "the colonist needs no doctor to begin with (precondition"
+                             + (stripped.Count > 0 ? "; removed " + string.Join(", ", stripped) : "") + ")")
+                    & Expect(fix.Comp.HandlesRest(),
                              "the bed makes this a bedroom, so the stand serves sleep automatically")
                     & Expect(fix.Comp.IsAutomatic,
                              "from the room's role, not an override (that is what is being tested)")
@@ -360,6 +380,12 @@ namespace ShiftChange
             // at exactly the wake-up boundary, so the guard meant to protect
             // sleepers suppressed the change-back at the one moment the pawn
             // was standing beside their own stand.
+            //
+            // Nothing queued from the probes above: a job waiting at the head
+            // of the queue is one vanilla put back behind a haul, and an
+            // errand ahead of the job they dressed for keeps the outfit on
+            // (QueuedAheadOfServedWork), which would answer the wake-up below.
+            Settle(fix.Pawn);
             if (!RunSwap(fix))
             {
                 return ok & Expect(false, "the pawn could dress for the wake-up test");
@@ -434,9 +460,28 @@ namespace ShiftChange
             }
             bed.Medical = true;
 
+            // A generated colonist can arrive needing a doctor: the birthday
+            // rolls that age a 30-year-old can give asthma, which wants
+            // tending, and a pawn with anything tendable is an urgent patient
+            // before this case adds its own wound. Both positives below then
+            // fail together, as they did once on the default list
+            // (2026-10-10). Strip what needs tending, and name it.
+            List<string> stripped = new List<string>();
+            foreach (Hediff existing in fix.Pawn.health.hediffSet.hediffs.ToList())
+            {
+                if (existing.TendableNow())
+                {
+                    stripped.Add(existing.LabelCap);
+                    fix.Pawn.health.RemoveHediff(existing);
+                }
+            }
+
             // Tick the row the README tells a player to tick, and nothing else.
             fix.Comp.ToggleWork(bedRest);
-            bool ok = Expect(bed.Medical,
+            bool ok = Expect(!HealthAIUtility.ShouldSeekMedicalRestUrgent(fix.Pawn),
+                             "the colonist needs no doctor to begin with (precondition"
+                             + (stripped.Count > 0 ? "; removed " + string.Join(", ", stripped) : "") + ")")
+                    & Expect(bed.Medical,
                              "the bed takes the medical flag, so the room is a hospital")
                     & Expect(fix.Comp.HandlesWork(bedRest),
                              "and the stand is ticked for bed rest")
@@ -886,28 +931,29 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// FISHING IS TICKABLE AND NEVER DRESSES: a known gap, kept on purpose.
+        /// FISHING DRESSES AT A STAND TICKED FOR IT.
         ///
         /// <para>Odyssey's Fish giver (work type Fishing) hands its jobs out
         /// from <c>WorkGiver_Fish.NonScanJob</c> only, and <c>JobGiver_Work</c>
         /// stamps <c>workGiverDef</c> on its scanner paths alone, so a fishing
-        /// job arrives with no giver and the work arm never sees it. The fix is
-        /// the shape medical bed rest already uses, a job-to-work-type row for
-        /// an unstamped non-scan job, and it is not made here.</para>
+        /// job arrives with no giver, tagged with the giver's own
+        /// <c>Fieldwork</c>. <c>JobRoomTargets.NonScanGivers</c> hands it its
+        /// giver back. Built the way Odyssey builds it, it dresses in the
+        /// stand's room, as the same job stamped with its giver does
+        /// (control). With the tag a player's order carries it does not, since
+        /// the row keys on the tag too.</para>
         ///
-        /// <para>The reason is where fishing happens. Its target is the water,
-        /// which is outdoors on almost every map, and every outdoor cell is one
-        /// map-wide room. So the only stand the row could reach today is one
-        /// standing in the open, which would then dress for every fishing spot
-        /// on the map, while a stand in a hut by the lake, the layout a player
-        /// would build, stays inert. That fix belongs with the release that
-        /// gives a stand a boundary beyond its room.</para>
+        /// <para>Fishing water is outdoors on nearly every map, so the setup
+        /// that matters is a hut by the shore serving a radius: fishing out
+        /// past the door does not dress in room mode (control), and does once
+        /// the ring reaches it, but not past the ring.</para>
         ///
-        /// <para>The control is the same job carrying its giver, which dresses:
-        /// the stand, the room and the work type are not the problem, the
-        /// missing stamp is.</para>
+        /// <para>Vanilla's <c>StartJob</c> can put the fishing job back in the
+        /// queue with no tag and start a haul first. Untagged, it still reads
+        /// as fishing, and on shift that haul keeps the uniform on, where the
+        /// same haul with nothing queued changes them back.</para>
         /// </summary>
-        internal static bool FishingNeverDresses(Fixture fix)
+        internal static bool FishingDressesAtAStandTickedForIt(Fixture fix)
         {
             WorkTypeDef fishing = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Fishing");
             WorkGiverDef fishGiver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("Fish");
@@ -916,24 +962,62 @@ namespace ShiftChange
             {
                 return Expect(false, "Odyssey's fishing work type, giver and job resolve");
             }
+            if (fix.Outside.Area == 0)
+            {
+                return Expect(false, "the fixture has a door and open ground outside it");
+            }
             fix.Comp.ToggleWork(fishing);
             MakeCalm(fix.Map);
 
             // The shape WorkGiver_Fish.NonScanJob builds: the fishing cell in A,
-            // the cell to stand on in B. Both inside the room here, so the room
-            // is not what decides it.
-            IntVec3 spot = fix.Stand.Position + new IntVec3(3, 0, 3);
-            IntVec3 standOn = fix.Stand.Position + new IntVec3(3, 0, 2);
+            // the cell to stand on in B. First both inside the room, so the
+            // room is not what decides it.
+            IntVec3 at = fix.Stand.Position;
+            IntVec3 spot = at + new IntVec3(3, 0, 3);
+            IntVec3 standOn = at + new IntVec3(3, 0, 2);
             Job stamped = JobMaker.MakeJob(fish, spot, standOn);
             stamped.workGiverDef = fishGiver;
+            IntVec3 shore = new IntVec3(fix.Outside.minX, 0, at.z);
+            IntVec3 farShore = new IntVec3(fix.Outside.minX, 0, fix.Outside.maxZ);
 
             bool ok = Expect(fix.Comp.HandlesWork(fishing), "the stand is ticked for fishing")
                     & Expect(Probe(fix, stamped, JobTag.Fieldwork),
-                             "a fishing job carrying its giver would dress (control)");
-            return ok & ExpectKnownGap(Probe(fix, JobMaker.MakeJob(fish, spot, standOn), JobTag.Fieldwork),
-                "a fishing job as Odyssey hands it out dresses",
-                "it arrives with no giver; the fix waits for stand boundaries beyond the room, "
-                + "since fishing water is outdoors and the outdoors is one map-wide room");
+                             "a fishing job carrying its giver dresses (control)")
+                    & Expect(Probe(fix, JobMaker.MakeJob(fish, spot, standOn), JobTag.Fieldwork),
+                             "a fishing job as Odyssey hands it out, with no giver, dresses")
+                    & Expect(!Probe(fix, JobMaker.MakeJob(fish, spot, standOn), JobTag.Misc),
+                             "the same job with an order's tag does not: the row keys on the giver's own tag")
+                    & Expect(!Probe(fix, JobMaker.MakeJob(fish, shore, shore), JobTag.Fieldwork),
+                             "room mode: fishing out past the door does not dress (control)");
+
+            fix.Comp.SetServes(CatchmentKind.Radius);
+            fix.Comp.SetServeRadius(5);
+            Job forced = JobMaker.MakeJob(fish, shore, shore);
+            forced.playerForced = true;
+            ok &= Expect(Probe(fix, JobMaker.MakeJob(fish, shore, shore), JobTag.Fieldwork),
+                         "radius 5: fishing out past the door, inside the ring, dresses: the hut by the shore")
+                & Expect(!Probe(fix, JobMaker.MakeJob(fish, farShore, farShore), JobTag.Fieldwork),
+                         "fishing past the ring does not")
+                & Expect(Probe(fix, JobMaker.MakeJob(fish, shore, shore)),
+                         "the job with no tag, as vanilla puts it back in the queue behind a haul, still dresses")
+                & Expect(JobRoomTargets.NonScanGiver(forced, null) == null,
+                         "while a player-forced one with no tag is not read as fishing");
+
+            // On shift, the shape vanilla's opportunistic haul leaves: the
+            // fishing job back at the head of the queue, untagged, and a haul
+            // started first (Pawn_JobTracker.TryOpportunisticJob).
+            ok &= Expect(RunSwap(fix), "dressed for fishing")
+                & Expect(fix.Comp.OnShift, "and on shift (control)");
+            if (!fix.Comp.OnShift)
+            {
+                return false;
+            }
+            ok &= HarnessCatchments.NotSentStraightBack(fix);
+            ok &= Expect(Probe(fix, JobMaker.MakeJob(JobDefOf.HaulToCell, farShore, shore)),
+                         "a haul from past the ring changes them back (control)");
+            fix.Pawn.jobs.jobQueue.EnqueueFirst(JobMaker.MakeJob(fish, shore, shore));
+            return ok & Expect(!Probe(fix, JobMaker.MakeJob(JobDefOf.HaulToCell, farShore, shore)),
+                               "the same haul keeps the uniform on with fishing inside the ring queued behind it, untagged");
         }
     }
 }

@@ -516,6 +516,134 @@ namespace ShiftChange
                                "the freed stand interrupted them to dress");
         }
 
+        /// <summary>
+        /// THE CHANGE-BACK LATCH, AS IT SHIPS. After Change back the colonist
+        /// is not dressed again in that stand's room until they leave it, a
+        /// stand in another room still dresses them meanwhile, drafting drops
+        /// the latch, and the mid-job catch-up honours it. Every refusal sits
+        /// beside the same job without the latch as its control.
+        ///
+        /// <para>Written before the catchment work reworks the latch, so room
+        /// mode has something to hold the rework to. docs/DESIGN.md, "Change
+        /// back".</para>
+        /// </summary>
+        internal static bool ChangeBackLatchHoldsUntilTheyLeave(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+            if (doctor == null || tend == null)
+            {
+                return Expect(false, "the doctor work defs resolve");
+            }
+            if (fix.Outside.Area == 0)
+            {
+                return Expect(false, "the fixture has a door and open ground outside it");
+            }
+            fix.Comp.ToggleWork(doctor);
+            MakeCalm(fix.Map);
+            Patch_JobInterception.ChangedBackAt.Remove(fix.Pawn);
+
+            bool ok = Expect(Diverts(fix, WorkJob(fix, tend)),
+                             "a work job in the stand's room dresses (control)")
+                    & Expect(RunSwap(fix), "dressed for the shift")
+                    & Expect(fix.Comp.OnShift, "and is on shift (control)");
+            if (!fix.Comp.OnShift)
+            {
+                return false;
+            }
+
+            // The button's own path, which orders a swap and sets the latch.
+            // The ordered swap is cut short and run again through RunSwap,
+            // which pumps the driver to completion; a swap interrupted before
+            // its transfer announces nothing, so the cut leaves no trace.
+            Patch_ChangeBackGizmo.ChangeBack(fix.Pawn, fix.Comp);
+            ok &= Expect(Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
+                         "Change back set the latch");
+            fix.Pawn.jobs.EndCurrentJob(JobCondition.InterruptForced, startNewJob: false);
+            ok &= Expect(RunSwap(fix), "and they changed back")
+                & Expect(!fix.Comp.OnShift, "so nothing of the stand's is out (control)");
+
+            ok &= Expect(!Diverts(fix, WorkJob(fix, tend)),
+                         "latched: a work job in the same room does NOT dress them")
+                & Expect(Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
+                         "and a job boundary inside the room keeps the latch");
+
+            // A stand in ANOTHER room still dresses them: the latch belongs to
+            // the room they changed back in. The second stand stands outside
+            // the door and the colonist stays inside, so the latch is still
+            // held while the work arm looks out there. A room stand in the
+            // open serves nothing, so the second stand serves the smallest
+            // ring instead.
+            IntVec3 outsideCell = new IntVec3(fix.Outside.minX, 0, fix.Outside.maxZ - 1);
+            Building_OutfitStand other = (Building_OutfitStand)DebugTools_Fixtures.Spawn(
+                fix.Map, fix.Stand.def, ThingDefOf.WoodLog, outsideCell, Rot4.North);
+            CompShiftStand otherComp = other?.TryGetComp<CompShiftStand>();
+            if (otherComp == null || !StockOne(other, "Apparel_Duster"))
+            {
+                return Expect(false, "a second stand could be staged outside the door");
+            }
+            otherComp.ToggleWork(doctor);
+            otherComp.SetServes(CatchmentKind.Radius);
+            otherComp.SetServeRadius(CompShiftStand.MinServeRadius);
+            ok &= Expect(other.GetRoom() != fix.Stand.GetRoom(),
+                         "the second stand is in another room")
+                & Expect(otherComp.serves == CatchmentKind.Radius,
+                         "serving a ring around it (control)")
+                & Expect(Diverts(fix, DoctoringAt(tend, outsideCell)),
+                         "and work out there still dresses them at it")
+                & Expect(Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
+                         "while the latch on their own room holds");
+            other.Destroy();
+
+            // Leaving releases it, at the next job boundary wherever that job
+            // is: a giver-less Wait here, which no arm dresses for.
+            IntVec3 inside = fix.Pawn.Position;
+            fix.Pawn.pather?.StopDead();
+            fix.Pawn.Position = outsideCell;
+            Diverts(fix, JobMaker.MakeJob(JobDefOf.Wait, outsideCell));
+            ok &= Expect(!Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
+                         "a job boundary outside the room releases the latch");
+            fix.Pawn.pather?.StopDead();
+            fix.Pawn.Position = inside;
+            ok &= Expect(Diverts(fix, WorkJob(fix, tend)),
+                         "so back inside, the room's work dresses them again (control)");
+
+            // Drafting drops it outright.
+            Patch_JobInterception.ChangedBackAt[fix.Pawn] = new Patch_JobInterception.ChangeBackLatch(fix.Stand);
+            ok &= Expect(!Diverts(fix, WorkJob(fix, tend)),
+                         "latched again, the room's work does not dress them");
+            if (fix.Pawn.drafter != null)
+            {
+                fix.Pawn.drafter.Drafted = true;
+                fix.Pawn.drafter.Drafted = false;
+                ok &= Expect(!Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
+                             "drafting dropped the latch")
+                    & Expect(Diverts(fix, WorkJob(fix, tend)),
+                             "so the room's work dresses them again (control)");
+            }
+
+            // The catch-up honours it too, or a stand returning to the pool
+            // would re-dress the colonist the player just pulled out. Goto
+            // aimed at another cell in the room, for the reason
+            // FreedStandCatchesUp gives.
+            Patch_JobInterception.ChangedBackAt[fix.Pawn] = new Patch_JobInterception.ChangeBackLatch(fix.Stand);
+            Job working = JobMaker.MakeJob(JobDefOf.Goto, fix.Stand.Position + new IntVec3(3, 0, 2));
+            working.workGiverDef = tend;
+            fix.Pawn.jobs.StartJob(working, JobCondition.InterruptForced, null,
+                resumeCurJobAfterwards: false, cancelBusyStances: true, null, null);
+            ok &= Expect(fix.Pawn.CurJobDef == JobDefOf.Goto,
+                         "latched, the colonist starts the work in their own clothes");
+            Patch_JobInterception.Notify_StandFreed(fix.Comp, null);
+            ok &= Expect(fix.Pawn.CurJobDef == JobDefOf.Goto,
+                         "and a freed stand does not interrupt them to dress");
+            Patch_JobInterception.ChangedBackAt.Remove(fix.Pawn);
+            Patch_JobInterception.Notify_StandFreed(fix.Comp, null);
+            ok &= Expect(fix.Pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
+                         "but without the latch the same freed stand does (control)");
+            Settle(fix.Pawn);
+            return ok;
+        }
+
         /// <summary>An automatic doctoring job at a cell, as the work arm sees one.</summary>
         internal static Job DoctoringAt(WorkGiverDef giver, IntVec3 at)
         {
@@ -660,7 +788,7 @@ namespace ShiftChange
                 ok &= Expect(fix.Comp.IsAssignedTo(pawn) && sharedComp.IsPool && !shared.IsForbidden(pawn),
                              "their own stand is outside the area, a shared one inside it (control)");
 
-                CompShiftStand chosen = Patch_JobInterception.FindAvailableStand(room, pawn, doctor);
+                CompShiftStand chosen = Patch_JobInterception.FindAvailableStand(workAt, fix.Map, pawn, doctor);
                 ok &= Expect(chosen == sharedComp,
                              "so the shared stand inside the area is chosen over their own (chose "
                              + (chosen == null ? "nothing" : chosen == fix.Comp ? "their own" : "another")
@@ -827,7 +955,7 @@ namespace ShiftChange
                 pawn.playerSettings.AreaRestrictionInPawnCurrentMap = area;
                 ok &= Expect(fix.Stand.IsForbidden(pawn),
                              "the area leaves the stand out, so it is forbidden to them (control)")
-                    & Expect(Patch_JobInterception.FindAvailableStand(room, pawn, null,
+                    & Expect(Patch_JobInterception.FindAvailableStand(pawn.Position, fix.Map, pawn, null,
                                  Patch_JobInterception.StandTrigger.Recreation) == null,
                              "the recreation arm's search passes the stand over")
                     & Expect(!Probe(fix, JoyJob(fix, chess)),
@@ -847,7 +975,7 @@ namespace ShiftChange
                 ok &= Expect(fix.Comp.HandlesRest() && !fix.Comp.HandlesRecreation(),
                              "the stand is switched to sleep (control)")
                     & Expect(!bed.IsForbidden(pawn), "and the bed is inside their area (control)")
-                    & Expect(Patch_JobInterception.FindAvailableStand(room, pawn, null,
+                    & Expect(Patch_JobInterception.FindAvailableStand(bed.Position, fix.Map, pawn, null,
                                  Patch_JobInterception.StandTrigger.Rest) == null,
                              "the sleep arm's search passes the stand over")
                     & Expect(!Probe(fix, JobMaker.MakeJob(laydown, bed)),

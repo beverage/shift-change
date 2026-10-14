@@ -245,7 +245,7 @@ namespace ShiftChange
             else
             {
                 CompShiftStand stand = Patch_JobInterception.FindAvailableStand(
-                    room, pawn, null, Patch_JobInterception.StandTrigger.Recreation);
+                    pawn.Position, map, pawn, null, Patch_JobInterception.StandTrigger.Recreation);
                 if (stand == null)
                 {
                     report.AppendLine("  stand: none in this room is free AND set to recreation.");

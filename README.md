@@ -1,6 +1,6 @@
 # Shift Change
 
-> **Requires RimWorld 1.6, the Odyssey expansion, and Harmony.** The outfit
+> **Requires RimWorld 1.6 or 1.7, the Odyssey expansion, and Harmony.** The outfit
 > stand this mod builds on is Odyssey content, so without it the mod does
 > nothing at all.
 
@@ -102,26 +102,15 @@ change note. Turn it on if you would rather a stand never left anyone indecent.
 is the penalty, so nothing is ever held back and the stand does what it was set
 to do.
 
-**"Allow removing items" is held off while a stand is in service.**
-Shift changes never need it, and turning it on hands the stand's contents to
-every colonist's outfit optimizer, which may take the uniform and wear it as
-everyday clothes, and assigning an owner does not prevent that. The stand
-clears it on load and again whenever it goes back into service, so a stand
-switched on while it was set aside does not stay that way. To take one garment
-back, use the eject button beside it in the Contents tab, which drops it next
-to the stand. To decommission a stand and let haulers empty it, set "Not used
-for shift changes" first; the toggle unlocks with it and stays unlocked.
-
 **"Keep contents out of trade" is on by default.** Traders will otherwise buy
 anything sitting on an outfit stand: the uniform, and the owner's own clothes
 parked there while they're on shift. That's vanilla behavior, it reaches both
 caravans at the gate and ships in orbit, and nothing else about the stand
-prevents it. "Allow removing items" doesn't cover trade, and neither does an
-assigned owner. With this on, the stand's contents never reach a trade window,
-and nothing else changes: colonists still stock it, shift changes still work,
-and you can still load the kit into a caravan yourself. Turn it off for a stand
-you keep as a shop shelf; a stand set to "Not used for shift changes" is
-tradeable either way.
+prevents it, not even an assigned owner. With this on, the stand's contents
+never reach a trade window, and nothing else changes: colonists still stock it,
+shift changes still work, and you can still load the kit into a caravan
+yourself. Turn it off for a stand you keep as a shop shelf; a stand set to "Not
+used for shift changes" is tradeable either way.
 
 A stand that is dressing anyone says so in its inspect pane: what it dresses
 for, who owns or is currently wearing it, and whether it's empty. A stand in a
@@ -179,12 +168,13 @@ over ordinary clothes; a sauna robe does not.
   off. The only room known at the start is wherever the book sits on a shelf,
   and dressing them for the library because that is where the novel lives would
   be the wrong room.
-- **Outdoors is excluded, for now.** Every outdoor cell on the map belongs to
-  the same map-spanning room, so a recreation stand in open ground would dress
-  colonists for every walk and every bit of stargazing anywhere on the map. A
-  walled but roofless yard is its own room and still counts. Serving open
-  ground needs a boundary of its own: a zone, or a radius around the stand.
-  That is planned.
+- **Outdoors needs a radius or an allowed area.** Every outdoor cell on the map
+  belongs to the same map-spanning room, so a recreation stand in open ground
+  serving its room would dress colonists for every walk and every bit of
+  stargazing anywhere on the map. Out there it serves nothing until you give it
+  a radius or an area (see
+  [Serving a radius or an allowed area](#serving-a-radius-or-an-allowed-area-instead-of-a-room)).
+  A walled but roofless yard is its own room and still counts.
 - **Nobody is pulled out of bed.** Vanilla hands patients recreation they can
   take lying down precisely so they stay put.
 - **A drink from the rec room's own stock does not end the visit.** The
@@ -235,6 +225,97 @@ serves one colonist at a time, so in a ten-bunk barracks the first sleeper to
 reach it would hold it all night and the other nine would go to bed in what
 they were already wearing. A shared sleeping room takes the switch by hand.
 
+## Serving a radius or an allowed area instead of a room
+
+A stand serves its own room unless you tell it otherwise. The **Serves** row at
+the bottom of its settings switches it to **Within a radius**: every cell within
+that many cells of the stand, walls or no walls. That suits a shed in the middle
+of the fields, a changing hut by the pool, a fishing hut on the shore, or a
+stand halfway down a corridor of workshops. The ring is drawn while the settings
+are open and whenever the stand is selected, and the slider runs from 3 cells to
+79. Fishing works now too: ticking it did nothing before v1.5.0, because the
+game hands out fishing differently from other work.
+
+The same menu lists your **allowed areas** in a section of their own, each with
+its colour beside it: the ones you restrict colonists to in the Schedule tab.
+Hovering one draws it on the map. Pick one and the stand serves the cells
+painted in it, as long as the stand itself stands on one of them, so an area
+that leaves the stand's own cell out is faded in the menu and marked "(stand is
+outside it)" in red. **New allowed area...** makes one for the stand and picks it,
+starting as a copy of the stand's room, or just its own cell out in the open,
+and named for what the stand serves: "Doctoring area". **Paint**, at the end of
+the row, closes the settings and starts vanilla's Expand allowed area tool on
+it, and **Manage areas...** opens vanilla's own list for renaming and deleting.
+An area painted for a stand is still an ordinary allowed area, so painting it
+also changes it for any colonist restricted to it. The Home area is not offered.
+
+![Two farmers change into cowboy hats, a duster and overalls at the stands in their farmhouse, then go out and harvest the corn](media/demo-farm.gif)
+
+*The farmhouse stands serve an allowed area painted over the house, every
+field, the horse pen and the storehouse, so the farmers stay dressed from one
+crop to the next.*
+
+Tick what the stand is for first. The row stays greyed until something is
+ticked, and Automatic only reads a room, so choosing a radius or an area for an
+automatic stand turns whatever the room gave it into ticks.
+
+**A stand in the open needs a radius or an area.** All the open ground on a map
+is one room, so a stand standing out there and serving its room serves nothing,
+work included. Until you give it one, its button reads *Shift stand (serves
+nothing)* and the alert *Shift stand serves nothing* lists it. A walled but
+roofless yard is its own room and works like any other.
+
+**A deleted area is not replaced.** When a stand's area is deleted, or the stand
+ends up outside it, the stand serves nothing rather than going back to its room,
+and the same button label and alert say so until you choose again. A gravship
+is the exception: an area painted on its deck flies with it, and a stand on the
+deck is bound to it again on landing.
+
+A room limits what happens inside it; a radius or an area does not. Inside
+either, a colonist keeps the outfit on only for:
+
+- whatever the stand serves;
+- idling and wandering, and walking back into their allowed area or out of the
+  heat or cold;
+- at a work stand, hauling, cleaning and building, provided every place the job
+  names is inside the ring or the area. A haul out to a freezer past its edge
+  changes them back before they leave, while the stand is still close.
+
+Most other jobs send them back to change first: a sit-down meal, bed,
+recreation at a work stand, work the stand does not serve. A sleep stand keeps pyjamas on only
+in bed and on the way to a bed inside its ring or area, so a marine who parked
+power armor overnight does not spend the next day working without it.
+
+![A warden walks into a cell block in their own clothes, changes into a black duster, cap and sunglasses at a stand in the corridor, and goes into a cell to talk to a prisoner](media/demo-prison.gif)
+
+*The three stands in the corridor serve an allowed area painted over the
+corridor and all four cells.*
+
+**Construction deliveries dress nobody, unless an allowed area holds the whole
+trip.** A builder fetching steel goes in whatever they have on, and the hardhat
+goes on for the frame. One already wearing it keeps it on for the next fetch,
+wherever the steel lies, as long as every site the load goes to is inside their
+stand's room, ring or area; for a site outside, they change back before setting
+off, while the stand is near. In pyjamas or another stand's outfit, the outfit
+stays on only if the whole trip, stockpile included, is inside that stand's
+room, ring or area, so pyjamas come off before a fetch from a stockpile outside
+the bedroom. The exception is a stand serving an allowed area painted over both
+the stockpile and the site, a materials yard beside a build, say: there a
+builder changes before fetching, since the stand is on the way. One who ranks
+hauling above construction does not: the game files their fetch as hauling, so
+they fetch in their own clothes and change at the frame.
+Replanting a tree and planting seeds follow the same rule, with a stand that
+serves growing, since both start wherever the tree or the seed is lying.
+Clearing a site, by cutting a tree, hauling something aside or removing an old
+floor, is work at the site like any other.
+
+![Twelve colonists walk into a changing area, put on hardhats and builder's jackets, and carry granite blocks from the crates to a monument's blueprints](media/demo-construction.gif)
+
+*One allowed area covers the changing area, the eight crates and the whole
+build site, so each builder changes before fetching their first load. The
+stands are the mechanized ones from
+[Outfit Stands Plus](#mod-compatibility).*
+
 ## The rules it follows
 
 - **Automatic only**, for work, recreation and sleeping alike. Right-click orders
@@ -260,22 +341,25 @@ they were already wearing. A shared sleeping room takes the switch by hand.
   whites to reach a chair, which is the walk this mod exists to prevent.
   A sleeping stand does not take that exception, because a colonist wakes up
   standing beside it, so changing first costs them no walking at all.
-- **Fetching a meal for a patient or a prisoner changes nothing.** The job
+- **Fetching a meal for a patient or a prisoner dresses nobody.** The job
   starts wherever the meal is stored, so it used to read as leaving the
-  hospital or the cell. A doctor in scrubs or a warden in uniform now keeps it
-  on for the trip, and nobody is dressed for one.
+  hospital or the cell. A doctor in scrubs, or a handler or a warden in uniform,
+  now keeps it on for the trip, as long as the patient or prisoner is inside their stand's
+  room, ring or area. Someone in pyjamas changes back before carrying a meal
+  out of the bedroom.
 - **A quick errand before the stand's own work keeps the uniform on.** When
-  the job queued next is work this stand serves, in its room, a haul or
-  similar slotted in ahead of it is done in uniform instead of changing out
+  the job queued next is work this stand serves, in its room, radius or area, a
+  haul or similar slotted in ahead of it is done in uniform instead of changing out
   and back in. Vanilla's "haul something on the way" does this to bills, and
   so does Common Sense.
 - **Nobody is walked out of their allowed area to change.** A stand outside a
   colonist's allowed area is passed over, and a colonist whose stand ends up
   outside it keeps the outfit on until it is back inside. The stand's inspect
   pane says so. Change back is an order, so it still works.
-- If a stand frees up while someone is already working in its room out of
-  uniform, they'll step over and change, unless they're mid-treatment on a
-  patient.
+- If a stand serving its room frees up while someone is already working there
+  out of uniform, they'll step over and change, unless they're mid-treatment on
+  a patient. A stand serving a radius or an area waits for their next job
+  instead, since either can reach a long way.
 - **Change back** appears on any colonist currently in a uniform, for when you
   want them out of it now rather than at their next job. They will get there on
   their own, raid or no raid, but "on their own next job" can be a long time if
@@ -289,12 +373,12 @@ Three mod settings, under Options → Mod settings:
 - **Medical emergencies change first**, off by default. On, a doctor answering
   an emergency tend puts scrubs on first and a colonist in critical condition
   stops for a gown on the way to bed. Fires are never covered by it. It works
-  in both directions, so a doctor already in another room's uniform may change
+  in both directions, so a doctor already in another stand's uniform may change
   out of it before answering the call as well.
 
 ## Requirements
 
-- RimWorld 1.6
+- RimWorld 1.6 or 1.7
 - **Odyssey** (the outfit stand is Odyssey content)
 - Harmony
 
@@ -371,12 +455,12 @@ built into a wall so that it faces two enclosed rooms equally belongs to
 neither, and a stand in either one stays quiet. Setting it against a wall rather
 than through one avoids that, and so does a stand on both sides.
 
-Fetching the chemfuel that goes into the plutonium processor is left alone on
-purpose, and it is the one part of that loop that will not change anyone.
-Chemfuel is inert, and it lives wherever your colony keeps chemfuel rather than
-beside the reactor, so suiting up for that haul costs a walk to the wardrobe and
-buys nothing. Carrying the spent rods themselves still changes them, at the
-rods.
+Fetching the chemfuel that goes into the plutonium processor never suits anyone
+up, on purpose. Chemfuel is inert, and it lives wherever your colony keeps
+chemfuel rather than beside the reactor, so suiting up for that haul costs a
+walk to the wardrobe and buys nothing. A colonist already suited at a stand that
+serves that work keeps the suit on for it. Carrying the spent rods themselves
+still changes them, at the rods.
 
 Research counts too, in the rooms where it can hurt you. The steps run at a
 research reactor or a plutonium processor are the ones that can spring a
@@ -513,9 +597,12 @@ artifacts.
 [Automatic Swap Outfit](https://github.com/aedbia/AutomaticSwapForStand) by
 aedbia (MIT) covers adjacent ground: automatic swapping at an outfit stand,
 triggered by allowed-area boundaries. Shift Change is an independent
-implementation with a different trigger (the room and its work type) and
-per-stand ownership, but that mod is why several dead ends were cheap to
-avoid.
+implementation with a different trigger (the job, and whether it falls in the
+stand's room, radius or allowed area) and per-stand ownership, but that mod is
+why several dead ends were cheap to avoid.
+
+[Reel's Expanded Storage](https://steamcommunity.com/sharedfiles/filedetails/?id=3237638097)
+by Reel, for letting me use it for the shots above.
 
 ## License
 

@@ -48,7 +48,7 @@ namespace ShiftChange
     internal static class DebugTools_SaveRoundTrip
     {
         /// <summary>
-        /// Four save files, not cleaned up.
+        /// Five save files, not cleaned up.
         ///
         /// <para><c>run-harness.sh</c> gives the game an isolated
         /// <c>-savedatafolder</c> and wipes it at the start of every run, so the
@@ -63,6 +63,11 @@ namespace ShiftChange
         internal const string LegacySaveName = "shiftchange-harness-legacy";
         internal const string ReSaveName = "shiftchange-harness-resave";
         internal const string ForeignSaveName = "shiftchange-harness-foreign";
+        internal const string AreaSaveName = "shiftchange-harness-area";
+
+        /// <summary>The keys an area binding scribes under.</summary>
+        internal const string AreaKey = "shiftChangeServeArea";
+        internal const string AreaLabelKey = "shiftChangeServeAreaLabel";
 
         /// <summary>
         /// Our mod-prefixed keys, and the generic keys <c>CompAssignableToPawn</c>
@@ -81,6 +86,15 @@ namespace ShiftChange
         /// </summary>
         internal const string OurMarkerKey = "shiftChangeOwnersUnified";
         internal const string OurMarkerNode = "<" + OurMarkerKey + ">[^<]*</" + OurMarkerKey + ">";
+
+        /// <summary>
+        /// The catchment keys' prefix (<see cref="CompShiftStand.PostExposeData"/>),
+        /// and every node under it, written out or null. They arrived in
+        /// v1.5.0, so <see cref="LegacyMigration"/> strips them too.
+        /// </summary>
+        internal const string CatchmentKeyPrefix = "shiftChangeServe";
+        internal const string CatchmentNodes =
+            "<(" + CatchmentKeyPrefix + @"\w*)>[^<]*</\1>|<" + CatchmentKeyPrefix + @"\w*\b[^>]*/>";
 
         /// <summary>
         /// Logged when a reference list registers load-ids during LoadingVars
@@ -117,9 +131,9 @@ namespace ShiftChange
         internal const string FinalizeAbort = "Error in Map.FinalizeLoading()";
 
         /// <summary>
-        /// Seven assertions in this file test for absence — no unconsumed
+        /// Several assertions in this file test for absence — no unconsumed
         /// load-ids, no duplicate registration, no failed take. A scanner that
-        /// never matches anything satisfies all seven, so one leg logs this
+        /// never matches anything satisfies all of them, so one leg logs this
         /// string and asserts <see cref="Logged"/> finds it.
         /// </summary>
         internal const string Probe = "[ShiftChange] harness log-scanner probe";
@@ -173,6 +187,20 @@ namespace ShiftChange
             fix.Comp.NotifyDressed(fix.Pawn, stored, issued,
                                    new List<Apparel> { stored[0] });
 
+            // The catchment rides in the same save: a radius stand at a radius
+            // that is not the default, so a value that never left the object
+            // cannot pass for one that scribed. A radius needs something
+            // ticked first.
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            if (doctor == null)
+            {
+                DebugTools_LifecycleHarness.Report.AppendLine("      the Doctor work type does not resolve");
+                return false;
+            }
+            fix.Comp.ToggleWork(doctor);
+            fix.Comp.SetServes(CatchmentKind.Radius);
+            fix.Comp.SetServeRadius(9);
+
             // Captured before the load: afterwards these objects belong to a
             // disposed game.
             IntVec3 standCell = fix.Stand.Position;
@@ -223,7 +251,11 @@ namespace ShiftChange
                         ? "and not under the generic " + LegacyKey
                         : "and under the generic " + LegacyKey
                           + " only as the foreign comp's copy (" + genericHits
-                          + " found, " + foreignCopies + " expected)");
+                          + " found, " + foreignCopies + " expected)")
+                & DebugTools_LifecycleHarness.Expect(
+                    saved.Contains("<shiftChangeServes>Radius</shiftChangeServes>")
+                        && saved.Contains("<shiftChangeServeRadius>9</shiftChangeServeRadius>"),
+                    "the save carries the catchment under its prefixed keys");
 
             SavedGameLoaderNow.LoadGameFromSaveFileNow(SaveName);
 
@@ -272,6 +304,12 @@ namespace ShiftChange
                         && a.GetUniqueLoadID() == forcedLoadID),
                     "the force-worn flag came back on the same garment")
                 & DebugTools_LifecycleHarness.Expect(
+                    ledger.serves == CatchmentKind.Radius && ledger.serveRadius == 9,
+                    "the stand still serves a radius of 9")
+                & DebugTools_LifecycleHarness.Expect(
+                    CompShiftStand.CatchmentStands.Contains(ledger),
+                    "and the load put it back in the registry")
+                & DebugTools_LifecycleHarness.Expect(
                     !ledger.IsExcluded,
                     "the loaded stand is in service (control for the sweep below)")
                 & DebugTools_LifecycleHarness.Expect(
@@ -311,6 +349,10 @@ namespace ShiftChange
         /// skipped the reconcile, and the copy then emptied the foreign list as
         /// well. That failed this case with Outfit Stands Plus loaded, found
         /// 2026-09-29.</para>
+        ///
+        /// <para>The catchment keys go for the same reason: the round-trip
+        /// save serves a radius, and no save from before v1.5.0 serves
+        /// anything but its room.</para>
         /// </summary>
         internal static bool LegacyMigration()
         {
@@ -336,10 +378,10 @@ namespace ShiftChange
 
             // Longest key first: rewriting the short one first would corrupt
             // the long one into "shiftChangeUninstalledassignedPawns".
-            string legacy = Regex.Replace(source
+            string legacy = Regex.Replace(Regex.Replace(source
                     .Replace(OurUninstalledKey, LegacyUninstalledKey)
                     .Replace(OurKey, LegacyKey),
-                OurMarkerNode, "");
+                OurMarkerNode, ""), CatchmentNodes, "");
             if (!NodeContains(legacy, LegacyKey, ownerLoadID))
             {
                 DebugTools_LifecycleHarness.Report.AppendLine(
@@ -350,7 +392,10 @@ namespace ShiftChange
 
             bool ok = DebugTools_LifecycleHarness.Expect(
                 !legacy.Contains(OurMarkerKey),
-                "the rewritten save carries no reconciled marker, as no save that old does");
+                "the rewritten save carries no reconciled marker, as no save that old does")
+                & DebugTools_LifecycleHarness.Expect(
+                source.Contains("<" + CatchmentKeyPrefix) && !legacy.Contains("<" + CatchmentKeyPrefix),
+                "nor the catchment keys the round-trip save wrote, as no save that old does");
 
             SavedGameLoaderNow.LoadGameFromSaveFileNow(LegacySaveName);
 
@@ -671,9 +716,9 @@ namespace ShiftChange
             finally
             {
                 // Revert the def, and ONLY what this case actually added.
-                // This case runs last and the process exits shortly after, but
-                // a def edit outliving its case would silently change what any
-                // later case tests — and on a list that supplied its own
+                // Only leg 4 runs after this one, and the process exits shortly
+                // after, but a def edit outliving its case would silently change
+                // what any later case tests — and on a list that supplied its own
                 // foreign assignable nothing was added here at all, so this
                 // must not reach for somebody else's comp.
                 if (foreignProps != null)
@@ -681,6 +726,161 @@ namespace ShiftChange
                     standDef.comps.Remove(foreignProps);
                 }
             }
+        }
+
+        // ------------------------------------------------------------ leg 4
+
+        /// <summary>
+        /// Saves two stands serving allowed areas, one whose area was renamed
+        /// and one whose area was deleted, loads them back, and asserts the
+        /// first came back bound to its area under the new name, and the
+        /// second in area mode with no area, under the deleted one's name. A
+        /// third, boxed and carried by a world pawn so it is on no map, keeps
+        /// its binding to the live area through the save, as a stand carried by
+        /// a caravan must to serve that area again at home.
+        ///
+        /// <para>The file is asserted first. A rename changes an allowed
+        /// area's load ID, which embeds the name, so the reference has to carry
+        /// the name the area had when saved. The deleted area's reference must
+        /// be dropped rather than left for the loader to fail on, and a stand
+        /// with no binding writes no reference node at all.</para>
+        ///
+        /// <para>A leg of its own, on a fresh pad: leg 2 loads leg 1's file
+        /// and takes the first stand it finds, so two more stands in that file
+        /// would make leg 2 test whichever came first.</para>
+        /// </summary>
+        internal static bool AreaRoundTrip()
+        {
+            Map map = Find.CurrentMap;
+            if (map == null || !Patch_HarnessAutoRun.TryFindPad(map, out IntVec3 origin))
+            {
+                return CannotStage("no usable pad on the current map");
+            }
+            CellRect pad = new CellRect(origin.x, origin.z, DebugTools_LifecycleHarness.PadSize,
+                                        DebugTools_LifecycleHarness.PadSize);
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            DebugTools_LifecycleHarness.Fixture fix = doctor == null
+                ? null
+                : HarnessFixtures.Stage(map, pad, DebugTools_LifecycleHarness.StageKit.Displacing,
+                                        enclose: true);
+            if (fix == null)
+            {
+                DebugTools_LifecycleHarness.Report.AppendLine(
+                    "      the Doctor work type or the fixture could not be had");
+                return false;
+            }
+
+            IntVec3 boundCell = fix.Stand.Position;
+            IntVec3 paintedCell = boundCell + new IntVec3(2, 0, 2);
+            IntVec3 lostCell = boundCell + new IntVec3(4, 0, 2);
+            CompShiftStand lost = HarnessCatchments.StageStand(fix, lostCell);
+            Area_Allowed area = HarnessCatchments.NewArea(fix, "Shift harness area", boundCell, paintedCell);
+            Area_Allowed doomed = HarnessCatchments.NewArea(fix, "Shift harness gone", lostCell);
+            if (lost == null || area == null || doomed == null)
+            {
+                DebugTools_LifecycleHarness.Report.AppendLine(
+                    "      the second stand or the two areas could not be staged");
+                return false;
+            }
+            // A third stand, boxed and carried by a colonist off every map, as a
+            // caravan carries one. Its area lives on, so the save keeps the
+            // binding for when the stand is set down at home again.
+            CompShiftStand boxed = HarnessCatchments.StageStand(fix, boundCell + new IntVec3(3, 0, 3));
+            if (boxed == null)
+            {
+                DebugTools_LifecycleHarness.Report.AppendLine("      the boxed stand could not be staged");
+                return false;
+            }
+            fix.Comp.ToggleWork(doctor);
+            fix.Comp.SetServeArea(area);
+            area.SetLabel("Shift harness renamed");
+            lost.ToggleWork(doctor);
+            lost.SetServeArea(doomed);
+            doomed.Delete();
+            boxed.ToggleWork(doctor);
+            boxed.SetServeArea(area);
+            MinifiedThing box = boxed.parent.MakeMinified();
+            Pawn carrier = DebugTools_Fixtures.AveragePawn(Gender.Male, "Carrier");
+            bool carried = box != null && carrier.inventory.innerContainer.TryAdd(box);
+            Find.WorldPawns.PassToWorld(carrier, RimWorld.Planet.PawnDiscardDecideMode.KeepForever);
+            string carrierID = carrier.ThingID;
+            string areaLoadID = area.GetUniqueLoadID();
+            string doomedLoadID = doomed.GetUniqueLoadID();
+
+            bool ok = DebugTools_LifecycleHarness.Expect(
+                fix.Comp.serves == CatchmentKind.Area && lost.serves == CatchmentKind.Area,
+                "both stands serve an area before the save (control)")
+                & DebugTools_LifecycleHarness.Expect(
+                    carried && boxed.parent.MapHeld == null && boxed.serveArea == area
+                        && boxed.serves == CatchmentKind.Area,
+                    "a third stand serving the area is boxed and carried off every map (control)");
+
+            if (!TrySave(AreaSaveName, out string savePath))
+            {
+                return false;
+            }
+            string saved = File.ReadAllText(savePath);
+            ok &= DebugTools_LifecycleHarness.Expect(
+                    NodeContains(saved, AreaKey, areaLoadID),
+                    "the save carries the binding under the renamed area's load ID")
+                & DebugTools_LifecycleHarness.Expect(
+                    NodeContains(saved, AreaLabelKey, "Shift harness renamed"),
+                    "and the new name as its label")
+                & DebugTools_LifecycleHarness.Expect(
+                    !NodeContains(saved, AreaKey, doomedLoadID)
+                        && NodeContains(saved, AreaLabelKey, "Shift harness gone"),
+                    "the deleted area's stand keeps its name but no reference to it")
+                & DebugTools_LifecycleHarness.Expect(
+                    NodeBodies(saved, AreaKey).Count() == 2
+                        && NodeBodies(saved, AreaKey).All(body => body.Contains(areaLoadID)),
+                    "and only the bound stand and the boxed one write a reference node, both to the live area");
+
+            SavedGameLoaderNow.LoadGameFromSaveFileNow(AreaSaveName);
+            ok &= DebugTools_LifecycleHarness.Expect(
+                !Logged(UnconsumedWarning),
+                "the load consumed every load-id it registered");
+
+            Building_OutfitStand loadedBound = FindStand(boundCell);
+            Building_OutfitStand loadedLost = FindStand(lostCell);
+            if (loadedBound == null || loadedLost == null)
+            {
+                return ok & MissingStand("no area stands at " + boundCell + " and " + lostCell
+                                         + " after loading");
+            }
+            CompShiftStand bound = loadedBound.TryGetComp<CompShiftStand>();
+            CompShiftStand unbound = loadedLost.TryGetComp<CompShiftStand>();
+            if (bound == null || unbound == null)
+            {
+                DebugTools_LifecycleHarness.Report.AppendLine(
+                    "      a loaded stand lost its comp — cannot assert");
+                return false;
+            }
+            Area live = bound.LiveServeArea();
+            Pawn loadedCarrier = Find.WorldPawns.AllPawnsAliveOrDead.FirstOrDefault(p => p.ThingID == carrierID);
+            CompShiftStand loadedBoxed = (loadedCarrier?.inventory?.innerContainer
+                    .OfType<MinifiedThing>().FirstOrDefault()?.InnerThing)?.TryGetComp<CompShiftStand>();
+            ok &= DebugTools_LifecycleHarness.Expect(
+                loadedBoxed != null && loadedBoxed.serves == CatchmentKind.Area && live != null
+                    && loadedBoxed.serveArea == live,
+                "the boxed stand came back still bound to its area, off every map");
+            return ok
+                & DebugTools_LifecycleHarness.Expect(
+                    bound.serves == CatchmentKind.Area && live != null
+                        && live.Label == "Shift harness renamed",
+                    "the bound stand came back serving its area, under the new name")
+                & DebugTools_LifecycleHarness.Expect(
+                    bound.Covers(paintedCell, loadedBound.Map),
+                    "which covers the cell painted in it")
+                & DebugTools_LifecycleHarness.Expect(
+                    CompShiftStand.CatchmentStands.Contains(bound),
+                    "and the load put it back in the registry")
+                & DebugTools_LifecycleHarness.Expect(
+                    unbound.serves == CatchmentKind.Area && unbound.serveArea == null
+                        && unbound.serveAreaLabel == "Shift harness gone",
+                    "the other came back in area mode with no area, under the deleted one's name")
+                & DebugTools_LifecycleHarness.Expect(
+                    !unbound.Covers(lostCell, loadedLost.Map),
+                    "covering nothing");
         }
 
         // ---------------------------------------------------------- plumbing
@@ -843,17 +1043,18 @@ namespace ShiftChange
         /// one asks whether the map a later leg inherited is fit to build on at
         /// all.
         ///
-        /// <para><b>Why leg 3 is the one that needs this.</b> The three
-        /// round-trip cases replace <c>Current.Game</c>, so each runs on
-        /// whatever the one before it left behind. When an earlier load aborts
-        /// in <c>Map.FinalizeLoading</c> the region and room grids are never
+        /// <para><b>Why legs 3 and 4 need this.</b> The round-trip cases
+        /// replace <c>Current.Game</c>, so each runs on whatever the one before
+        /// it left behind. When an earlier load aborts in
+        /// <c>Map.FinalizeLoading</c> the region and room grids are never
         /// built, <c>TryFindPad</c> requires a room on every cell of the pad
         /// and its margin, and so no origin can be found anywhere on the map.
         /// Legs 1 and 2 already report that as a gap through
-        /// <see cref="MissingStand"/>; leg 3 fails EARLIER than any assertion,
-        /// at staging, so it never reached the treatment its siblings get and
-        /// the release gate read red for a cause none of the three share with
-        /// the mod. Found on the v1.4.4 release gate, 2026-09-19.</para>
+        /// <see cref="MissingStand"/>; legs 3 and 4 stage a pad of their own,
+        /// so they fail EARLIER than any assertion, at staging. Leg 3 once
+        /// never reached the treatment its siblings get, and the release gate
+        /// read red for a cause none of the three legs then shared with the
+        /// mod. Found on the v1.4.4 release gate, 2026-09-19.</para>
         ///
         /// <para><b>The discriminator is the abort, not the missing pad.</b>
         /// "The previous leg killed the map" and "this run never had a usable

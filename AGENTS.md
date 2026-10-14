@@ -82,24 +82,26 @@ A harness pass is not a play observation, and a `GAP` line is a known failure
 being tracked, not a pass. **Six gaps are expected on the default list**: the
 Rimatomics table and marker cases skip themselves when Rimatomics is not
 loaded, and the Outfit Stands Plus, Common Sense and Pick Up And Haul cases
-when their mod is not (`--with=` loads each). The sixth is fishing, a gap on
-every list until a stand can serve beyond its room: Odyssey hands fishing jobs
-out with no giver. So a clean default run reads `0 failed, 6 known gaps` and
-exits 0. Any other gap, or any failure, is real. It does now run
+when their mod is not (`--with=` loads each). The sixth is Complex Jobs'
+two delivery givers, probed by the delivery case only when that mod is loaded
+(`--with=FrozenSnowFox.ComplexJobs`). So a clean default run reads
+`0 failed, 6 known gaps` and exits 0. Any other gap, or any failure, is real. It does now run
 `JobDriver_SwapAtStand` for real, through the pawn's own tracker, so "the
 driver builds a correct ledger" is covered, and the player-facing rules have
-functional cases. Save/load round trips are covered by three cases that load
+functional cases. Save/load round trips are covered by four cases that load
 through the engine's synchronous loader (`SavedGameLoaderNow`;
 `GameDataSaveLoader.LoadGame` is async and never returns control) and assert on
 the written file as well as the loaded state. They run last, since they replace
 `Current.Game`. A real gravship launch is the one thing still out of reach.
 
-**Two engine traps live in the driver cases**, both invisible from the API and
-both already paid for once. Pathfinding in 1.6 is asynchronous, so ticking a
+**Three engine traps live in the driver cases**, all invisible from the API and
+all already paid for once. Pathfinding in 1.6 is asynchronous, so ticking a
 single pawn never completes a walk — fixtures stage the pawn on the stand's
-interaction cell. And Jobs are pooled, so a `Job` reference held across its own
+interaction cell. Jobs are pooled, so a `Job` reference held across its own
 completion silently becomes the pawn's *next* job — watch `jobs.curDriver`,
-never the job.
+never the job. And the clock stands still while the harness runs, so a pumped
+pawn's needs can tick every tick and rest drains to an involuntary sleep — the
+pump holds rest full.
 
 **Every colony exit must reach the reaper.** Vanilla routes death, trade,
 kidnap and map exit through `Pawn_Ownership.UnclaimAll`, which

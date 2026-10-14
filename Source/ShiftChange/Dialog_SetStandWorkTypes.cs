@@ -187,8 +187,9 @@ namespace ShiftChange
 
         /// <summary>
         /// Height for the two rows that only some stands draw: the
-        /// deposit-only checkbox on a sleep stand, and the note explaining
-        /// that an AUTOMATIC stand's trigger came from the room.
+        /// deposit-only checkbox on a sleep stand, and the note under the grid
+        /// for a recreation or sleep trigger: that an automatic stand's came
+        /// from the room, or that ticking a work type switches a ticked one.
         ///
         /// <para>Computed rather than folded into
         /// <see cref="HeaderAllowance"/> because both are conditional and the
@@ -211,7 +212,7 @@ namespace ShiftChange
                 {
                     extra += RowHeight + 4f;
                 }
-                if (!comp.IsTriggerOverridden && (comp.HandlesRecreation() || comp.HandlesRest()))
+                if (!comp.HidesWorkList && (comp.HandlesRecreation() || comp.HandlesRest()))
                 {
                     // TWO rows, not one. The note is drawn with
                     // Listing_Standard.Label, which wraps, and the English
@@ -240,7 +241,7 @@ namespace ShiftChange
                     ? ModeOnlyAllowance
                     : (measuredBody > 0f
                         ? measuredBody
-                        : HeaderAllowance + TriggerRowsAllowance
+                        : HeaderAllowance + TriggerRowsAllowance + ServesAllowance
                             + rowsPerColumn * RowHeight + autoLabelOverflow);
 
                 float height = WindowMargin * 2f + CloseButSize.y + 10f + body;
@@ -409,15 +410,34 @@ namespace ShiftChange
             // underneath it and loses its last few characters. Compose the two
             // halves instead so the label owns a rect the button is not in.
             Rect autoRect = listing.GetRect(autoRowHeight);
+            // Automatic reads the room, so it is room mode only: greyed and
+            // inert while the stand serves a radius or an area, with the reason on hover
+            // (docs/DESIGN.md, "Catchments").
+            bool autoAvailable = comp.serves == CatchmentKind.Room;
+            if (!autoAvailable)
+            {
+                GUI.color = Color.gray;
+            }
             Widgets.Label(new Rect(autoRect.x, autoRect.y,
                                    autoRect.width - RadioButtonWidth, autoRect.height),
                           autoLabel);
-            if (Widgets.RadioButton(autoRect.xMax - 24f,
-                                    autoRect.y + autoRect.height / 2f - 12f,
-                                    comp.IsAutomatic)
-                | Widgets.ButtonInvisible(autoRect))
+            // Disabled for real: the radio draws greyed, and GUI.enabled false
+            // makes both clicks below refuse, so no accept tick plays.
+            bool wasEnabled = GUI.enabled;
+            GUI.enabled = autoAvailable;
+            bool autoClicked = Widgets.RadioButton(autoRect.xMax - 24f,
+                                                   autoRect.y + autoRect.height / 2f - 12f,
+                                                   comp.IsAutomatic, disabled: !autoAvailable)
+                               | Widgets.ButtonInvisible(autoRect);
+            GUI.enabled = wasEnabled;
+            GUI.color = Color.white;
+            if (autoClicked && autoAvailable)
             {
                 comp.SetAutomatic();
+            }
+            if (!autoAvailable)
+            {
+                TooltipHandler.TipRegion(autoRect, "ShiftChange.AutomaticRoomOnly".Translate());
             }
             if (Widgets.RadioButtonLabeled(listing.GetRect(RowHeight),
                     "ShiftChange.WorkTypeNone".Translate(), comp.IsExcluded))
@@ -479,7 +499,7 @@ namespace ShiftChange
             TooltipHandler.TipRegion(tradeRect, "ShiftChange.WithholdFromTradeDesc".Translate());
 
             listing.GapLine();
-            listing.Label("ShiftChange.WorkTypesExplainer".Translate());
+            listing.Label(comp.ByCatchment("ShiftChange.WorkTypesExplainer").Translate());
             listing.Gap(4f);
 
             // Recreation is one trigger, not a work type — the room is the
@@ -490,7 +510,7 @@ namespace ShiftChange
             bool recreationOn = comp.HandlesRecreation();
             bool recreationWas = recreationOn;
             Widgets.CheckboxLabeled(listing.GetRect(RowHeight),
-                "ShiftChange.RecreationRow".Translate(), ref recreationOn);
+                comp.ByCatchment("ShiftChange.RecreationRow").Translate(), ref recreationOn);
             if (recreationOn != recreationWas)
             {
                 comp.ToggleRecreation();
@@ -508,7 +528,7 @@ namespace ShiftChange
             bool restOn = comp.HandlesRest();
             bool restWas = restOn;
             Widgets.CheckboxLabeled(listing.GetRect(RowHeight),
-                "ShiftChange.RestRow".Translate(), ref restOn);
+                comp.ByCatchment("ShiftChange.RestRow").Translate(), ref restOn);
             if (restOn != restWas)
             {
                 comp.ToggleRest();
@@ -551,20 +571,25 @@ namespace ShiftChange
             // (adversarial review, 2026-09-03). An automatic stand's trigger is
             // the room's suggestion, and ticking a work type is how a player
             // overrides it — ToggleWork clears the other half, so the exclusive
-            // switch still happens, it is just reachable now.
-            if (comp.IsTriggerOverridden)
+            // switch still happens, it is just reachable now. The same holds
+            // for an explicit trigger the room would suggest anyway: a bedroom
+            // stand moved to an area has its Sleeping ticked for real, and
+            // keeps the list too.
+            if (comp.HidesWorkList)
             {
                 GUI.color = Color.gray;
                 listing.Label(comp.HandlesRest()
                     ? "ShiftChange.RestExclusiveNote".Translate()
                     : "ShiftChange.RecreationExclusiveNote".Translate());
                 GUI.color = Color.white;
+                DrawServes(listing);
                 float exclusiveHeight = listing.CurHeight;
                 listing.End();
                 return exclusiveHeight;
             }
-            // The from-room note is drawn BELOW the grid, not above it. Ticking
-            // a work type overrides the room's trigger, which correctly makes
+            // The trigger note (from the room, or ticked) is drawn BELOW the
+            // grid, not above it. Ticking a work type overrides the trigger,
+            // which correctly makes
             // both this note and the deposit-only row vanish — and above the
             // grid that shortened the header by ~80px on the next frame, moving
             // every cell up three rows under a cursor that was mid-click. Below
@@ -627,16 +652,242 @@ namespace ShiftChange
                 }
             }
 
+            // Only an automatic stand's trigger comes from the room. One ticked
+            // for real, which the room would suggest anyway, reaches the grid
+            // too (HidesWorkList), and says what ticking a work type does.
             if (roomTrigger)
             {
                 GUI.color = Color.gray;
-                listing.Label("ShiftChange.TriggerFromRoomNote".Translate());
+                listing.Label(comp.IsAutomatic
+                    ? "ShiftChange.TriggerFromRoomNote".Translate()
+                    : "ShiftChange.TriggerTickedNote".Translate());
                 GUI.color = Color.white;
             }
 
+            DrawServes(listing);
             float bodyHeight = listing.CurHeight;
             listing.End();
             return bodyHeight;
+        }
+
+        /// <summary>
+        /// The Serves row's height, and the slider's in radius mode, for the
+        /// estimate <see cref="InitialSize"/> uses before the body is first
+        /// measured: a separator, the row, and the slider.
+        /// </summary>
+        internal float ServesAllowance =>
+            12f + RowHeight + (comp.serves == CatchmentKind.Radius ? RowHeight + 8f : 0f);
+
+        /// <summary>The Paint button's width, at the end of the Serves row in area mode.</summary>
+        internal const float PaintButtonWidth = 90f;
+
+        /// <summary>
+        /// Where the stand serves: in radius mode with the slider for how far,
+        /// in area mode with the Paint button at the end of the row. Last in
+        /// the window, below the triggers, because they come first: a stand
+        /// leaves room mode only with something ticked, so the row is greyed
+        /// until it serves something. Last also means nothing above it moves
+        /// when the slider appears (docs/DESIGN.md, "Catchments").
+        /// </summary>
+        internal void DrawServes(Listing_Standard listing)
+        {
+            listing.GapLine();
+            bool canChoose = comp.ServesSomething;
+            Rect row = listing.GetRect(RowHeight);
+            if (comp.serves == CatchmentKind.Area)
+            {
+                DrawPaint(row.RightPartPixels(PaintButtonWidth));
+                row.width -= PaintButtonWidth + 6f;
+            }
+            // ButtonText's active flag only refuses the click: it draws the
+            // button exactly as a live one. The tint is what greys it.
+            if (!canChoose)
+            {
+                GUI.color = Widgets.InactiveColor;
+            }
+            // Cut to fit, with the whole row first in the tooltip: an area's
+            // name is the player's own and runs to 28 characters, and beside
+            // Paint a label too wide is drawn centred and clipped at both ends.
+            string label = "ShiftChange.ServesRow".Translate(comp.ServesLabel());
+            string shown = label.Truncate(row.width - 10f);
+            bool clicked = Widgets.ButtonText(row, shown, active: canChoose);
+            GUI.color = Color.white;
+            if (clicked && canChoose)
+            {
+                ServesMenuOption.Open(ServesMenuOptions());
+            }
+            string tip = canChoose
+                ? "ShiftChange.ServesDesc".Translate()
+                : "ShiftChange.ServesNeedsTrigger".Translate();
+            switch (comp.ServeFault)
+            {
+                case CatchmentFault.InTheOpen:
+                    tip += "\n\n" + "ShiftChange.ServesNothingOutdoorsDesc".Translate();
+                    break;
+                case CatchmentFault.AreaGone:
+                    tip += "\n\n" + "ShiftChange.ServesAreaGoneDesc".Translate();
+                    break;
+                case CatchmentFault.OutsideArea:
+                    tip += "\n\n" + "ShiftChange.ServesAreaWithoutStandDesc".Translate();
+                    break;
+            }
+            if (shown != label)
+            {
+                tip = label + "\n\n" + tip;
+            }
+            TooltipHandler.TipRegion(row, tip);
+
+            if (comp.serves == CatchmentKind.Radius)
+            {
+                int radius = Mathf.RoundToInt(listing.SliderLabeled(
+                    "ShiftChange.ServeRadius".Translate(comp.serveRadius),
+                    comp.serveRadius, CompShiftStand.MinServeRadius, CompShiftStand.MaxServeRadius));
+                if (radius != comp.serveRadius)
+                {
+                    comp.SetServeRadius(radius);
+                }
+            }
+        }
+
+        /// <summary>
+        /// The Paint button, greyed while the stand's area is gone, since there
+        /// is nothing left to paint. Binding and painting stay separate steps:
+        /// picking an area in the menu never starts a tool.
+        /// </summary>
+        internal void DrawPaint(Rect rect)
+        {
+            Area area = comp.LiveServeArea();
+            if (area == null)
+            {
+                GUI.color = Widgets.InactiveColor;
+            }
+            bool clicked = Widgets.ButtonText(rect, "ShiftChange.ServesPaint".Translate(), active: area != null);
+            GUI.color = Color.white;
+            TooltipHandler.TipRegion(rect, area != null
+                ? "ShiftChange.ServesPaintDesc".Translate(area.Label)
+                : "ShiftChange.ServesPaintGone".Translate(comp.serveAreaLabel));
+            if (clicked && area != null)
+            {
+                Paint(area);
+            }
+        }
+
+        /// <summary>
+        /// The Serves menu, in three sections (<see cref="ServesMenuOption"/>):
+        /// this room and a radius; every area a colonist could be restricted to
+        /// except Home, each with its colour; then New allowed area and Manage
+        /// areas. Hovering an area draws it. One that leaves out the stand's own
+        /// cell is faded and says why in red, since a stand outside its area
+        /// serves nothing. Vanilla's own area menu
+        /// (<c>AreaUtility.MakeAllowedAreaListFloatMenu</c>) is not used: it
+        /// lists Home, opens the menu itself with plain rows, so no swatches,
+        /// fading or sections, and its Manage areas leaves this window open.
+        /// Built apart from the click so the harness can read and pick the
+        /// options (docs/DESIGN.md, "Catchments").
+        /// </summary>
+        internal List<FloatMenuOption> ServesMenuOptions()
+        {
+            List<FloatMenuOption> options = new List<FloatMenuOption>
+            {
+                new ServesMenuOption(ServesMenuOption.SectionWhere, "ShiftChange.ServesOptionRoom".Translate(),
+                                     () => comp.SetServes(CatchmentKind.Room)),
+                new ServesMenuOption(ServesMenuOption.SectionWhere, "ShiftChange.ServesOptionRadius".Translate(),
+                                     () => comp.SetServes(CatchmentKind.Radius)),
+            };
+            Map map = comp.parent.Spawned ? comp.parent.Map : null;
+            if (map == null)
+            {
+                return options;
+            }
+            IntVec3 standCell = comp.parent.Position;
+            List<Area> areas = map.areaManager.AllAreas;
+            for (int i = 0; i < areas.Count; i++)
+            {
+                Area area = areas[i];
+                // Home stays out of the menu for now, though the binding
+                // would take it (docs/DESIGN.md, "Catchments").
+                if (!area.AssignableAsAllowed() || area is Area_Home)
+                {
+                    continue;
+                }
+                bool holdsStand = area[standCell];
+                options.Add(new ServesMenuOption(ServesMenuOption.SectionAreas,
+                                                 holdsStand ? area.Label : AreaLeavingStandOut(area.Label),
+                                                 () => comp.SetServeArea(area),
+                                                 area.ColorTexture, holdsStand ? Color.white : FadedSwatch,
+                                                 _ => area.MarkForDraw()));
+            }
+            // Greyed at the cap rather than hidden, with vanilla's own reason.
+            // A disabled option sorts last, below Manage areas..., which is
+            // where the player goes next to make room.
+            ServesMenuOption make = new ServesMenuOption(ServesMenuOption.SectionManage,
+                                                         "ShiftChange.ServesOptionNewArea".Translate(),
+                                                         () => comp.MakeServeArea());
+            if (!map.areaManager.CanMakeNewAllowed())
+            {
+                make.Disabled = true;
+                make.tooltip = new TipSignal("MaxAreasReached".Translate(AreaManager.MaxAllowedAreas));
+            }
+            options.Add(make);
+            options.Add(new ServesMenuOption(ServesMenuOption.SectionManage, "ManageAreas".Translate(),
+                                             () => OpenManageAreas(map)));
+            return options;
+        }
+
+        /// <summary>A faded swatch, for an area that leaves the stand out.</summary>
+        internal static readonly Color FadedSwatch = new Color(1f, 1f, 1f, 0.35f);
+
+        /// <summary>
+        /// How the menu lists an area that leaves out the stand's own cell: its
+        /// name faded and the rest in red, the Serves row's own words for a
+        /// stand outside its area, so it reads apart from the areas the stand
+        /// can serve. Rich-text colour tags, as vanilla's labels use.
+        ///
+        /// <para><c>Resolve</c>, never a cast: <c>TaggedString</c>'s implicit
+        /// conversion to string strips every tag (<c>StripTags</c>), which would
+        /// take the faded name back to the row's red.</para>
+        /// </summary>
+        internal static string AreaLeavingStandOut(string name)
+        {
+            return "ShiftChange.ServesAreaStandOutside".Translate(name.Colorize(ColoredText.SubtleGrayColor))
+                .Resolve()
+                .Colorize(ColorLibrary.RedReadable);
+        }
+
+        /// <summary>
+        /// Starts vanilla's Expand allowed area tool on <paramref name="area"/>
+        /// the way Manage areas does (<c>Dialog_ManageAreas.SelectDesignator</c>):
+        /// the tool paints whichever area its public static names. This window
+        /// closes first. It absorbs clicks around itself, so left open it would
+        /// swallow every stroke of the brush.
+        /// </summary>
+        internal void Paint(Area area)
+        {
+            Close();
+            Find.MainTabsRoot.EscapeCurrentTab(playSound: false);
+            Designator_AreaAllowed.selectedArea = area;
+            Designator expand = DesignationCategoryDefOf.Zone.AllResolvedDesignators
+                .OfType<Designator_AreaAllowedExpand>().FirstOrDefault()
+                ?? new Designator_AreaAllowedExpand();
+            Find.DesignatorManager.Select(expand);
+        }
+
+        /// <summary>
+        /// Opens vanilla's Manage areas, closing this window first: the paint
+        /// buttons there close only their own dialog, and this one, still open
+        /// behind it, would then swallow the strokes (see <see cref="Paint"/>).
+        /// </summary>
+        internal void OpenManageAreas(Map map)
+        {
+            Close();
+            Find.WindowStack.Add(new Dialog_ManageAreas(map));
+        }
+
+        /// <summary>The stand's ring or area, drawn on the map while the window is open.</summary>
+        public override void WindowUpdate()
+        {
+            base.WindowUpdate();
+            comp.DrawCatchment();
         }
     }
 }

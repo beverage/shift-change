@@ -1,0 +1,13 @@
+v1.5.0 update:
+
+A stand can now serve a radius or an allowed area instead of its room, chosen under Serves in its settings: a shed in the fields, a fishing hut, a cell block, a build site.
+
+A stand standing in the open and serving its room now serves nothing, where a work stand there used to serve every outdoor job on the map. An alert lists those stands; give them a radius or an area.
+
+Fetching building materials no longer dresses anyone, unless one allowed area covers both the stockpile and the site, and a builder already in a hardhat keeps it on for a fetch to a site inside their stand's room, ring or area.
+
+Fishing now dresses at a stand ticked for it whose radius or allowed area covers the water.
+
+Also fixed: meal runs in pyjamas, urgent patients stopping at a stand on the way to bed, stands beside a door dressing for work on the door, and baby rescues waiting on a change.
+
+Every stand still starts on This room.

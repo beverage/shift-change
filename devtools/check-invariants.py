@@ -22,6 +22,10 @@ SOURCE = os.path.join(ROOT, "Source")
 KEYED = os.path.join(ROOT, "Languages", "English", "Keyed", "ShiftChange.xml")
 PREVIEW = os.path.join(ROOT, "About", "Preview.png")
 
+# The suffixes CompShiftStand.ByCatchment appends to a key, one per catchment
+# kind ("" for a room). Keep the two in step.
+CATCHMENT_SUFFIXES = ("", "Radius", "Area")
+
 # Steam rejects a Workshop preview over 1 MiB. The game does not check:
 # Workshop.cs:266-272 tests only that the file exists before handing it to
 # SteamUGC.SetItemPreview, so an oversized one fails mid-publish as a bare
@@ -39,6 +43,11 @@ VANILLA_KEYS = {
     # replacing it, so vanilla's half stays translated in every language.
     "CommandAllowRemovingApparel",
     "CommandAllowRemovingApparelDesc",
+    # The Serves menu opens vanilla's own Manage areas dialog under vanilla's
+    # label for it, and greys New allowed area at vanilla's own cap with
+    # vanilla's reason, so both read as the game's in every language.
+    "ManageAreas",
+    "MaxAreasReached",
 }
 
 failures = []
@@ -132,6 +141,14 @@ def check_translation_keys():
         for match in re.finditer(
                 r'\{\s*"[A-Za-z0-9_.]+"\s*,\s*"(ShiftChange\.[A-Za-z0-9_.]+)"\s*\}', text):
             used.setdefault(match.group(1), rel(path))
+        # A third known shape: a key whose wording follows the stand's
+        # catchment goes through CompShiftStand.ByCatchment, which appends the
+        # mode's suffix. The base key and every variant are therefore in use,
+        # and each must exist, since a missing variant renders as the raw key
+        # in that mode only, where nobody testing room mode would see it.
+        for match in re.finditer(r'ByCatchment\(\s*"(ShiftChange\.[A-Za-z0-9_.]+)"\s*\)', text):
+            for suffix in CATCHMENT_SUFFIXES:
+                used.setdefault(match.group(1) + suffix, rel(path))
 
     for key, where in sorted(used.items()):
         if key in defined or key in VANILLA_KEYS:

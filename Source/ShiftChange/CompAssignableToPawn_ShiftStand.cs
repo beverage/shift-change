@@ -611,15 +611,15 @@ namespace ShiftChange
             // design (the trigger-only guard in CompShiftStand.WorkTypes), and
             // calling the feature's flagship state "no work type yet"
             // contradicted the inspect pane on the same stand (review,
-            // 2026-08-15). Every trigger added here has to be added there too.
-            if (comp == null || (comp.WorkTypes.Count == 0
-                                 && !comp.HandlesRecreation() && !comp.HandlesRest()))
+            // 2026-08-15). Both ask CompShiftStand.ServesSomething, so a
+            // trigger added there reaches both.
+            if (comp == null || !comp.ServesSomething)
             {
                 return "ShiftChange.AssignDescNoWork".Translate();
             }
             string works = comp.WorkTypesLabel();
             return ShiftChangeMod.PoolingEnabled
-                ? "ShiftChange.AssignDesc".Translate(works)
+                ? comp.ByCatchment("ShiftChange.AssignDesc").Translate(works)
                 : "ShiftChange.AssignDescNoPool".Translate(works);
         }
 
