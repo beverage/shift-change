@@ -1,6 +1,6 @@
 # Shift Change
 
-> **Requires RimWorld 1.6, the Odyssey expansion, and Harmony.** The outfit
+> **Requires RimWorld 1.6 or 1.7, the Odyssey expansion, and Harmony.** The outfit
 > stand this mod builds on is Odyssey content, so without it the mod does
 > nothing at all.
 
@@ -102,26 +102,15 @@ change note. Turn it on if you would rather a stand never left anyone indecent.
 is the penalty, so nothing is ever held back and the stand does what it was set
 to do.
 
-**"Allow removing items" is held off while a stand is in service.**
-Shift changes never need it, and turning it on hands the stand's contents to
-every colonist's outfit optimizer, which may take the uniform and wear it as
-everyday clothes, and assigning an owner does not prevent that. The stand
-clears it on load and again whenever it goes back into service, so a stand
-switched on while it was set aside does not stay that way. To take one garment
-back, use the eject button beside it in the Contents tab, which drops it next
-to the stand. To decommission a stand and let haulers empty it, set "Not used
-for shift changes" first; the toggle unlocks with it and stays unlocked.
-
 **"Keep contents out of trade" is on by default.** Traders will otherwise buy
 anything sitting on an outfit stand: the uniform, and the owner's own clothes
 parked there while they're on shift. That's vanilla behavior, it reaches both
 caravans at the gate and ships in orbit, and nothing else about the stand
-prevents it. "Allow removing items" doesn't cover trade, and neither does an
-assigned owner. With this on, the stand's contents never reach a trade window,
-and nothing else changes: colonists still stock it, shift changes still work,
-and you can still load the kit into a caravan yourself. Turn it off for a stand
-you keep as a shop shelf; a stand set to "Not used for shift changes" is
-tradeable either way.
+prevents it, not even an assigned owner. With this on, the stand's contents
+never reach a trade window, and nothing else changes: colonists still stock it,
+shift changes still work, and you can still load the kit into a caravan
+yourself. Turn it off for a stand you keep as a shop shelf; a stand set to "Not
+used for shift changes" is tradeable either way.
 
 A stand that is dressing anyone says so in its inspect pane: what it dresses
 for, who owns or is currently wearing it, and whether it's empty. A stand in a
@@ -248,7 +237,7 @@ are open and whenever the stand is selected, and the slider runs from 3 cells to
 game hands out fishing differently from other work.
 
 The same menu lists your **allowed areas** in a section of their own, each with
-its colour beside it: the ones you restrict colonists to in the Assign tab.
+its colour beside it: the ones you restrict colonists to in the Schedule tab.
 Hovering one draws it on the map. Pick one and the stand serves the cells
 painted in it, as long as the stand itself stands on one of them, so an area
 that leaves the stand's own cell out is faded in the menu and marked "(stand is
@@ -259,6 +248,12 @@ the row, closes the settings and starts vanilla's Expand allowed area tool on
 it, and **Manage areas...** opens vanilla's own list for renaming and deleting.
 An area painted for a stand is still an ordinary allowed area, so painting it
 also changes it for any colonist restricted to it. The Home area is not offered.
+
+![Two farmers change into cowboy hats, a duster and overalls at the stands in their farmhouse, then go out and harvest the corn](media/demo-farm.gif)
+
+*The farmhouse stands serve an allowed area painted over the house, every
+field, the horse pen and the storehouse, so the farmers stay dressed from one
+crop to the next.*
 
 Tick what the stand is for first. The row stays greyed until something is
 ticked, and Automatic only reads a room, so choosing a radius or an area for an
@@ -286,18 +281,40 @@ either, a colonist keeps the outfit on only for:
   names is inside the ring or the area. A haul out to a freezer past its edge
   changes them back before they leave, while the stand is still close.
 
-Anything else sends them back to change first: a meal, bed, recreation at a
-work stand, work the stand does not serve. A sleep stand keeps pyjamas on only
+Most other jobs send them back to change first: a sit-down meal, bed,
+recreation at a work stand, work the stand does not serve. A sleep stand keeps pyjamas on only
 in bed and on the way to a bed inside its ring or area, so a marine who parked
 power armor overnight does not spend the next day working without it.
 
-**Construction deliveries change nobody, unless an allowed area holds the whole
+![A warden walks into a cell block in their own clothes, changes into a black duster, cap and sunglasses at a stand in the corridor, and goes into a cell to talk to a prisoner](media/demo-prison.gif)
+
+*The three stands in the corridor serve an allowed area painted over the
+corridor and all four cells.*
+
+**Construction deliveries dress nobody, unless an allowed area holds the whole
 trip.** A builder fetching steel goes in whatever they have on, and the hardhat
-goes on for the frame. The exception is a stand serving an allowed area painted
-over both the stockpile and the site, a materials yard beside a build, say:
-there the builder changes before fetching, since the stand is on the way.
-Replanting a tree follows the same rule, since it also starts wherever the tree
-is lying. Planting seeds changes nobody, whatever the stand serves.
+goes on for the frame. One already wearing it keeps it on for the next fetch,
+wherever the steel lies, as long as every site the load goes to is inside their
+stand's room, ring or area; for a site outside, they change back before setting
+off, while the stand is near. In pyjamas or another stand's outfit, the outfit
+stays on only if the whole trip, stockpile included, is inside that stand's
+room, ring or area, so pyjamas come off before a fetch from a stockpile outside
+the bedroom. The exception is a stand serving an allowed area painted over both
+the stockpile and the site, a materials yard beside a build, say: there a
+builder changes before fetching, since the stand is on the way. One who ranks
+hauling above construction does not: the game files their fetch as hauling, so
+they fetch in their own clothes and change at the frame.
+Replanting a tree and planting seeds follow the same rule, with a stand that
+serves growing, since both start wherever the tree or the seed is lying.
+Clearing a site, by cutting a tree, hauling something aside or removing an old
+floor, is work at the site like any other.
+
+![Twelve colonists walk into a changing area, put on hardhats and builder's jackets, and carry granite blocks from the crates to a monument's blueprints](media/demo-construction.gif)
+
+*One allowed area covers the changing area, the eight crates and the whole
+build site, so each builder changes before fetching their first load. The
+stands are the mechanized ones from
+[Outfit Stands Plus](#mod-compatibility).*
 
 ## The rules it follows
 
@@ -361,7 +378,7 @@ Three mod settings, under Options → Mod settings:
 
 ## Requirements
 
-- RimWorld 1.6
+- RimWorld 1.6 or 1.7
 - **Odyssey** (the outfit stand is Odyssey content)
 - Harmony
 
@@ -580,9 +597,12 @@ artifacts.
 [Automatic Swap Outfit](https://github.com/aedbia/AutomaticSwapForStand) by
 aedbia (MIT) covers adjacent ground: automatic swapping at an outfit stand,
 triggered by allowed-area boundaries. Shift Change is an independent
-implementation with a different trigger (the room and its work type) and
-per-stand ownership, but that mod is why several dead ends were cheap to
-avoid.
+implementation with a different trigger (the job, and whether it falls in the
+stand's room, radius or allowed area) and per-stand ownership, but that mod is
+why several dead ends were cheap to avoid.
+
+[Reel's Expanded Storage](https://steamcommunity.com/sharedfiles/filedetails/?id=3237638097)
+by Reel, for letting me use it for the shots above.
 
 ## License
 

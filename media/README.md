@@ -179,20 +179,59 @@ stands, and that is exactly the stretch the 8× compresses. A version that
 holds ~18–22 s at 1× would show the distinction better at the cost of a longer
 gif; this cut favours the bookends instead.
 
+## demo-construction.gif, demo-prison.gif, demo-farm.gif
+
+The catchment scenes (v1.5.0): a stand serving an allowed area. Filmed with OBS
+on 2026-10-13 in the constellation's media sandbox, a separate RimWorld profile
+staged in god mode; the takes are not in this repository. All three are 7 s at
+12 fps and 540 px tall, cut from the 2560×1440 take with one ffmpeg pass:
+
+```bash
+ffmpeg -ss <in> -to <out> -i "<take>.mov" -an -filter_complex \
+  "crop=<crop>,scale=<size>:flags=lanczos,fps=12,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" \
+  -loop 0 <name>.gif
+```
+
+| gif | take | in, out | crop | size |
+|---|---|---|---|---|
+| `demo-construction` | 12:36 | 3.2, 10.2 | `1920:1080:60:208` | 960:540 |
+| `demo-prison` | 15:56 | 2.5, 9.5 | `846:810:720:363` | 564:540 |
+| `demo-farm` | 14:51 | 2.0, 9.0 | `1440:900:479:417` | 864:540 |
+
+The construction cut also sets `palettegen=max_colors=192`, and its 16:9 crop
+centres the changing area and the formation on one line. The prison and farm
+crops take in only what the scene uses: the prison to the edge of its
+sidewalks, through the generator, and the farm to where the green grass starts.
+
+**Turn off Options → Graphics → Plant wind sway before a take.** Swaying plants
+redraw the whole frame every frame, so a GIF cannot shrink a frame to the patch
+that changed: the farm cut at 1280 wide came out 17.8 MB with sway on and
+6.4 MB with it off. The yard was filmed with sway on, and its grass edges are
+part of why it is the largest of the three.
+
+The stands in the construction and prison scenes are Outfit Stands Plus's
+mechanised ones, which swap in a fraction of a vanilla stand's time, so the
+change does not dominate a 7 s cut. The construction crates and the farm's
+storehouse barrels are Reel's Expanded Storage, credited in the README.
+
 ## cards/
 
-Workshop gallery images. `card-chef`, `card-doc`, `card-lab`, `card-recreation`
-and `card-sleep` are 640×360 scene shots; `card-blacktie` is a 1482×587
-three-panel sequence; `card-controls` (1700×800) and `card-tooltip` (1536×864)
-show UI instead.
+Workshop gallery images. `card-chef`, `card-doc`, `card-lab`, `card-recreation`,
+`card-sleep` and `card-warden` are 640×360 scene shots; `card-farm` is a
+946×516 pair; `card-blacktie` (1482×587) and `card-construction` (1518×830)
+are three-beat sequences; `card-controls` (1493×819) shows UI instead.
 
-`card-controls` is 1700×800 and carries three panels: the SAME work-types
-dialog in its two modes — work on the left (automatic, resolved to doctoring
-from the room, grid populated) and recreation in the middle (grid hidden,
-exclusivity note showing) — then the owner list on the right. Both dialog
-panels show the **Sleeping** row, which is how the card advertises that a rest
-configuration exists without spending a fourth panel on it; `card-sleep`
-immediately precedes it in the gallery and shows the feature itself.
+`card-controls` carries three panels: the work-types dialog on the left
+(automatic, resolved to doctoring from the room, grid populated, the Serves row
+at its foot), the Serves menu in the middle, then the owner list on the right.
+The menu lists This room, Within a radius, the quicktest map's own empty
+"Area 1" faded as outside the stand, the Doctoring area the shoot makes, New
+allowed area and Manage areas, so every section shows. Until 2026-10-13 the
+middle panel was the same dialog with recreation ticked; the scene cards
+already show recreation, and the menu is the control catchments added. The
+dialog still shows the **Sleeping** row, which is how the card advertises that
+a rest configuration exists; `card-sleep` immediately precedes it in the
+gallery and shows the feature itself.
 
 **Shot and composited by script since 2026-09-04** — the second fully
 automated asset, after `card-sleep`:
@@ -203,9 +242,12 @@ devtools/bridge/shoot-controls-card.py 5176 shiftchange-scene-bridge
 ```
 
 It boots a clean colony, builds the demo stage, selects the hospital stand,
-opens its work-types dialog, captures, ticks Recreation, captures the SAME
-window again, then opens the owner list and captures that. No crops to measure
-and no offsets to carry forward.
+opens its work-types dialog and captures it, makes the stand an allowed area
+through the menu's own New allowed area, captures the dialog again in area mode
+(Paint and all; kept for the record, not composited), opens the Serves menu and
+captures that, then opens the owner list and captures that. No crops to
+measure and no offsets to carry forward. `--recompose` rebuilds the card from
+the last captures without a game.
 
 **`clipTargetId` is what retired the hand-cropping.** `take_screenshot` clips to
 a window's own rect, so the 3-6 px of game world a screengrab carries outside
@@ -213,13 +255,16 @@ the border simply never appears. The old recipe's per-capture crop offsets
 (`525x813+6+6`, `525x813+4+8`) existed only to remove it, and had to be
 re-measured every take.
 
-**Driving one stand through both modes is what keeps the two panels equal.**
-`FitToMode` sizes that window from `InitialSize.y`, which branches on
-`ModeOnly` and not on recreation — so the same stand in two modes is the same
-window, and the script asserts the two heights match rather than trusting it.
-A mismatch means the captures came from different stands: a bedroom stand's
-auto label wraps to two lines and grows the window by 12 px, which is exactly
-what a hand-assembled attempt from mixed screengrabs produced.
+**The Serves menu takes two tricks.** Its button opens the menu only with the
+bridge's virtual cursor on it, so the script hovers it (`set_hover_target`)
+before clicking; a bare click reports success and opens nothing. And the menu
+draws nothing in the gaps between its sections, so a window capture shows a
+strip of whatever lay behind it there, map floor in one and dialog in the
+other. The script paints every row whose left pixel is not the menu's frame
+colour (#424549) with the card backdrop before compositing.
+
+**A stand in a bedroom grows the dialog.** Its auto label wraps to two lines
+and adds 12 px, which is why the shoot always uses the hospital stand.
 
 **One instance means one UI scale, by construction.** Panels captured at 1.0x
 and 1.25x cannot be composited — cropped to their borders the same dialog is
@@ -397,39 +442,69 @@ cluster around the harp and billiards, and cropping the poker corner out would
 push the after panel's window well away from the before panel's, which is what
 makes the pair read as one room.
 
+**Its title is smaller than the others' in the gallery.** It was scaled by
+height (587/360), which puts it at 43% of the card's width, where the scene
+cards' spans 61%. Steam's gallery shows every image at one width, so the share
+of the width is what decides how big a title looks; the cards since scale by
+width.
+
+### card-warden and card-farm — before/after by script
+
+Both are built by [`card-pair.sh`](card-pair.sh): the same crop of one take at
+two moments, side by side, with the scene cards' title. Its header carries each
+card's exact command, crop and moments, and why each moment was chosen.
+
+`card-warden` is a standard 640×360 scene card: Sam outside the cell block's
+front door in their own clothes, then in Mullen's cell in the guard kit, mid
+chat, their clothes on the stand. The prison take is zoomed out further than
+the original scene cards' footage, so its pawns come out slightly smaller.
+
+`card-farm` is wider, two 470×516 panels at the take's native resolution and a
+6 px gutter, the same 1.83:1 shape as `card-construction`: the farmers in the
+farmhouse in their own clothes, then in the corn in their ranch clothes.
+`PANEL` and `GUTTER` make the wide card, and the title and fade scale with the
+card's width. The farm take is zoomed out a third further than the yard's, so at
+native resolution its pawns, shown at the gallery's width, come out the yard
+card's size. Two moments are enough here: the farmhouse and the corn make the
+order of events obvious, so the pair needs no seams.
+
+### card-construction — three beats in one frame
+
+Built by [`card-yard-triptych.sh`](card-yard-triptych.sh) from the 12:36 yard
+take. The yard runs west to east in the order things happen (formation,
+changing area, crates and site) and the camera never moves, so the card is one
+framing cut into three equal thirds, each from its own moment: the crew in
+formation, all twelve at their stands, and the crew carrying granite out to the
+site. The thirds line up into one picture of the yard.
+
+**The seams carry the direction of time.** Each is a line shaped like a wave
+crest travelling right: shading that builds slowly and then steepens over
+128 px from the left, a firm edge on the line, and a fade back to full light
+within 12 px ahead of it. A symmetric band read as a panel border and a linear
+ramp as a plain shadow. Each line is a 12 px chevron pointing at the yard's
+centre line (the alcoves' open aisle, the formation's middle row, the crates'
+middle), not the card's, which sits 54 px higher for the title's headroom. The
+shading is the cards' slate (#262b30) at 45%, and a sideways motion blur fades
+in on the same profile, strongest on the line.
+
+The script's comments hold every measurement: why the thirds are 506 px and
+start where they do (each seam's shadow needs bare ground in both moments it
+joins), why each moment was picked frame by frame (two frames earlier, Toni is
+still walking to her stand), and the variants tried and dropped (a sine-wave
+boundary, a lit rim, motion ghosts). Every look setting is an environment
+variable, so a variant needs no edit, and `SEAMS=none` gives the seamless join.
+
+### The UI cards
+
 The UI cards share one treatment, and it is worth stating because it is what
 makes them read as a set: **the interface is lifted out of the game and floated
 on a flat field of `srgb(38,43,48)`**, with generous margins and no annotations,
 arrows or captions. No game world behind it, nothing pointing at anything.
 
-`card-tooltip` was cut from a windowed screengrab. **Both halves are in it on
-purpose** — the gizmo and the tooltip it belongs to. A floating panel of text
-does not say which control it describes, and that is the whole subject of the
-card; the button also carries its own state, the red ✗ showing the toggle off,
-which is the state the text is arguing for.
-
-```bash
-# crop each element TO its own edge, not around it. The tooltip's 1px border is
-# srgb(89,98,111); stop at x=90 on the button or you take a strip of the tooltip
-# with it, since the panel overlaps the gizmo in the live UI.
-magick <shot>.png -crop 335x338+91+17 +repage tip.png
-magick <shot>.png -crop  88x103+3+298 +repage btn.png
-magick -size 1536x864 xc:"srgb(38,43,48)" \
-       \( tip.png -filter point -resize 200% \) -geometry +550+94  -composite \
-       \( btn.png -filter point -resize 200% \) -geometry +330+564 -composite \
-       -strip -define png:compression-level=9 cards/card-tooltip.png
-```
-
-The two are **bottom-aligned with the button to the left**, echoing where the
-tooltip actually appears when you hover, and framed with the same ~94 px
-vertical margin `card-controls` uses.
-
-Unlike a dialog, a gizmo has no opaque backing — RimWorld draws it over the
-world, so the button carries a little of the blue map with it and its label
-runs to the bottom of the capture with the last row or two of "items" shaved.
-Both are artefacts of the source, not the composite.
-
-**`-filter point`, and it is not a stylistic choice — measured 2026-08-17:**
+**Upscale a UI capture with `-filter point`, and it is not a stylistic choice.**
+Measured 2026-08-17 on `card-tooltip` (retired 2026-10-13 with the Allow
+removing items card), a 1× window capture doubled to sit at `card-controls`
+scale:
 
 | upscale | file |
 |---|---|
@@ -442,11 +517,7 @@ The text is already antialiased in the capture, so doubling pixels preserves
 that antialiasing intact, while Lanczos interpolates thousands of new
 intermediate values across every glyph edge — gradients PNG cannot pack. Do not
 "improve" this to a smoother filter; it costs 15× the bytes for a softer image.
-
-The 200% itself is a compromise: the source was a 1× window capture, so the
-panel is only 335 px wide and has to be doubled to sit at `card-controls`
-scale. A capture at the display's native resolution would not need it, and
-would also carry the button's label whole.
+Better still, capture at the display's native resolution and skip the upscale.
 
 ## Preview.png
 

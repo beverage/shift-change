@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Cuts the raw game captures in media/cards/ into the pieces the description
-# cards use. Run from media/, or set SRC/TIP/OUT to absolute paths.
+# cards use. Run from media/, or set SRC/OUT to absolute paths.
 #
 # WHY THIS EXISTS: card-controls.png is a 1700x800 contact sheet of three
 # dialogs. Steam renders a description image at 640, so the sheet arrives on the
@@ -34,38 +34,36 @@
 # in exact alignment on the card instead of stepping in and out by a few pixels.
 #
 # ---------------------------------------------------------------------------
-# MEASURED GEOMETRY — card-controls.png, 1700x800
+# MEASURED GEOMETRY — card-controls.png, 1493x819
 # ---------------------------------------------------------------------------
-# Measured, not eyeballed: `magick SRC -crop 36x1+44+400 +repage txt:-` and
+# Measured, not eyeballed: `magick SRC -crop 1x819+1100+0 +repage txt:-` and
 # friends, reading the runs off the pixel dump. Re-measure if it is re-shot.
 #
-# RE-MEASURED 2026-09-05, and every number below moved. shoot-controls-card.py
-# derives the canvas from the panels and shoots at 1.0x UI scale, where the
-# hand-assembled sheet was 1.25x on a fixed 2000x900 canvas. Panels are 0.8x
-# their old size, the game frame is 1 px rather than 2, and the interior reads
-# #15191D rather than #15181B. Nothing carried over; do not part-patch these
-# against a sheet shot the other way.
+# RE-MEASURED 2026-10-13, when the middle panel became the Serves menu
+# (catchments) and the work panel grew its Serves row. Still 1.0x UI scale,
+# still a derived canvas; the work panel's top and its section rules did not
+# move, everything to its right did. The menu is as wide as its longest row,
+# so a wording change there moves the owner list: "(stand is outside it)"
+# took it from 199 to 213.
 #
 #   backdrop  #262B30      frame  1 px      interior  #15191D
 #
-#   panel            frame x      frame y      INTERIOR
-#   1 work types     75,494       60,739       x 76 w 418    y 61 h 678
-#   2 recreation     570,989      60,739       x 571 w 418   y 61 h 678
-#   3 owners         1065,1624    120,679      x 1066 w 558  y 121 h 558
+#   panel            frame x      frame y      INTERIOR / WIDGET
+#   1 work types     75,494       60,758       x 76 w 418    y 61 h 697
+#   2 Serves menu    570,782      314,504      widget 213x191 at +570+314
+#   3 owners         858,1417     129,688      x 859 w 558   y 130 h 558
 #
-# The two Work types panels are the same window captured twice, hence the
-# identical y and width; only x differs.
-#
-# The work-types panel's two section rules land at y 171 and y 235.
+# The work-types panel's section rules land at y 171, y 235 and y 659; the last
+# sits above the Serves row. The menu's own frame is #424549, and its section
+# gaps arrive already filled with the backdrop by shoot-controls-card.py.
 set -eu
 
 SRC=${SRC:-cards/card-controls.png}
-TIP=${TIP:-cards/card-tooltip.png}
 SRCD=${SRCD:-cards/src}
 OUT=${OUT:-cards/parts}
 mkdir -p "$OUT"
 
-P1_X=76 ; P2_X=571 ; P3_X=1066
+P1_X=76 ; P3_X=859
 PW=418  ; P3_W=558
 
 # Generated directory: wipe it, so a renamed or retired part cannot linger and
@@ -82,50 +80,26 @@ rm -f "$OUT"/*.png
 #   y 105  type        Automatic (from the room) / Not used for shift changes
 #   y 178  flags       Change the whole outfit / Keep contents out of trade
 #   y 237  activities  the ticked-activities blurb, Recreation, Sleeping, and
-#                      the work list
+#                      the work list, stopping a row short of the y 659 rule
 #
 # Full interior width on all three, so they stack in exact alignment.
 magick "$SRC" -crop ${PW}x59+${P1_X}+105  +repage "$OUT/sec-type.png"
 magick "$SRC" -crop ${PW}x52+${P1_X}+178  +repage "$OUT/sec-flags.png"
-magick "$SRC" -crop ${PW}x423+${P1_X}+237 +repage "$OUT/sec-activities.png"
+magick "$SRC" -crop ${PW}x421+${P1_X}+237 +repage "$OUT/sec-activities.png"
+
+# ---- the Serves menu ----------------------------------------------------
+# A WHOLE WIDGET by the border rule: a float menu's frame is what makes it read
+# as a menu, so it is kept, all 213x191 of it.
+magick "$SRC" -crop 213x191+570+314 +repage "$OUT/menu-serves.png"
 
 # ---- whole dialogs ------------------------------------------------------
-# Each stops below its last meaningful row rather than at the panel's bottom
-# frame: both carry 400+ px of empty panel below their content, and on a 640
-# card every wasted pixel is spent shrinking the text. The Close button carries
-# no information either.
-magick "$SRC" -crop ${PW}x322+${P2_X}+61   +repage "$OUT/dlg-recreation.png"
-magick "$SRC" -crop ${P3_W}x277+${P3_X}+121 +repage "$OUT/dlg-owners.png"
-
-# The recreation row carries its greyed note, which is the informative half —
-# it is the game saying work types no longer apply. Both note lines or neither;
-# a strip that clips the second one mid-sentence reads as a mistake.
-#
-# The Sleeping row now sits BETWEEN the two and is inside the strip whether it
-# is wanted or not: rows and note are one block in the dialog, and cutting the
-# middle out would be a doctored screenshot. The strip covers all three.
-magick "$SRC" -crop ${PW}x103+${P2_X}+280 +repage "$OUT/row-recreation.png"
-
-# ---- the Allow removing items tooltip -----------------------------------
-# Text only, and only the first half of it. The tooltip runs on for two more
-# paragraphs after the yellow line, and those two say — at greater length —
-# exactly what the card's own copy underneath says. Printing both is asking the
-# reader to read the same warning twice in two different voices.
-#
-# The button is NOT taken from this file any more. card-tooltip.png predates the
-# purpose-shot captures in cards/src/, so its gizmo is the older, worse
-# rendering; the card pairs this text with giz-removing.png below instead.
-#
-# A PANEL SLICE by the border rule, so it is cut inside the game frame and the
-# card draws the only edge. Measured on card-tooltip.png the same way as
-# card-controls.png:
-#
-#   frame #59626F (2 px)   left 550   right 1218   top 94
-#   -> interior x 552 w 666, y 96
-#
-# 265 tall stops about 20 px under the yellow line's descenders, clear of the
-# next paragraph, which begins near y 395.
-magick "$TIP" -crop 666x265+552+96 +repage "$OUT/tip-text.png"
+# Stops below its last meaningful row rather than at the panel's bottom frame:
+# six colonists end at y 399, under 300 px of empty panel and a Close button,
+# and on a 640 card every wasted pixel is spent shrinking the text. The count is
+# the demo stage's four staff plus however many the quicktest colony started
+# with, which varies by run (three on one shoot, six on the next), so measure
+# the last row on every shoot.
+magick "$SRC" -crop ${P3_W}x275+${P3_X}+130 +repage "$OUT/dlg-owners.png"
 
 # ---- gizmo buttons ------------------------------------------------------
 # The four gizmos a stand can show, from four separate hand-made captures in

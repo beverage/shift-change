@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Shoot and composite card-controls: the work-types dialog in two modes,
-plus the owner list.
+"""Shoot and composite card-controls: the work-types dialog, its Serves menu,
+and the owner list.
 
     devtools/run-scene.sh --media --bridge
     devtools/bridge/shoot-controls-card.py 5176 shiftchange-scene-bridge
+    devtools/bridge/shoot-controls-card.py --recompose   # last captures, no game
 
 WHY THIS IS AUTOMATED AND THE OLD ONE WAS NOT. The card was three hand-cropped
 screengrabs composited by hand, and every crop offset had to be re-measured per
@@ -23,6 +24,19 @@ composited: cropped to their borders the same dialog is 420 px wide at one and
 525 at the other, and the larger simply dominates. Shooting all three from one
 instance makes that impossible to get wrong, which a mix of old and new
 screengrabs did not.
+
+THE MIDDLE PANEL WAS RECREATION MODE UNTIL 2026-10-13, when catchments gave the
+dialog its Serves row; the scene cards already show recreation, and the menu
+is the new control. A quicktest map carries one empty allowed area, "Area 1",
+which the menu lists faded as outside the stand; the shoot adds the hospital's
+own through the menu's New allowed area, so the list shows one of each. The
+hospital dialog is captured once more in area mode, Paint button and all, for
+the description card; it is not composited.
+
+THE SERVES BUTTON OPENS ITS MENU ONLY WITH THE VIRTUAL CURSOR ON IT: hover it
+with set_hover_target, then click. A bare click_ui_target reports success and
+opens nothing. Menu options are not UI-layout elements; choose one with
+execute_context_menu_option.
 """
 import json
 import os
@@ -62,10 +76,12 @@ CARD_BG = "srgb(38,43,48)"
 WORKTYPES_GIZMO = ("shift stand",)
 OWNER_GIZMO = ("set owners", "owner")
 
-RECREATION_ROW = "recreation"
+SERVES_ROW = "serves:"
+NEW_AREA_OPTION = "New allowed area"
 
 WORKTYPES_WINDOW = "Dialog_SetStandWorkTypes"
 OWNERS_WINDOW = "Dialog_AssignStandOwners"
+MENU_WINDOW = "FloatMenu"
 
 
 def magick(*args):
@@ -129,21 +145,46 @@ def fresh_game(b, wait_s=90):
            {"readiness": "playable", "pauseIfNeeded": True, "timeoutMs": 180000})
 
 
-def select_stand(b):
+def select_stand(b, cell=STAND):
     close_all(b)
     # FRAME THE CELL FIRST. click_cell injects a click at the screen position
     # the cell maps to, so a cell outside the camera's viewRect cannot be
     # clicked at all — it fails as "nothing selected", which reads like a build
     # failure and is not one. The previous shoot left the camera on the card
     # stage, and z=130 sat one row below the visible rect.
-    b.tool("rimworld/jump_camera_to_cell", {"x": STAND[0], "z": STAND[1]})
+    b.tool("rimworld/jump_camera_to_cell", {"x": cell[0], "z": cell[1]})
     b.tool("rimworld/clear_selection", {})
-    b.tool("rimworld/click_cell", {"x": STAND[0], "z": STAND[1]})
+    b.tool("rimworld/click_cell", {"x": cell[0], "z": cell[1]})
     sel = b.tool("rimworld/list_selected_gizmos", {})
     if not sel.get("hasSelection"):
-        raise SystemExit(f"nothing selected at {STAND} — camera framed there, so "
+        raise SystemExit(f"nothing selected at {cell} — camera framed there, so "
                          "check the demo stage actually built at this origin")
     return sel.get("gizmos") or []
+
+
+def open_dialog(b, cell=STAND):
+    gizmos = select_stand(b, cell)
+    b.tool("rimworld/execute_gizmo", {"gizmoId": gizmo_id(gizmos, *WORKTYPES_GIZMO)})
+
+
+def open_serves_menu(b):
+    target = ui_row(b, SERVES_ROW)
+    b.tool("rimworld/set_hover_target", {"targetId": target, "durationMs": 20000, "settleMs": 300})
+    b.tool("rimworld/click_ui_target", {"targetId": target})
+    time.sleep(0.3)
+    if not [w for w in windows(b) if MENU_WINDOW in (w.get("type") or "")]:
+        raise SystemExit("the Serves menu did not open")
+
+
+def new_area(b):
+    """Make an allowed area for the hospital stand through its own Serves
+    menu, which names it for what the stand serves and picks it."""
+    open_dialog(b)
+    open_serves_menu(b)
+    b.tool("rimworld/execute_context_menu_option", {"label": NEW_AREA_OPTION})
+    b.tool("rimworld/clear_hover_target", {}, ok=False)
+    time.sleep(0.5)
+    close_all(b)
 
 
 def gizmo_id(gizmos, *needles):
@@ -203,8 +244,14 @@ def ui_row(b, needle):
 
 
 def main():
-    b, rest = connect(sys.argv[1:])
     out = os.path.join(REPO, "media", "cards", "card-controls.png")
+    if "--recompose" in sys.argv:
+        # The last shoot's captures, composited again without a game.
+        shots = os.path.join(REPO, "dist", "scenedata", "Screenshots")
+        compose(*(os.path.join(shots, f"controls-{tag}__clip.png")
+                  for tag in ("work", "serves-menu", "owners")), out)
+        return
+    b, rest = connect(sys.argv[1:])
 
     # FRESH GAME FIRST, unless told otherwise. The demo stage spawns four
     # staff every time it is built, and they accumulate: a second run put
@@ -224,26 +271,63 @@ def main():
            {"path": STAGE, "x": ORIGIN[0], "z": ORIGIN[1]})
     b.tool("rimworld/step_game_ticks", {"ticks": 15})
 
-    # --- panel 1: work mode, resolved to doctoring from the room
-    gizmos = select_stand(b)
-    b.tool("rimworld/execute_gizmo", {"gizmoId": gizmo_id(gizmos, *WORKTYPES_GIZMO)})
+    # --- panel 1: work mode, resolved to doctoring from the room, serving it
+    open_dialog(b)
     p_work = window_shot(b, "work", WORKTYPES_WINDOW)
+    close_all(b)
 
-    # --- panel 2: the SAME window with recreation ticked
-    b.tool("rimworld/click_ui_target", {"targetId": ui_row(b, RECREATION_ROW)})
-    p_rec = window_shot(b, "recreation", WORKTYPES_WINDOW)
-    b.tool("rimworld/close_window", {}, ok=False)
+    # --- the hospital's own area, made through the menu
+    new_area(b)
+
+    # --- the hospital dialog in area mode (description card only), then
+    # --- panel 2: its Serves menu, listing Area 1 and the new area
+    open_dialog(b)
+    window_shot(b, "area", WORKTYPES_WINDOW)
+    open_serves_menu(b)
+    p_menu = window_shot(b, "serves-menu", MENU_WINDOW)
+    b.tool("rimworld/clear_hover_target", {}, ok=False)
+    close_all(b)
 
     # --- panel 3: the owner list
     gizmos = select_stand(b)
     b.tool("rimworld/execute_gizmo", {"gizmoId": gizmo_id(gizmos, *OWNER_GIZMO)})
     p_owners = window_shot(b, "owners", OWNERS_WINDOW)
-    b.tool("rimworld/close_window", {}, ok=False)
+    b.tool("rimworld/close_window", {"windowType": OWNERS_WINDOW}, ok=False)
 
-    compose(p_work, p_rec, p_owners, out)
+    compose(p_work, p_menu, p_owners, out)
 
 
-def compose(work, rec, owners, out):
+def fill_menu_gaps(path):
+    """Paint the Serves menu's section gaps the card's background colour.
+
+    The menu draws nothing between its sections, so a window capture shows
+    whatever lay behind it there: a strip of map floor in one gap and of the
+    settings window in the other, which on a flat card reads as damage. Every
+    option row starts with the menu's frame (#424549, or #44474A on a row's
+    top and bottom edge), so a row whose left pixel is anything else is a gap.
+    """
+    w, h = (int(v) for v in subprocess.run(["magick", "identify", "-format", "%w %h", path],
+                                           capture_output=True, check=True, text=True).stdout.split())
+    dump = subprocess.run(["magick", path, "-crop", f"1x{h}+0+0", "+repage", "-depth", "8", "txt:-"],
+                          capture_output=True, check=True, text=True).stdout.splitlines()[1:]
+    gaps = []
+    for line in dump:
+        # "0,59: (106,81,46,255)  #6A512EFF  srgba(...)"
+        row = int(line.split(":")[0].split(",")[1])
+        colour = line.split()[2]
+        r, g, b = (int(colour[i:i + 2], 16) for i in (1, 3, 5))
+        if not (abs(r - 66) <= 4 and abs(g - 69) <= 4 and abs(b - 73) <= 4):
+            gaps.append(row)
+    clean = path.replace(".png", "-clean.png")
+    args = [path, "-fill", CARD_BG]
+    for row in gaps:
+        args += ["-draw", f"rectangle 0,{row} {w - 1},{row}"]
+    magick(*args, clean)
+    print(f"  menu gaps   {len(gaps)} rows filled -> {clean}")
+    return clean
+
+
+def compose(work, menu, owners, out):
     """Three panels on the cards' background, each vertically centred.
 
     The vertical offsets are not free parameters — every panel is centred, so
@@ -251,22 +335,12 @@ def compose(work, rec, owners, out):
     left over, so a dialog that grows a row re-spaces itself instead of
     silently overlapping its neighbour.
     """
-    panels = (work, rec, owners)
+    panels = (work, fill_menu_gaps(menu), owners)
     sizes = []
     for p in panels:
         w, h = subprocess.run(["magick", "identify", "-format", "%w %h", p],
                               capture_output=True, check=True).stdout.split()
         sizes.append((int(w), int(h)))
-
-    # The two work-types panels MUST match in height: FitToMode sizes that
-    # window from InitialSize.y, which branches on ModeOnly and not on
-    # recreation, so it is the same window in both modes. A mismatch means one
-    # capture caught a different dialog — a different room's stand, whose auto
-    # label wraps to a second line — and the pair is not a before/after of one
-    # control any more.
-    if sizes[0][1] != sizes[1][1]:
-        raise SystemExit(f"work-types panels differ in height {sizes[0]} vs {sizes[1]} — "
-                         "they should be one window in two modes")
 
     card_w = sum(w for w, _ in sizes) + CARD_GAP * (len(sizes) + 1)
     card_h = max(h for _, h in sizes) + CARD_MARGIN_Y * 2

@@ -64,4 +64,4 @@ do
 done
 
 magick identify "$OUT"/banner-*.png "$OUT"/card-faq.png "$OUT"/card-gizmos.png \
-                "$OUT"/card-removing.png "$OUT"/card-stand-controls.png
+                "$OUT"/card-stand-controls.png
