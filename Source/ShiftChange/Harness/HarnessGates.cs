@@ -571,7 +571,9 @@ namespace ShiftChange
             // A stand in ANOTHER room still dresses them: the latch belongs to
             // the room they changed back in. The second stand stands outside
             // the door and the colonist stays inside, so the latch is still
-            // held while the work arm looks out there.
+            // held while the work arm looks out there. A room stand in the
+            // open serves nothing, so the second stand serves the smallest
+            // ring instead.
             IntVec3 outsideCell = new IntVec3(fix.Outside.minX, 0, fix.Outside.maxZ - 1);
             Building_OutfitStand other = (Building_OutfitStand)DebugTools_Fixtures.Spawn(
                 fix.Map, fix.Stand.def, ThingDefOf.WoodLog, outsideCell, Rot4.North);
@@ -581,8 +583,12 @@ namespace ShiftChange
                 return Expect(false, "a second stand could be staged outside the door");
             }
             otherComp.ToggleWork(doctor);
+            otherComp.SetServes(CatchmentKind.Radius);
+            otherComp.SetServeRadius(CompShiftStand.MinServeRadius);
             ok &= Expect(other.GetRoom() != fix.Stand.GetRoom(),
                          "the second stand is in another room")
+                & Expect(otherComp.serves == CatchmentKind.Radius,
+                         "serving a ring around it (control)")
                 & Expect(Diverts(fix, DoctoringAt(tend, outsideCell)),
                          "and work out there still dresses them at it")
                 & Expect(Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),

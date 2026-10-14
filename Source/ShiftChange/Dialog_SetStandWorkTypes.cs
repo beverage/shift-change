@@ -702,8 +702,7 @@ namespace ShiftChange
             string tip = canChoose
                 ? "ShiftChange.ServesDesc".Translate()
                 : "ShiftChange.ServesNeedsTrigger".Translate();
-            if (canChoose && comp.serves == CatchmentKind.Room && comp.StandsInTheOpen
-                && (comp.HandlesRecreation() || comp.HandlesRest()))
+            if (canChoose && comp.serves == CatchmentKind.Room && comp.StandsInTheOpen)
             {
                 tip += "\n\n" + "ShiftChange.ServesNothingOutdoorsDesc".Translate();
             }

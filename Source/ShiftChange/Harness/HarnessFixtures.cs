@@ -848,6 +848,14 @@ namespace ShiftChange
                 {
                     fix.Stand.Destroy();
                 }
+                for (int i = 0; i < fix.Areas.Count; i++)
+                {
+                    Area area = fix.Areas[i];
+                    if (area != null && map.areaManager.AllAreas.Contains(area))
+                    {
+                        area.Delete();
+                    }
+                }
                 // The doorway fixture's strip lies outside the pad, so the pad
                 // clear below never reaches it. A zone a case left there goes
                 // too: an extra stockpile on the map is a haul destination for

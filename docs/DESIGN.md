@@ -240,11 +240,12 @@ stored, and stored is the common case.
 drinks on purpose, and stripping the robe to fetch a beer from the poolside
 shelf wrapped every drink taken inside the room in two wardrobe trips (review,
 2026-08-15). So same-room food on a stand that serves recreation keeps the pawn
-dressed. A stand serving a radius counts food inside its ring the same way: the
-test is `Covers`, not the room ("Catchments"). Carrying the drink out in the robe is bounded churn, not a loop: the
-next job's ordinary return trip still fires. Both carve-outs read the stand's
-current configuration, not why the pawn was dressed, so re-configuring a stand
-while its uniform is out can skip one change-out, bounded the same way.
+dressed. A stand serving a radius or an area counts food inside it the same
+way: the test is `Covers`, not the room ("Catchments"). Carrying the drink out
+in the robe is bounded churn, not a loop: the next job's ordinary return trip
+still fires. Both carve-outs read the stand's current configuration, not why
+the pawn was dressed, so re-configuring a stand while its uniform is out can
+skip one change-out, bounded the same way.
 Recording the dress reason in the ledger is the refinement, queued with the
 full-change ledger work.
 
@@ -651,16 +652,36 @@ would re-dress the pawn the player just pulled out.
 The latch is asked **per candidate**, inside the stand search (`LatchBlocks`),
 not as a gate in front of it. As a gate it blocked every stand in the job's
 room. Carried over to catchments as "the latched stand covers the job", one
-Change back at a stand serving a wide ring would have blocked every other
+Change back at a stand with a wide catchment would have blocked every other
 stand's work inside it.
 
-**Waking releases it too**, since a pawn can stay inside a wide ring for days.
-Waking is the first job after a lay-down, counted from the press: a Change back
-that wakes a sleeper is not itself the waking, and the job tracker's pause
-between jobs counts for nothing. Released on lying down instead, it fails at a
-sleep rack: Change back followed by lying down would release it on that same
-boundary, and the sleep arm would park the armour again, silently undoing an
-explicit order.
+**Waking releases it too**, since a pawn can stay inside a wide catchment for
+days. Waking is the first job after a lay-down, counted from the press: a Change
+back that wakes a sleeper is not itself the waking, and the job tracker's pause
+between jobs counts for nothing. Nor does a job starting while a lay-down waits
+at the head of the queue: that is a haul vanilla slipped in ahead of going to
+bed (`Pawn_JobTracker.TryOpportunisticJob`), and counted as the waking it let
+the re-queued lay-down park the armour again. Released on lying down instead,
+it fails at a sleep rack: Change back followed by lying down would release it
+on that same boundary, and the sleep arm would park the armour again, silently
+undoing an explicit order.
+
+**Leaving is judged where the pawn stands, and for a radius or an area also
+where the job goes** (`StillInside`). Room mode asks the room the pawn stands
+in. A radius or an area counts a pawn standing on or next to a covered cell,
+and a job whose place is covered. An area need not hold the cells around its
+stand, and changing back leaves the pawn on one of them; a painted rock face or
+field edge is worked from the unpainted cell beside it; and the job tracker's
+one-tick pause after that work names no place, so only the cell it is taken on
+can be read. Judged by the pawn's cell alone, an area stand's latch dropped at
+the pause right after the swap (adversarial review, 2026-10-14), and judged by
+the job's place as well, at the pause after each rock or row (fix review,
+2026-10-14); either way the same stand dressed them again for the next job in
+the area. So the latch now lifts one cell further out than the catchment.
+
+The latch is sampled at the job boundaries this mod decides on, at the top of
+the decision. A pawn the decision passes over entirely, downed, in a mental
+state or off the map, is not sampled until that ends.
 
 The latch stores the **stand**, not its room, so its catchment is re-derived live
 and a rebuilt wall cannot strand a stale reference. It is keyed by pawn reference,
@@ -739,10 +760,12 @@ dress a pawn for it, and where a dressed pawn may keep the uniform on. It is the
 stand's own room by default, which is how every save from before catchments
 loads. A stand can serve a radius around itself instead (`CatchmentKind`,
 scribed as `shiftChangeServes` and `shiftChangeServeRadius`, prefixed because
-comps scribe flat into the stand's node beside any other mod's).
+comps scribe flat into the stand's node beside any other mod's), or the cells
+painted in an allowed area (`shiftChangeServeArea` and
+`shiftChangeServeAreaLabel`).
 
-**One question, asked by both directions.** `CompShiftStand.Covers(cell, map)`
-is the whole membership test. The return trip, the meal break's recreation
+**One question, asked by both directions.** `CompShiftStand.Covers` is the
+whole membership test. The return trip, the meal break's recreation
 carve-out, the queued-errand check and the catch-up all ask it, so dressing and
 staying dressed cannot disagree about where a stand's work is.
 
@@ -754,48 +777,107 @@ staying dressed cannot disagree about where a stand's work is.
   `GenRadial.NumCellsInRadius` counts every cell out to r plus `float.Epsilon`.
   The bill radius compares strictly, and copied here it would leave the ring's
   outermost cells drawn but not served.
-- **The radius stops below the radial pattern's limit**, about 80 cells, past
-  which the ring logs an error and draws nothing (`GenDraw.cs:455-462`). So the
-  ring always shows what the stand serves.
+- **The radius stops below the radial pattern's limit**, at 79 cells on 1.6's
+  and 1.7's pattern (`MaxServeRadius`), past which the ring logs an error and
+  draws nothing (`GenDraw.cs:455-462`). So the ring always shows what the stand
+  serves. The README and the changelog give the 79, and the harness asserts it.
+- **An area covers its painted cells while the stand stands in one.** An area
+  stand outside its own area covers nothing, so one on unpainted ground serves
+  nothing, with the alert up. Nothing makes the painted cells connected: a stand
+  in one field serves a field across the map, and the walk is the player's to
+  judge.
+- **A solid target is judged at its own cell, then the floor beside it.** A rock
+  face, a wall or a solid machine has no room on its own cells, so the resolver
+  gives a job two cells (`JobPlace`): the one its target names, and a cell
+  beside it that has a room (`RoomBearing`). A room stand reads the second, as
+  it always has, since it needs a room. A radius or area stand is covered by
+  either, so a painted rock face is the quarry whether or not the floor in front
+  of it is painted. Pass-through work judges every place it names the same way,
+  so a wall's repair counts as inside or outside by one rule whichever check
+  asks.
+
+**An area is held by reference, and can go.** The stand keeps the area itself,
+saved by reference as a pawn's allowed area is, and its name when last seen.
+Deleting an area tells pawns and nothing else, so every read goes through
+`LiveServeArea`, which answers only while the area is still in the area list of
+the map the stand is held on, and refreshes the name. Held rather than spawned,
+so a stand boxed for a move keeps its binding through an autosave.
+
+- **A stand whose area has gone stays in area mode and serves nothing.** Falling
+  back to its room would put a corridor or shed stand back on a room where none
+  of its work happens, with nothing to say so.
+- **An alert lists every stand that serves nothing**
+  (`Alert_ShiftStandServesNothing`): its area is gone, it stands outside it, or
+  it serves its room in the open (below). It reads every stand on every map,
+  since a room stand is never in the registry. An alert rather than a message,
+  because it stays up until the stand is fixed
+  and needs no hook on the area's removal: vanilla asks every alert about once
+  every 24 frames, and creates every alert subclass itself. Alerts are not
+  saved, so the class writes nothing into a save.
+- **A later area under the same name is not adopted**, since default names
+  repeat ("Area 1").
+- **Only an area a colonist could be restricted to can be bound:** an allowed
+  area, or Home. The roof, snow and pollution areas never are.
+- **Before saving, a binding to an area that has gone is dropped**, and its name
+  kept: the saver warns of a reference to anything not saved in full, and the
+  loader of one it cannot resolve. A stand with no binding writes no reference
+  node, so a colony that never serves an area saves as it did before.
 
 **Leaving room mode needs something ticked.** Automatic is a room's reading, and a
-disc has no role to read, so automatic is room mode only: `WorkTypes`,
-`HandlesRecreation` and `HandlesRest` answer from the room only while the stand
-serves its room. Choosing a radius for an automatic stand turns its automatic set
-into ticks first, so nothing visibly changes, and a stand with nothing to tick
-stays in room mode. Unticking the last trigger, or choosing Automatic or Not
-used, returns the stand to room mode; the radius is kept for when it comes back.
-So no stand serves a radius with nothing ticked, and a load normalises one that
-somehow does.
+disc or an area has no role to read, so automatic is room mode only:
+`WorkTypes`, `HandlesRecreation` and `HandlesRest` answer from the room only
+while the stand serves its room. Choosing a radius or an area for an automatic
+stand turns its automatic set into ticks first, so nothing visibly changes, and
+a stand with nothing to tick stays in room mode. Unticking the last trigger, or
+choosing Automatic or Not used, returns the stand to room mode; the radius, and
+the area binding while the area lives, are kept for when it comes back. So no
+stand serves a radius or an area with nothing ticked, and a load normalises one
+that somehow does.
 
-**Radius stands are kept in a registry** (`CompShiftStand.CatchmentStands`),
-filled on spawn and emptied on despawn, so nothing has to walk the map to find
-them, and a colony that never leaves room mode pays nothing for them.
+**Radius and area stands are kept in a registry**
+(`CompShiftStand.CatchmentStands`), filled on spawn and emptied on despawn, so
+nothing has to walk the map to find them, and a colony that never leaves room
+mode pays nothing for them. Removing a map despawns no building
+(`MapDeiniter.Deinit` despawns pawns only), so a stand left on a map the colony
+abandoned would stay listed, and through its bound area keep that whole map in
+memory. Each walk of the registry prunes every entry that is no longer spawned
+first (`PruneCatchmentStands`); a despawn removes its own entry, so only a
+removed map leaves one.
 
 **The stand search takes the job's cell.** `FindAvailableStand` walks the room
-stands in that cell's room, as it always has, then the registry's radius stands
-that cover the cell, and ranks them all the same way: the colonist's own stand
-first, then the nearest. A radius replaces the room rather than adding to it, so
-a radius stand is never found through its room, and a job in its own room but
-past its ring does not dress. Two catchments could have been merged into one, but
-a union would give an outdoor stand the whole map, and the overlay can draw only
-one boundary.
+stands in that cell's room, as it always has, then the registry's radius and
+area stands that cover the cell, and ranks them all the same way: the colonist's
+own stand first, then the nearest. A room stand is a candidate only when it
+covers the job (`Covers`), the question the return trip and the catch-up ask:
+`Room.ContainedThings` also lists a thing in every region it can be touched
+from, so a stand standing just outside a door is listed in the doorway's room,
+and the search alone dressed for doorway jobs that the next boundary changed
+them back from, a room stand in the open included. A radius or an area replaces the room rather
+than adding to it, so neither kind of stand is found through its room, and a job
+in its own room but outside its catchment does not dress. Two catchments could
+have been merged into one, but a union would give an outdoor stand the whole
+map, and the overlay can draw only one boundary.
 
-**The outdoor guard is for room stands.** Recreation and sleep skip room stands
-in a room that touches the map edge, since that room is the whole outdoors (see
-"The recreation branch"). A radius is bounded by construction, so a radius stand
-serves outdoor recreation and sleep within its ring. Work keeps its outdoor room
-stands, which serve the whole map, as they always have.
+**A room stand in the open serves nothing.** A room that touches the map edge
+is the whole outdoors (see "The recreation branch"), so a stand serving it from
+open ground would serve every outdoor job on the map. Recreation and sleep
+always skipped such a room. Since v1.5.0 work does too, where v1.4.9 let a work
+stand out there serve the whole map (decided 2026-10-10). `Covers` answers
+false for every cell, the search skips the room, and the catch-up returns
+early. A radius or an area is bounded by construction, so a stand in the open
+serves once it has one, and until then the alert lists it, its inspect pane
+says why, and its Serves row reads "nothing out in the open".
 
 **Staying dressed goes by what the stand is for.** A room limits what can happen
 in it, so a room stand keeps the rule it shipped with: anything in the room
-keeps the uniform on. A radius limits nothing. Kept on for anything inside it, a
-builder's hardhat would see them through meals and bedtime, and the hospital's
-stand would never dress them, since they would already be on shift. So at each
-job boundary a radius stand's colonist keeps the uniform on only for these
-(`StaysDressed`):
+keeps the uniform on. A radius or an area limits nothing. Kept on for anything
+inside it, a builder's hardhat would see them through meals and bedtime, and the
+hospital's stand would never dress them, since they would already be on shift.
+So at each job boundary a radius or area stand's colonist keeps the uniform on
+only for these (`StaysDressed`):
 
-- **What the stand would dress them for, inside the ring**, under every trigger.
+- **What the stand would dress them for, inside the catchment**, under every
+  trigger.
   Otherwise the two directions disagree, and the colonist changes back only to
   be dressed again. It is the dress arms' own classification, in their order: a
   work type first, then ordinary sleep (`IsOrdinarySleep`, which the sleep arm
@@ -807,16 +889,16 @@ job boundary a radius stand's colonist keeps the uniform on only for these
 - **At a sleep stand, nothing else.** Staying in bed is settled for every stand
   before this is asked (`StaysInBed`), and the first job out of bed changes them
   back, wherever it is. Otherwise a colonist who parked power armour on a
-  deposit-only rack would wake and work unarmoured all day inside the ring.
+  deposit-only rack would wake and work unarmoured all day inside the catchment.
 
 **Pass-through work** is work whose type carries the tag `Hauling`, `Cleaning`,
 `Constructing` or `Firefighting` (`JobRoomTargets.PassThroughTags`). Tags rather
 than names, because Complex Jobs splits hauling, repair and deconstruction into
 work types of its own, and Allow Utilities adds an urgent haul. It is judged at
 both ends: every place the job names, its three targets and both queues, has to
-be inside the ring (`EveryPlaceCovered`). So a haul to a freezer outside changes
-the colonist back before the haul, while the stand is still near, rather than
-after it, from the freezer.
+be inside the catchment (`EveryPlaceCovered`). So a haul to a freezer outside
+changes the colonist back before the haul, while the stand is still near, rather
+than after it, from the freezer.
 
 **The incidental jobs are a list** (`JobRoomTargets.IncidentalJobs`), and count
 only without a giver: idling and wandering (`Wait`, `Wait_Wander`,
@@ -834,37 +916,37 @@ meal-break rule ("Meal breaks"). And two things keep the uniform on whatever
 this test says: the jobs that ride along in both directions (`RidesAlong`: a
 haul's follow-ups, and the job tracker's pause between jobs, see "Mod
 compatibility"), and an errand queued ahead of the stand's own work inside the
-ring ("Errands queued ahead of work").
+catchment ("Errands queued ahead of work").
 
 **The job a colonist was just dressed for never changes them back.** `Insert`
 records the job it defers behind a dressing swap (`DressedFor`), and the return
 trip lets that one job through, though its target may have left the catchment
-while they changed: an animal walks out of an unwalled ring, and a cow out of
-the barn, so room stands get it too. The record is taken at the colonist's next
-decided job boundary, below the gates, used or not. That keeps the job tracker's
-pause between the swap and the deferred job, which rides along above the gates,
-from spending it. The job's def and first target are kept beside it, because
-jobs are pooled and a recycled Job object must not pass for the deferred one. A
-change back records nothing: cut short, its deferred job is judged again.
+while they changed: an animal walks out of an unwalled catchment, and a cow out
+of the barn, so room stands get it too. The record is taken at the colonist's
+next decided job boundary, below the gates, used or not. That keeps the job
+tracker's pause between the swap and the deferred job, which rides along above
+the gates, from spending it. The job's def and first target are kept beside it,
+because jobs are pooled and a recycled Job object must not pass for the deferred
+one. A change back records nothing: cut short, its deferred job is judged again.
 
 **The settings window's Serves row** sits below the triggers and lists This room
 and Within a radius, with a slider under it in radius mode. It is greyed until
 the stand serves something, and it is last in the window, so nothing above it
 moves when it changes, which this window has a history of. In the open it says
-what room mode does there: a work stand serves everywhere outdoors, and a
-recreation or sleep stand serves nothing. Automatic is greyed outside room mode,
-with the reason on hover. The ring is drawn on selection and while the window is
-open, as a bill's ingredient radius is, and the inspect pane gains a line only
-outside room mode, by the full-change line's rule. Strings that say where a
+that a room stand serves nothing out there, with the reason on hover. Automatic
+is greyed outside room mode, with the reason on hover. The ring is drawn on
+selection and while the window is open, as a bill's ingredient radius is, and
+the inspect pane gains a line only outside room mode or for a room stand in the
+open, by the full-change line's rule. Strings that say where a
 stand serves come in a variant per catchment, picked by
 `CompShiftStand.ByCatchment`. `devtools/check-invariants.py` reads that call as
 using every variant, so a missing one fails the check instead of rendering as a
 raw key in radius mode only.
 
-**The mid-job catch-up stays in room mode.** A freed radius stand would pull a
-bare colonist off a frame anywhere in its ring: most site jobs are suspendable,
-and every meal or bedtime of a dressed builder frees the stand. The next job
-boundary catches the pawn anyway.
+**The mid-job catch-up stays in room mode.** A freed radius or area stand would
+pull a bare colonist off a frame anywhere in its catchment: most site jobs are
+suspendable, and every meal or bedtime of a dressed builder frees the stand. The
+next job boundary catches the pawn anyway.
 
 ## Mod compatibility
 
@@ -1224,13 +1306,14 @@ read: work jobs put the pawn at A.
 Outdoor joy is fenced off explicitly, not by accident. Every outdoor cell
 resolves a real Room — the one map-spanning, edge-touching outdoor room, not
 null — so without a guard, a rec-toggled stand in open ground would serve
-every walk, skygaze and snowman on the entire map. The arm (and the mid-job
-catch-up's joy twin) refuses rooms that touch the map edge. A walled but
+every walk, skygaze and snowman on the entire map. The arm and the mid-job
+catch-up refuse rooms that touch the map edge. A walled but
 roofless yard is its own non-edge room and stays eligible on purpose;
 open-ground service belongs to a catchment that supplies its own boundary,
 done deliberately or not at all (review, 2026-08-15). Since v1.5.0 that is a
-radius around the stand, which needs no guard, with an allowed area to follow
-("Catchments"). The guard stays, for room stands only. Two more deliberate refusals: a pawn lying in bed is never
+radius around the stand, or an allowed area, which need no guard
+("Catchments"). The guard stays, for room stands only, and since v1.5.0 holds
+for work too. Two more deliberate refusals: a pawn lying in bed is never
 diverted — vanilla issues in-bed joy precisely so patients stay put
 (`JobGiver_GetJoyInBed`, `CanDoDuringMedicalRest`; review, 2026-08-15) — and a
 rec shift's drink from the SAME room does not trigger the
@@ -1623,8 +1706,8 @@ seconds later. Found in play, 2026-08-08.
 
 When a stand returns to the pool, scan for a colonist already doing matching work
 in its room and interrupt them to change, resuming their job afterwards. Room
-stands only: "Catchments" says why a freed radius stand catches nobody. The
-interrupt is the same mechanism vomiting uses: `StartJob` with
+stands only: "Catchments" says why a freed radius or area stand catches nobody.
+The interrupt is the same mechanism vomiting uses: `StartJob` with
 `resumeCurJobAfterwards` suspends the current job when its def allows and resumes
 it from the queue (`Pawn_JobTracker.cs:293-296`). The suspended job goes back on
 the queue as the same object, and is recorded as the job they were dressed for

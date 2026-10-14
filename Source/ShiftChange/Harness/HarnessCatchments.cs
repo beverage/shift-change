@@ -4,6 +4,7 @@
 // "Development tooling".
 #if HARNESS
 using System.Collections.Generic;
+using HarmonyLib;
 using RimWorld;
 using Verse;
 using Verse.AI;
@@ -13,8 +14,8 @@ using static ShiftChange.HarnessFixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// Harness cases for catchments: a stand serving a radius around itself
-    /// instead of its room. docs/DESIGN.md, "Catchments".
+    /// Harness cases for catchments: a stand serving a radius around itself,
+    /// or an allowed area, instead of its room. docs/DESIGN.md, "Catchments".
     ///
     /// <para>Case ORDER is decided in one place,
     /// <see cref="DebugTools_LifecycleHarness.Run"/>.</para>
@@ -259,6 +260,62 @@ namespace ShiftChange
             ok &= Expect(Diverts(fix, JobMaker.MakeJob(chess, joyCell, joyCell)),
                          "the same stand given a radius dresses for it (control)");
             return ok;
+        }
+
+        /// <summary>
+        /// A ROOM STAND IN THE OPEN SERVES NOTHING. On open ground the stand's
+        /// room is all the open ground on the map, so serving it covers no cell
+        /// and dresses nobody, for work as for recreation and sleep, and the
+        /// alert lists the stand. Given a radius, the same work dresses and the
+        /// alert drops it (control). A colonist already in its uniform, as an
+        /// older save can hold, changes back at their next job once the stand
+        /// serves its room again.
+        /// </summary>
+        internal static bool RoomStandInTheOpenServesNothing(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+            if (doctor == null || tend == null)
+            {
+                return Expect(false, "the doctor work defs resolve");
+            }
+            Alert alert = VanillaAlert(typeof(Alert_ShiftStandServesNothing));
+            if (alert == null)
+            {
+                return Expect(false, "vanilla's alert readout made the alert");
+            }
+            fix.Comp.ToggleWork(doctor);
+            MakeCalm(fix.Map);
+
+            IntVec3 near = fix.Stand.Position + new IntVec3(2, 0, 2);
+            bool ok = Expect(fix.Comp.StandsInTheOpen && fix.Comp.serves == CatchmentKind.Room,
+                             "the stand stands in the open, serving its room (control)")
+                    & Expect(!fix.Comp.Covers(near, fix.Map) && !fix.Comp.Covers(fix.Stand.Position, fix.Map),
+                             "which covers nothing, not even its own cell")
+                    & Expect(!Probe(fix, WorkAt(tend, near)), "so Doctor work right beside it dresses nobody")
+                    & Expect(Lists(alert, fix.Stand), "and the alert lists it");
+
+            fix.Comp.SetServes(CatchmentKind.Radius);
+            fix.Comp.SetServeRadius(5);
+            ok &= Expect(Probe(fix, WorkAt(tend, near)), "given a radius, the same work dresses (control)")
+                & Expect(!Lists(alert, fix.Stand), "and the alert drops it (control)");
+
+            // As an older save can hold: a colonist in the uniform of a room
+            // stand in the open. The dressing probe recorded its job as the one
+            // just dressed for, which on shift would keep the uniform on
+            // whatever the stand covers.
+            Patch_JobInterception.DressedFor.Remove(fix.Pawn);
+            ok &= Expect(RunSwap(fix), "dressed at the stand while it serves a radius")
+                & Expect(fix.Comp.OnShift, "and on shift (control)");
+            if (!fix.Comp.OnShift)
+            {
+                return false;
+            }
+            ok &= NotSentStraightBack(fix);
+            ok &= Expect(!Probe(fix, WorkAt(tend, near)), "in uniform, work inside the ring keeps it on (control)");
+            fix.Comp.SetServes(CatchmentKind.Room);
+            return ok & Expect(Probe(fix, WorkAt(tend, near)),
+                               "back on its room, the same work changes them back: the stand covers nothing");
         }
 
         /// <summary>
@@ -963,7 +1020,7 @@ namespace ShiftChange
         /// <summary>
         /// THE WORDS FOLLOW THE CATCHMENT. The Serves row, the inspect pane and
         /// the switch's tooltip all read the stand's mode: its room, the open
-        /// ground (everywhere for work, nothing for recreation), or its radius.
+        /// ground (nothing, whatever the stand is for), or its radius.
         /// Asserted on the strings the window draws, since no case opens one;
         /// the room's wording is the control for each radius one.
         /// </summary>
@@ -1009,15 +1066,19 @@ namespace ShiftChange
             {
                 return ok & Expect(false, "a stand could be staged in the open");
             }
+            string nothingLine = "ShiftChange.InspectServesNothingOutdoors".Translate();
             open.ToggleWork(doctor);
             ok &= Expect(open.StandsInTheOpen
-                         && open.ServesLabel() == (string)"ShiftChange.ServesOutdoors".Translate(),
-                         "a work stand in the open serves everywhere outdoors");
+                         && open.ServesLabel() == (string)"ShiftChange.ServesNothingOutdoors".Translate(),
+                         "a work stand in the open serves nothing there")
+                & Expect(open.CompInspectStringExtra().Contains(nothingLine),
+                         "and its inspect pane says so");
             open.ToggleRecreation();
             ok &= Expect(open.ServesLabel() == (string)"ShiftChange.ServesNothingOutdoors".Translate(),
-                         "a recreation stand there serves nothing");
+                         "nor does a recreation stand there");
             open.SetServes(CatchmentKind.Radius);
-            return ok & Expect(open.ServesLabel() == (string)"ShiftChange.ServesRadius".Translate(open.serveRadius),
+            return ok & Expect(open.ServesLabel() == (string)"ShiftChange.ServesRadius".Translate(open.serveRadius)
+                               && !open.CompInspectStringExtra().Contains(nothingLine),
                                "until it serves a radius (control)");
         }
 
@@ -1032,13 +1093,426 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// A new allowed area on the fixture's map, named and painted on
+        /// <paramref name="cells"/>, or null when the map already holds ten.
+        /// Recorded on the fixture, whose teardown deletes it, since an area
+        /// outlives the pad.
+        /// </summary>
+        internal static Area_Allowed NewArea(Fixture fix, string label, params IntVec3[] cells)
+        {
+            Area_Allowed area;
+            if (!fix.Map.areaManager.TryMakeNewAllowed(out area))
+            {
+                return null;
+            }
+            fix.Areas.Add(area);
+            area.SetLabel(label);
+            for (int i = 0; i < cells.Length; i++)
+            {
+                area[cells[i]] = true;
+            }
+            return area;
+        }
+
+        /// <summary>
+        /// AN AREA COVERS ITS PAINTED CELLS while the stand stands in one. It
+        /// reaches a painted cell past the walls and leaves out an unpainted
+        /// cell of the stand's own room, since the area replaces the room, and
+        /// it covers nothing once the stand's own cell is cleared. Room mode's
+        /// answers on the same cells are the control. Binding needs something
+        /// ticked and an area a colonist could be restricted to, and the radius
+        /// served before comes back on switching to a radius.
+        /// </summary>
+        internal static bool AreaCoversItsCells(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            if (doctor == null)
+            {
+                return Expect(false, "the Doctor work type resolves");
+            }
+            IntVec3 at = fix.Stand.Position;
+            IntVec3 inRoom = at + new IntVec3(2, 0, 2);
+            IntVec3 farCorner = at + new IntVec3(4, 0, 4);
+            IntVec3 pastWall = at + new IntVec3(-2, 0, 2);
+            Area_Allowed area = NewArea(fix, "Shift harness area", at, inRoom, pastWall);
+            if (area == null)
+            {
+                return Expect(false, "the map has room for another allowed area");
+            }
+
+            bool ok = Expect(fix.Comp.Covers(farCorner, fix.Map) && !fix.Comp.Covers(pastWall, fix.Map),
+                             "room mode covers the room's far corner and nothing past the wall (control)");
+            fix.Comp.SetServeArea(area);
+            ok &= Expect(fix.Comp.serves == CatchmentKind.Room && fix.Comp.serveArea == null,
+                         "with nothing ticked, the stand cannot serve an area, and the refusal binds nothing");
+
+            fix.Comp.ToggleWork(doctor);
+            fix.Comp.SetServeArea(fix.Map.areaManager.BuildRoof);
+            ok &= Expect(fix.Comp.serves == CatchmentKind.Room && fix.Comp.serveArea == null,
+                         "nor the build-roof area, which no colonist can be restricted to");
+
+            fix.Comp.SetServes(CatchmentKind.Radius);
+            fix.Comp.SetServeRadius(9);
+            fix.Comp.SetServeArea(area);
+            ok &= Expect(fix.Comp.serves == CatchmentKind.Area && fix.Comp.serveArea == area,
+                         "with Doctoring ticked, it serves the area")
+                & Expect(CompShiftStand.CatchmentStands.Contains(fix.Comp),
+                         "and is in the registry")
+                & Expect(fix.Comp.Covers(inRoom, fix.Map),
+                         "which covers a painted cell of its room")
+                & Expect(fix.Comp.Covers(pastWall, fix.Map),
+                         "and a painted cell past the wall")
+                & Expect(!fix.Comp.Covers(farCorner, fix.Map),
+                         "but not the room's unpainted far corner: the area replaces the room")
+                & Expect(!fix.Comp.Covers(inRoom, null),
+                         "and nothing on no map");
+
+            area[at] = false;
+            ok &= Expect(!fix.Comp.Covers(inRoom, fix.Map) && !fix.Comp.Covers(pastWall, fix.Map),
+                         "with its own cell cleared, the stand stands outside its area and covers nothing");
+            area[at] = true;
+            ok &= Expect(fix.Comp.Covers(inRoom, fix.Map),
+                         "painted back in, it covers again (control)");
+
+            fix.Comp.SetServes(CatchmentKind.Radius);
+            ok &= Expect(fix.Comp.serves == CatchmentKind.Radius && fix.Comp.serveRadius == 9,
+                         "switched to a radius, it serves the radius it had before");
+            fix.Comp.SetServes(CatchmentKind.Area);
+            ok &= Expect(fix.Comp.serves == CatchmentKind.Area && fix.Comp.serveArea == area,
+                         "and switched back, the area it was bound to");
+
+            fix.Comp.ToggleWork(doctor);
+            return ok & Expect(fix.Comp.IsExcluded && fix.Comp.serves == CatchmentKind.Room,
+                               "unticking the last work type takes it back to its room (control)")
+                      & Expect(fix.Comp.serveArea == area,
+                               "with the area binding kept while the area lives");
+        }
+
+        /// <summary>
+        /// AN AREA REPLACES THE ROOM, through the real dressing decision. Work
+        /// on a painted cell outside the stand's room dresses; work on an
+        /// unpainted cell does not, the stand's own room included. Room mode's
+        /// answers on the same cells are the control, and painting the far
+        /// corner in brings it back.
+        /// </summary>
+        internal static bool AreaStandDressesWithinItsArea(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+            if (doctor == null || tend == null)
+            {
+                return Expect(false, "the doctor work defs resolve");
+            }
+            if (fix.Outside.Area == 0)
+            {
+                return Expect(false, "the fixture has a door and open ground outside it");
+            }
+            fix.Comp.ToggleWork(doctor);
+            MakeCalm(fix.Map);
+
+            IntVec3 at = fix.Stand.Position;
+            IntVec3 nearOutside = new IntVec3(fix.Outside.minX, 0, at.z);
+            IntVec3 farOutside = new IntVec3(fix.Outside.minX, 0, fix.Outside.maxZ);
+            IntVec3 farCorner = at + new IntVec3(4, 0, 4);
+            Area_Allowed area = NewArea(fix, "Shift harness area", at, nearOutside);
+            if (area == null)
+            {
+                return Expect(false, "the map has room for another allowed area");
+            }
+
+            bool ok = Expect(!Diverts(fix, HarnessGates.DoctoringAt(tend, nearOutside)),
+                             "room mode: work outside the stand's room does not dress (control)")
+                    & Expect(Diverts(fix, HarnessGates.DoctoringAt(tend, farCorner)),
+                             "room mode: work in the room's far corner does (control)");
+
+            fix.Comp.SetServeArea(area);
+            ok &= Expect(fix.Comp.serves == CatchmentKind.Area,
+                         "the stand now serves the area (control)")
+                & Expect(Diverts(fix, HarnessGates.DoctoringAt(tend, nearOutside)),
+                         "work on a painted cell outside the room dresses")
+                & Expect(!Diverts(fix, HarnessGates.DoctoringAt(tend, farOutside)),
+                         "work on an unpainted cell outside does not")
+                & Expect(!Diverts(fix, HarnessGates.DoctoringAt(tend, farCorner)),
+                         "and nor does the room's unpainted far corner: the area replaces the room");
+
+            area[farCorner] = true;
+            return ok & Expect(Diverts(fix, HarnessGates.DoctoringAt(tend, farCorner)),
+                               "painted in, the far corner dresses again (control)");
+        }
+
+        /// <summary>
+        /// A DELETED AREA LEAVES ITS STAND SERVING NOTHING. The stand stays in
+        /// area mode under the area's last name, a rename included, and covers
+        /// no cell and dresses nobody, rather than falling back to its room. A
+        /// new area under the same name is not adopted, since default names
+        /// repeat; picking it binds it, which is the paired positive.
+        /// </summary>
+        internal static bool DeletedAreaServesNobody(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+            if (doctor == null || tend == null)
+            {
+                return Expect(false, "the doctor work defs resolve");
+            }
+            fix.Comp.ToggleWork(doctor);
+            MakeCalm(fix.Map);
+
+            IntVec3 at = fix.Stand.Position;
+            IntVec3 inRoom = at + new IntVec3(2, 0, 2);
+            Area_Allowed area = NewArea(fix, "Shift harness area", at, inRoom);
+            if (area == null)
+            {
+                return Expect(false, "the map has room for another allowed area");
+            }
+            fix.Comp.SetServeArea(area);
+            area.SetLabel("Shift harness renamed");
+            bool ok = Expect(fix.Comp.serves == CatchmentKind.Area && fix.Comp.Covers(inRoom, fix.Map),
+                             "the stand serves its area (control)")
+                    & Expect(fix.Comp.LiveServeArea() == area
+                             && fix.Comp.serveAreaLabel == "Shift harness renamed",
+                             "and, read again after a rename, goes by the area's new name")
+                    & Expect(Diverts(fix, HarnessGates.DoctoringAt(tend, inRoom)),
+                             "work in the area dresses (control)");
+
+            area.Delete();
+            ok &= Expect(fix.Comp.LiveServeArea() == null && !fix.Comp.Covers(inRoom, fix.Map),
+                         "with the area deleted, the stand covers nothing")
+                & Expect(!Diverts(fix, HarnessGates.DoctoringAt(tend, inRoom)),
+                         "and dresses nobody for the same work")
+                & Expect(fix.Comp.serves == CatchmentKind.Area
+                         && fix.Comp.serveAreaLabel == "Shift harness renamed",
+                         "it stays in area mode under the area's last name, rather than falling back to its room");
+
+            Area_Allowed namesake = NewArea(fix, "Shift harness renamed", at, inRoom);
+            if (namesake == null)
+            {
+                return ok & Expect(false, "the map has room for another allowed area");
+            }
+            ok &= Expect(!fix.Comp.Covers(inRoom, fix.Map) && fix.Comp.serveArea != namesake,
+                         "a new area under the same name is not adopted");
+            fix.Comp.SetServeArea(namesake);
+            return ok & Expect(fix.Comp.serveArea == namesake && fix.Comp.Covers(inRoom, fix.Map),
+                               "picking it binds it, and it covers again (control)");
+        }
+
+        /// <summary>
+        /// THE ALERT LISTS A STAND THAT SERVES NOTHING. Vanilla made the alert
+        /// from the subclass alone. It leaves out an area stand that serves
+        /// (control), lists the stand while it stands outside its area and once
+        /// the area is deleted, naming the area each time, and drops it when
+        /// the stand serves its room again. A colonist in the stand's uniform,
+        /// kept in it by work inside the area, changes back for the same work
+        /// once the area is deleted.
+        /// </summary>
+        internal static bool ServesNothingAlertListsTheStand(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+            if (doctor == null || tend == null)
+            {
+                return Expect(false, "the doctor work defs resolve");
+            }
+            Alert alert = VanillaAlert(typeof(Alert_ShiftStandServesNothing));
+            bool ok = Expect(alert != null, "vanilla's alert readout made the alert from the subclass alone");
+            if (alert == null)
+            {
+                return false;
+            }
+            fix.Comp.ToggleWork(doctor);
+            MakeCalm(fix.Map);
+
+            IntVec3 at = fix.Stand.Position;
+            IntVec3 inRoom = at + new IntVec3(2, 0, 2);
+            Area_Allowed area = NewArea(fix, "Shift harness area", at, inRoom);
+            if (area == null)
+            {
+                return ok & Expect(false, "the map has room for another allowed area");
+            }
+            fix.Comp.SetServeArea(area);
+            ok &= Expect(fix.Comp.serves == CatchmentKind.Area && !Lists(alert, fix.Stand),
+                         "a stand serving its area is not listed (control)");
+
+            area[at] = false;
+            ok &= Expect(Lists(alert, fix.Stand) && Explains(alert, "Shift harness area"),
+                         "standing outside its area, it is listed, under the area's name");
+            area[at] = true;
+            ok &= Expect(!Lists(alert, fix.Stand), "painted back in, it is not (control)");
+
+            ok &= Expect(RunSwap(fix), "dressed at the area stand")
+                & Expect(fix.Comp.OnShift, "and on shift (control)");
+            if (!fix.Comp.OnShift)
+            {
+                return false;
+            }
+            ok &= NotSentStraightBack(fix);
+            ok &= Expect(!Probe(fix, WorkAt(tend, inRoom)),
+                         "Doctor work in the area keeps the uniform on (control)");
+
+            area.Delete();
+            ok &= Expect(Lists(alert, fix.Stand) && Explains(alert, "Shift harness area"),
+                         "with the area deleted, the stand is listed, under the area's name")
+                & Expect(Probe(fix, WorkAt(tend, inRoom)),
+                         "and the colonist in its uniform changes back for the same work");
+
+            fix.Comp.SetServes(CatchmentKind.Room);
+            return ok & Expect(!Lists(alert, fix.Stand),
+                               "serving its room again, it is not listed (control)");
+        }
+
+        /// <summary>
+        /// A SOLID TARGET IS JUDGED AT ITS OWN CELL, THEN THE FLOOR BESIDE IT.
+        /// A rock has no room on its own cell, so a mining job's room cell is
+        /// the floor beside it, and room mode dresses by that (control). An area
+        /// dresses a miner with the rock painted, or only the floor around it,
+        /// and not with neither; a miner in uniform keeps it for the rock
+        /// painted alone. A wall's repair, judged as pass-through work at the
+        /// places it names, keeps the uniform on with only the floor around the
+        /// wall painted, and not with nothing painted.
+        /// </summary>
+        internal static bool SolidTargetIsJudgedAtItsOwnCellFirst(Fixture fix)
+        {
+            WorkTypeDef mining = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Mining");
+            WorkGiverDef mine = DefDatabase<WorkGiverDef>.GetNamedSilentFail("Mine");
+            WorkGiverDef repair = DefDatabase<WorkGiverDef>.GetNamedSilentFail("Repair");
+            ThingDef granite = DefDatabase<ThingDef>.GetNamedSilentFail("Granite");
+            if (mining == null || mine == null || repair == null || granite == null)
+            {
+                return Expect(false, "the mining, repair and granite defs resolve");
+            }
+            fix.Comp.ToggleWork(mining);
+            MakeCalm(fix.Map);
+
+            IntVec3 at = fix.Stand.Position;
+            Thing rock = GenSpawn.Spawn(ThingMaker.MakeThing(granite), at + new IntVec3(3, 0, 3), fix.Map);
+            if (rock == null || !rock.Spawned)
+            {
+                return Expect(false, "a granite rock spawns in the stand's room");
+            }
+            JobPlace place = Patch_JobInterception.SharedTargetPlace(JobOn(JobDefOf.Mine, mine, rock), fix.Map);
+            bool ok = Expect(rock.Position.GetRoom(fix.Map) == null && place.Cell == rock.Position
+                             && place.RoomCell != rock.Position && place.RoomCell.GetRoom(fix.Map) != null,
+                             "the rock's own cell has no room, so the job's room cell is a floor cell beside it (control)")
+                    & Expect(Probe(fix, JobOn(JobDefOf.Mine, mine, rock)),
+                             "room mode dresses for mining it, by that floor cell (control)");
+
+            Area_Allowed area = NewArea(fix, "Shift harness quarry", at, rock.Position);
+            if (area == null)
+            {
+                return ok & Expect(false, "the map has room for another allowed area");
+            }
+            fix.Comp.SetServeArea(area);
+            ok &= Expect(fix.Comp.serves == CatchmentKind.Area && !area[place.RoomCell],
+                         "the stand serves an area with the rock painted and its floor cell not (control)")
+                & Expect(Probe(fix, JobOn(JobDefOf.Mine, mine, rock)), "which dresses for mining the rock face");
+
+            area[rock.Position] = false;
+            ok &= Expect(!Probe(fix, JobOn(JobDefOf.Mine, mine, rock)), "with the rock unpainted too, it does not");
+
+            List<IntVec3> aroundRock = new List<IntVec3>(GenAdj.CellsAdjacent8Way(rock));
+            SetCells(area, aroundRock, true);
+            ok &= Expect(Probe(fix, JobOn(JobDefOf.Mine, mine, rock)),
+                         "with only the floor around the rock painted, it does");
+
+            SetCells(area, aroundRock, false);
+            area[rock.Position] = true;
+            // Each dressing probe recorded its job as the one just dressed for,
+            // and on shift that grace would keep the uniform on for the same
+            // job whatever the catchment said: the probe below would pass for
+            // the wrong reason.
+            Patch_JobInterception.DressedFor.Remove(fix.Pawn);
+            ok &= Expect(RunSwap(fix), "dressed for mining") & Expect(fix.Comp.OnShift, "and on shift (control)");
+            if (!fix.Comp.OnShift)
+            {
+                return false;
+            }
+            ok &= NotSentStraightBack(fix);
+            ok &= Expect(!Probe(fix, JobOn(JobDefOf.Mine, mine, rock)),
+                         "a miner in uniform keeps it on for the rock painted alone");
+
+            // Clear of the rock's ring, so the two sets of painted cells never
+            // meet. One wall inside a room does not split it.
+            Thing wall = GenSpawn.Spawn(ThingMaker.MakeThing(ThingDefOf.Wall, ThingDefOf.Steel),
+                                        at + new IntVec3(0, 0, 3), fix.Map);
+            if (wall == null || !wall.Spawned)
+            {
+                return ok & Expect(false, "a wall spawns in the stand's room");
+            }
+            List<IntVec3> aroundWall = new List<IntVec3>(GenAdj.CellsAdjacent8Way(wall));
+            SetCells(area, aroundWall, true);
+            ok &= Expect(!area[wall.Position] && !Probe(fix, JobOn(JobDefOf.Repair, repair, wall)),
+                         "repairing a wall with only the floor around it painted keeps the uniform on: pass-through work, judged by the same rule");
+            SetCells(area, aroundWall, false);
+            return ok & Expect(Probe(fix, JobOn(JobDefOf.Repair, repair, wall)),
+                               "with nothing around it painted, it changes them back (control)");
+        }
+
+        /// <summary>
+        /// A fresh job of <paramref name="def"/> on <paramref name="target"/>,
+        /// as <paramref name="giver"/> hands it out. One per probe: jobs are
+        /// pooled, and one a probe queued can be handed out again once the
+        /// queue is cleared.
+        /// </summary>
+        internal static Job JobOn(JobDef def, WorkGiverDef giver, Thing target)
+        {
+            Job job = JobMaker.MakeJob(def, target);
+            job.workGiverDef = giver;
+            return job;
+        }
+
+        /// <summary>Paints or clears every cell of <paramref name="cells"/> that is on the map.</summary>
+        internal static void SetCells(Area area, List<IntVec3> cells, bool painted)
+        {
+            for (int i = 0; i < cells.Count; i++)
+            {
+                if (cells[i].InBounds(area.Map))
+                {
+                    area[cells[i]] = painted;
+                }
+            }
+        }
+
+        /// <summary>A fresh report from <paramref name="alert"/> lists <paramref name="stand"/>.</summary>
+        internal static bool Lists(Alert alert, Thing stand)
+        {
+            AlertReport report = alert.GetReport();
+            return report.active && report.culpritsThings != null && report.culpritsThings.Contains(stand);
+        }
+
+        /// <summary>
+        /// The explanation <paramref name="alert"/> gives with a fresh report
+        /// contains <paramref name="text"/>. Vanilla asks for the report first
+        /// too: the explanation is built from what the report found.
+        /// </summary>
+        internal static bool Explains(Alert alert, string text)
+        {
+            alert.GetReport();
+            return alert.GetExplanation().Resolve().Contains(text);
+        }
+
+        /// <summary>
+        /// The instance of <paramref name="type"/> that vanilla's alert readout
+        /// made for this game, or null. Read off the readout's private list,
+        /// since what is under test is that vanilla made it from the subclass.
+        /// </summary>
+        internal static Alert VanillaAlert(System.Type type)
+        {
+            AlertsReadout readout = (Find.UIRoot as UIRoot_Play)?.alerts;
+            List<Alert> all = readout == null
+                ? null
+                : AccessTools.Field(typeof(AlertsReadout), "AllAlerts").GetValue(readout) as List<Alert>;
+            return all?.Find(a => a != null && a.GetType() == type);
+        }
+
+        /// <summary>
         /// THE CHANGE-BACK LATCH IS PER STAND AND TRIGGER. After Change back at
         /// a radius stand, neither it nor a pooled room stand beside it, with
         /// the same trigger, dresses the colonist. A recreation stand in the
-        /// same room does, and so does a work stand in the open whose
-        /// catchment does not reach the latched one. Lifting the latch by hand
-        /// is the control for the refusal, and a job boundary past the ring
-        /// releases it.
+        /// same room does, and so does a radius stand in the open whose ring
+        /// does not reach the latched one. Lifting the latch by hand
+        /// is the control for the refusal. One cell past the ring, beside a
+        /// covered cell, still holds it, and a job boundary with no covered
+        /// cell beside it releases it.
         /// </summary>
         internal static bool LatchHoldsItsStandAndTriggerOnly(Fixture fix)
         {
@@ -1061,7 +1535,10 @@ namespace ShiftChange
             IntVec3 at = fix.Stand.Position;
             CompShiftStand pooled = StageStand(fix, at + new IntVec3(0, 0, 2));
             CompShiftStand play = StageStand(fix, at + new IntVec3(0, 0, 4));
-            CompShiftStand open = StageStand(fix, new IntVec3(fix.Outside.minX, 0, fix.Outside.maxZ));
+            // Three cells along the open strip from the door: a ring of the
+            // smallest radius there reaches the work beside the door (3 cells)
+            // and neither the latched stand (about 3.6) nor the room's work.
+            CompShiftStand open = StageStand(fix, new IntVec3(fix.Outside.minX, 0, at.z + 3));
             if (pooled == null || play == null || open == null)
             {
                 return Expect(false, "three more stands could be staged");
@@ -1069,6 +1546,9 @@ namespace ShiftChange
             pooled.ToggleWork(doctor);
             play.ToggleRecreation();
             open.ToggleWork(doctor);
+            // A room stand in the open serves nothing, so this one serves a ring.
+            open.SetServes(CatchmentKind.Radius);
+            open.SetServeRadius(CompShiftStand.MinServeRadius);
 
             IntVec3 inRoom = at + new IntVec3(2, 0, 2);
             IntVec3 joyAt = at + new IntVec3(3, 0, 3);
@@ -1079,7 +1559,9 @@ namespace ShiftChange
                              "the ring covers the work in the room and beside the door, and not the far end outside (control)")
                     & Expect(pooled.serves == CatchmentKind.Room && pooled.Covers(at, fix.Map)
                              && !open.Covers(at, fix.Map),
-                             "the pooled stand's room holds the latched stand, the open stand's does not (control)")
+                             "the pooled stand's room holds the latched stand, the open stand's ring does not (control)")
+                    & Expect(open.Covers(doorside, fix.Map) && !open.Covers(inRoom, fix.Map),
+                             "and that ring takes the work beside the door, not the room's (control)")
                     & Expect(RunSwap(fix), "dressed at the radius stand")
                     & Expect(fix.Comp.OnShift, "and on shift (control)");
             if (!fix.Comp.OnShift)
@@ -1100,7 +1582,7 @@ namespace ShiftChange
                 & Expect(Diverts(fix, JobMaker.MakeJob(chess, joyAt, joyAt)),
                          "a recreation stand in the same room still does: the latch is the work trigger's")
                 & Expect(Diverts(fix, HarnessGates.DoctoringAt(tend, doorside)),
-                         "and so does a work stand in the open, which does not reach the latched stand")
+                         "and so does a radius stand in the open whose ring does not reach the latched stand")
                 & Expect(Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
                          "the latch holding all the while, since they never left the ring");
 
@@ -1110,11 +1592,21 @@ namespace ShiftChange
 
             Patch_JobInterception.ChangedBackAt[fix.Pawn] = new Patch_JobInterception.ChangeBackLatch(fix.Stand);
             IntVec3 wasAt = fix.Pawn.Position;
+            // One cell past the ring is beside a covered cell, where work at
+            // the ring's edge is done from, so the pause there is not leaving.
             fix.Pawn.pather?.StopDead();
             fix.Pawn.Position = pastRing;
-            Diverts(fix, JobMaker.MakeJob(JobDefOf.Wait, pastRing));
-            ok &= Expect(!Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
-                         "a job boundary past the ring releases the latch");
+            Diverts(fix, JobMaker.MakeJob(JobDefOf.Wait_MaintainPosture, 1));
+            ok &= Expect(Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
+                         "the pause one cell past the ring, beside a covered cell, keeps the latch");
+            IntVec3 farEnd = new IntVec3(fix.Outside.minX, 0, fix.Outside.maxZ);
+            bool farClear = System.Array.TrueForAll(GenAdj.AdjacentCellsAndInside,
+                                                    o => !fix.Comp.Covers(farEnd + o, fix.Map));
+            fix.Pawn.pather?.StopDead();
+            fix.Pawn.Position = farEnd;
+            Diverts(fix, JobMaker.MakeJob(JobDefOf.Wait, farEnd));
+            ok &= Expect(farClear && !Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
+                         "a job boundary at the far end, no covered cell beside it, releases the latch");
             fix.Pawn.pather?.StopDead();
             fix.Pawn.Position = wasAt;
             return ok;
@@ -1125,7 +1617,9 @@ namespace ShiftChange
         /// WAKING. After Change back, going to bed does not dress the colonist
         /// again, and the job tracker's pause does not count as waking; the
         /// first job after the lay-down releases the latch, and bed dresses
-        /// them again, which is the control. Released on lying down instead,
+        /// them again, which is the control. A haul vanilla starts ahead of the
+        /// lay-down, putting it back in the queue, is not the waking either.
+        /// Released on lying down instead,
         /// the latch would undo the order at the very next boundary. A Change
         /// back that wakes a sleeper is not itself the waking: the latch holds
         /// through the job after it.
@@ -1171,6 +1665,14 @@ namespace ShiftChange
                          "latched: going to bed does not dress them again")
                 & Expect(Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
                          "and lying down does not release the latch");
+
+            // Vanilla's StartJob can put the lay-down back in the queue and
+            // start a haul first (Pawn_JobTracker.TryOpportunisticJob).
+            fix.Pawn.jobs.jobQueue.EnqueueFirst(JobMaker.MakeJob(JobDefOf.LayDown, bed));
+            Diverts(fix, JobMaker.MakeJob(JobDefOf.HaulToCell, inside, inside));
+            fix.Pawn.jobs.ClearQueuedJobs();
+            ok &= Expect(Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
+                         "a haul vanilla starts ahead of the lay-down, which waits in the queue, is not the waking");
 
             IntVec3 wasAt = fix.Pawn.Position;
             fix.Pawn.pather?.StopDead();

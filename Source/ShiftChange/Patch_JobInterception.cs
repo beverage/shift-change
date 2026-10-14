@@ -195,12 +195,13 @@ namespace ShiftChange
 
         /// <summary>
         /// Drops the latch when the pawn starts a job outside the latched
-        /// stand's catchment, or wakes: starts the first job after a lay-down.
-        /// Called at the top of every interception, so it samples at every
-        /// job boundary for every pawn, with no tick hook. (A doorway is its
-        /// own Room, <c>Room.IsDoorway</c>, so in room mode a pawn caught
-        /// mid-door reads as "left": a hair early, and they are in fact
-        /// leaving.)
+        /// stand's catchment (<see cref="StillInside"/>), or wakes: starts the
+        /// first job after a lay-down. Called from the interception for every
+        /// job it decides on, so it samples at those job boundaries with no
+        /// tick hook; drafting drops the latch outright
+        /// (<see cref="Patch_DraftClearsDressBlock"/>). (A doorway is its own Room,
+        /// <c>Room.IsDoorway</c>, so in room mode a pawn caught mid-door reads
+        /// as "left": a hair early, and they are in fact leaving.)
         /// </summary>
         internal static void UpdateChangeBackLatch(Pawn pawn, Job job)
         {
@@ -212,7 +213,7 @@ namespace ShiftChange
             CompShiftStand stand = latch.Stand != null && latch.Stand.Spawned
                 ? latch.Stand.TryGetComp<CompShiftStand>()
                 : null;
-            if (stand == null || !stand.Covers(pawn.Position, pawn.MapHeld))
+            if (stand == null || !StillInside(stand, pawn, job))
             {
                 ChangedBackAt.Remove(pawn);
                 return;
@@ -227,10 +228,54 @@ namespace ShiftChange
             {
                 latch.LaidDown = true;
             }
-            else if (latch.LaidDown)
+            else if (latch.LaidDown && !LyingDownNext(pawn))
             {
                 ChangedBackAt.Remove(pawn);
             }
+        }
+
+        /// <summary>
+        /// The pawn has not left the latched stand's catchment. Room mode asks
+        /// the room the pawn stands in. A radius or an area also counts a pawn
+        /// standing next to a covered cell, and the place the new job names.
+        /// Changing back leaves the pawn beside the stand, on a cell an area
+        /// need not hold, and work at a painted rock face or field edge is
+        /// done from the unpainted cell beside it, before the job and in the
+        /// job tracker's pause after it, which names no place. None of that is
+        /// leaving.
+        /// </summary>
+        internal static bool StillInside(CompShiftStand stand, Pawn pawn, Job job)
+        {
+            Map map = pawn.MapHeld;
+            if (stand.Covers(pawn.Position, map))
+            {
+                return true;
+            }
+            if (stand.serves == CatchmentKind.Room || map == null || stand.parent.Map != map)
+            {
+                return false;
+            }
+            IntVec3[] around = GenAdj.AdjacentCellsAndInside;
+            for (int i = 0; i < around.Length; i++)
+            {
+                if (stand.Covers(pawn.Position + around[i], map))
+                {
+                    return true;
+                }
+            }
+            JobPlace place = SharedTargetPlace(job, map);
+            return place.IsValid && stand.Covers(place, map);
+        }
+
+        /// <summary>
+        /// The pawn's next queued job is a lay-down: vanilla slipped a haul in
+        /// ahead of it (<c>Pawn_JobTracker.TryOpportunisticJob</c>), so the
+        /// job starting now is not the waking.
+        /// </summary>
+        internal static bool LyingDownNext(Pawn pawn)
+        {
+            JobQueue queue = pawn.jobs?.jobQueue;
+            return queue != null && queue.Count > 0 && IsLyingDown(queue.Peek()?.job);
         }
 
         /// <summary>
@@ -371,9 +416,9 @@ namespace ShiftChange
             {
                 return;
             }
-            // Room stands only. A freed radius stand would pull a bare colonist
-            // off work anywhere in its ring, and the next job boundary catches
-            // them anyway (docs/DESIGN.md, "Catchments").
+            // Room stands only. A freed radius or area stand would pull a bare
+            // colonist off work anywhere in its catchment, and the next job
+            // boundary catches them anyway (docs/DESIGN.md, "Catchments").
             if (stand.serves != CatchmentKind.Room)
             {
                 return;
@@ -383,8 +428,9 @@ namespace ShiftChange
             {
                 return;
             }
+            // A room stand in the open serves nothing, so it catches nobody up.
             Room room = parent.GetRoom();
-            if (room == null)
+            if (room == null || room.TouchesMapEdge)
             {
                 return;
             }
@@ -436,10 +482,9 @@ namespace ShiftChange
                 // are disjoint by construction.
                 bool forRecreation = !forWork && giver == null
                     && stand.HandlesRecreation() && IsRecreationJob(job)
-                    // The dress arm's two guards apply here too: never pull a
-                    // pawn out of bed, and never treat the map-spanning
-                    // outdoor room as this stand's room.
-                    && !OnABed(pawn) && !room.TouchesMapEdge;
+                    // The dress arm's bed guard applies here too: never pull a
+                    // pawn out of bed. Its outdoor guard returned above.
+                    && !OnABed(pawn);
                 // NO SLEEP ARM HERE, and it is not an omission. Catch-up
                 // interrupts a pawn already doing the thing the freed stand
                 // dresses for, and the sleep equivalent is a colonist asleep
@@ -459,7 +504,7 @@ namespace ShiftChange
                 // dress/undress churn per stand-freed event (fix-verify,
                 // 2026-08-15). Every site answers "where does this job
                 // happen" identically or the two answers fight.
-                if (!stand.Covers(SharedTargetCell(job, map), map))
+                if (!stand.Covers(SharedTargetPlace(job, map), map))
                 {
                     continue;
                 }
@@ -629,7 +674,7 @@ namespace ShiftChange
             // the job tracker's pause between a swap and the job deferred
             // behind it rides along above without spending it.
             bool dressedForThis = TakeDressedFor(pawn, job);
-            IntVec3 target = SharedTargetCell(job, map);
+            JobPlace target = SharedTargetPlace(job, map);
 
             // The return trip. Checked first: a pawn already in uniform who is
             // leaving should change back whatever the new job is.
@@ -786,13 +831,13 @@ namespace ShiftChange
         /// Where the job happens, read by job class, so both directions get
         /// the same answer.
         /// </summary>
-        internal static IntVec3 SharedTargetCell(Job job, Map map)
+        internal static JobPlace SharedTargetPlace(Job job, Map map)
         {
             // ONE room resolver per job class, consumed by BOTH directions:
             // with split reads the two arms disagreed about where a job
             // happens, and a pawn ping-ponged between stand and work forever
             // (docs/DESIGN.md, "The recreation branch").
-            return IsRecreationJob(job) ? JoyTargetCell(job, map) : TargetCell(job, map);
+            return IsRecreationJob(job) ? JoyTargetPlace(job, map) : TargetPlace(job, map);
         }
 
         /// <summary>
@@ -801,7 +846,7 @@ namespace ShiftChange
         /// started.
         /// </summary>
         internal static bool ReturnTrip(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
-                                        CompShiftStand onShift, IntVec3 target, Map map)
+                                        CompShiftStand onShift, JobPlace target, Map map)
         {
             Room standRoom = onShift.parent.GetRoom();
             if (standRoom == null)
@@ -838,8 +883,8 @@ namespace ShiftChange
                 return MealBreak(job, tag, pawn, tracker, onShift, target, map);
             }
             // Room mode keeps its shipped rule, anything in the room, because
-            // a room limits what can happen inside it. A radius limits
-            // nothing, so there it goes by what the stand is for
+            // a room limits what can happen inside it. A radius or an area
+            // limits nothing, so there it goes by what the stand is for
             // (StaysDressed).
             if (onShift.serves == CatchmentKind.Room)
             {
@@ -876,7 +921,7 @@ namespace ShiftChange
         /// first. True if a swap started.
         /// </summary>
         internal static bool MealBreak(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
-                                       CompShiftStand onShift, IntVec3 target, Map map)
+                                       CompShiftStand onShift, JobPlace target, Map map)
         {
             // Eat-as-is is a WORK and RECREATION rule, and a sleep stand must
             // not inherit it: at the wake-up the pawn is standing at the
@@ -899,16 +944,16 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// For a stand serving a radius: the pawn on shift at it keeps the
-        /// uniform on for this job. What the stand would dress them for,
-        /// inside its catchment, always does. Past that it goes by what the
-        /// stand is for: a work stand also lets through pass-through work with
-        /// every place inside, and the incidental jobs; a recreation stand the
-        /// incidental jobs alone; a sleep stand nothing, since staying in bed
-        /// was settled above (docs/DESIGN.md, "Catchments").
+        /// For a stand serving a radius or an area: the pawn on shift at it
+        /// keeps the uniform on for this job. What the stand would dress them
+        /// for, inside its catchment, always does. Past that it goes by what
+        /// the stand is for: a work stand also lets through pass-through work
+        /// with every place inside, and the incidental jobs; a recreation stand
+        /// the incidental jobs alone; a sleep stand nothing, since staying in
+        /// bed was settled above (docs/DESIGN.md, "Catchments").
         /// </summary>
         internal static bool StaysDressed(Job job, JobTag? tag, Pawn pawn, CompShiftStand onShift,
-                                          IntVec3 target, Map map)
+                                          JobPlace target, Map map)
         {
             // The dress arms' own classification, in their order. A job this
             // stand would dress the pawn for must not change them back, or the
@@ -938,7 +983,7 @@ namespace ShiftChange
             // Idling and the walks are judged where they go, and a wait, which
             // goes nowhere, where the pawn stands.
             return JobRoomTargets.IsIncidental(job)
-                   && onShift.Covers(target.IsValid ? target : pawn.Position, map);
+                   && onShift.Covers(target.IsValid ? target : JobPlace.At(pawn.Position), map);
         }
 
         /// <summary>
@@ -965,7 +1010,10 @@ namespace ShiftChange
 
         /// <summary>
         /// One place a job names is inside the catchment, or cannot be read.
-        /// Sets <paramref name="named"/> once any place could be.
+        /// Sets <paramref name="named"/> once any place could be. A solid place
+        /// is judged as the job's own location is, at its own cell, then the
+        /// cell beside it with a room, so a wall's repair is inside or outside
+        /// by the same rule whichever check asks.
         /// </summary>
         internal static bool PlaceCovered(LocalTargetInfo place, CompShiftStand stand, Map map,
                                           ref bool named)
@@ -976,7 +1024,7 @@ namespace ShiftChange
                 return true;
             }
             named = true;
-            return stand.Covers(cell, map);
+            return stand.Covers(new JobPlace(cell, RoomBearing(cell, place, map)), map);
         }
 
         /// <summary><see cref="PlaceCovered"/> for every entry of a target queue.</summary>
@@ -1030,7 +1078,7 @@ namespace ShiftChange
         /// if a swap started.
         /// </summary>
         internal static bool WorkArm(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
-                                     WorkTypeDef work, IntVec3 target, Map map)
+                                     WorkTypeDef work, JobPlace target, Map map)
         {
             if (!target.IsValid)
             {
@@ -1044,7 +1092,7 @@ namespace ShiftChange
                 if (Verbose)
                 {
                     Log.Message($"[ShiftChange] no free {work.defName} stand for {pawn.LabelShort} " +
-                                $"({job.def.defName}) at {target}, {RoomName(target.GetRoom(map))}");
+                                $"({job.def.defName}) at {target}, {RoomName(target.RoomCell.GetRoom(map))}");
                 }
                 return false;
             }
@@ -1053,11 +1101,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Dress for bed at a sleep stand in the bed's room. True if a swap
-        /// started.
+        /// Dress for bed at a sleep stand whose catchment covers the bed. True
+        /// if a swap started.
         /// </summary>
         internal static bool SleepArm(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
-                                      IntVec3 target, Map map)
+                                      JobPlace target, Map map)
         {
             // The SLEEP arm. Disjoint from the other two by construction: a
             // lay-down job carries no joyKind, and the tag test in
@@ -1096,7 +1144,7 @@ namespace ShiftChange
                 if (Verbose)
                 {
                     Log.Message($"[ShiftChange] no free sleep stand for {pawn.LabelShort} " +
-                                $"({job.def.defName}) at {target}, {RoomName(target.GetRoom(map))}");
+                                $"({job.def.defName}) at {target}, {RoomName(target.RoomCell.GetRoom(map))}");
                 }
                 return false;
             }
@@ -1104,11 +1152,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Dress for recreation at a stand in the room where it happens, if the
-        /// job is recreation at all. True if a swap started.
+        /// Dress for recreation at a stand whose catchment covers where it
+        /// happens, if the job is recreation at all. True if a swap started.
         /// </summary>
         internal static bool RecreationArm(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
-                                           IntVec3 target, Map map)
+                                           JobPlace target, Map map)
         {
             // The RECREATION arm. Joy jobs carry no workGiverDef, so it is
             // disjoint from the work arm by construction. The shared resolver
@@ -1141,7 +1189,7 @@ namespace ShiftChange
                 if (Verbose)
                 {
                     Log.Message($"[ShiftChange] no free recreation stand for {pawn.LabelShort} " +
-                                $"({job.def.defName}) at {target}, {RoomName(target.GetRoom(map))}");
+                                $"({job.def.defName}) at {target}, {RoomName(target.RoomCell.GetRoom(map))}");
                 }
                 return false;
             }
@@ -1603,17 +1651,23 @@ namespace ShiftChange
         /// <summary>
         /// Where a recreation job happens: <c>targetB</c> FIRST, the cell the
         /// pawn occupies while the joy ticks, then the work-style
-        /// <see cref="TargetCell"/>, since where B is unset A is already the
+        /// <see cref="TargetPlace"/>, since where B is unset A is already the
         /// venue. docs/DESIGN.md, "The recreation branch".
         /// </summary>
-        internal static IntVec3 JoyTargetCell(Job job, Map map)
+        internal static JobPlace JoyTargetPlace(Job job, Map map)
         {
             IntVec3 cell = job.targetB.HasThing ? job.targetB.Thing.PositionHeld : job.targetB.Cell;
             if (cell.IsValid && cell.InBounds(map))
             {
-                return cell;
+                return JobPlace.At(cell);
             }
-            return TargetCell(job, map);
+            return TargetPlace(job, map);
+        }
+
+        /// <summary>The room cell of <see cref="JoyTargetPlace"/>.</summary>
+        internal static IntVec3 JoyTargetCell(Job job, Map map)
+        {
+            return JoyTargetPlace(job, map).RoomCell;
         }
 
         /// <summary>
@@ -1686,9 +1740,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The stand this pawn should use for a job at <paramref name="cell"/>,
-        /// or null if there isn't one: the room stands in the cell's room, and
-        /// the radius stands whose catchment covers the cell.
+        /// The stand this pawn should use for a job at <paramref name="place"/>,
+        /// or null if there isn't one: the room stands in the room of its room
+        /// cell, and the radius and area stands whose catchment covers it.
         ///
         /// An unassigned stand is a POOL stand: any capable pawn may claim it,
         /// so a kitchen needs one stand per CONCURRENT cook rather than one per
@@ -1700,34 +1754,42 @@ namespace ShiftChange
         /// No free stand simply means no swap. Never queue for one: this is a
         /// nicety and must not become a bottleneck on the work itself.
         ///
-        /// <para>For recreation and sleep, room stands in a room touching the
-        /// map edge are skipped: the outdoor room spans the whole map, so one
-        /// standing in it would serve every outdoor activity. A radius is
-        /// bounded by construction and needs no such guard. Work keeps its
-        /// map-wide outdoor stands, as it always has (docs/DESIGN.md,
+        /// <para>Room stands in a room touching the map edge are skipped, for
+        /// every trigger: the outdoor room spans the whole map, so one standing
+        /// in it would serve every outdoor job. A radius or an area is bounded
+        /// by construction and needs no such guard (docs/DESIGN.md,
         /// "Catchments").</para>
+        ///
+        /// <para>A room stand is a candidate only when it covers the place
+        /// (<see cref="CompShiftStand.Covers(JobPlace, Map)"/>), the question
+        /// the return trip and the catch-up ask: the room's contents also list
+        /// a stand standing just outside its door.</para>
         ///
         /// <para>A candidate the change-back latch holds is passed over
         /// (<see cref="LatchBlocks"/>), so the latch never hides a stand it
         /// does not reach.</para>
         /// </summary>
-        internal static CompShiftStand FindAvailableStand(IntVec3 cell, Map map, Pawn pawn,
+        internal static CompShiftStand FindAvailableStand(JobPlace place, Map map, Pawn pawn,
             WorkTypeDef work, StandTrigger trigger = StandTrigger.Work)
         {
             CompShiftStand best = null;
             bool bestIsPersonal = false;
             int bestDistance = int.MaxValue;
 
+            IntVec3 cell = place.RoomCell;
             Room room = map != null && cell.IsValid && cell.InBounds(map) ? cell.GetRoom(map) : null;
-            if (room != null && (trigger == StandTrigger.Work || !room.TouchesMapEdge))
+            if (room != null && !room.TouchesMapEdge)
             {
                 List<ThingDef> defs = StandDefs;
                 for (int i = 0; i < defs.Count; i++)
                 {
+                    // ContainedThings also lists a stand standing just outside
+                    // a door, in the doorway's region, so each one is asked
+                    // the same question as the return trip and the catch-up.
                     foreach (Thing thing in room.ContainedThings(defs[i]))
                     {
                         CompShiftStand comp = thing.TryGetComp<CompShiftStand>();
-                        if (comp != null && comp.serves == CatchmentKind.Room)
+                        if (comp != null && comp.serves == CatchmentKind.Room && comp.Covers(place, map))
                         {
                             Consider(comp, pawn, work, trigger, ref best, ref bestIsPersonal, ref bestDistance);
                         }
@@ -1735,15 +1797,26 @@ namespace ShiftChange
                 }
             }
 
+            CompShiftStand.PruneCatchmentStands();
             foreach (CompShiftStand comp in CompShiftStand.CatchmentStands)
             {
                 Thing thing = comp.parent;
-                if (thing != null && thing.Spawned && thing.Map == map && comp.Covers(cell, map))
+                if (thing != null && thing.Spawned && thing.Map == map && comp.Covers(place, map))
                 {
                     Consider(comp, pawn, work, trigger, ref best, ref bestIsPersonal, ref bestDistance);
                 }
             }
             return best;
+        }
+
+        /// <summary>
+        /// <see cref="FindAvailableStand(JobPlace, Map, Pawn, WorkTypeDef, StandTrigger)"/>
+        /// for a job at one ordinary cell.
+        /// </summary>
+        internal static CompShiftStand FindAvailableStand(IntVec3 cell, Map map, Pawn pawn,
+            WorkTypeDef work, StandTrigger trigger = StandTrigger.Work)
+        {
+            return FindAvailableStand(JobPlace.At(cell), map, pawn, work, trigger);
         }
 
         /// <summary>
@@ -1860,7 +1933,7 @@ namespace ShiftChange
             {
                 return false;
             }
-            return onShift.Covers(SharedTargetCell(next, map), map);
+            return onShift.Covers(SharedTargetPlace(next, map), map);
         }
 
         /// <summary>
@@ -1872,8 +1945,13 @@ namespace ShiftChange
         /// <para>A short list of jobs answers from <c>targetB</c> instead,
         /// because they name their destination in targetA and the thing being
         /// carried in targetB; see <see cref="JobRoomTargets"/>.</para>
+        ///
+        /// <para>Both cells are kept: the one the target names, and the room
+        /// cell <see cref="RoomBearing"/> gives a solid target, since a radius
+        /// or an area can serve the first where a room stand needs the second
+        /// (<see cref="JobPlace"/>).</para>
         /// </summary>
-        internal static IntVec3 TargetCell(Job job, Map map)
+        internal static JobPlace TargetPlace(Job job, Map map)
         {
             // A few jobs name their DESTINATION in targetA and the thing being
             // carried in targetB, which is the reverse of both vanilla shapes
@@ -1896,14 +1974,14 @@ namespace ShiftChange
                     : job.targetB.Cell;
                 if (carried.IsValid && carried.InBounds(map))
                 {
-                    return RoomBearing(carried, job.targetB, map);
+                    return new JobPlace(carried, RoomBearing(carried, job.targetB, map));
                 }
             }
 
             IntVec3 cell = job.targetA.HasThing ? job.targetA.Thing.PositionHeld : job.targetA.Cell;
             if (cell.IsValid && cell.InBounds(map))
             {
-                return RoomBearing(cell, job.targetA, map);
+                return new JobPlace(cell, RoomBearing(cell, job.targetA, map));
             }
 
             List<LocalTargetInfo> queue = job.targetQueueA;
@@ -1914,11 +1992,17 @@ namespace ShiftChange
                     IntVec3 queued = queue[i].HasThing ? queue[i].Thing.PositionHeld : queue[i].Cell;
                     if (queued.IsValid && queued.InBounds(map))
                     {
-                        return queued;
+                        return JobPlace.At(queued);
                     }
                 }
             }
-            return IntVec3.Invalid;
+            return JobPlace.Invalid;
+        }
+
+        /// <summary>The room cell of <see cref="TargetPlace"/>.</summary>
+        internal static IntVec3 TargetCell(Job job, Map map)
+        {
+            return TargetPlace(job, map).RoomCell;
         }
 
         /// <summary>

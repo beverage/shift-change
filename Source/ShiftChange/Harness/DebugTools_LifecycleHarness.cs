@@ -289,6 +289,10 @@ namespace ShiftChange
                  RadiusStandDressesWithinItsRing);
             Case(map, pad, "a room stand in the open serves no outdoor recreation, a radius stand does",
                  StageWithDoorway, RadiusServesOutdoorRecreation);
+            Case(map, pad, "a room stand in the open serves no work either, and the alert lists it",
+                 (m, p) => Stage(m, p, StageKit.Displacing,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 RoomStandInTheOpenServesNothing);
             Case(map, pad, "an owned radius stand beats a nearer shared room stand",
                  (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  OwnedRadiusStandBeatsANearerSharedOne);
@@ -320,6 +324,23 @@ namespace ShiftChange
             Case(map, pad, "the Serves row, the inspect pane and the switch's tooltip follow the catchment",
                  (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  CatchmentWordsFollowTheMode);
+            Case(map, pad, "an area covers its painted cells while the stand stands in one, and nothing else",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), AreaCoversItsCells);
+            Case(map, pad, "an area stand dresses for work painted in, past its room, and not elsewhere",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 AreaStandDressesWithinItsArea);
+            Case(map, pad, "a deleted area leaves its stand serving nothing, and a namesake is not adopted",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 DeletedAreaServesNobody);
+            Case(map, pad, "the alert lists a stand whose area is gone or that stands outside it",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 ServesNothingAlertListsTheStand);
+            Case(map, pad, "a solid target is judged at its own cell, then the floor beside it",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Mining")),
+                 SolidTargetIsJudgedAtItsOwnCellFirst);
             Case(map, pad, "a stand outside the colonist's allowed area dresses nobody",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
@@ -376,6 +397,8 @@ namespace ShiftChange
                  DebugTools_SaveRoundTrip.LegacyMigration);
             Case("an older save's foreign owner round-trips without contest and is adopted",
                  DebugTools_SaveRoundTrip.ForeignAssignable);
+            Case("an area binding survives a save under a new name, and a deleted area's is dropped",
+                 DebugTools_SaveRoundTrip.AreaRoundTrip);
 
             // The cases below need no map, so they are unaffected by the game
             // replacement above.
@@ -482,6 +505,12 @@ namespace ShiftChange
 
             /// <summary>Extra pawns a case spawned; swept by <see cref="Teardown"/>.</summary>
             internal List<Pawn> Extras = new List<Pawn>();
+
+            /// <summary>
+            /// Allowed areas a case made; deleted by <see cref="Teardown"/>,
+            /// since an area outlives the pad and a map holds ten at most.
+            /// </summary>
+            internal List<Area> Areas = new List<Area>();
 
             /// <summary>
             /// The strip of open ground outside the door that

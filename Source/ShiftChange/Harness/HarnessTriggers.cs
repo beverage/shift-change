@@ -897,11 +897,9 @@ namespace ShiftChange
         ///
         /// <para>The reason is where fishing happens. Its target is the water,
         /// which is outdoors on almost every map, and every outdoor cell is one
-        /// map-wide room. So the only stand the row could reach today is one
-        /// standing in the open, which would then dress for every fishing spot
-        /// on the map, while a stand in a hut by the lake, the layout a player
-        /// would build, stays inert. That fix belongs with the release that
-        /// gives a stand a boundary beyond its room.</para>
+        /// map-wide room, which no room stand serves. So the row could only
+        /// ever reach a radius or an area stand by the water, and belongs with
+        /// them.</para>
         ///
         /// <para>The control is the same job carrying its giver, which dresses:
         /// the stand, the room and the work type are not the problem, the
@@ -932,8 +930,8 @@ namespace ShiftChange
                              "a fishing job carrying its giver would dress (control)");
             return ok & ExpectKnownGap(Probe(fix, JobMaker.MakeJob(fish, spot, standOn), JobTag.Fieldwork),
                 "a fishing job as Odyssey hands it out dresses",
-                "it arrives with no giver; the fix waits for stand boundaries beyond the room, "
-                + "since fishing water is outdoors and the outdoors is one map-wide room");
+                "it arrives with no giver, and the row that fixes it belongs with radius and area "
+                + "stands, since fishing water is outdoors, where only those serve");
         }
     }
 }

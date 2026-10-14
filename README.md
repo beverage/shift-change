@@ -248,6 +248,11 @@ Tick what the stand is for first. The row stays greyed until something is
 ticked, and Automatic only reads a room, so choosing a radius for an automatic
 stand turns whatever the room gave it into ticks.
 
+**A stand in the open needs a radius.** All the open ground on a map is one
+room, so a stand standing out there and serving its room serves nothing, work
+included. Until you give it a radius, the alert *Shift stand serves nothing*
+lists it. A walled but roofless yard is its own room and works like any other.
+
 A room limits what happens inside it; a radius does not. Inside a ring a
 colonist keeps the outfit on only for:
 

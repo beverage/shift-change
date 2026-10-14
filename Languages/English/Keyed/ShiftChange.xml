@@ -70,16 +70,26 @@
   <!-- The Serves row, last in the settings window. -->
   <ShiftChange.ServesRow>Serves: {0}</ShiftChange.ServesRow>
   <ShiftChange.ServesRoom>this room</ShiftChange.ServesRoom>
-  <ShiftChange.ServesOutdoors>everywhere outdoors</ShiftChange.ServesOutdoors>
   <ShiftChange.ServesNothingOutdoors>nothing out in the open</ShiftChange.ServesNothingOutdoors>
   <ShiftChange.ServesRadius>within {0} cells</ShiftChange.ServesRadius>
   <ShiftChange.ServesOptionRoom>This room</ShiftChange.ServesOptionRoom>
   <ShiftChange.ServesOptionRadius>Within a radius</ShiftChange.ServesOptionRadius>
   <ShiftChange.ServesDesc>Where this stand dresses colonists, and where they keep its outfit on.\n\nThis room: the stand's own room. This is the default.\n\nWithin a radius: every cell inside the ring, walls or no walls. The ring is drawn while this window is open and whenever the stand is selected. Inside it a colonist keeps the outfit on for what the stand is for, for idling and wandering, and for walking back into their allowed area or out of the heat or cold. At a work stand, hauling, cleaning and building keep it on as well; at a sleep stand, only bed does. Anything else sends them back to change first.</ShiftChange.ServesDesc>
-  <ShiftChange.ServesNothingOutdoorsDesc>Standing in the open, its room is all the open ground on the map, so a stand for recreation or sleep serves nothing there. Choose Within a radius to serve the ground around it.</ShiftChange.ServesNothingOutdoorsDesc>
+  <ShiftChange.ServesNothingOutdoorsDesc>Standing in the open, its room is all the open ground on the map, so a stand serving its room serves nothing there. Choose Within a radius to serve the ground around it.</ShiftChange.ServesNothingOutdoorsDesc>
   <ShiftChange.ServesNeedsTrigger>Tick what this stand serves first: a work type, Recreation or Sleeping.</ShiftChange.ServesNeedsTrigger>
   <ShiftChange.ServeRadius>Radius: {0} cells</ShiftChange.ServeRadius>
   <ShiftChange.InspectServesRadius>Serves a radius of {0} cells</ShiftChange.InspectServesRadius>
+  <ShiftChange.InspectServesNothingOutdoors>Serves nothing out in the open. Choose a radius in its settings.</ShiftChange.InspectServesNothingOutdoors>
+
+  <!-- The alert for stands set to serve something that serve nothing. Each
+       line is one stand: its label, what it serves, and the area's name where
+       there is one. -->
+  <ShiftChange.AlertServesNothing>Shift stand serves nothing</ShiftChange.AlertServesNothing>
+  <ShiftChange.AlertServesNothingPlural>Shift stands serve nothing</ShiftChange.AlertServesNothingPlural>
+  <ShiftChange.AlertServesNothingDesc>These stands are set to serve something, but dress nobody:\n{0}\n\nIn the open, a stand's room is all the open ground on the map, so give it a radius under Serves in its settings. Where its allowed area is gone, choose what it serves again under Serves. Where it stands outside its area, paint the area over the stand, or move the stand into it.</ShiftChange.AlertServesNothingDesc>
+  <ShiftChange.AlertInTheOpen>{0} ({1}) stands in the open, where its room serves nothing</ShiftChange.AlertInTheOpen>
+  <ShiftChange.AlertAreaGone>{0} ({1}) serves the allowed area {2}, which is gone</ShiftChange.AlertAreaGone>
+  <ShiftChange.AlertOutsideArea>{0} ({1}) stands outside its allowed area {2}</ShiftChange.AlertOutsideArea>
 
   <!-- Work-type names we override, because the mod supplying them fills
        gerundLabel and labelShort with names for different things. Keyed on the

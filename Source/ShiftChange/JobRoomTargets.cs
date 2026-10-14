@@ -12,8 +12,8 @@ namespace ShiftChange
     /// all. Mostly other mods' jobs, plus vanilla's feeding givers. Why each
     /// list exists, and why a list rather than a rule: docs/DESIGN.md, "Mod
     /// compatibility". Also which jobs a pawn may do in uniform inside a
-    /// radius stand's catchment besides the stand's own: docs/DESIGN.md,
-    /// "Catchments".
+    /// radius or area stand's catchment besides the stand's own:
+    /// docs/DESIGN.md, "Catchments".
     ///
     /// <para><b>It must not consult the map.</b> The dressing arm and the
     /// change-back arm share this resolver and must answer identically for
@@ -175,8 +175,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Giver-less JobDefs a pawn keeps a radius stand's uniform on for,
-        /// inside its catchment: idling and wandering (<c>JobGiver_IdleError</c>,
+        /// Giver-less JobDefs a pawn keeps a radius or area stand's uniform on
+        /// for, inside its catchment: idling and wandering (<c>JobGiver_IdleError</c>,
         /// <c>JobGiver_Wander</c>), and walking somewhere allowed or safe
         /// (<c>JobGiver_SeekAllowedArea</c>, <c>JobGiver_SeekSafeTemperature</c>).
         /// A list rather than whatever is left over, so dining, deathrest,
@@ -202,8 +202,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Work a work stand serving a radius lets through in uniform when every
-        /// place the job names is inside the catchment. Tags, not work type
+        /// Work a work stand serving a radius or an area lets through in
+        /// uniform when every place the job names is inside the catchment. Tags, not work type
         /// names, because Complex Jobs splits hauling, repair and
         /// deconstruction into work types of its own and Allow Utilities adds
         /// an urgent haul, and all of them carry these tags.

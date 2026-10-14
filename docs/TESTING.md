@@ -97,7 +97,7 @@ does.
 
 ## What the cases assert
 
-Eighty-four cases. This section is a map: the detail lives with each case, in
+Ninety-one cases. This section is a map: the detail lives with each case, in
 the comment on its method under `Source/ShiftChange/Harness/`, and the report
 prints the cases in the order `DebugTools_LifecycleHarness.Run` registers them.
 
@@ -165,7 +165,9 @@ colonist already working bare in its room (`FreedStandCatchesUp`). Change back
 keeps a colonist out of their stand's room until they leave it, drafting drops
 that, and the catch-up honours it (`ChangeBackLatchHoldsUntilTheyLeave`). That
 case was written against the room latch as it shipped, before catchments
-reworked it, and it still passes on the per-stand latch.
+reworked it, and it still passes on the per-stand latch. Its second stand, out
+past the door, serves the smallest radius, since a room stand in the open
+serves nothing.
 
 **Allowed areas** (`HarnessGates` too). A stand outside the colonist's allowed
 area dresses nobody by any of the three paths that dress, and an allowed shared
@@ -209,17 +211,32 @@ and are known gaps without it: Common Sense's bill haul
 (`CommonSenseBillHaulKeepsTheUniform`) and Pick Up And Haul's follow-up jobs
 (`PickUpAndHaulFollowUpsKeepTheUniform`).
 
-**Catchments** (`HarnessCatchments`). A stand serving a radius instead of its
-room. The ring is inclusive, exactly the cells it draws (`RadiusCoversItsRing`);
-a stand leaves room mode only with something ticked and returns to it on
-leaving shift use, and its Serves row greys exactly where the setter refuses
-(`CatchmentNeedsSomethingTicked`); and a freed radius stand
+**Catchments** (`HarnessCatchments`). A stand serving a radius or an allowed
+area instead of its room. The ring is inclusive, exactly the cells it draws
+(`RadiusCoversItsRing`); a stand leaves room mode only with something ticked and
+returns to it on leaving shift use, and its Serves row greys exactly where the
+setter refuses (`CatchmentNeedsSomethingTicked`); and a freed radius stand
 catches nobody up (`FreedRadiusStandCatchesNobody`). Dressing happens within
 the ring, past the stand's own room and never beyond the ring
 (`RadiusStandDressesWithinItsRing`), outdoors for recreation, which a room
 stand in the open may not serve (`RadiusServesOutdoorRecreation`), and at an
 owned radius stand before a nearer shared one
-(`OwnedRadiusStandBeatsANearerSharedOne`).
+(`OwnedRadiusStandBeatsANearerSharedOne`). A room stand in the open serves no
+work either: it covers no cell, the alert lists it, and a colonist already in
+its uniform changes back at their next job (`RoomStandInTheOpenServesNothing`).
+
+An allowed area covers its painted cells only while the stand stands in one:
+past the walls, and not on an unpainted cell of the stand's own room
+(`AreaCoversItsCells`). The dressing decision agrees
+(`AreaStandDressesWithinItsArea`). A deleted area leaves its stand in area mode,
+serving nothing under the area's last name, and a new area under that name is
+not adopted (`DeletedAreaServesNobody`). The alert that vanilla made from its
+subclass lists a stand whose area is gone or that stands outside it, naming the
+area, and a colonist in that stand's uniform changes back once its area is
+deleted (`ServesNothingAlertListsTheStand`). A solid target counts as inside
+an area when the area covers either its own cell or the floor beside it, for
+dressing, for staying dressed, and for a wall repair as pass-through work
+(`SolidTargetIsJudgedAtItsOwnCellFirst`).
 
 Staying dressed goes by what the stand is for, with a case per trigger
 (`RadiusWorkStandKeepsTheUniformInItsRing`,
@@ -269,13 +286,16 @@ a work target's room: one with no room of its own
 **Round trips** (`DebugTools_SaveRoundTrip`). Save, load back through the
 engine's own synchronous loader, and assert on the written file as well as on
 the loaded state: a plain trip, which also sweeps vanilla's removal flag and
-keeps a radius catchment (`RoundTrip`); a save from before v1.0.2, with the legacy keys
-(`LegacyMigration`); and an older save whose stand carries a foreign assignable
-with an owner of its own (`ForeignAssignable`). On the four-mod list the
-legacy-key case takes the key migration, and beside a foreign assignable it
-takes the decline and the reconcile instead; no other case reaches the
-decline. These cases replace `Current.Game`, so they run last among the map
-cases; the class doc says what else follows from that.
+keeps a radius catchment (`RoundTrip`); a save from before v1.0.2, with the
+legacy keys and none of the catchment keys (`LegacyMigration`); an older save whose stand carries a foreign
+assignable with an owner of its own (`ForeignAssignable`); and three area
+stands, one whose area was renamed before the save, one whose area was deleted,
+and one boxed and carried off every map, which keeps its binding
+(`AreaRoundTrip`). On the four-mod list the legacy-key case takes the key
+migration, and beside a foreign assignable it takes the decline and the
+reconcile instead; no other case reaches the decline. These cases replace
+`Current.Game`, so they run last among the map cases; the class doc says what
+else follows from that.
 
 **The harness itself.** `HarnessAccounting`, registered last, asserts that
 `Expect` reports and returns, that `Case` counts, and that a known gap is
@@ -303,7 +323,8 @@ a suite that checks nothing.
 - **UI.** No case draws a gizmo or opens a window. The button cases read
   gizmo labels and grouping, one allowed-area case reads an inspect string, and
   the catchment wording case reads the Serves row's label, the inspect line and
-  the switch's tooltip, all without drawing. The test the Serves row greys on
+  the switch's tooltip, and the alert case its report and explanation, all
+  without drawing. The test the Serves row greys on
   is checked against the setter, but the grey itself, the radius slider and
   the ring are verified in play only.
 - **Trade.** No case opens a trade session or builds a `TradeDeal`, so the
