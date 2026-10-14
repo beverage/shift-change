@@ -360,6 +360,12 @@ namespace ShiftChange
             // at exactly the wake-up boundary, so the guard meant to protect
             // sleepers suppressed the change-back at the one moment the pawn
             // was standing beside their own stand.
+            //
+            // Nothing queued from the probes above: a job waiting at the head
+            // of the queue is one vanilla put back behind a haul, and an
+            // errand ahead of the job they dressed for keeps the outfit on
+            // (QueuedAheadOfServedWork), which would answer the wake-up below.
+            Settle(fix.Pawn);
             if (!RunSwap(fix))
             {
                 return ok & Expect(false, "the pawn could dress for the wake-up test");

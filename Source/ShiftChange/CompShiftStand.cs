@@ -726,9 +726,94 @@ namespace ShiftChange
         /// because an automatic stand's trigger is a suggestion from the room
         /// and must stay overridable in one click; hiding it on any active
         /// trigger once left a bedroom stand no path to a work type
-        /// (docs/DESIGN.md, "The sleep branch").</para>
+        /// (docs/DESIGN.md, "The sleep branch"). Not for every explicit one
+        /// either: <see cref="HidesWorkList"/> is the dialog's test.</para>
         /// </summary>
         public bool IsTriggerOverridden => !excluded && (recreationOverride || restOverride);
+
+        /// <summary>
+        /// The explicit trigger is the one this stand's room would suggest
+        /// anyway: Sleeping ticked in a bedroom, Recreation in a rec room. That
+        /// is what an automatic stand's suggestion becomes when it moves to a
+        /// radius or an area, which has to tick it for real
+        /// (<see cref="TickAutomaticSet"/>), so it keeps the automatic stand's
+        /// one-click path to a work type. Read from the room live, through the
+        /// same role tables <see cref="HandlesRest"/> and
+        /// <see cref="HandlesRecreation"/> consult, so nothing is saved for it
+        /// and a room that changes role changes the answer.
+        /// </summary>
+        internal bool TriggerIsRoomsOwn
+        {
+            get
+            {
+                if (!IsTriggerOverridden || !parent.Spawned)
+                {
+                    return false;
+                }
+                // Work wins in the room's own reading, so a room that would
+                // give work types suggests no trigger.
+                if (AutomaticWorkTypes.Count > 0)
+                {
+                    return false;
+                }
+                RoomRoleDef role = parent.GetRoom()?.Role;
+                return restOverride
+                    ? RoomWorkTypes.RestForRole(role)
+                    : RoomWorkTypes.RecreationForRole(role);
+            }
+        }
+
+        /// <summary>
+        /// The settings window hides the work list: an explicit trigger the
+        /// room would not have suggested. Ticking a work type would silently
+        /// drop that trigger, so the list stays out of reach until it is
+        /// unticked. Every other stand keeps the list, and ticking a work type
+        /// replaces the room's suggestion (docs/DESIGN.md, "The sleep branch").
+        /// </summary>
+        internal bool HidesWorkList => IsTriggerOverridden && !TriggerIsRoomsOwn;
+
+        /// <summary>
+        /// The stand's ticks are exactly what its room would give an automatic
+        /// stand: the same work types, or the trigger the room suggests
+        /// (<see cref="TriggerIsRoomsOwn"/>). That is what
+        /// <see cref="TickAutomaticSet"/> writes when an automatic stand leaves
+        /// room mode, so <see cref="SetServes"/> reads it as Automatic coming
+        /// back. Live from the room, like <see cref="TriggerIsRoomsOwn"/>:
+        /// nothing is saved for it, ticks the player changed while away no
+        /// longer match, and a room whose role changed meanwhile keeps the
+        /// ticks.
+        /// </summary>
+        internal bool TicksAreRoomsOwn
+        {
+            get
+            {
+                if (excluded || !parent.Spawned || serves != CatchmentKind.Room)
+                {
+                    return false;
+                }
+                if (IsTriggerOverridden)
+                {
+                    return TriggerIsRoomsOwn;
+                }
+                if (workTypeOverrides == null || workTypeOverrides.Count == 0)
+                {
+                    return false;
+                }
+                List<WorkTypeDef> automatic = AutomaticWorkTypes;
+                if (automatic.Count != workTypeOverrides.Count)
+                {
+                    return false;
+                }
+                for (int i = 0; i < automatic.Count; i++)
+                {
+                    if (!workTypeOverrides.Contains(automatic[i]))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
 
         /// <summary>
         /// Deposit-only is a property of a SLEEP stand and of nothing else —
@@ -808,13 +893,27 @@ namespace ShiftChange
         /// Switch where the stand serves. Leaving room mode needs something
         /// ticked: an automatic stand's set becomes ticks first, so nothing
         /// visibly changes, and a stand with nothing to tick stays where it is
-        /// (docs/DESIGN.md, "Catchments"). Area mode also needs a live area,
-        /// the one <see cref="SetServeArea"/> bound. A stand whose area goes
-        /// while it serves it stays in area mode, serving nothing, but is never
-        /// put there that way.
+        /// (docs/DESIGN.md, "Catchments"). Coming back, ticks that are exactly
+        /// the room's own reading (<see cref="TicksAreRoomsOwn"/>), which is
+        /// what leaving ticked, go back to Automatic, so the stand follows its
+        /// room again. Area mode also needs a live area, the one
+        /// <see cref="SetServeArea"/> bound. A stand whose area goes while it
+        /// serves it stays in area mode, serving nothing, but is never put
+        /// there that way.
         /// </summary>
         internal void SetServes(CatchmentKind kind)
         {
+            if (kind == CatchmentKind.Room)
+            {
+                ApplyServes(kind);
+                // Asked once back in the room: only a stand serving its room
+                // has a room reading to compare against.
+                if (TicksAreRoomsOwn)
+                {
+                    SetAutomatic();
+                }
+                return;
+            }
             if (kind == CatchmentKind.Area && LiveServeArea() == null)
             {
                 return;
@@ -850,6 +949,67 @@ namespace ShiftChange
             serveArea = area;
             serveAreaLabel = area.Label;
             SetServes(CatchmentKind.Area);
+        }
+
+        /// <summary>
+        /// The Serves menu's New allowed area: a new allowed area on the
+        /// stand's map, bound and returned, or null with nothing ticked or with
+        /// the map at vanilla's cap of ten. It starts as a copy of the stand's
+        /// room, or just the stand's own cell in the open: an empty area would
+        /// leave the stand outside it, serving nothing, where a copy of the
+        /// room keeps it serving what it served until the player paints more.
+        /// </summary>
+        internal Area_Allowed MakeServeArea()
+        {
+            Map map = parent.Spawned ? parent.Map : null;
+            Area_Allowed area;
+            if (map == null || !ServesSomething)
+            {
+                return null;
+            }
+            string label = NewAreaLabel(map);
+            if (!map.areaManager.TryMakeNewAllowed(out area))
+            {
+                return null;
+            }
+            area.SetLabel(label);
+            Room room = parent.GetRoom();
+            if (room != null && !room.TouchesMapEdge)
+            {
+                foreach (IntVec3 cell in room.Cells)
+                {
+                    area[cell] = true;
+                }
+            }
+            area[parent.Position] = true;
+            SetServeArea(area);
+            return area;
+        }
+
+        /// <summary>
+        /// A new area's name: the first thing the stand serves, "Doctoring
+        /// area", numbered from 2 while the map already has one by that name.
+        /// The served work rather than the stand's label, which would make every
+        /// area "Outfit stand area" and a number. Asked before the stand leaves
+        /// room mode, so an automatic stand is named for what its room gives it,
+        /// which is what it goes on to tick.
+        /// </summary>
+        internal string NewAreaLabel(Map map)
+        {
+            List<string> served = ServedLabels();
+            string purpose = served.Count > 0 ? served[0].CapitalizeFirst() : parent.LabelCap;
+            string label = "ShiftChange.NewAreaLabel".Translate(purpose).RawText;
+            // Bounded: a translation of the numbered string without its {1}
+            // gives the same name every pass, and the map holds only so many
+            // areas, so past that many tries the number is appended here.
+            int tries = map.areaManager.AllAreas.Count + 2;
+            for (int n = 2; map.areaManager.GetLabeled(label) != null; n++)
+            {
+                label = n <= tries
+                    ? "ShiftChange.NewAreaLabelNumbered".Translate(purpose, n).RawText
+                    : "ShiftChange.NewAreaLabel".Translate(purpose).RawText + " " + n;
+            }
+            return label;
         }
 
         /// <summary>
@@ -904,31 +1064,53 @@ namespace ShiftChange
 
         /// <summary>
         /// A keyed string's variant for this stand's catchment: the key itself
-        /// for a room, the key plus "Radius" for a radius. For the strings that
-        /// say where a stand serves (docs/DESIGN.md, "Catchments").
+        /// for a room, the key plus "Radius" for a radius, plus "Area" for an
+        /// allowed area. For the strings that say where a stand serves
+        /// (docs/DESIGN.md, "Catchments").
         /// </summary>
         internal string ByCatchment(string key)
         {
-            return serves == CatchmentKind.Radius ? key + "Radius" : key;
+            switch (serves)
+            {
+                case CatchmentKind.Radius:
+                    return key + "Radius";
+                case CatchmentKind.Area:
+                    return key + "Area";
+                default:
+                    return key;
+            }
         }
 
         /// <summary>
         /// What the settings window's Serves row says the stand covers. A room
         /// in the open is the one map-wide outdoor room, so a stand serving it
         /// serves nothing, whatever it is for, and the row says so rather than
-        /// "this room" (docs/DESIGN.md, "Catchments").
+        /// "this room". An area goes by its name, with the reason it serves
+        /// nothing when it does: it is gone, or it leaves the stand out
+        /// (docs/DESIGN.md, "Catchments").
         /// </summary>
         internal string ServesLabel()
         {
-            if (serves == CatchmentKind.Radius)
+            switch (serves)
             {
-                return "ShiftChange.ServesRadius".Translate(serveRadius);
+                case CatchmentKind.Radius:
+                    return "ShiftChange.ServesRadius".Translate(serveRadius);
+                case CatchmentKind.Area:
+                {
+                    Area area = LiveServeArea();
+                    if (area == null)
+                    {
+                        return "ShiftChange.ServesAreaGone".Translate(serveAreaLabel);
+                    }
+                    return parent.Spawned && !area[parent.Position]
+                        ? (string)"ShiftChange.ServesAreaStandOutside".Translate(area.Label)
+                        : area.Label;
+                }
+                default:
+                    return StandsInTheOpen
+                        ? "ShiftChange.ServesNothingOutdoors".Translate()
+                        : "ShiftChange.ServesRoom".Translate();
             }
-            if (serves == CatchmentKind.Room && StandsInTheOpen)
-            {
-                return "ShiftChange.ServesNothingOutdoors".Translate();
-            }
-            return "ShiftChange.ServesRoom".Translate();
         }
 
         /// <summary>The stand's room is the map-wide outdoor one.</summary>
@@ -942,16 +1124,27 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Draws a radius stand's ring: exactly the cells it serves. On
-        /// selection, and while its settings window is open, as a bill's
-        /// ingredient radius is drawn. Nothing for a room stand, whose walls
-        /// are its outline.
+        /// Draws what a radius or area stand serves: its ring, or its area's
+        /// painted cells. On selection, and while its settings window is open,
+        /// as a bill's ingredient radius is drawn. Nothing for a room stand,
+        /// whose walls are its outline. The area is left undrawn while a float
+        /// menu is open, as vanilla's paint tool does with its own
+        /// (<c>Designator_AreaAllowed.SelectedUpdate</c>), so an area hovered in
+        /// the Serves menu is the only one drawn.
         /// </summary>
         internal void DrawCatchment()
         {
-            if (serves == CatchmentKind.Radius && parent.Spawned && parent.Map == Find.CurrentMap)
+            if (!parent.Spawned || parent.Map != Find.CurrentMap)
+            {
+                return;
+            }
+            if (serves == CatchmentKind.Radius)
             {
                 GenDraw.DrawRadiusRing(parent.Position, serveRadius);
+            }
+            else if (serves == CatchmentKind.Area && Find.WindowStack.FloatMenu == null)
+            {
+                LiveServeArea()?.MarkForDraw();
             }
         }
 
@@ -1000,10 +1193,11 @@ namespace ShiftChange
         /// excluded so the states stay canonical. Work types, recreation and
         /// sleep are mutually exclusive (decided 2026-08-16), so touching any
         /// work type also drops the recreation and sleep triggers. The dialog
-        /// hides this list while either trigger is ticked, so reaching here
-        /// from such a stand is a deliberate switch; on an automatic stand the
-        /// list stays reachable on purpose (see
-        /// <see cref="IsTriggerOverridden"/>).
+        /// hides this list while a trigger the room did not suggest is ticked,
+        /// so reaching here from such a stand is a deliberate switch; on a
+        /// stand whose trigger is the room's suggestion, automatic or ticked,
+        /// the list stays reachable on purpose (see
+        /// <see cref="HidesWorkList"/>).
         /// </summary>
         public void ToggleWork(WorkTypeDef work)
         {
@@ -1305,6 +1499,9 @@ namespace ShiftChange
         public override void PostSwapMap()
         {
             base.PostSwapMap();
+            // FIRST, ahead of the early return below: an idle stand rebinds
+            // too, and an idle stand is the common case.
+            RebindAfterLanding();
             if (borrower == null || !OnShift)
             {
                 return;
@@ -1317,6 +1514,45 @@ namespace ShiftChange
             // Idempotent with PostSpawnSetup's own rebuild; ordering between
             // the two is not guaranteed and both must leave the registry right.
             OnShiftStands[borrower] = this;
+        }
+
+        /// <summary>
+        /// After a gravship landing, find the bound area again on the map the
+        /// stand landed on. The landing spawns things first and copies the
+        /// ship's areas after (<c>GravshipPlacementUtility.cs:35-38</c>), and
+        /// <c>PostSwapMap</c> runs after both, so the area the ship carried is
+        /// there by now: Home by type, an allowed area under its label, found
+        /// as the landing itself finds it (<c>MoveableArea_Allowed.TryCreateArea</c>,
+        /// <c>AreaManager.GetLabeled</c>).
+        ///
+        /// <para>Only an area holding the stand's own cell is taken. One that
+        /// flew with the stand on the deck always does, since the ship carries
+        /// every painted cell of its floors. One that does not is a
+        /// destination area that merely shares the name, "Area 1" say, and
+        /// binding it would rebind behind the player's back. The stand then
+        /// stays bound to the area it left, which is not live here, so it
+        /// serves nothing and the alert lists it, as when an area is not
+        /// carried at all. The binding is mended whatever the stand serves
+        /// now, as a radius is kept while it serves an area. docs/DESIGN.md,
+        /// "Catchments".</para>
+        /// </summary>
+        internal void RebindAfterLanding()
+        {
+            Map map = parent.Spawned ? parent.Map : null;
+            if (map == null || (serveArea == null && serveAreaLabel == null) || IsLiveHere(serveArea))
+            {
+                return;
+            }
+            // The departed area keeps its own label, renamed or not; the
+            // stored one is the fallback for a reference dropped on saving.
+            string label = serveArea?.Label ?? serveAreaLabel;
+            Area found = serveArea is Area_Home ? map.areaManager.Home : map.areaManager.GetLabeled(label);
+            if (found == null || !IsLiveHere(found) || !found[parent.Position])
+            {
+                return;
+            }
+            serveArea = found;
+            serveAreaLabel = found.Label;
         }
 
         /// <summary>
@@ -1613,6 +1849,33 @@ namespace ShiftChange
             }
         }
 
+        /// <summary>
+        /// The inspect pane's catchment line, or null for a stand serving an
+        /// ordinary room: why the stand serves nothing, else its radius or its
+        /// area's name.
+        /// </summary>
+        internal string CatchmentInspectLine()
+        {
+            switch (ServeFault)
+            {
+                case CatchmentFault.InTheOpen:
+                    return "ShiftChange.InspectServesNothingOutdoors".Translate();
+                case CatchmentFault.AreaGone:
+                    return "ShiftChange.InspectAreaGone".Translate(serveAreaLabel);
+                case CatchmentFault.OutsideArea:
+                    return "ShiftChange.InspectStandOutsideArea".Translate(serveAreaLabel);
+            }
+            switch (serves)
+            {
+                case CatchmentKind.Radius:
+                    return "ShiftChange.InspectServesRadius".Translate(serveRadius);
+                case CatchmentKind.Area:
+                    return "ShiftChange.InspectServesArea".Translate(serveAreaLabel);
+                default:
+                    return null;
+            }
+        }
+
         public override string CompInspectStringExtra()
         {
             if (excluded)
@@ -1628,14 +1891,11 @@ namespace ShiftChange
 
             // Only where the catchment is not an ordinary room, by the
             // full-change line's rule below: report what differs from the
-            // default. A room in the open serves nothing, and says so here.
-            if (serves == CatchmentKind.Radius)
+            // default. A stand that serves nothing says why here.
+            string catchment = CatchmentInspectLine();
+            if (catchment != null)
             {
-                line += "\n" + "ShiftChange.InspectServesRadius".Translate(serveRadius);
-            }
-            else if (ServeFault == CatchmentFault.InTheOpen)
-            {
-                line += "\n" + "ShiftChange.InspectServesNothingOutdoors".Translate();
+                line += "\n" + catchment;
             }
 
             // Say who owns or holds it here as well as on the gizmo: the base
@@ -1737,6 +1997,13 @@ namespace ShiftChange
                 {
                     regime = "ShiftChange.RegimeIdle".Translate().RawText;
                 }
+                else if (ServeFault != CatchmentFault.None)
+                {
+                    // Set to serve something that dresses nobody: its area
+                    // is gone or leaves it out, or it serves its room in the
+                    // open. The inspect pane and the alert say which.
+                    regime = "ShiftChange.RegimeServesNothing".Translate().RawText;
+                }
                 else
                 {
                     regime = served.Count == 1
@@ -1748,7 +2015,7 @@ namespace ShiftChange
             {
                 defaultLabel = regime,
                 defaultDesc = ByCatchment("ShiftChange.SetWorkTypeDesc")
-                    .Translate(WorkTypesLabel(), source, serveRadius),
+                    .Translate(WorkTypesLabel(), source, serveRadius, serveAreaLabel ?? string.Empty),
                 // The pencil, not ForbidOff — a forbid glyph on a
                 // configuration gizmo reads as "this stand is disabled".
                 // Zero-art rule: icons come from vanilla's atlas only.

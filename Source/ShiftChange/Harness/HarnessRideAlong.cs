@@ -31,14 +31,14 @@ namespace ShiftChange
     internal static class HarnessRideAlong
     {
         /// <summary>
-        /// The six vanilla feeding givers, with <see cref="DeliverFoodGivers"/>
+        /// The seven vanilla feeding givers, with <see cref="DeliverFoodGivers"/>
         /// below. Each builds its job with the FOOD in targetA and the patient
         /// or prisoner in targetB: docs/DESIGN.md, "Mod compatibility". The
         /// hemogen givers are Biotech's and resolve only with it loaded.
         /// </summary>
         internal static readonly string[] FeedPatientGivers =
         {
-            "DoctorFeedHumanlikes", "DoctorFeedAnimals", "FeedPrisoner", "FeedHemogen",
+            "DoctorFeedHumanlikes", "DoctorFeedAnimals", "HandlingFeedPatientAnimals", "FeedPrisoner", "FeedHemogen",
         };
 
         internal static readonly string[] DeliverFoodGivers =
@@ -56,10 +56,13 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// FEEDING RIDES ALONG, in both directions: a meal run neither dresses
-        /// anyone nor sends anyone back to change. The doctor's and the
-        /// warden's halves, and why the giver is ignored rather than targetB
-        /// read: docs/DESIGN.md, "Mod compatibility".
+        /// FEEDING DRESSES NOBODY, and sends nobody back to change whose stand
+        /// serves its work, for a patient in the stand's room. A colonist in
+        /// another stand's outfit, pyjamas here, changes back first. A patient
+        /// elsewhere, and a haul slipped in ahead of the meal run, are
+        /// <see cref="MealRunKeepsTheUniformForAPatientInside"/>'s. The
+        /// doctor's and the warden's halves, and why the giver is ignored
+        /// rather than targetB read: docs/DESIGN.md, "Mod compatibility".
         ///
         /// <para>Every refusal is paired with the SAME job shape under a giver
         /// that is not on the list, which still dresses and still changes them
@@ -70,14 +73,16 @@ namespace ShiftChange
         {
             WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
             WorkTypeDef warden = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Warden");
+            WorkTypeDef handling = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Handling");
             WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
             ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
-            if (doctor == null || warden == null || tend == null || mealDef == null)
+            if (doctor == null || warden == null || handling == null || tend == null || mealDef == null)
             {
-                return Expect(false, "the doctor, warden and meal defs resolve");
+                return Expect(false, "the doctor, warden, handling and meal defs resolve");
             }
             fix.Comp.ToggleWork(doctor);
             fix.Comp.ToggleWork(warden);
+            fix.Comp.ToggleWork(handling);
             MakeCalm(fix.Map);
 
             Map map = fix.Map;
@@ -146,6 +151,116 @@ namespace ShiftChange
                 ok &= Expect(!Probe(fix, FeedingJob(row.Value, mealAway, patient, row.Key)),
                              row.Key.defName + " keeps the uniform on while they fetch a meal from storage");
             }
+
+            // The meal run keeps the uniform on only for a stand serving its
+            // work. In another stand's outfit, pyjamas here, it changes them
+            // back first, as any job out of the room does.
+            fix.Comp.ToggleWork(doctor);
+            fix.Comp.ToggleWork(warden);
+            fix.Comp.ToggleWork(handling);
+            fix.Comp.ToggleRest();
+            ok &= Expect(fix.Comp.HandlesRest() && !fix.Comp.HandlesWork(doctor) && !fix.Comp.HandlesWork(warden)
+                         && !fix.Comp.HandlesWork(handling) && fix.Comp.OnShift,
+                         "the stand now serves sleep, not doctoring, wardening or handling, the colonist still on shift (control)");
+            foreach (KeyValuePair<WorkGiverDef, JobDef> row in rows)
+            {
+                ok &= Expect(Probe(fix, FeedingJob(row.Value, mealAway, patient, row.Key)),
+                             row.Key.defName + " changes a colonist in pyjamas back before the meal run");
+            }
+            return ok & Expect(fix.Comp.OnShift, "and they are still on shift at the end");
+        }
+
+        /// <summary>
+        /// A MEAL RUN KEEPS THE UNIFORM ON ONLY FOR A PATIENT INSIDE. On shift
+        /// at a stand serving doctoring and wardening, the meal stored out past
+        /// the door: a patient in the room keeps the uniform on (control), and
+        /// a patient out past the door changes them back now, while the stand
+        /// is near; a prisoner's meal left at a spot out there does the same,
+        /// and at a spot in the room keeps it on (control). A haul vanilla
+        /// slips in ahead of the meal run keeps the uniform on when the meal
+        /// run would, and only then. In pyjamas, a meal from the room for a
+        /// patient in the room is the room's (control), and one carried to a
+        /// patient out past the door changes them back first.
+        /// docs/DESIGN.md, "Mod compatibility".
+        /// </summary>
+        internal static bool MealRunKeepsTheUniformForAPatientInside(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            WorkTypeDef warden = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Warden");
+            WorkGiverDef feed = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorFeedHumanlikes");
+            WorkGiverDef deliver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DeliverFoodToPrisoner");
+            ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
+            if (doctor == null || warden == null || feed == null || deliver == null || mealDef == null)
+            {
+                return Expect(false, "the doctor, warden, feeding and meal defs resolve");
+            }
+            if (fix.Outside.Height < 4)
+            {
+                return Expect(false, "the fixture has a door and four cells of open ground outside it");
+            }
+            fix.Comp.ToggleWork(doctor);
+            fix.Comp.ToggleWork(warden);
+            MakeCalm(fix.Map);
+
+            Map map = fix.Map;
+            Room room = fix.Stand.GetRoom();
+            IntVec3 at = fix.Stand.Position;
+            int x = fix.Outside.minX;
+            int top = fix.Outside.maxZ;
+            Pawn patientIn = SpawnExtra(fix, Gender.Female, "Patient");
+            Pawn patientOut = SpawnExtra(fix, Gender.Male, "Outpatient", new IntVec3(x, 0, top));
+            Thing mealOut = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), new IntVec3(x, 0, top - 1), map);
+            Thing mealIn = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), at + new IntVec3(3, 0, 3), map);
+            Thing steel = HarnessCatchments.Steel(map, new IntVec3(x, 0, top - 2));
+            IntVec3 store = new IntVec3(x, 0, top - 3);
+
+            bool ok = Expect(patientIn.GetRoom() == room && patientOut.GetRoom() != room
+                             && mealOut.GetRoom() != room && mealIn.GetRoom() == room,
+                             "a patient and a meal in the stand's room, and another of each out past the door (control)")
+                    & Expect(fix.Comp.HandlesWork(doctor) && fix.Comp.HandlesWork(warden),
+                             "the stand serves doctoring and wardening (control)")
+                    & Expect(RunSwap(fix), "dressed for the shift")
+                    & Expect(fix.Comp.OnShift, "and on shift (control)");
+            if (!fix.Comp.OnShift)
+            {
+                return false;
+            }
+
+            Job spotIn = FeedingJob(JobDefOf.DeliverFood, mealOut, patientIn, deliver);
+            spotIn.targetC = at + new IntVec3(3, 0, 2);
+            Job spotOut = FeedingJob(JobDefOf.DeliverFood, mealOut, patientIn, deliver);
+            spotOut.targetC = store;
+            ok &= Expect(!Probe(fix, FeedingJob(JobDefOf.FeedPatient, mealOut, patientIn, feed)),
+                         "a meal from out past the door for the patient in the room keeps the uniform on (control)")
+                & Expect(Probe(fix, FeedingJob(JobDefOf.FeedPatient, mealOut, patientOut, feed)),
+                         "one for the patient out past the door changes them back now")
+                & Expect(!Probe(fix, spotIn),
+                         "a prisoner's meal left at a spot in the room keeps it on (control)")
+                & Expect(Probe(fix, spotOut),
+                         "and one left at a spot out past the door changes them back");
+
+            // The shape vanilla's opportunistic haul leaves: the meal run put
+            // back at the head of the queue, untagged, and a haul started first.
+            JobQueue queue = fix.Pawn.jobs.jobQueue;
+            ok &= Expect(Probe(fix, GiverlessHaul(steel, store)),
+                         "a haul out past the door with nothing queued behind it changes them back (control)");
+            queue.EnqueueFirst(FeedingJob(JobDefOf.FeedPatient, mealOut, patientIn, feed));
+            ok &= Expect(!Probe(fix, GiverlessHaul(steel, store)),
+                         "the same haul slipped in ahead of a meal run for the patient in the room keeps it on");
+            queue.EnqueueFirst(FeedingJob(JobDefOf.FeedPatient, mealOut, patientOut, feed));
+            ok &= Expect(Probe(fix, GiverlessHaul(steel, store)),
+                         "but not ahead of one for the patient out past the door");
+
+            fix.Comp.ToggleWork(doctor);
+            fix.Comp.ToggleWork(warden);
+            fix.Comp.ToggleRest();
+            ok &= Expect(fix.Comp.HandlesRest() && !fix.Comp.HandlesWork(doctor) && !fix.Comp.HandlesWork(warden)
+                         && fix.Comp.OnShift,
+                         "the stand now serves sleep, not doctoring or wardening, the colonist still on shift (control)")
+                & Expect(!Probe(fix, FeedingJob(JobDefOf.FeedPatient, mealIn, patientIn, feed)),
+                         "in pyjamas, a meal from the room for the patient in the room is the room's (control)")
+                & Expect(Probe(fix, FeedingJob(JobDefOf.FeedPatient, mealIn, patientOut, feed)),
+                         "and one carried to the patient out past the door changes them back first");
             return ok & Expect(fix.Comp.OnShift, "and they are still on shift at the end");
         }
 

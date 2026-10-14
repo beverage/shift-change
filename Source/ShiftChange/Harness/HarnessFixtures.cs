@@ -44,7 +44,12 @@ namespace ShiftChange
         /// </summary>
         internal static Pawn SpawnExtra(Fixture fix, Gender gender, string nick)
         {
-            IntVec3 cell = fix.Stand.Position + new IntVec3(2, 0, fix.Extras.Count + 1);
+            return SpawnExtra(fix, gender, nick, fix.Stand.Position + new IntVec3(2, 0, fix.Extras.Count + 1));
+        }
+
+        /// <summary><see cref="SpawnExtra(Fixture, Gender, string)"/> on a given cell.</summary>
+        internal static Pawn SpawnExtra(Fixture fix, Gender gender, string nick, IntVec3 cell)
+        {
             for (int attempt = 1; ; attempt++)
             {
                 Pawn pawn = DebugTools_Fixtures.AveragePawn(gender, nick);

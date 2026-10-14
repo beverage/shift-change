@@ -317,10 +317,26 @@ namespace ShiftChange
             Case(map, pad, "at a sleep rack the latch holds through the night and lifts on waking",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  SleepRackLatchLiftsOnWaking);
+            Case(map, pad, "an area stand's latch holds beside the stand and for work in its area",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 AreaLatchHoldsBesideItsStand);
             // A known gap unless Complex Jobs is loaded (--with=).
-            Case(map, pad, "a construction delivery changes nobody, in either direction, and the site does",
+            Case(map, pad, "a delivery dresses nobody at a room or radius stand, keeps its own work's uniform on, and the site does",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 DeliveriesChangeNobody);
+                 DeliveriesKeepTheirOwnWorkOn);
+            Case(map, pad, "a delivery outside the stand's work changes pyjamas and whites back first",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Construction")),
+                 DeliveryOutsideTheStandsWorkChangesThemBack);
+            Case(map, pad, "a room stand beside a door serves its own room, and work in the doorway dresses nobody",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 RoomStandBesideADoorServesItsOwnRoom);
+            Case(map, pad, "an urgent patient on shift goes straight to bed, untagged and behind a haul too",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 UrgentPatientGoesStraightToBed);
+            Case(map, pad, "the catchment registry forgets a stand that is no longer spawned",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 RegistryForgetsAStandNoLongerSpawned);
             Case(map, pad, "the Serves row, the inspect pane and the switch's tooltip follow the catchment",
                  (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  CatchmentWordsFollowTheMode);
@@ -329,14 +345,34 @@ namespace ShiftChange
             Case(map, pad, "an area stand dresses for work painted in, past its room, and not elsewhere",
                  (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  AreaStandDressesWithinItsArea);
+            Case(map, pad, "an area stand dresses for a delivery whose steel and every site are painted in, and for no other",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Construction")),
+                 AreaStandDressesForADeliveryItHolds);
+            Case(map, pad, "a bedroom stand moved to an area keeps its work list, and a work type replaces sleeping",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), BedroomStandMovedToAnAreaKeepsItsWorkList);
             Case(map, pad, "a deleted area leaves its stand serving nothing, and a namesake is not adopted",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  DeletedAreaServesNobody);
+            Case(map, pad, "a gravship landing rebinds the area it carried, with nobody on shift, and no unrelated namesake",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 GravshipLandingRebindsTheArea);
             Case(map, pad, "the alert lists a stand whose area is gone or that stands outside it",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  ServesNothingAlertListsTheStand);
+            Case(map, pad, "the Serves menu offers the allowed areas but Home, marks one leaving the stand out, and binds the one picked",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), ServesMenuOffersTheAllowedAreas);
+            Case(map, pad, "New allowed area copies the stand's room, is named for its work, and greys at vanilla's cap",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 NewAllowedAreaCopiesTheRoom);
+            Case(map, pad, "Paint and Manage areas close the settings window before vanilla's tools open",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), PaintAndManageAreasCloseTheWindowFirst);
+            Case(map, pad, "an area stand's row, inspect pane and switch name the area, and say when it serves nothing",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 AreaWordsNameTheArea);
             Case(map, pad, "a solid target is judged at its own cell, then the floor beside it",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Mining")),
@@ -352,8 +388,11 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                  capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
                  StandOutsideTheAreaKeepsTheOutfitOn);
-            Case(map, pad, "feeding a patient or a prisoner neither dresses nor undresses anyone",
+            Case(map, pad, "feeding a patient or a prisoner dresses nobody, and keeps a doctor's or a warden's uniform on",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), FeedingRidesAlong);
+            Case(map, pad, "a meal run keeps the uniform on only for a patient inside, and so does a haul slipped in ahead of it",
+                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                 MealRunKeepsTheUniformForAPatientInside);
             Case(map, pad, "an errand queued ahead of work the stand serves keeps the uniform on",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  DetourAheadOfServedWorkKeepsTheUniform);

@@ -187,8 +187,9 @@ Behaviour is verified in game, on a clean Release restart. Two tools help.
 **The demo stage** is the general fixture — a colony in one click, where a swap
 can be watched end to end.
 
-**The lifecycle harness** covers what the demo stage cannot: sixty-seven cases
-that drive the engine's own entry points and assert where the ledger landed.
+**The lifecycle harness** covers what the demo stage cannot: a hundred and four
+cases that drive the engine's own entry points and assert where the ledger
+landed.
 What it covers, what it deliberately does not, the rules it follows and the two
 engine traps it had to pay for are all in [TESTING.md](TESTING.md).
 
@@ -410,14 +411,18 @@ flowchart LR
 | `Patch_JobInterception.cs` | Prefix on `StartJob`. Decides whether to divert, defers the original job, carries the mid-job catch-up. |
 | `JobDriver_SwapAtStand.cs` | Moves apparel, one direction at a time. Sets the forced flag on the way in, clears it on the way out. |
 | `SwapPlan.cs` | The single answer to "what would this swap move". Every wearability predicate lives here. |
-| `CompShiftStand.cs` | Per-stand work types and the checkout ledger. Static registry of on-shift stands. |
+| `CompShiftStand.cs` | Per-stand work types and the checkout ledger. What the stand serves, its room, a radius or an allowed area, and `Covers`, the one membership test. Static registries of on-shift stands and of radius and area stands. |
+| `JobPlace.cs` | Where a job happens: the cell its target names and, for a solid target, the cell beside it with a room. |
+| `JobRoomTargets.cs` | Tables for jobs whose targets mislead: which end is the place, the ignored givers, deliveries, giver-less fishing, the ride-along, incidental and pass-through lists. |
+| `Alert_ShiftStandServesNothing.cs` | The alert for stands set to serve something that serve nothing: in the open, area gone, or outside their area. |
+| `ServesMenuOption.cs` | A float-menu row that opens a section of the Serves menu with a gap. |
 | `CompAssignableToPawn_ShiftStand.cs` | Ownership. Narrows candidates to pawns capable of the stand's work, swaps the vanilla assign window for ours, and keeps any other mod's owner list on the stand as a copy of ours (reconciling the two once for an older save). On a stand not used for shift changes, keeps a group from shift use until the player picks one colonist (`AssignSoleOwner`). |
 | `Dialog_AssignStandOwners.cs` | The owner list. Replaces `Dialog_AssignBuildingOwner` for stands only — multi-select, a gender column and a gender filter, none of which the vanilla window exposes a seam for. On a stand not used for shift changes, Assign is a pick that replaces the list, and Assign all is not drawn. |
 | `Interop_OutfitStandsPlus.cs` | Reflection bridge to Outfit Stands Plus. Silent-fail; absent mod means an inert file. |
 | `Patch_OutfitStandsPlusUseButton.cs` | Transpiler that swaps the walk over every colony building, in Outfit Stands Plus' per-colonist stand button, for a per-map list of the colony's stands kept in the same order. Applied by hand from `HarmonyInit`, and only while their original IL still makes that call; otherwise it leaves the button alone and says why. Its case is in `Harness/HarnessInterop.cs`. |
 | `Patch_ForeignOwnerGizmos.cs` | Hides the other mod's Set owner control on every stand carrying ours, in both modes. Its list is a copy of ours, so an edit made through it would only be overwritten. |
 | `Patch_AllowRemovingToggle.cs` | Holds the stand's "Allow removing items" off while it is in service. |
-| `Patch_ChangeBackGizmo.cs` | "Change back" command on a pawn in uniform, plus the room-exit latch. |
+| `Patch_ChangeBackGizmo.cs` | "Change back" command on a pawn in uniform, setting the latch per stand and trigger that the stand search honours; drafting drops it. |
 | `Patch_OptimizeApparelOnShift.cs` | Pauses the vanilla wardrobe optimizer while a pawn is checked out. |
 | `Patch_UnclaimStands.cs` | Releases stands when vanilla unclaims beds and thrones. Holds the reaper both it and the banish patch call. |
 | `Patch_BanishStands.cs` | Calls the same reaper for banishment, the one colony exit vanilla routes past `UnclaimAll`. |
@@ -428,8 +433,9 @@ flowchart LR
 | `SessionGuard.cs` | Clears session-scoped statics when the loaded game changes. Route any new static through it. |
 | `HarmonyInit.cs` | Patch bootstrap. |
 | `DebugTools_Fixtures.cs` | Fixture primitives — make a thing, a pawn, a garment. `SCENES \|\| HARNESS`: both dev-only callers gate independently and both build their fixtures from these. |
-| `Harness/DebugTools_LifecycleHarness.cs` | `HARNESS` only. The test suite: the runner, its assertions, its self-check, and the list that registers all sixty-seven cases in the order they run. The other cases' bodies, which drive real engine entry points, live in the files beside it — see [TESTING.md](TESTING.md). Its `[DebugAction]` wrapper is `SCENES` on top of that. |
-| `Harness/DebugTools_SaveRoundTrip.cs` | `HARNESS` only. The three save/load cases. Separate file because they replace `Current.Game` and must run last. |
+| `Harness/DebugTools_LifecycleHarness.cs` | `HARNESS` only. The test suite: the runner, its assertions, its self-check, and the list that registers every case in the order they run. The other cases' bodies, which drive real engine entry points, live in the files beside it — see [TESTING.md](TESTING.md). Its `[DebugAction]` wrapper is `SCENES` on top of that. |
+| `Harness/DebugTools_SaveRoundTrip.cs` | `HARNESS` only. The four save/load cases. Separate file because they replace `Current.Game` and must run last. |
+| `Harness/HarnessCatchments.cs` | `HARNESS` only. The catchment cases: radius and area coverage, the dress and return paths in each mode, deliveries, the latch, the area UI. |
 | `Patch_HarnessAutoRun.cs` | `HARNESS` only. Runs the harness and quits, when launched with `-shiftchange-harness`. Neither it nor the flag exists in a shipping build. |
 | `DebugTools_Menu.cs` | `SCENES` only. The mod's entire debug-menu surface: one "Dev tools…" submenu. Absent in Release, so the category never renders. |
 | `DebugTools_DemoStage.cs` | `SCENES` only. The demo stage. Test fixture and film set. Clears 13×16 before building. |

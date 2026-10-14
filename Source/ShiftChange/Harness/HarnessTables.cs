@@ -395,19 +395,31 @@ namespace ShiftChange
 
         /// <summary>
         /// The official givers <see cref="JobRoomTargets.IgnoredGivers"/>
-        /// carries ON PURPOSE, and the only ones it may: vanilla's six feeding
-        /// givers, whose jobs put the meal in targetA
-        /// (<see cref="HarnessRideAlong.FeedingRidesAlong"/> has the reason),
-        /// and the seed planter, whose job puts the seed there. Any other
-        /// official giver on the list fails the guard below.
+        /// carries ON PURPOSE, and the only ones it may: vanilla's seven
+        /// feeding givers, whose jobs put the meal in targetA
+        /// (<see cref="HarnessRideAlong.FeedingRidesAlong"/> has the reason).
+        /// Any other official giver on the list fails the guard below, and so
+        /// does an official giver of a feeding class missing from it.
         /// </summary>
         internal static readonly HashSet<string> DeliberatelyIgnoredOfficialGivers =
-            new HashSet<string>(HarnessRideAlong.FeedPatientGivers.Concat(HarnessRideAlong.DeliverFoodGivers)
-                                                                  .Concat(new[] { "PlantSeed" }));
+            new HashSet<string>(HarnessRideAlong.FeedPatientGivers.Concat(HarnessRideAlong.DeliverFoodGivers));
+
+        /// <summary>
+        /// The classes vanilla feeds a patient or a prisoner with. Every
+        /// official giver built on one is a meal run and must be on
+        /// <see cref="JobRoomTargets.IgnoredGivers"/>: a giver def can take its
+        /// class from a parent, as Core's Handling one does from the Doctor
+        /// one, and a list of names alone missed it.
+        /// </summary>
+        internal static readonly System.Type[] FeedingGiverClasses =
+        {
+            typeof(WorkGiver_FeedPatient), typeof(WorkGiver_Warden_Feed), typeof(WorkGiver_Warden_DeliverFood),
+            typeof(Workgiver_AdministerHemogen), typeof(WorkGiver_Warden_DeliverHemogen),
+        };
 
         /// <summary>
         /// The official givers <see cref="JobRoomTargets.DeliveryGivers"/>
-        /// ignores by class: Core's four construction deliveries and its
+        /// takes by class: Core's four construction deliveries and its
         /// replanting giver, which derives from the same class. An official
         /// giver joining the class later fails the guard below, since the
         /// class takes it without a row anyone reviewed.
@@ -423,12 +435,34 @@ namespace ShiftChange
             };
 
         /// <summary>
-        /// The same for <see cref="JobRoomTargets.RideAlongJobs"/>: vanilla's
-        /// target-less unload and the job tracker's pause between jobs, and no
-        /// other official job.
+        /// The job def a delivery giver builds its delivery with:
+        /// <c>Replant</c> for the replanting giver, <c>PlantSeed</c> for the
+        /// seed planter, <c>HaulToContainer</c> for the rest
+        /// (<c>WorkGiver_ConstructDeliverResources.ResourceDeliverJobFor</c>).
+        /// </summary>
+        internal static JobDef DeliveryDefFor(WorkGiverDef giver)
+        {
+            if (giver.defName == JobRoomTargets.SeedPlanter)
+            {
+                return JobDefOf.PlantSeed;
+            }
+            return giver.giverClass != null && typeof(WorkGiver_Replant).IsAssignableFrom(giver.giverClass)
+                ? JobDefOf.Replant
+                : JobDefOf.HaulToContainer;
+        }
+
+        /// <summary>
+        /// The official jobs <see cref="JobRoomTargets.RideAlongJobs"/> carries
+        /// on purpose, and the only ones it may: vanilla's target-less unload,
+        /// the job tracker's pause between jobs, the carry Biotech's feeding
+        /// and playing end with, and its rescue of a baby left somewhere
+        /// unsafe.
         /// </summary>
         internal static readonly HashSet<string> DeliberatelyRiddenOfficialJobs =
-            new HashSet<string> { "UnloadYourInventory", "Wait_MaintainPosture" };
+            new HashSet<string>
+            {
+                "UnloadYourInventory", "Wait_MaintainPosture", "BringBabyToSafety", "BringBabyToSafetyUnforced",
+            };
 
         /// <summary>
         /// <see cref="JobRoomTargets"/> holds three lists, mostly of another
@@ -466,6 +500,19 @@ namespace ShiftChange
                          "and the same job carrying a giver does not");
             ok &= Expect(JobRoomTargets.RidesAlong(JobMaker.MakeJob(JobDefOf.Wait_MaintainPosture, 1)),
                          "the job tracker's one-tick pause between jobs rides along, as it builds it");
+            // Both as the game builds them, with no giver: the carry a feeding
+            // or a play session ends with (ChildcareUtility), and the rescue
+            // the childcare giver's NonScanJob and the think tree hand out.
+            if (JobDefOf.BringBabyToSafety != null)
+            {
+                ok &= Expect(JobRoomTargets.RidesAlong(JobMaker.MakeJob(JobDefOf.BringBabyToSafety)),
+                             "the carry a feeding or a play session ends with rides along");
+            }
+            if (JobDefOf.BringBabyToSafetyUnforced != null)
+            {
+                ok &= Expect(JobRoomTargets.RidesAlong(JobMaker.MakeJob(JobDefOf.BringBabyToSafetyUnforced)),
+                             "and so does the rescue of a baby left somewhere unsafe");
+            }
 
             foreach (JobDef job in DefDatabase<JobDef>.AllDefsListForReading)
             {
@@ -491,6 +538,14 @@ namespace ShiftChange
                 {
                     ok &= Expect(false, "official giver " + giver.defName + " is NOT ignored");
                 }
+                if (giver.modContentPack != null && giver.modContentPack.IsOfficialMod
+                    && giver.giverClass != null
+                    && FeedingGiverClasses.Any(c => c.IsAssignableFrom(giver.giverClass))
+                    && !(DeliberatelyIgnoredOfficialGivers.Contains(giver.defName) && JobRoomTargets.Ignored(giver)))
+                {
+                    ok &= Expect(false, "official feeding giver " + giver.defName + " (" + giver.giverClass.Name
+                                        + ") is on the ignored list and named in the harness");
+                }
             }
             foreach (string name in DeliberatelyIgnoredOfficialGivers)
             {
@@ -506,22 +561,46 @@ namespace ShiftChange
             ok &= Expect(DefDatabase<JobDef>.GetNamedSilentFail("UnloadYourInventory") != null,
                          "vanilla's UnloadYourInventory resolves");
 
-            // The delivery ignore goes by class, so it is held to its named
-            // official givers the same way.
+            // The delivery givers go by class, so they are held to their named
+            // official givers the same way. A delivery is the giver's
+            // delivery job alone: the site jobs the same giver hands out are
+            // ordinary work.
             foreach (WorkGiverDef giver in JobRoomTargets.DeliveryGivers)
             {
                 if (giver.modContentPack != null && giver.modContentPack.IsOfficialMod
                     && !OfficialDeliveryGivers.Contains(giver.defName))
                 {
-                    ok &= Expect(false, "official giver " + giver.defName + " is NOT ignored as a delivery");
+                    ok &= Expect(false, "official giver " + giver.defName + " is NOT a delivery giver");
                 }
             }
             foreach (string name in OfficialDeliveryGivers)
             {
                 WorkGiverDef giver = DefDatabase<WorkGiverDef>.GetNamedSilentFail(name);
-                ok &= Expect(giver != null && JobRoomTargets.DeliveryGivers.Contains(giver)
-                             && JobRoomTargets.Ignored(giver),
-                             "vanilla's " + name + " resolves and is ignored as a delivery");
+                if (!Expect(giver != null && JobRoomTargets.DeliveryGivers.Contains(giver)
+                            && !JobRoomTargets.Ignored(giver),
+                            "vanilla's " + name + " resolves and is a delivery giver, not an ignored one"))
+                {
+                    ok = false;
+                    continue;
+                }
+                Job delivery = JobMaker.MakeJob(DeliveryDefFor(giver));
+                delivery.workGiverDef = giver;
+                Job site = JobMaker.MakeJob(JobDefOf.RemoveFloor);
+                site.workGiverDef = giver;
+                ok &= Expect(JobRoomTargets.IsDelivery(delivery) && !JobRoomTargets.IsDelivery(site),
+                             "its " + delivery.def.defName + " is a delivery, and a RemoveFloor it hands out is not");
+            }
+            WorkGiverDef seeds = DefDatabase<WorkGiverDef>.GetNamedSilentFail(JobRoomTargets.SeedPlanter);
+            if (seeds != null)
+            {
+                Job planting = JobMaker.MakeJob(JobDefOf.PlantSeed);
+                planting.workGiverDef = seeds;
+                Job cutting = JobMaker.MakeJob(JobDefOf.CutPlant);
+                cutting.workGiverDef = seeds;
+                Job unstamped = JobMaker.MakeJob(JobDefOf.PlantSeed);
+                ok &= Expect(!JobRoomTargets.Ignored(seeds) && JobRoomTargets.IsDelivery(planting)
+                             && !JobRoomTargets.IsDelivery(cutting) && !JobRoomTargets.IsDelivery(unstamped),
+                             "the seed planter's PlantSeed is a delivery, its CutPlant and an unstamped PlantSeed are not");
             }
 
             if (!RimatomicsLoaded)

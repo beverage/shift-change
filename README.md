@@ -179,12 +179,13 @@ over ordinary clothes; a sauna robe does not.
   off. The only room known at the start is wherever the book sits on a shelf,
   and dressing them for the library because that is where the novel lives would
   be the wrong room.
-- **Outdoors needs a radius.** Every outdoor cell on the map belongs to the
-  same map-spanning room, so a recreation stand in open ground serving its room
-  would dress colonists for every walk and every bit of stargazing anywhere on
-  the map. Out there it serves nothing until you give it a radius (see
-  [Serving a radius](#serving-a-radius-instead-of-a-room)). A walled but
-  roofless yard is its own room and still counts.
+- **Outdoors needs a radius or an allowed area.** Every outdoor cell on the map
+  belongs to the same map-spanning room, so a recreation stand in open ground
+  serving its room would dress colonists for every walk and every bit of
+  stargazing anywhere on the map. Out there it serves nothing until you give it
+  a radius or an area (see
+  [Serving a radius or an allowed area](#serving-a-radius-or-an-allowed-area-instead-of-a-room)).
+  A walled but roofless yard is its own room and still counts.
 - **Nobody is pulled out of bed.** Vanilla hands patients recreation they can
   take lying down precisely so they stay put.
 - **A drink from the rec room's own stock does not end the visit.** The
@@ -235,7 +236,7 @@ serves one colonist at a time, so in a ten-bunk barracks the first sleeper to
 reach it would hold it all night and the other nine would go to bed in what
 they were already wearing. A shared sleeping room takes the switch by hand.
 
-## Serving a radius instead of a room
+## Serving a radius or an allowed area instead of a room
 
 A stand serves its own room unless you tell it otherwise. The **Serves** row at
 the bottom of its settings switches it to **Within a radius**: every cell within
@@ -244,34 +245,57 @@ of the fields, a changing hut by the pool, or a stand halfway down a corridor of
 workshops. The ring is drawn while the settings are open and whenever the stand
 is selected, and the slider runs from 3 cells to 79.
 
+The same menu lists your **allowed areas** in a section of their own, each with
+its colour beside it: the ones you restrict colonists to in the Assign tab.
+Hovering one draws it on the map. Pick one and the stand serves the cells
+painted in it, as long as the stand itself stands on one of them, so an area
+that leaves the stand's own cell out is faded in the menu and marked "(stand is
+outside it)" in red. **New allowed area...** makes one for the stand and picks it,
+starting as a copy of the stand's room, or just its own cell out in the open,
+and named for what the stand serves: "Doctoring area". **Paint**, at the end of
+the row, closes the settings and starts vanilla's Expand allowed area tool on
+it, and **Manage areas...** opens vanilla's own list for renaming and deleting.
+An area painted for a stand is still an ordinary allowed area, so painting it
+also changes it for any colonist restricted to it. The Home area is not offered.
+
 Tick what the stand is for first. The row stays greyed until something is
-ticked, and Automatic only reads a room, so choosing a radius for an automatic
-stand turns whatever the room gave it into ticks.
+ticked, and Automatic only reads a room, so choosing a radius or an area for an
+automatic stand turns whatever the room gave it into ticks.
 
-**A stand in the open needs a radius.** All the open ground on a map is one
-room, so a stand standing out there and serving its room serves nothing, work
-included. Until you give it a radius, the alert *Shift stand serves nothing*
-lists it. A walled but roofless yard is its own room and works like any other.
+**A stand in the open needs a radius or an area.** All the open ground on a map
+is one room, so a stand standing out there and serving its room serves nothing,
+work included. Until you give it one, its button reads *Shift stand (serves
+nothing)* and the alert *Shift stand serves nothing* lists it. A walled but
+roofless yard is its own room and works like any other.
 
-A room limits what happens inside it; a radius does not. Inside a ring a
-colonist keeps the outfit on only for:
+**A deleted area is not replaced.** When a stand's area is deleted, or the stand
+ends up outside it, the stand serves nothing rather than going back to its room,
+and the same button label and alert say so until you choose again. A gravship
+is the exception: an area painted on its deck flies with it, and a stand on the
+deck is bound to it again on landing.
+
+A room limits what happens inside it; a radius or an area does not. Inside
+either, a colonist keeps the outfit on only for:
 
 - whatever the stand serves;
 - idling and wandering, and walking back into their allowed area or out of the
   heat or cold;
 - at a work stand, hauling, cleaning and building, provided every place the job
-  names is inside the ring. A haul out to a freezer past the ring changes them
-  back before they leave, while the stand is still close.
+  names is inside the ring or the area. A haul out to a freezer past its edge
+  changes them back before they leave, while the stand is still close.
 
 Anything else sends them back to change first: a meal, bed, recreation at a
 work stand, work the stand does not serve. A sleep stand keeps pyjamas on only
-in bed and on the way to a bed inside its ring, so a marine who parked power
-armor overnight does not spend the next day working without it.
+in bed and on the way to a bed inside its ring or area, so a marine who parked
+power armor overnight does not spend the next day working without it.
 
-**Construction deliveries change nobody.** A builder fetching steel goes in
-whatever they have on, and the hardhat goes on for the frame. Replanting a tree
-and planting seeds work the same way, since both start wherever the tree or the
-seed is lying. This holds for stands serving a room too.
+**Construction deliveries change nobody, unless an allowed area holds the whole
+trip.** A builder fetching steel goes in whatever they have on, and the hardhat
+goes on for the frame. The exception is a stand serving an allowed area painted
+over both the stockpile and the site, a materials yard beside a build, say:
+there the builder changes before fetching, since the stand is on the way.
+Replanting a tree follows the same rule, since it also starts wherever the tree
+is lying. Planting seeds changes nobody, whatever the stand serves.
 
 ## The rules it follows
 
@@ -298,13 +322,15 @@ seed is lying. This holds for stands serving a room too.
   whites to reach a chair, which is the walk this mod exists to prevent.
   A sleeping stand does not take that exception, because a colonist wakes up
   standing beside it, so changing first costs them no walking at all.
-- **Fetching a meal for a patient or a prisoner changes nothing.** The job
+- **Fetching a meal for a patient or a prisoner dresses nobody.** The job
   starts wherever the meal is stored, so it used to read as leaving the
-  hospital or the cell. A doctor in scrubs or a warden in uniform now keeps it
-  on for the trip, and nobody is dressed for one.
+  hospital or the cell. A doctor in scrubs, or a handler or a warden in uniform,
+  now keeps it on for the trip, as long as the patient or prisoner is inside their stand's
+  room, ring or area. Someone in pyjamas changes back before carrying a meal
+  out of the bedroom.
 - **A quick errand before the stand's own work keeps the uniform on.** When
-  the job queued next is work this stand serves, in its room or radius, a haul or
-  similar slotted in ahead of it is done in uniform instead of changing out
+  the job queued next is work this stand serves, in its room, radius or area, a
+  haul or similar slotted in ahead of it is done in uniform instead of changing out
   and back in. Vanilla's "haul something on the way" does this to bills, and
   so does Common Sense.
 - **Nobody is walked out of their allowed area to change.** A stand outside a
@@ -313,8 +339,8 @@ seed is lying. This holds for stands serving a room too.
   pane says so. Change back is an order, so it still works.
 - If a stand serving its room frees up while someone is already working there
   out of uniform, they'll step over and change, unless they're mid-treatment on
-  a patient. A stand serving a radius waits for their next job instead, since a
-  ring can reach a long way.
+  a patient. A stand serving a radius or an area waits for their next job
+  instead, since either can reach a long way.
 - **Change back** appears on any colonist currently in a uniform, for when you
   want them out of it now rather than at their next job. They will get there on
   their own, raid or no raid, but "on their own next job" can be a long time if
@@ -410,12 +436,12 @@ built into a wall so that it faces two enclosed rooms equally belongs to
 neither, and a stand in either one stays quiet. Setting it against a wall rather
 than through one avoids that, and so does a stand on both sides.
 
-Fetching the chemfuel that goes into the plutonium processor is left alone on
-purpose, and it is the one part of that loop that will not change anyone.
-Chemfuel is inert, and it lives wherever your colony keeps chemfuel rather than
-beside the reactor, so suiting up for that haul costs a walk to the wardrobe and
-buys nothing. Carrying the spent rods themselves still changes them, at the
-rods.
+Fetching the chemfuel that goes into the plutonium processor never suits anyone
+up, on purpose. Chemfuel is inert, and it lives wherever your colony keeps
+chemfuel rather than beside the reactor, so suiting up for that haul costs a
+walk to the wardrobe and buys nothing. A colonist already suited at a stand that
+serves that work keeps the suit on for it. Carrying the spent rods themselves
+still changes them, at the rods.
 
 Research counts too, in the rooms where it can hurt you. The steps run at a
 research reactor or a plutonium processor are the ones that can spring a

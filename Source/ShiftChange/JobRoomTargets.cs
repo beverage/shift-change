@@ -63,27 +63,25 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// WorkGiverDefs this mod ignores completely, in BOTH directions: no
-        /// dressing for them, and no changing back out either. The uniform
-        /// rides along and the next ordinary job settles it, which is the same
-        /// answer the player-forced and emergency gate already gives. Keyed on
-        /// the GIVER because one job def can carry two givers that want
-        /// opposite answers. Why each row: docs/DESIGN.md, "Mod
-        /// compatibility".
+        /// WorkGiverDefs whose jobs dress nobody. A colonist in uniform keeps
+        /// it on for one when their stand serves the giver's work, and for a
+        /// meal run (<see cref="IsMealRun"/>) only when the patient or prisoner
+        /// is inside the stand's catchment too; anyone else takes the return
+        /// trip (<c>Patch_JobInterception.TryInsertSwap</c>). Keyed on the
+        /// GIVER because one job def can carry two givers that want opposite
+        /// answers. Why each row: docs/DESIGN.md, "Mod compatibility".
         ///
         /// <para>The rows: Rimatomics' chemfuel run into the plutonium
         /// processor (its spent-rod run shares the job def, is not listed, and
-        /// still dresses at the rod), and vanilla's six feeding givers, the
+        /// still dresses at the rod), and vanilla's seven feeding givers, the
         /// only official rows. Vanilla feeds animals and hands out hemogen
-        /// under Doctor, which is why those sit beside the patient's;
+        /// under Doctor, which is why those sit beside the patient's, and
+        /// feeds animals under Handling too, from the same giver class;
         /// FeedHemogen and DeliverHemogenToPrisoner are Biotech's and simply
         /// never match without it.</para>
         ///
-        /// <para>PlantSeed carries the seed in targetA, wherever it lies, and
-        /// the planting cell in targetB, so read by targetA it dressed a
-        /// gardener for the walk to the seed. Construction deliveries are
-        /// the same shape and are ignored by class instead
-        /// (<see cref="DeliveryGivers"/>).</para>
+        /// <para>Deliveries are not here: they are judged by job, not by giver
+        /// (<see cref="IsDelivery"/>).</para>
         /// </summary>
         internal static readonly HashSet<string> IgnoredGivers =
             new HashSet<string>
@@ -91,33 +89,81 @@ namespace ShiftChange
                 "LoadProcChemFuel",
                 "DoctorFeedHumanlikes",
                 "DoctorFeedAnimals",
+                "HandlingFeedPatientAnimals",
                 "FeedHemogen",
                 "FeedPrisoner",
                 "DeliverFoodToPrisoner",
                 "DeliverHemogenToPrisoner",
-                "PlantSeed",
             };
 
-        /// <summary>Whether this giver's jobs are invisible to the mod.</summary>
+        /// <summary>Whether this giver's jobs dress nobody.</summary>
         internal static bool Ignored(WorkGiverDef giver)
         {
-            return giver != null
-                   && (IgnoredGivers.Contains(giver.defName) || DeliveryGivers.Contains(giver));
+            return giver != null && IgnoredGivers.Contains(giver.defName);
+        }
+
+        /// <summary>
+        /// A meal carried to a patient or a prisoner: <c>FeedPatient</c> or
+        /// <c>DeliverFood</c> from one of the feeding givers in
+        /// <see cref="IgnoredGivers"/>. Each has the meal in targetA and the
+        /// patient or prisoner in targetB; <c>DeliverFood</c> has the spot it
+        /// leaves the meal at in targetC, and <c>FeedPatient</c> a colonist
+        /// carrying the meal, when one is.
+        /// </summary>
+        internal static bool IsMealRun(Job job)
+        {
+            return job?.def != null && Ignored(job.workGiverDef)
+                   && (job.def == JobDefOf.FeedPatient || job.def == JobDefOf.DeliverFood);
+        }
+
+        /// <summary>
+        /// The seed planter's giver. Its <c>PlantSeed</c> job is a delivery
+        /// (<see cref="IsDelivery"/>), and the <c>CutPlant</c> it hands out for
+        /// a plant in the way is ordinary work at the planting cell.
+        /// </summary>
+        internal const string SeedPlanter = "PlantSeed";
+
+        /// <summary>
+        /// A job that starts at a stack and carries it to a site: a
+        /// construction delivery (<c>HaulToContainer</c> from a
+        /// <see cref="DeliveryGivers"/> giver), a replanting (<c>Replant</c>,
+        /// from the same class), or a seed carried to its planting cell
+        /// (<c>PlantSeed</c> from <see cref="SeedPlanter"/>). Read at targetA,
+        /// the stack, such a job dressed a bare builder for the walk to the
+        /// stockpile and sent a dressed one back to change before it.
+        ///
+        /// <para>Keyed on the job def as well as the giver, because the same
+        /// givers hand out the site's own jobs: clearing what blocks a
+        /// blueprint (cutting, hauling aside, deconstructing, mining),
+        /// removing an old floor, placing a frame that costs nothing. Those
+        /// happen at the site and are ordinary work. How each direction treats
+        /// a delivery: <c>Patch_JobInterception.TryInsertSwap</c> and
+        /// docs/DESIGN.md, "Mod compatibility".</para>
+        /// </summary>
+        internal static bool IsDelivery(Job job)
+        {
+            WorkGiverDef giver = job?.workGiverDef;
+            if (giver == null || job.def == null)
+            {
+                return false;
+            }
+            if (DeliveryGivers.Contains(giver))
+            {
+                return job.def == JobDefOf.HaulToContainer || job.def == JobDefOf.Replant;
+            }
+            return giver.defName == SeedPlanter && job.def == JobDefOf.PlantSeed;
         }
 
         internal static HashSet<WorkGiverDef> deliveryGivers;
 
         /// <summary>
         /// Every giver whose class derives from
-        /// <c>WorkGiver_ConstructDeliverResources</c>, ignored like
-        /// <see cref="IgnoredGivers"/>: a construction delivery starts at the
-        /// resource stack, so it dressed a bare builder for the walk to the
-        /// stockpile and sent a dressed one back to change before it. The site
-        /// jobs settle the uniform instead. By class, so a mod's delivery giver
-        /// built on vanilla's classes needs no row, and vanilla's replanting
-        /// giver, which derives from the same class, comes with them. Resolved
-        /// once: the def set is fixed for the process. docs/DESIGN.md, "Mod
-        /// compatibility".
+        /// <c>WorkGiver_ConstructDeliverResources</c>, whose deliveries
+        /// <see cref="IsDelivery"/> recognises. By class, so a mod's delivery
+        /// giver built on vanilla's classes needs no row, and vanilla's
+        /// replanting giver, which derives from the same class, comes with
+        /// them. Resolved once: the def set is fixed for the process.
+        /// docs/DESIGN.md, "Mod compatibility".
         /// </summary>
         internal static HashSet<WorkGiverDef> DeliveryGivers
         {
@@ -144,8 +190,8 @@ namespace ShiftChange
         /// <summary>
         /// JobDefs whose jobs ride along when they carry NO giver: the
         /// follow-ups a haul leaves behind it, which finish the haul rather than
-        /// start anything new. Same answer as <see cref="IgnoredGivers"/>, keyed
-        /// on the job because these have no giver to key on.
+        /// start anything new. They ride along in both directions, as a direct
+        /// order does, keyed on the job because these have no giver to key on.
         ///
         /// <para>The test is "no giver", not the def alone, because the giver
         /// is what separates a fresh <c>HaulToInventory</c> from a
@@ -157,6 +203,16 @@ namespace ShiftChange
         /// (<c>Pawn_JobTracker.EndCurrentJob</c>), so it falls between every
         /// swap and the job deferred behind it. It finishes a job rather than
         /// starting one: docs/DESIGN.md, "Mod compatibility".</para>
+        ///
+        /// <para><c>BringBabyToSafety</c> is how Biotech's feeding and playing
+        /// end: the carer is handed the baby to take to safety as the job
+        /// finishes (<c>ChildcareUtility</c>). Judged on its own it sent a
+        /// carer at a radius or area childcare stand to change, putting the
+        /// baby on the floor first. <c>BringBabyToSafetyUnforced</c> is the
+        /// rescue of a baby left somewhere unsafe, from the childcare giver's
+        /// <c>NonScanJob</c> and from the think tree's urgent giver, both with
+        /// no giver stamped. It is not dressed for and changes nobody back, as
+        /// an emergency is not.</para>
         /// </summary>
         internal static readonly HashSet<string> RideAlongJobs =
             new HashSet<string>
@@ -165,6 +221,8 @@ namespace ShiftChange
                 "HaulToInventory",
                 "UnloadYourInventory",
                 "Wait_MaintainPosture",
+                "BringBabyToSafety",
+                "BringBabyToSafetyUnforced",
             };
 
         /// <summary>Whether this job is a giver-less follow-up the uniform rides along on.</summary>

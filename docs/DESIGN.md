@@ -815,20 +815,44 @@ so a stand boxed for a move keeps its binding through an autosave.
   every 24 frames, and creates every alert subclass itself. Alerts are not
   saved, so the class writes nothing into a save.
 - **A later area under the same name is not adopted**, since default names
-  repeat ("Area 1").
+  repeat ("Area 1"). The one exception is a gravship landing.
+- **A gravship landing rebinds the area it carried** (`RebindAfterLanding`). The
+  ship carries an area's painted deck cells and the landing copies them into an
+  area found by label, or a new one under it (`MoveableArea_Allowed.TryCreateArea`),
+  so the stand's own area object stays behind on the old map. `PostSwapMap` runs
+  after that copy, and looks the area up again the same way: Home by type, an
+  allowed area by `GetLabeled`. It runs ahead of `PostSwapMap`'s early return for
+  an idle stand, which is most stands. **Only an area holding the stand's own
+  cell is taken.** One that flew with the stand on its deck always does; one
+  that does not is a destination area that merely shares the name, which the
+  namesake rule above refuses. The stand then serves nothing with the alert up,
+  as when its area was painted off the deck and not carried at all. A stand
+  crated aboard gets no `PostSwapMap` and stays unbound: one click rebinds it,
+  and rebinding by label on spawn would also rebind after a caravan.
 - **Only an area a colonist could be restricted to can be bound:** an allowed
   area, or Home. The roof, snow and pollution areas never are.
 - **Before saving, a binding to an area that has gone is dropped**, and its name
   kept: the saver warns of a reference to anything not saved in full, and the
-  loader of one it cannot resolve. A stand with no binding writes no reference
-  node, so a colony that never serves an area saves as it did before.
+  loader of one it cannot resolve. Gone means deleted, or on a map no longer in
+  the game (`AreaSavedInFull`), not on another map than the stand: a stand boxed
+  in a caravan is on none, and dropped for that, as the rule first was, it came
+  home serving nothing, with only a gravship landing to rebind it (code review,
+  2026-10-14). A stand with no binding writes no reference node, so a colony
+  that never serves an area saves as it did before.
 
 **Leaving room mode needs something ticked.** Automatic is a room's reading, and a
 disc or an area has no role to read, so automatic is room mode only:
 `WorkTypes`, `HandlesRecreation` and `HandlesRest` answer from the room only
 while the stand serves its room. Choosing a radius or an area for an automatic
 stand turns its automatic set into ticks first, so nothing visibly changes, and
-a stand with nothing to tick stays in room mode. Unticking the last trigger, or
+a stand with nothing to tick stays in room mode. Choosing This room again turns
+ticks that are exactly the room's own reading back into Automatic
+(`TicksAreRoomsOwn`, read live like `TriggerIsRoomsOwn`, nothing saved), so the
+stand follows its room again; ticks changed while it was away, or a room whose
+role changed meanwhile, keep the ticks. Kept as ticks, as the round trip first
+left them, a stand tried on a radius and put back stopped following its room
+with nothing on its Serves row to say so (code review, 2026-10-14). Unticking
+the last trigger, or
 choosing Automatic or Not used, returns the stand to room mode; the radius, and
 the area binding while the area lives, are kept for when it comes back. So no
 stand serves a radius or an area with nothing ticked, and a load normalises one
@@ -866,7 +890,8 @@ stand out there serve the whole map (decided 2026-10-10). `Covers` answers
 false for every cell, the search skips the room, and the catch-up returns
 early. A radius or an area is bounded by construction, so a stand in the open
 serves once it has one, and until then the alert lists it, its inspect pane
-says why, and its Serves row reads "nothing out in the open".
+says why, its switch reads "serves nothing", and its Serves row reads "nothing
+out in the open".
 
 **Staying dressed goes by what the stand is for.** A room limits what can happen
 in it, so a room stand keeps the rule it shipped with: anything in the room
@@ -898,7 +923,38 @@ work types of its own, and Allow Utilities adds an urgent haul. It is judged at
 both ends: every place the job names, its three targets and both queues, has to
 be inside the catchment (`EveryPlaceCovered`). So a haul to a freezer outside
 changes the colonist back before the haul, while the stand is still near, rather
-than after it, from the freezer.
+than after it, from the freezer. A place that is a thing on another map, as a
+delivery across levels would name, is outside, whatever its coordinates read
+(`PlaceCovered`).
+
+**An area stand dresses for a delivery its area holds whole**
+(decided 2026-10-13, reversing the delivery ignore for this one case).
+Everywhere else a delivery dresses nobody ("Mod compatibility"), because it
+starts at the stack, and the stack is usually somewhere the stand is not. An
+area painted over a materials yard and its build site together is the case that
+rule got wrong: the stand, the stack and every site are inside it, so the
+wardrobe is on the way, and a builder who fetched in their own clothes walked
+back to change for the first frame. `DeliveryArm` dresses a bare colonist for
+such a delivery at an area stand whose area holds every place the job names, by
+the pass-through test above: the stack in targetA and its queue, the first drop
+in targetB, the site in targetC, and the other sites in targetB's queue. The
+stand serves the giver's own work type. A builder's fetch that vanilla files
+under Hauling is kept on for at a construction stand ("Mod compatibility") but
+dressed for at none. Vanilla files it there for a colonist who ranks hauling
+above construction, or who lacks the skill for the blueprint
+(`GenConstruct.CanConstruct` checks skills only for the Construction work
+type), and either way the frame is seldom their next job. Keeping a uniform on
+costs nothing and changing costs a trip to the stand, so the two directions
+differ on purpose. Dressed for that fetch, as one round had it, a builder too
+unskilled for the blueprint put on the hardhat for a frame they could not build,
+and changed back at their next job outside the area (second focused check,
+2026-10-14). It takes a delivery in place of the exemption, below
+the lord, mid-swap and cooldown gates, and the stand search's own gates apply
+through `Consider`. It only dresses: a colonist already in uniform is decided by
+what their stand serves ("Mod compatibility"). Room and radius stands dress for
+no delivery. A room seldom holds
+a yard and a site both, and a ring is drawn round the stand rather than painted
+over a yard, so neither says what the area says.
 
 **The incidental jobs are a list** (`JobRoomTargets.IncidentalJobs`), and count
 only without a giver: idling and wandering (`Wait`, `Wait_Wander`,
@@ -919,29 +975,99 @@ compatibility"), and an errand queued ahead of the stand's own work inside the
 catchment ("Errands queued ahead of work").
 
 **The job a colonist was just dressed for never changes them back.** `Insert`
-records the job it defers behind a dressing swap (`DressedFor`), and the return
-trip lets that one job through, though its target may have left the catchment
-while they changed: an animal walks out of an unwalled catchment, and a cow out
-of the barn, so room stands get it too. The record is taken at the colonist's
-next decided job boundary, below the gates, used or not. That keeps the job
+records the job it defers behind a dressing swap (`DressedFor`), and so does the
+mid-job catch-up for the job it suspends, which goes back on the queue as the
+same object. The return trip lets that job through, though its target may have
+left the catchment while they changed: an animal walks out of an unwalled
+catchment, and a cow out of the barn, so room stands get it too. The record is
+asked at the colonist's decided job boundaries, below the gates, so the job
 tracker's pause between the swap and the deferred job, which rides along above
-the gates, from spending it. The job's def and first target are kept beside it,
-because jobs are pooled and a recycled Job object must not pass for the deferred
-one. A change back records nothing: cut short, its deferred job is judged again.
+the gates, never reaches it. It is asked before a delivery or a meal run is
+decided, too, so one kept on there drops a record that is not its own.
 
-**The settings window's Serves row** sits below the triggers and lists This room
-and Within a radius, with a slider under it in radius mode. It is greyed until
-the stand serves something, and it is last in the window, so nothing above it
-moves when it changes, which this window has a history of. In the open it says
-that a room stand serves nothing out there, with the reason on hover. Automatic
-is greyed outside room mode, with the reason on hover. The ring is drawn on
-selection and while the window is open, as a bill's ingredient radius is, and
-the inspect pane gains a line only outside room mode or for a room stand in the
-open, by the full-change line's rule. Strings that say where a
-stand serves come in a variant per catchment, picked by
+The record lasts while its job is starting or waits at the head of the queue,
+and drops at the first decided boundary that is neither. Vanilla's `StartJob`
+can take the job, put it back at the head of the queue untagged and start a haul
+first (`Pawn_JobTracker.TryOpportunisticJob`, for any def allowing the prefix:
+milking, training, sowing, fishing, deliveries, lying down). The haul is then
+an errand ahead of the job they were dressed for, which keeps the uniform on
+("Errands queued ahead of work"), and the job, starting again after it, is let
+through again. Spent at the first boundary, as it first was, the record went on
+the job vanilla then displaced, and the haul changed them back (adversarial
+review, 2026-10-14). The job's load id is kept beside it, because jobs are
+pooled and a recycled Job object must not pass for the deferred one;
+`JobMaker.MakeJob` gives every job it hands out a new id. The def and first
+target, kept at first, did not separate them: the next delivery from the same
+steel can be the same object with the same def and stack, and it passed for the
+job they were dressed for, to a site outside (focused check, 2026-10-14). A
+change back records nothing: cut short, its deferred job is judged again.
+
+**The settings window's Serves row** sits below the triggers. Its menu
+(`ServesMenuOptions`) lists This room, Within a radius, every allowed area on the
+map but Home, New allowed area and Manage areas, and the row carries a slider
+under it in radius mode and a Paint button at its end in area mode. It is
+greyed until the stand serves something, and it is last in the window, so
+nothing above it moves when it changes, which this window has a history of. In
+the open it says that a room stand serves nothing out there; an area stand's
+row names its area, or says the area is gone or the stand is outside it. Each
+gives the reason on hover. A row too wide for its button is cut to fit, with the
+whole of it first in the tooltip: an area's name is the player's, up to vanilla's
+28 characters, and beside Paint an overlong label was drawn centred and clipped
+at both ends (found in the lab, 2026-10-10). Automatic is greyed outside room
+mode, with the reason on hover.
+
+- **Vanilla's area menu is not reused.** `AreaUtility.MakeAllowedAreaListFloatMenu`
+  lists Home, since it takes every area a colonist could be restricted to, adds
+  the float menu itself with plain rows, so no swatches, fading or sections, and
+  its Manage areas leaves this window open behind vanilla's. So the list is
+  built by hand, with the same `Area.MarkForDraw` on hover.
+- **The menu is in three sections** (decided 2026-10-12): this room and a
+  radius; the areas, each with a swatch of its colour (`Area.ColorTexture`, in
+  the slot vanilla gives an item icon); then New allowed area and Manage areas.
+  Vanilla's float menu stacks its rows one pixel apart and has no sections, so
+  `ServesMenuOption` opens one with a transparent gap: the first row of each
+  section is made taller through its cached height, the one figure the menu
+  sizes its window and lays out its rows by, and draws itself below the gap. The
+  menu's constructor recomputes that height, so the gap goes in after it, and in
+  the menu's own sort order, since a disabled row sorts last. If Ludeon renames
+  the field, the menu draws as one list.
+- **An area that leaves out the stand's own cell is faded and marked in red**,
+  with the Serves row's own words, "(stand is outside it)": rich-text colour
+  tags, the name in vanilla's subtle grey and the swatch at a third of its
+  strength. The menu's first wording, "(does not include this stand)", would
+  wrap at vanilla's 300-pixel row once a swatch took its width. The "is" came
+  back on 2026-10-13: without it, "(stand outside it)" also reads as an
+  instruction to go and stand outside the area. It can still be picked, and the stand then
+  serves nothing until the area is painted over it, with the alert listing it
+  meanwhile.
+- **Home stays out of the menu** for now. The binding accepts it, since
+  `IsLiveHere` takes any area a colonist could be restricted to, so a test
+  build can bind one.
+- **New allowed area** makes one with `AreaManager.TryMakeNewAllowed` and binds
+  it (`MakeServeArea`), leaving the window open. It starts as a copy of the
+  stand's room, or the stand's own cell in the open: an empty area would leave
+  the stand outside it, serving nothing. It is named for the first thing the
+  stand serves ("Doctoring area"), numbered while that name is taken; the
+  stand's own label would make every one "Outfit stand area". At vanilla's cap
+  of ten allowed areas the option is greyed with vanilla's reason, and sorts
+  last, as every disabled float-menu option does.
+- **Paint and Manage areas close the settings window first.** It absorbs clicks
+  around itself, so left open it would swallow every stroke of the brush. Paint
+  then does what Manage areas' own Expand button does
+  (`Dialog_ManageAreas.SelectDesignator`): it sets the public static
+  `Designator_AreaAllowed.selectedArea` and selects the Expand allowed area tool
+  from the Zone category. Binding and painting stay separate steps.
+
+The ring or the area is drawn on selection and while the window is open, as a
+bill's ingredient radius is. The area is left undrawn while a float menu is
+open, as vanilla's paint tool does with its own, so an area hovered in the menu
+is the only one drawn. The inspect pane gains a line only outside room mode or
+for a stand that serves nothing, by the full-change line's rule, and the switch
+reads "Shift stand (serves nothing)" while the stand serves nothing. Strings
+that say where a stand serves come in a variant per catchment, picked by
 `CompShiftStand.ByCatchment`. `devtools/check-invariants.py` reads that call as
 using every variant, so a missing one fails the check instead of rendering as a
-raw key in radius mode only.
+raw key in one mode only.
 
 **The mid-job catch-up stays in room mode.** A freed radius or area stand would
 pull a bare colonist off a frame anywhere in its catchment: most site jobs are
@@ -1095,11 +1221,14 @@ job def and nothing else — never on which room has a free stand — because th
 resolver is shared by the dressing and change-back arms, and an
 availability-dependent answer would let them disagree.
 
-**Givers we ignore outright** (`JobRoomTargets.IgnoredGivers`). The same table
-file carries a second list, keyed on the WorkGiverDef rather than the job def,
-whose jobs this mod does not act on in either direction — no dressing, and no
-changing back either. It sits in the same gate as player-forced and emergency
-work, so the uniform rides along and the next ordinary job settles it.
+**Givers whose jobs dress nobody** (`JobRoomTargets.IgnoredGivers`). The same
+table file carries a second list, keyed on the WorkGiverDef rather than the job
+def. Its jobs never dress anyone. A colonist in uniform keeps it on for one when
+their stand serves the giver's work, and for a meal run only when the patient
+or prisoner is inside the catchment as well (`KeepsTheUniformFor`); anyone else
+takes the return trip. The list first sat in the gate with player-forced and
+emergency work, so the uniform rode along whatever wore it, and the next
+ordinary job settled it (fix review, 2026-10-14, below).
 
 Keyed on the giver because the job def cannot always separate two givers.
 Rimatomics runs two into one `LoadSpentFuel` job: `WorkGiver_LoadPlutoniumProc`
@@ -1108,13 +1237,13 @@ the CHEMFUEL that goes in with them.
 Their WorkGiverDefs differ, and `JobGiver_Work` stamps `workGiverDef` on every
 scanner job, so the giver is the only thing that tells them apart.
 
-That puts one job def in the path of both tables, and the ORDER settles it
-rather than a rule about precedence. The giver gate sits with player-forced and
-emergency work, above the room resolver, so a chemfuel run returns there and
-`LoadSpentFuel`'s targetB entry is never consulted for it. A spent-rod run
-carries a giver that is not on the list, passes the gate, and reads targetB as
-normal. Same job def, opposite outcomes, and neither table has to know about
-the other.
+That puts one job def in the path of both tables, and the giver settles it
+rather than a rule about precedence. A chemfuel run carries a listed giver, so
+it dresses nobody and keeps a suit on for a stand that serves its work; anyone
+else takes the return trip, where `LoadSpentFuel`'s targetB entry is read as
+for any other job. A spent-rod run carries a giver that is not on the list and
+is ordinary work, read at targetB. Same job def, different outcomes, and
+neither table has to know about the other.
 
 Chemfuel is inert and lives wherever a colony stores chemfuel, not beside a
 reactor: 146 tiles away on the map this was reported from. Treating it as
@@ -1122,11 +1251,13 @@ nuclear work meant either a wardrobe detour before a very long haul, or, for an
 already-suited pawn, undressing for the trip and
 dressing again after — two wardrobe walks for a job needing no suit. Changing
 is the expensive part, not the wearing, and that is the general principle this
-list encodes.
+list encodes. The chemfuel run is judged by its work alone, with no site test: a
+stand serving its work keeps the suit on whichever processor the chemfuel goes
+to, inside the catchment or not.
 
-The list also carries vanilla's six feeding givers, the only official rows on
-it: feeding patients and animals, feeding prisoners and delivering their food,
-and the two hemogen equivalents. Every one builds its job with the FOOD in
+The list also carries vanilla's seven feeding givers, the only official rows on
+it: feeding patients, feeding animals as a doctor and as a handler, feeding
+prisoners and delivering their food, and the two hemogen equivalents. Every one builds its job with the FOOD in
 targetA and the patient or prisoner in targetB (`WorkGiver_FeedPatient`,
 `WorkGiver_Warden_Feed`, `WorkGiver_Warden_DeliverFood`,
 `Workgiver_AdministerHemogen`, `WorkGiver_Warden_DeliverHemogen`), so the job
@@ -1136,34 +1267,103 @@ same with a stand in the cell, where delivering food can never read as the
 cell at all, because its giver refuses food already stored there. Reading
 targetB instead would put the job where the meal ends up and dress a bare
 doctor before a trip whose first leg is the freezer. A meal run needs no
-uniform, so it rides along. The harness names these six as the deliberate
-official rows and fails on any other.
+uniform, so it dresses nobody, and is judged by where it goes, as a delivery is
+below (`JobRoomTargets.IsMealRun`, `HasSites`). A colonist whose stand serves
+its work (Doctor, Handling or Warden) keeps the uniform on for it while the patient or
+prisoner is inside the stand's catchment, and for a prisoner's meal the spot it
+is left at too (`DeliverFood`'s targetC; `FeedPatient`'s targetC names a
+colonist carrying the meal and is not read). Anyone else takes the return trip,
+judged by the whole trip, meal and patient, so a warden who wakes in pyjamas
+from a bedroom stand changes back before carrying a meal to the prison, from
+the freezer or from the bedroom. Kept on for everyone, as the list first did,
+that warden fed the prisoner in sleepwear, or without armour parked overnight,
+and walked back to the bedroom from the next warden job (fix review,
+2026-10-14). Kept on for a patient anywhere, as the rule then was, a doctor
+carried a meal in scrubs to a patient resting in their own bedroom, or an animal
+downed in a field, and walked back to the hospital to change at the next job
+(focused check, 2026-10-14). The harness names these seven as the deliberate
+official rows and fails on any other, and on any official giver of the five
+feeding classes left off the list. A list of names alone missed the handler's:
+it takes its class from the doctor's animal-feeding giver as a child def, and a
+barn stand went on dressing a handler for a meal stored in the barn (second
+focused check, 2026-10-14).
 
-Since v1.5.0 the list carries the seed planter too (`PlantSeed`). Its job has
-the seed in targetA, wherever it lies, and the planting cell in targetB, so read
-by targetA it dressed a gardener for the walk to the seed.
-
-**Construction deliveries are ignored by giver class** (`JobRoomTargets.DeliveryGivers`),
-every giver deriving from `WorkGiver_ConstructDeliverResources` (decided
-2026-10-04). A delivery starts at the resource stack, so it dressed a bare
-builder for the walk to the stockpile, and sent a dressed one back to change
-before it. The site jobs, which carry the site in targetA, settle the uniform
-instead. Players often interrupt a pawn mid-gather, and a wardrobe trip spent
-before the gather is wasted whenever they do. The class takes in Core's four
+**Deliveries are recognised by giver and by job** (`JobRoomTargets.IsDelivery`;
+decided 2026-10-04, narrowed to the job on 2026-10-14). A delivery starts at a
+stack and carries it to a site, so read at the stack it dressed a bare builder
+for the walk to the stockpile, and sent a dressed one back to change before it.
+Players often interrupt a pawn mid-gather, and a wardrobe trip spent before the
+gather is wasted whenever they do. The giver is one deriving from
+`WorkGiver_ConstructDeliverResources` (`JobRoomTargets.DeliveryGivers`), or the
+seed planter (`PlantSeed`, whose job has the seed in targetA, wherever it lies,
+and the planting cell in targetB). The job is the delivery itself:
+`HaulToContainer`, `Replant` from the replanting giver, `PlantSeed` from the
+seed planter. The same givers also hand out the site's own jobs: clearing what
+blocks a blueprint (`GenConstruct.HandleBlockingThingJob`: cutting, hauling
+aside, deconstructing, mining), removing an old floor, placing a frame that costs
+nothing, and the seed planter's `CutPlant` on the planting cell. Those carry the
+site in targetA and are ordinary work. Keyed on the giver alone, as the rule
+first was, they were ignored too, and a builder stopped dressing to clear a site
+in the stand's own room (adversarial review, 2026-10-14). The class takes in Core's four
 delivery givers and its replanting giver, which derives from the same class for
 the same shape of job. It also takes Complex Jobs' two, which use vanilla's
 classes, and VEF's construction-skill givers, which subclass them, and through
 those Vanilla Plants Expanded's soil tilling. MultiFloors' cross-level delivery
 giver is said to derive from it as well; it is not installed here, so that is
-unchecked. A delivery's site is targetC, not targetB, since targetB is the
-blueprint nearest the stack and can be another one. Nothing here reads either,
-and this is said so that nobody later "fixes" deliveries by reading targetB. The
-harness names the five delivery-class givers as official rows too, and fails on
-any other.
+unchecked. A construction delivery's site is targetC, the blueprint its giver
+chose, and targetB is the needer nearest the stack, which can be another one;
+the trip supplies both, and the rest queued behind targetB. A replanting and a
+seed planting carry their site in targetB, and a seed planting writes the seed
+stack it splits into targetC mid-job (`JobDriver_PlantSeed`), so a planting
+resumed after an interruption carries the stack's end of the trip there
+(`SiteInTargetC`). The harness names the five delivery-class givers as official
+rows too, and fails on any other.
 
-Both are mode-blind, like every row here: a room stand ticked for Construction,
-Hauling or Growing stops dressing for deliveries, replanting and seed planting as
-well.
+How each direction treats a delivery, in every mode:
+
+- **A bare colonist is dressed for one only at an area stand whose area holds
+  the whole trip and that ticks the giver's own work type** (`DeliveryArm`,
+  "Catchments"). A room stand and a radius stand never dress for a delivery,
+  whatever they tick.
+- **A colonist in uniform keeps it on when their stand serves the work and
+  holds every site the trip supplies** (`KeepsTheUniformFor`), wherever the
+  stack lies: the builder fetching steel in a hardhat, which is what the rule
+  is for. The work is the giver's own work type, or construction for a
+  `HaulToContainer` filed under a work type tagged Hauling (`ServesSiteWork`):
+  vanilla files the builder's fetch under Hauling (`DeliverResourcesToFrames`
+  and `...ToBlueprints`) when hauling outranks construction or the blueprint
+  needs more skill than the builder has, and Complex Jobs moves those two
+  hauler givers to `FSFDeliver`, tagged Hauling too; its builder givers stay on
+  Construction. A fetch filed under another work type is that work's: VEF's
+  art-skill delivery givers file theirs under Art, and kept on for one, a
+  builder would walk to the site in a hardhat and change back at the Art
+  frame. Replanting a tree and planting a seed are Growing. The sites are targetB, targetB's queue and, where it is a site,
+  targetC (`SitesCovered`), every one inside the stand's room, ring or area.
+  Kept on for a site outside, as the rule first was, the builder delivered and
+  then walked back to the stand to change at the first frame there (fix
+  review, 2026-10-14).
+- **A stand serving the work changes them back for a delivery it did not keep
+  on**, since a site is outside, and does it now, while the stand is near.
+  Judged at targetC alone, as the return trip then was, a delivery whose first
+  drop or a further site lay outside kept the uniform on, while a haul vanilla
+  slipped in ahead of it changed them out, so the one rule gave two answers
+  (focused check, 2026-10-14).
+- **Anyone else takes the return trip, judged by the whole trip**, stack
+  included (`SiteJobStaysDressed`, `EveryPlaceCovered`): in room mode the
+  uniform stays on when the stack and every site are in the stand's room, and
+  at a radius or area work stand when they are inside, as pass-through
+  construction; a sleep or recreation stand at a radius or an area changes
+  them back. So a colonist in pyjamas from a bedroom stand changes back before
+  a fetch from a stockpile outside, wherever the site is, and so does a cook in
+  kitchen whites. Kept on for every delivery, as the rule first was, a
+  colonist who woke into a run of deliveries did them in sleepwear, or without
+  armour parked overnight, and walked back to the bedroom from the first frame
+  (adversarial review, 2026-10-14). Judged at the site alone, as it then was,
+  pyjamas stayed on for the walk to the stockpile whenever the site was in the
+  bedroom (focused check, 2026-10-14).
+
+An errand vanilla slips in ahead of a queued delivery the uniform stays on for
+keeps the uniform on too ("Errands queued ahead of work").
 
 **Jobs that ride along without a giver** (`JobRoomTargets.RideAlongJobs`). The
 giver-keyed list's twin for jobs that have no giver to key on: the follow-ups a
@@ -1193,6 +1393,20 @@ sent a sleep stand's colonist straight back to change, every time. It finishes a
 job rather than starting one, so it rides along. `PawnUtility.ForceWait`'s
 posture-keeping wait shares the def, so a patient held still to be tended keeps
 what they wear.
+
+So does the carry Biotech's childcare ends with. As a feeding or a play session
+finishes, `JobDriver_FeedBaby`, `JobDriver_BabyPlay` and
+`JobDriver_BreastfeedCarryToMom` hand the carer a giver-less
+`BringBabyToSafety` with the baby still in their arms
+(`ChildcareUtility.MakeBringBabyToSafetyJob`). Room mode read its target, the
+baby, where the carer stood. A radius or area stand judges what a job is, and
+judged as a job it sent a nanny to change after every feeding, putting the baby
+on the floor first, since the swap drops what it carries. It finishes the
+childcare, so it rides along. The rescue of a baby left somewhere unsafe,
+`BringBabyToSafetyUnforced`, rides along too: the childcare giver hands it out
+from `NonScanJob` and the think tree's urgent giver hands it out directly, both
+with no giver stamped, so it read as no work at all, and it is not delayed or
+dressed for, as an emergency is not.
 
 ### Outfit Stands Plus' stand button
 
@@ -1697,6 +1911,19 @@ only when the player has EXPLICITLY chosen a trigger, not when the room's role
 supplied one. Hiding it on any active trigger left a bedroom stand with no
 reachable path to a work type at all — grid hidden, unticking Sleeping fell
 through to excluded, and Automatic put the room's default straight back.
+
+Catchments reopened the same trap (found 2026-10-13): a stand can leave room
+mode only with something ticked, so moving an automatic bedroom stand to a
+radius or an area ticks Sleeping for real, and an explicit trigger hid the grid
+again. Unticking it fell to excluded and room mode, and Automatic is greyed
+outside room mode. So the grid is hidden only for an explicit trigger the room
+would NOT suggest (`HidesWorkList`): Sleeping ticked in a bedroom, or
+Recreation in a rec room, keeps the grid, a note under it saying that ticking a
+work type switches the stand to work (`TriggerTickedNote`; an automatic stand's
+says its trigger comes from the room), and the one-click switch to a work type
+(`TriggerIsRoomsOwn`, read from the room's
+role each time, so nothing is saved for it). In room mode that also covers
+Sleeping ticked by hand in a bedroom, which was the same choice the room made.
 
 ## The mid-job catch-up
 

@@ -97,7 +97,7 @@ does.
 
 ## What the cases assert
 
-Ninety-one cases. This section is a map: the detail lives with each case, in
+A hundred and four cases. This section is a map: the detail lives with each case, in
 the comment on its method under `Source/ShiftChange/Harness/`, and the report
 prints the cases in the order `DebugTools_LifecycleHarness.Run` registers them.
 
@@ -203,7 +203,11 @@ button for a pawn in uniform, even with interception latched off
 
 **Riding along** (`HarnessRideAlong`). Jobs a uniform stays on for, each one a
 change-out the return trip used to make for nothing: feeding a patient or a
-prisoner (`FeedingRidesAlong`), an errand queued ahead of work the stand serves
+prisoner at a stand serving that work, where pyjamas still change back first
+(`FeedingRidesAlong`), but only for a patient inside, a haul vanilla slips in
+ahead of such a meal run keeping it on too, and in pyjamas a meal carried out of
+the room changing them back (`MealRunKeepsTheUniformForAPatientInside`), an
+errand queued ahead of work the stand serves
 (`DetourAheadOfServedWorkKeepsTheUniform`), and vanilla's own opportunistic
 haul on the way to a bill, which the engine builds
 (`VanillaOpportunisticHaulKeepsTheUniform`). Two run another mod's real code
@@ -213,10 +217,17 @@ and are known gaps without it: Common Sense's bill haul
 
 **Catchments** (`HarnessCatchments`). A stand serving a radius or an allowed
 area instead of its room. The ring is inclusive, exactly the cells it draws
-(`RadiusCoversItsRing`); a stand leaves room mode only with something ticked and
-returns to it on leaving shift use, and its Serves row greys exactly where the
-setter refuses (`CatchmentNeedsSomethingTicked`); and a freed radius stand
-catches nobody up (`FreedRadiusStandCatchesNobody`). Dressing happens within
+(`RadiusCoversItsRing`, which also holds the slider's top at the 79 the README
+gives); a stand leaves room mode only with something ticked and returns to it
+on leaving shift use, an automatic stand taken to a radius and back is automatic
+again unless its ticks changed meanwhile, and its Serves row greys exactly where
+the setter refuses (`CatchmentNeedsSomethingTicked`); and a freed radius stand catches nobody up,
+where a room stand records the job it interrupts as the one they dressed for
+(`FreedRadiusStandCatchesNobody`). The registry forgets a stand that is no
+longer spawned at the next stand search (`RegistryForgetsAStandNoLongerSpawned`).
+A room stand beside a door serves its own room only: the doorway's room lists
+both the stand inside and one outside, and work in the doorway dresses nobody
+(`RoomStandBesideADoorServesItsOwnRoom`). Dressing happens within
 the ring, past the stand's own room and never beyond the ring
 (`RadiusStandDressesWithinItsRing`), outdoors for recreation, which a room
 stand in the open may not serve (`RadiusServesOutdoorRecreation`), and at an
@@ -228,15 +239,44 @@ its uniform changes back at their next job (`RoomStandInTheOpenServesNothing`).
 An allowed area covers its painted cells only while the stand stands in one:
 past the walls, and not on an unpainted cell of the stand's own room
 (`AreaCoversItsCells`). The dressing decision agrees
-(`AreaStandDressesWithinItsArea`). A deleted area leaves its stand in area mode,
+(`AreaStandDressesWithinItsArea`). A construction delivery dresses a bare builder
+only at an area stand whose area holds the steel and every site the trip
+supplies; steel or a site outside it, and room and radius modes over the same
+cells, dress nobody, and so does the same fetch filed under Hauling at a stand
+ticking construction alone, though the colonist does construction. On shift a
+delivery to a site in the area keeps the uniform on wherever the
+steel lies, filed under Hauling or not, where one to a site outside it changes
+them back (`AreaStandDressesForADeliveryItHolds`). A bedroom stand moved to an area has
+its Sleeping ticked for real and still shows its work list, where Growing then
+replaces Sleeping with the stand still on the area; once the bed is gone a ticked
+Sleeping hides the list (`BedroomStandMovedToAnAreaKeepsItsWorkList`). A deleted area leaves its stand in area mode,
 serving nothing under the area's last name, and a new area under that name is
-not adopted (`DeletedAreaServesNobody`). The alert that vanilla made from its
+not adopted (`DeletedAreaServesNobody`). A gravship landing does adopt one, the
+area the landing carried under the stand's label, with nobody on shift so that
+`PostSwapMap`'s early return is in play, and still refuses a namesake that
+leaves out the stand's own cell (`GravshipLandingRebindsTheArea`; the same
+re-creation without a flight is the control). The alert that vanilla made from its
 subclass lists a stand whose area is gone or that stands outside it, naming the
 area, and a colonist in that stand's uniform changes back once its area is
 deleted (`ServesNothingAlertListsTheStand`). A solid target counts as inside
 an area when the area covers either its own cell or the floor beside it, for
 dressing, for staying dressed, and for a wall repair as pass-through work
 (`SolidTargetIsJudgedAtItsOwnCellFirst`).
+
+The area UI is asserted on what the window builds, since no case draws it. The
+Serves menu lists every allowed area but Home in a section of its own, each
+with its colour, fades and marks in red one that leaves the stand out, opens
+each section after the first with a gap the menu's layout really sees, and
+binds whichever area is picked (`ServesMenuOffersTheAllowedAreas`). New allowed
+area copies the stand's room, or its own cell in the open, names the area for
+the stand's work and numbers a second, and greys at vanilla's cap of ten with
+vanilla's reason, the gap then moving to Manage areas
+(`NewAllowedAreaCopiesTheRoom`). Paint and Manage areas close the settings
+window before vanilla's tool or dialog takes over, with both windows really
+opened on the stack (`PaintAndManageAreasCloseTheWindowFirst`). The row, the
+inspect pane and the switch name the area, and say when the stand serves
+nothing: outside its area, with the area gone, or as a room stand in the open
+(`AreaWordsNameTheArea`).
 
 Staying dressed goes by what the stand is for, with a case per trigger
 (`RadiusWorkStandKeepsTheUniformInItsRing`,
@@ -249,13 +289,38 @@ then asserts that the job tracker's pause after the swap did not send them
 straight back, which is how that pause was found.
 `JustDressedForNeverSendsThemBack` dresses through the real `Insert`, moves the
 patient away while the colonist changes, and lets the engine's own queue start
-the tending, once at a radius stand and once at a room stand. The per-stand
-latch holds its stand and its trigger only (`LatchHoldsItsStandAndTriggerOnly`),
-and at a sleep rack it lasts the night and lifts on waking
-(`SleepRackLatchLiftsOnWaking`). Construction deliveries change nobody in
-either direction (`DeliveriesChangeNobody`, a known gap for Complex Jobs' two
-givers without that mod), and the Serves row, the inspect pane and the switch's
-tooltip follow the mode (`CatchmentWordsFollowTheMode`).
+the tending, once at a radius stand and once at a room stand; a haul vanilla
+starts ahead of the tending, putting it back in the queue, keeps the uniform on,
+and so does the tending starting again. The per-stand latch holds its stand and
+its trigger only, and lifts at a cell with no covered cell beside it, where one
+cell past the ring still holds it (`LatchHoldsItsStandAndTriggerOnly`); at a
+sleep rack it lasts the night and lifts on waking, a haul ahead of a queued
+lay-down not counting as the waking (`SleepRackLatchLiftsOnWaking`); and at an
+area stand it holds on the unpainted cell beside the stand, for work in the
+area done from outside it, and through the job tracker's pause after that work
+(`AreaLatchHoldsBesideItsStand`). A delivery dresses nobody at a room or radius
+stand and keeps the uniform of its own work on to a site inside the ring,
+wherever the stack lies, each built with the job def its giver uses, a seed
+planting resumed with its seed stack in targetC included; to a site past the
+ring it changes them back now. The record of the delivery they were dressed for
+lets that job through and not the same Job object handed out again with a new
+id. Removing an old floor, a site job from the same giver, dresses and changes
+back like any work, and a haul ahead of a queued delivery keeps the uniform on,
+where one ahead of a delivery to a site past the ring does not
+(`DeliveriesKeepTheirOwnWorkOn`, a known gap for Complex Jobs' two givers
+without that mod). Pyjamas and kitchen whites change back before a delivery from
+steel out past the door, to a site there or in the room, where steel and site
+both in the room are the room's. A construction stand's uniform stays on for a
+site in the room, the same fetch filed under Hauling included and one filed
+under a work type that is not hauling excluded, and comes off now for a first
+drop, a site or a further site out past the door, each delivery built with its
+first drop and site apart as the giver builds it
+(`DeliveryOutsideTheStandsWorkChangesThemBack`). An urgent patient on
+shift goes straight to bed with the medical emergency setting off: in room mode
+to a bed past the door, tagged or as vanilla puts the lay-down back untagged,
+with a haul vanilla starts ahead of it, and at a radius stand
+(`UrgentPatientGoesStraightToBed`). The Serves row, the inspect pane and the
+switch's tooltip follow the mode (`CatchmentWordsFollowTheMode`).
 
 **Interop** (`HarnessInterop`). `OutfitStandsPlusButtonMatchesTheirs` covers
 code of ours that runs inside another mod: Outfit Stands Plus' stand button,
@@ -275,7 +340,8 @@ is worn through (`WornOutParkedKitStillGoesShopping`).
 the static tables still match the def database, where every lookup is
 silent-fail and a renamed def empties its row with no error: the room-role
 table (`RoomRoleTableResolves`), the job-target, ignored-giver and ride-along
-tables, delivery givers by class included (`JobTablesHold`), and the
+tables, delivery givers by class, deliveries by job, and every official giver of
+a feeding class on the ignored list included (`JobTablesHold`), and the
 room-contents markers (`ContentsMarkersHold`). The last two check Rimatomics'
 names only when it is loaded, and count as known gaps without it. A fourth asserts the arithmetic that sizes the work-type
 dialog's body (`WorkTypeDialogBodyRectFitsTheBody`). Two need a map and resolve
@@ -310,7 +376,8 @@ a suite that checks nothing.
   exercised only in play.
 - **A real gravship launch.** The flight case drives `DeSpawn(WillReplace)` →
   `Spawn` → `PostSwapMap`, which is what the engine does, but no gravship is
-  built or flown.
+  built or flown, so the area rebind is tested against an area re-created by
+  hand on the same map, not one the landing copied.
 - **The walk.** Fixtures stage the pawn on the stand's interaction cell, so
   pathing and interruption mid-walk are untested. See the traps below.
 - **Mod compatibility.** `--full` proves the suite passes with one large mod
@@ -320,7 +387,9 @@ a suite that checks nothing.
   Stands Plus is loaded: the interop case asserts against it, and the
   legacy-key case takes the branch that declines the generic keys to its comp.
   Common Sense and Pick Up And Haul each have one case that runs their code.
-- **UI.** No case draws a gizmo or opens a window. The button cases read
+- **UI.** No case draws a gizmo or a window. One case opens the settings
+  window and vanilla's Manage areas on the window stack and asserts which are
+  open (`PaintAndManageAreasCloseTheWindowFirst`). The button cases read
   gizmo labels and grouping, one allowed-area case reads an inspect string, and
   the catchment wording case reads the Serves row's label, the inspect line and
   the switch's tooltip, and the alert case its report and explanation, all

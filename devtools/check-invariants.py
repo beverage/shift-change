@@ -24,7 +24,7 @@ PREVIEW = os.path.join(ROOT, "About", "Preview.png")
 
 # The suffixes CompShiftStand.ByCatchment appends to a key, one per catchment
 # kind ("" for a room). Keep the two in step.
-CATCHMENT_SUFFIXES = ("", "Radius")
+CATCHMENT_SUFFIXES = ("", "Radius", "Area")
 
 # Steam rejects a Workshop preview over 1 MiB. The game does not check:
 # Workshop.cs:266-272 tests only that the file exists before handing it to
@@ -43,6 +43,11 @@ VANILLA_KEYS = {
     # replacing it, so vanilla's half stays translated in every language.
     "CommandAllowRemovingApparel",
     "CommandAllowRemovingApparelDesc",
+    # The Serves menu opens vanilla's own Manage areas dialog under vanilla's
+    # label for it, and greys New allowed area at vanilla's own cap with
+    # vanilla's reason, so both read as the game's in every language.
+    "ManageAreas",
+    "MaxAreasReached",
 }
 
 failures = []
