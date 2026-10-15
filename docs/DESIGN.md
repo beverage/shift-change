@@ -210,6 +210,44 @@ back is a pawn moving toward their own gear. Nothing reacts to danger *starting*
 — a raid never yanks anyone to a wardrobe. `TryDressMidJob` keeps its own copy
 of the check unchanged, being a dress path already.
 
+**What kind of job it is gets decided in one place** (`Classify`, in
+`Patch_JobInterception.JobKinds.cs`). The prefix classifies the job once, right
+after `MapToDecideOn`, and every step that asks what the job is reads that one
+answer: the exemption gate, the return trip, the errand check, the dress arms
+and the latch. A job is the first
+of these it matches, in this order: it rides along, it is a delivery, a meal
+run, another ignored giver's job, work, rest on a bed, recreation, or other.
+The order is the arms' order, and it is behaviour. Deliveries and ignored givers
+are decided before their work type is read. Work comes before recreation, so
+`VisitSickPawn`, Doctor work that carries a joyKind, is work. Rest comes before
+recreation too, though no vanilla lay-down carries a joyKind.
+
+Beside the kind, the classification keeps the answers some readers need that
+the kind does not give. The **work type** is filled in whatever the kind, so the
+return trip judges a delivery's colonist by the giver's work. The **recreation
+class** places `VisitSickPawn` B-first even though it is work ("The recreation
+branch"). Ordinary sleep, the urgent patient, eating, the incidental walks and
+lying down are flags. The job at the head of the queue is classified with its
+own tag, as vanilla left it there: by the errand check ("Errands queued ahead
+of work"), by the urgent patient's check, and by the latch's waking test.
+Nothing is kept between job boundaries, because whether a lay-down is medical
+rest depends on the pawn's health at that moment, and on a setting.
+
+Before this, each step asked the predicates for itself, about 33 times across
+the interception. Two steps disagreeing about one job was the commonest defect
+the v1.5.0 reviews found. The errand check refused a meal run that the job's
+own start kept the uniform on for. It required every site of a delivery while
+the return trip judged one. And in August the catch-up resolved `VisitSickPawn`
+as recreation while `StartJob` resolved it as work, and a pawn churned between
+the stand and the patient.
+
+Three readers still look at the job differently, and on purpose. The **catch-up**
+takes fewer kinds ("The mid-job catch-up"). **`ServesSiteWork`** reads the work
+type from the giver itself. That always matches the classification's, because
+every job it is asked about has a giver. The **return trip** asks whether the
+job is eating before it asks the kind, so a meal break keeps its own policy
+whatever else the job is ("Meal breaks").
+
 ### Meal breaks
 
 An ingest job's `targetA` is the food, and the chew spot is chosen mid-job
@@ -282,7 +320,7 @@ head is one of these:
 - **The job they were just dressed for** (`DressedFor`, "Catchments"), wherever
   its target has gone.
 - **A delivery or an ignored giver's job whose work the stand serves and keeps
-  the uniform on for** (`JobRoomTargets.IsDelivery`, `JobRoomTargets.Ignored`;
+  the uniform on for** (`JobClass.DeliveryOrIgnored`;
   `KeepsTheUniformFor`, "Mod compatibility"): a delivery or a meal run has
   every site it supplies inside the catchment. A delivery to a site outside
   does not count, nor does a meal for a patient outside, nor a delivery the
@@ -293,9 +331,9 @@ head is one of these:
   allow the prefix), to feed the patient in their own clothes and dress again
   for the next tend (focused check, 2026-10-14).
 - **Other work the stand serves, inside its catchment** (`Covers`, through the
-  same resolver both directions use). Its work
-  type is read the way the dress arms read it (`WorkTypeFor`), with the queue's
-  own tag, so fishing and medical bed rest count with no giver stamped. Vanilla
+  same resolver both directions use). The queued job is classified as the dress
+  arms classify it (`Classify`, "The gates"), with the queue's own tag, so
+  fishing and medical bed rest count with no giver stamped. Vanilla
   puts the job back with no tag, and a giver-less fishing job is recognised
   without one (`JobRoomTargets.NonScanGiver`), as is an urgent patient's bed
   lay-down (`IsMedicalLayDown`; with the medical emergency setting off, an
@@ -1127,6 +1165,13 @@ are separate tables rather than one because they fail differently: a missing
 vanilla name means a def was renamed under us and the harness asserts against
 it, while a missing modded name means nothing at all.
 
+The tables that sort jobs (deliveries, ignored givers, giver-less fishing, the
+jobs that ride along and the incidental walks) are read in one place, the job
+classifier (`Classify`, "The gates"). It turns each job into one kind that
+every step of the prefix reads, so a row added here changes the answer for the
+dress arms, the return trip, the errand check, the latch and the catch-up
+together.
+
 **Work types another mod supplies** (`RoomWorkTypes.CompatDefaults`). Complex
 Jobs does not add work so much as MOVE it: it repoints the `workType` field on
 vanilla WorkGiverDefs at finer-grained types, so surgery stops being Doctor
@@ -1312,7 +1357,7 @@ cell at all, because its giver refuses food already stored there. Reading
 targetB instead would put the job where the meal ends up and dress a bare
 doctor before a trip whose first leg is the freezer. A meal run needs no
 uniform, so it dresses nobody, and is judged by where it goes, as a delivery is
-below (`JobRoomTargets.IsMealRun`, `HasSites`). A colonist whose stand serves
+below (`JobRoomTargets.IsMealRun`, `JobClass.HasSites`). A colonist whose stand serves
 its work (Doctor, Handling or Warden) keeps the uniform on for it while the patient or
 prisoner is inside the stand's catchment, and for a prisoner's meal the spot it
 is left at too (`DeliverFood`'s targetC; `FeedPatient`'s targetC names a
@@ -1991,6 +2036,23 @@ The eligibility gate is `suspendable && casualInterruptible`. Both default true
 are caught up while a doctor mid-treatment is never pulled off a patient. Crafting
 progress lives in the unfinished thing on the bench, so nothing is lost. The gate
 was not designed; it fell out of reading what vanilla declares about its own jobs.
+`LayDown` is not casually interruptible either (`Core/Defs/JobDefs/Jobs_Misc.xml`),
+which is why there is no sleep arm here: the gate already refuses a sleeper.
+
+**It catches up fewer kinds of job than `StartJob` dresses for**, on purpose.
+The job is classified by the same classifier ("The gates"), but only two answers
+count: work from a stamped giver that is not an emergency, and recreation with
+no giver. Joy jobs carry no giver, because only `JobGiver_Work` and a
+prioritized order stamp one (`JobGiver_Work.cs:240`, `:334`, `:345`;
+`Pawn_JobTracker.cs:881`), so the two never overlap. Left out are work the
+dress arms take with no giver stamped (medical bed rest and Odyssey's unstamped
+fishing), and every emergency, whatever the medical-emergency setting says.
+Deliveries and ignored givers' jobs are not work, so a freed stand does not
+pull a colonist off one mid-haul. In vanilla and Odyssey the job gate would
+refuse the giver-less ones anyway: `LayDown` is not casually interruptible and
+`Fish` is not suspendable (`Odyssey/Defs/JobDefs/Jobs_Misc.xml`). Widening the
+catch-up to the full classification would be a change of behaviour, and would
+need a case of its own.
 
 **The announcement waits for the stand to be let go.** A stand takes one
 reservation, and the colonist who just changed back still holds it while their

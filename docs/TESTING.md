@@ -160,6 +160,20 @@ past its ring. Untagged, as vanilla puts it back in the queue behind a haul, it
 still dresses, and on shift that haul keeps the uniform on, where the same haul
 with nothing queued changes them back (`FishingDressesAtAStandTickedForIt`).
 
+**The job classifier** (`HarnessJobKinds`). One table, in a fixture because
+medical rest depends on the colonist's health and on a bed:
+`ClassifierSortsEveryJobShape` gives each job shape the other cases build, and
+the kind and work type `Classify` must return for it. Rows cover work from a
+giver, VisitSickPawn from its work giver (Work) and from its joy giver
+(Recreation), reading and eating, ordinary and ground sleep, medical lay-downs
+tagged and untagged for a patient who is and is not urgent with the
+medical-emergency setting off and on, a delivery and a site job from every
+delivery giver on the list, a meal run from every feeding giver, the jobs that
+ride along, a direct order, the emergencies, the incidental walks, and fishing
+stamped and unstamped by tag. The cases that drive jobs through the prefix test
+what each reader does with the answer, while this one tests the answer, so a
+change to the order of the classifier's tests fails here with the row named.
+
 **Gates** (`HarnessGates`). `PromisesHold` is the decision table for the
 promises: automatic work only, emergencies never delayed, drafted pawns left
 alone, work the stand does not serve ignored. The meal-break policy has a case

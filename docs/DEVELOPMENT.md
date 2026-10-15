@@ -427,7 +427,7 @@ Folders by concern. Everything outside `Dev/` and `Harness/` ships, and `check-i
 | `Patch_JobInterception.Latch.cs` | The change-back latch, and the record of the job a pawn was just dressed for. |
 | `Patch_JobInterception.CatchUp.cs` | The mid-job catch-up: a stand that comes free dresses the nearest colonist already doing what it serves. |
 | `Patch_JobInterception.Deliveries.cs` | Deliveries and meal runs, judged by where they go: the site rule that keeps a uniform on, the area stand's delivery arm, and an errand queued ahead of served work. |
-| `Patch_JobInterception.JobKinds.cs` | What kind of job this is: eating, recreation, sleep, medical rest and the urgent patient, beds, and where recreation happens. |
+| `Patch_JobInterception.JobKinds.cs` | What kind of job this is: `Classify`, the one place a job's kind is decided, and the predicates it asks (eating, recreation, sleep, medical rest and the urgent patient, beds, and where recreation happens). |
 | `Patch_JobInterception.StandSearch.cs` | Finding a stand: the trigger each one serves, and the nearest a pawn may use. |
 | `Patch_JobInterception.Places.cs` | Where a job happens and whether a catchment covers it: the shared resolver, `RoomBearing` for a solid target with no room of its own, and the coverage checks over every place a job names. |
 | `JobPlace.cs` | Where a job happens: the cell its target names and, for a solid target, the cell beside it with a room. |
@@ -506,6 +506,7 @@ Each file here is guarded whole, by `SCENES`, `DEBUG` or `SCENES || HARNESS`, an
 | `DebugTools_LifecycleHarness.cs` | `HARNESS` only. The test suite: the runner, its assertions, its self-check, and the list that registers every case in the order they run. The other cases' bodies, which drive real engine entry points, live in the files beside it — see [TESTING.md](TESTING.md). Its `[DebugAction]` wrapper is `SCENES` on top of that. |
 | `DebugTools_SaveRoundTrip.cs` | `HARNESS` only. The four save/load cases. Separate file because they replace `Current.Game` and must run last. |
 | `HarnessCatchments.cs` | `HARNESS` only. The catchment cases, one `partial` class: `.Radius` for coverage and dressing in a ring, `.ReturnTrip`, `.Deliveries`, `.Area`, `.AreaUi` for the alert and the Serves menu, and `.Latch`. The main file holds the cases true in every mode and the helpers several files share. |
+| `HarnessJobKinds.cs` | `HARNESS` only. The job classifier as a table: every job shape the other cases build, and the kind and work type it must get. |
 | `Patch_HarnessAutoRun.cs` | `HARNESS` only. Runs the harness and quits, when launched with `-shiftchange-harness`. Neither it nor the flag exists in a shipping build. |
 
 ### Content
