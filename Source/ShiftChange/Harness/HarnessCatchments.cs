@@ -537,17 +537,6 @@ namespace ShiftChange
             {
                 return Expect(false, "the fixture has a door and open ground outside it");
             }
-            // Anything tendable from generation would make the colonist an
-            // urgent case before the wound below (MedicalBedRestDressesAtAGownStand).
-            List<string> stripped = new List<string>();
-            foreach (Hediff existing in fix.Pawn.health.hediffSet.hediffs.ToList())
-            {
-                if (existing.TendableNow())
-                {
-                    stripped.Add(existing.LabelCap);
-                    fix.Pawn.health.RemoveHediff(existing);
-                }
-            }
             fix.Comp.ToggleWork(doctor);
             MakeCalm(fix.Map);
             Map map = fix.Map;
@@ -565,9 +554,11 @@ namespace ShiftChange
             IntVec3 haulFrom = new IntVec3(fix.Outside.minX, 0, fix.Outside.maxZ);
             IntVec3 haulTo = new IntVec3(fix.Outside.minX, 0, fix.Outside.maxZ - 1);
 
+            // The wound below is the only thing that makes them urgent: the
+            // fixture removes what a generated colonist arrives needing
+            // tended (DebugTools_Fixtures.RemoveTendableConditions).
             bool ok = Expect(!HealthAIUtility.ShouldSeekMedicalRestUrgent(fix.Pawn),
-                             "the colonist needs no doctor to begin with (precondition"
-                             + (stripped.Count > 0 ? "; removed " + string.Join(", ", stripped) : "") + ")")
+                             "the colonist needs no doctor to begin with (precondition)")
                     & Expect(!fix.Comp.Covers(bedOut.Position, map) && fix.Comp.Covers(bedIn.Position, map),
                              "the stand's room holds one bed and not the one past the door (control)")
                     & Expect(RunSwap(fix), "dressed for doctoring")

@@ -718,16 +718,11 @@ namespace ShiftChange
                     return false;
                 }
                 // The game clock stands still while the harness runs, inside one
-                // frame, and the pawn's own interval gates read it
-                // (Pawn.IsHashIntervalTick): for some pawns the needs then
-                // tick on every pumped tick instead of once per 150, rest
-                // drains in a few hundred ticks, and vanilla's involuntary
-                // sleep cuts the swap short at random. Rest is held full.
-                Need_Rest rest = fix.Pawn.needs?.rest;
-                if (rest != null)
-                {
-                    rest.CurLevel = rest.MaxLevel;
-                }
+                // frame, and the pawn's needs are gated on it. The fixture only
+                // hands out colonists whose needs do not tick under a stopped
+                // clock (DebugTools_Fixtures.NeedsTickWhilePumped), so rest,
+                // food and mood hold still here without being topped up.
+                //
                 // The whole pawn, so a third-party Pawn.Tick postfix can throw
                 // in here. The case-level catch reports that as FAIL threw:
                 // rather than swallowing it.
@@ -891,8 +886,41 @@ namespace ShiftChange
                     }
                     GenDebug.ClearArea(fix.Outside, map);
                 }
+                for (int i = 0; i < fix.Claimed.Count; i++)
+                {
+                    IntVec3 cell = fix.Claimed[i];
+                    map.zoneManager.ZoneAt(cell)?.Delete();
+                    GenDebug.ClearArea(CellRect.SingleCell(cell), map);
+                }
             }
             GenDebug.ClearArea(pad, map);
+        }
+
+        /// <summary>
+        /// Makes <paramref name="cell"/>, past the pad, bare soil with nothing
+        /// on it and no roof, for a case to put things on, and has
+        /// <see cref="Teardown"/> clear it again. Returns the cell, and leaves
+        /// one outside the map alone for the caller's bounds check.
+        ///
+        /// <para>The pad finder checks one cell of margin around the pad
+        /// (<c>Patch_HarnessAutoRun.TryFindPad</c>), and these cells lie
+        /// further out, so on some maps they hold natural rock. A meal spawned
+        /// onto rock read as being in the cell beside it, and failed the
+        /// feeding case (2026-10-15). And with nothing clearing them after,
+        /// what a case left there stayed on the map for every case after it,
+        /// where vanilla's opportunistic haul can pick it up.</para>
+        /// </summary>
+        internal static IntVec3 OpenGround(Fixture fix, IntVec3 cell)
+        {
+            Map map = fix.Map;
+            if (!cell.InBounds(map))
+            {
+                return cell;
+            }
+            GenDebug.ClearArea(CellRect.SingleCell(cell), map);
+            map.terrainGrid.SetTerrain(cell, TerrainDefOf.Soil);
+            fix.Claimed.Add(cell);
+            return cell;
         }
 
         // ------------------------------------------------------- assertions

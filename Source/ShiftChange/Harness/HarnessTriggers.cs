@@ -220,23 +220,6 @@ namespace ShiftChange
                 return Expect(false, "a bed spawns in the stand's room");
             }
 
-            // A generated colonist can arrive needing a doctor (the birthday
-            // rolls can give asthma), and an untagged lay-down by an urgent
-            // patient is medical bed rest (IsMedicalLayDown), which no sleep
-            // stand dresses. The positive control then fails at random, as it
-            // did once on the Common Sense + Pick Up And Haul list
-            // (2026-10-14). Strip what needs tending, and name it, as the
-            // bed-rest case does.
-            List<string> stripped = new List<string>();
-            foreach (Hediff existing in fix.Pawn.health.hediffSet.hediffs.ToList())
-            {
-                if (existing.TendableNow())
-                {
-                    stripped.Add(existing.LabelCap);
-                    fix.Pawn.health.RemoveHediff(existing);
-                }
-            }
-
             // DO NOT DECLARE THE TRIGGER HERE. Every other case in this file
             // calls a Toggle to opt the pad's roleless room in, and copying
             // that idiom would have inverted this case: a bed is not a chess
@@ -248,9 +231,12 @@ namespace ShiftChange
             // and fall through to SetExcluded(). Assert the automatic default
             // instead; it is the stronger claim anyway, since it exercises the
             // RestRoles table rather than bypassing it.
+            // An untagged lay-down by an urgent patient is medical bed rest
+            // (IsMedicalLayDown), which no sleep stand dresses, so the
+            // positive control below needs a colonist who needs no doctor.
+            // The fixture arranges that (DebugTools_Fixtures.RemoveTendableConditions).
             bool ok = Expect(!HealthAIUtility.ShouldSeekMedicalRestUrgent(fix.Pawn),
-                             "the colonist needs no doctor to begin with (precondition"
-                             + (stripped.Count > 0 ? "; removed " + string.Join(", ", stripped) : "") + ")")
+                             "the colonist needs no doctor to begin with (precondition)")
                     & Expect(fix.Comp.HandlesRest(),
                              "the bed makes this a bedroom, so the stand serves sleep automatically")
                     & Expect(fix.Comp.IsAutomatic,
@@ -460,27 +446,14 @@ namespace ShiftChange
             }
             bed.Medical = true;
 
-            // A generated colonist can arrive needing a doctor: the birthday
-            // rolls that age a 30-year-old can give asthma, which wants
-            // tending, and a pawn with anything tendable is an urgent patient
-            // before this case adds its own wound. Both positives below then
-            // fail together, as they did once on the default list
-            // (2026-10-10). Strip what needs tending, and name it.
-            List<string> stripped = new List<string>();
-            foreach (Hediff existing in fix.Pawn.health.hediffSet.hediffs.ToList())
-            {
-                if (existing.TendableNow())
-                {
-                    stripped.Add(existing.LabelCap);
-                    fix.Pawn.health.RemoveHediff(existing);
-                }
-            }
-
             // Tick the row the README tells a player to tick, and nothing else.
+            // A pawn with anything tendable is an urgent patient before this
+            // case adds its own wound, and both positives below would then
+            // fail together; the fixture removes what a generated colonist
+            // arrives needing tended (DebugTools_Fixtures.RemoveTendableConditions).
             fix.Comp.ToggleWork(bedRest);
             bool ok = Expect(!HealthAIUtility.ShouldSeekMedicalRestUrgent(fix.Pawn),
-                             "the colonist needs no doctor to begin with (precondition"
-                             + (stripped.Count > 0 ? "; removed " + string.Join(", ", stripped) : "") + ")")
+                             "the colonist needs no doctor to begin with (precondition)")
                     & Expect(bed.Medical,
                              "the bed takes the medical flag, so the room is a hospital")
                     & Expect(fix.Comp.HandlesWork(bedRest),

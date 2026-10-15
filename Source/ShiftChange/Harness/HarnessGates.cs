@@ -844,12 +844,13 @@ namespace ShiftChange
 
             Pawn pawn = fix.Pawn;
             Map map = fix.Map;
-            IntVec3 outside = fix.Stand.Position + new IntVec3(8, 0, 0);
+            IntVec3 outside = OpenGround(fix, fix.Stand.Position + new IntVec3(8, 0, 0));
+            IntVec3 mealCell = OpenGround(fix, outside + new IntVec3(0, 0, 1));
             if (!outside.InBounds(map) || outside.GetRoom(map) == fix.Stand.GetRoom())
             {
                 return Expect(false, "a cell outside the stand's room resolves for the test");
             }
-            Thing meal = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), outside + new IntVec3(0, 0, 1), map);
+            Thing meal = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), mealCell, map);
             string line = "ShiftChange.InspectOutsideArea".Translate(pawn.LabelShort);
 
             bool ok = Expect(RunSwap(fix), "dressed for the shift")

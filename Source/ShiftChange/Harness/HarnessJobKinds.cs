@@ -91,15 +91,6 @@ namespace ShiftChange
             {
                 return Expect(false, "the work types, givers, jobs, bed and meal the table uses resolve");
             }
-            // Anything tendable from generation would make the colonist an
-            // urgent case before the wound below (UrgentPatientGoesStraightToBed).
-            foreach (Hediff existing in fix.Pawn.health.hediffSet.hediffs.ToList())
-            {
-                if (existing.TendableNow())
-                {
-                    fix.Pawn.health.RemoveHediff(existing);
-                }
-            }
             Map map = fix.Map;
             IntVec3 at = fix.Stand.Position;
             Building_Bed bed = DebugTools_Fixtures.Spawn(

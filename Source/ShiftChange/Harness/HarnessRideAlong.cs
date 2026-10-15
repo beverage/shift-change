@@ -90,7 +90,7 @@ namespace ShiftChange
             Pawn patient = SpawnExtra(fix, Gender.Female, "Patient");
             Thing mealHere = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef),
                                             fix.Stand.Position + new IntVec3(3, 0, 3), map);
-            IntVec3 outside = fix.Stand.Position + new IntVec3(8, 0, 0);
+            IntVec3 outside = OpenGround(fix, fix.Stand.Position + new IntVec3(8, 0, 0));
             if (!outside.InBounds(map) || outside.GetRoom(map) == room)
             {
                 return Expect(false, "a cell outside the stand's room resolves for the test");
@@ -321,8 +321,9 @@ namespace ShiftChange
             Map map = fix.Map;
             Room room = fix.Stand.GetRoom();
             IntVec3 bench = fix.Stand.Position + new IntVec3(3, 0, 3);
-            IntVec3 outside = fix.Stand.Position + new IntVec3(8, 0, 0);
-            IntVec3 store = fix.Stand.Position + new IntVec3(8, 0, 2);
+            IntVec3 outside = OpenGround(fix, fix.Stand.Position + new IntVec3(8, 0, 0));
+            IntVec3 store = OpenGround(fix, fix.Stand.Position + new IntVec3(8, 0, 2));
+            IntVec3 mealCell = OpenGround(fix, outside + new IntVec3(0, 0, 1));
             if (!outside.InBounds(map) || !store.InBounds(map) || outside.GetRoom(map) == room)
             {
                 return Expect(false, "cells outside the stand's room resolve for the test");
@@ -330,7 +331,7 @@ namespace ShiftChange
             Thing potatoes = ThingMaker.MakeThing(potatoDef);
             potatoes.stackCount = 10;
             GenSpawn.Spawn(potatoes, outside, map);
-            Thing meal = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), outside + new IntVec3(0, 0, 1), map);
+            Thing meal = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), mealCell, map);
 
             bool ok = Expect(RunSwap(fix), "dressed for the shift")
                     & Expect(fix.Comp.OnShift, "and is on shift (control)");

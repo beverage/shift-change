@@ -175,6 +175,9 @@ namespace ShiftChange
             KnownGaps = 0;
             Report.AppendLine("[ShiftChange] lifecycle harness");
 
+            // First: every case below takes for granted what this checks.
+            Case(map, pad, "the fixture colonist is healthy and holds still under the stopped clock, and ground past the pad is ground",
+                 HarnessFixtureChecks.FixtureColonistHoldsStill);
             Case(map, pad, "gravship flight keeps the ledger", GravshipFlight);
             Case(map, pad, "gravship flight without the borrower releases it", GravshipFlightLeftBehind);
             Case(map, pad, "teardown (deconstruct, burn) releases the ledger", TeardownReleases);
@@ -562,6 +565,13 @@ namespace ShiftChange
             /// clears it along with the pad.
             /// </summary>
             internal CellRect Outside = CellRect.Empty;
+
+            /// <summary>
+            /// Single cells past the pad that a case put things on
+            /// (<see cref="HarnessFixtures.OpenGround"/>); cleared by
+            /// <see cref="Teardown"/>.
+            /// </summary>
+            internal List<IntVec3> Claimed = new List<IntVec3>();
         }
 
         /// <summary>

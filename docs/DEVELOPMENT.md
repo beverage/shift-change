@@ -189,10 +189,10 @@ Behaviour is verified in game, on a clean Release restart. Two tools help.
 **The demo stage** is the general fixture — a colony in one click, where a swap
 can be watched end to end.
 
-**The lifecycle harness** covers what the demo stage cannot: a hundred and four
+**The lifecycle harness** covers what the demo stage cannot: a hundred and six
 cases that drive the engine's own entry points and assert where the ledger
 landed.
-What it covers, what it deliberately does not, the rules it follows and the three
+What it covers, what it deliberately does not, the rules it follows and the four
 engine traps it had to pay for are all in [TESTING.md](TESTING.md).
 
 ```bash
@@ -507,6 +507,7 @@ Each file here is guarded whole, by `SCENES`, `DEBUG` or `SCENES || HARNESS`, an
 | `DebugTools_SaveRoundTrip.cs` | `HARNESS` only. The four save/load cases. Separate file because they replace `Current.Game` and must run last. |
 | `HarnessCatchments.cs` | `HARNESS` only. The catchment cases, one `partial` class: `.Radius` for coverage and dressing in a ring, `.ReturnTrip`, `.Deliveries`, `.Area`, `.AreaUi` for the alert and the Serves menu, and `.Latch`. The main file holds the cases true in every mode and the helpers several files share. |
 | `HarnessJobKinds.cs` | `HARNESS` only. The job classifier as a table: every job shape the other cases build, and the kind and work type it must get. |
+| `HarnessFixtureChecks.cs` | `HARNESS` only. What every case takes for granted about its fixture: a colonist who needs no doctor and whose needs hold still under the stopped clock, and open ground past the pad. Registered first. |
 | `Patch_HarnessAutoRun.cs` | `HARNESS` only. Runs the harness and quits, when launched with `-shiftchange-harness`. Neither it nor the flag exists in a shipping build. |
 
 ### Content

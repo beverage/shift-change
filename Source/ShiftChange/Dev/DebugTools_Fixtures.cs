@@ -16,7 +16,7 @@ namespace ShiftChange
     /// <para><b>Why the guard is <c>SCENES || HARNESS</c> and not either one
     /// alone.</b> Two dev-only callers gate independently — the stage builders
     /// on SCENES, the harness on HARNESS — and each builds its fixtures out of
-    /// these six members. Naming one guard would break the other's build. The
+    /// these members. Naming one guard would break the other's build. The
     /// OR is the whole reason this file is not simply part of one of them;
     /// everything that BUILDS A SCENE from these stays in
     /// <c>DebugTools_DemoStage</c> / <c>DebugTools_PreviewStage</c>.</para>
@@ -66,6 +66,12 @@ namespace ShiftChange
         /// all non-specialty work) and wanders the set for the whole take
         /// (found in play, 2026-08-08). So reroll until the specialty is
         /// enabled; relations are off so the discards leave nothing behind.
+        ///
+        /// <para>Two more rolls are taken out, for the lifecycle harness: a pawn
+        /// whose needs would move while the harness pumps it
+        /// (<see cref="NeedsTickWhilePumped"/>) is rerolled too, and whatever
+        /// the pawn arrived needing tended is removed
+        /// (<see cref="RemoveTendableConditions"/>).</para>
         /// </summary>
         internal static Pawn AveragePawn(Gender gender, string nick, WorkTypeDef mustBeCapableOf = null)
         {
@@ -82,12 +88,15 @@ namespace ShiftChange
             }
             Pawn pawn = PawnGenerator.GeneratePawn(request);
             for (int tries = 0;
-                 mustBeCapableOf != null && pawn.WorkTypeIsDisabled(mustBeCapableOf) && tries < 30;
+                 (NeedsTickWhilePumped(pawn)
+                  || (mustBeCapableOf != null && pawn.WorkTypeIsDisabled(mustBeCapableOf)))
+                 && tries < 30;
                  tries++)
             {
                 pawn.Destroy();
                 pawn = PawnGenerator.GeneratePawn(request);
             }
+            RemoveTendableConditions(pawn);
 
             pawn.Name = new NameTriple(gender == Gender.Female ? "Jane" : "John", nick, "Doe");
             pawn.story.traits.allTraits.Clear();
@@ -135,6 +144,67 @@ namespace ShiftChange
             }
             pawn.Drawer?.renderer?.SetAllGraphicsDirty();
             return pawn;
+        }
+
+        /// <summary>
+        /// The largest delta <c>Thing.DoTick</c> hands to <c>TickInterval</c>:
+        /// <c>Thing.MaxTickIntervalRate</c> (<c>Thing.cs:606</c>, used at
+        /// <c>:727-732</c>), which is protected.
+        /// </summary>
+        internal const int MaxTickIntervalDelta = 15;
+
+        /// <summary>
+        /// This pawn's needs, and its random mental-break check, would fire
+        /// while the lifecycle harness pumps it. The harness runs every case
+        /// inside one frame, so the game clock stands still while
+        /// <c>RunSwap</c> and the other pumps call <c>Pawn.DoTick</c> by hand.
+        /// Both are gated on <c>IsHashIntervalTick(150, delta)</c>
+        /// (<c>Pawn_NeedsTracker.cs:112</c>, <c>MentalBreaker.cs:253</c>), which
+        /// reads that clock and the pawn's id, with a delta of at most
+        /// <see cref="MaxTickIntervalDelta"/>. With the clock stopped the
+        /// answer never changes. Most pawns' needs never move, about one pawn
+        /// in ten gets 150 ticks of need every 15 pumped ticks, and about one
+        /// in 150 gets them on every pumped tick.
+        ///
+        /// <para>Measured on 1.7.4979, 2026-10-15, pumping each kind 6,000
+        /// ticks: a colonist of the last kind ran out of food within 500
+        /// ticks, was downed by malnutrition, and died at tick 1,114 in one run
+        /// and 1,334 in another. One of the middle kind ran out of food by
+        /// tick 5,000. A case that pumps such a colonist through a few swaps
+        /// sees one cut short with nothing taking over, and then a dead pawn.
+        /// With the clock running, as the stage builders have it, this costs a
+        /// reroll now and then and nothing else.</para>
+        /// </summary>
+        internal static bool NeedsTickWhilePumped(Pawn pawn)
+        {
+            return pawn.IsHashIntervalTick(150, MaxTickIntervalDelta);
+        }
+
+        /// <summary>
+        /// Removes every condition the pawn needs tended now. Vanilla tends a
+        /// new pawn's conditions only when it is not joining the player
+        /// (<c>PawnGenerator.cs:1297</c>), so a colonist who rolled asthma
+        /// starts untended, and is an urgent patient
+        /// (<c>HealthAIUtility.ShouldSeekMedicalRestUrgent</c>) from the start.
+        /// Nobody dresses an urgent patient for bed, and nobody changes one
+        /// back before it, so a case that sends its colonist to bed failed at
+        /// random. Asthma comes to roughly one colonist in seventy by thirty.
+        /// </summary>
+        internal static void RemoveTendableConditions(Pawn pawn)
+        {
+            List<Hediff> all = pawn.health.hediffSet.hediffs;
+            List<Hediff> tendable = new List<Hediff>();
+            for (int i = 0; i < all.Count; i++)
+            {
+                if (all[i].TendableNow())
+                {
+                    tendable.Add(all[i]);
+                }
+            }
+            for (int i = 0; i < tendable.Count; i++)
+            {
+                pawn.health.RemoveHediff(tendable[i]);
+            }
         }
 
         /// <summary>

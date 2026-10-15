@@ -139,15 +139,13 @@ tables against the def database, with no map (`RecreationClassifierHolds`,
 (`JoyJobInTheRoomDresses`), and work and recreation clear each other on one
 stand (`WorkAndRecreationAreExclusive`). `SleepJobInTheRoomDresses` puts a bed
 in the stand's room and covers going to bed there, every refusal, the mid-sleep
-re-trigger and the wake-up. It strips anything tendable the colonist arrived
-with first, as the bed-rest case below does: an untagged lay-down by a colonist
-who needs a doctor is medical bed rest, which no sleep stand dresses.
+re-trigger and the wake-up. Its precondition is a colonist who needs no doctor,
+which the fixture arranges ("Four engine traps"): an untagged lay-down by a
+colonist who needs a doctor is medical bed rest, which no sleep stand dresses.
 
 **Bed rest, deposit only and fishing** (`HarnessTriggers` too). A stand ticked
 for vanilla's bed-rest work type dresses a patient going to recuperate, never
-one who needs a doctor first (`MedicalBedRestDressesAtAGownStand`, which first
-strips anything tendable the generated colonist arrived with, such as asthma,
-and names it), and the
+one who needs a doctor first (`MedicalBedRestDressesAtAGownStand`), and the
 medical emergency setting covers doctors and patients but never firefighting
 (`MedicalEmergencySettingCoversTheRightWork`). A deposit-only stand parks what
 its filter accepts and hands it back (`DepositOnlyParksAndReturns`), and
@@ -388,7 +386,14 @@ else follows from that.
 **The harness itself.** `HarnessAccounting`, registered last, asserts that
 `Expect` reports and returns, that `Case` counts, and that a known gap is
 counted apart from a failure. Without it the runner can grep a green log out of
-a suite that checks nothing.
+a suite that checks nothing. `FixtureColonistHoldsStill` (`HarnessFixtureChecks`),
+registered first, asserts what every other case takes for granted about its
+fixture. Forty colonists from the fixture in a row have no needs that tick
+under the stopped clock, and none needs tending. One of them keeps its food
+through 1,500 pumped ticks, while a colonist the fixture would reject loses
+food under the same pump. Asthma makes a colonist an urgent patient until the
+fixture removes it. A cell of natural rock past the pad becomes ground with a
+room under `OpenGround`. "Four engine traps" says why each is there.
 
 ## What is not covered
 
@@ -472,7 +477,7 @@ fishing out with no giver, and the fix waited for stands that can serve beyond
 their room. The mechanism exists because a suite that always prints one failure
 is ignored within a week.
 
-## Three engine traps
+## Four engine traps
 
 None is visible from the API surface. All are recorded at their call sites.
 
@@ -491,12 +496,33 @@ across its own completion silently becomes a different job. The pump watches
 of a job that failed its reservations and died before its transfer toil.
 
 **The clock stands still.** The harness runs inside one frame, so `TicksGame`
-never moves while the pump ticks a pawn, and the pawn's own interval gates read
-it (`Pawn.IsHashIntervalTick`). For some pawns the needs then tick on every
-pumped tick instead of once per 150, rest drains in a few hundred ticks, and
-vanilla's involuntary sleep cut a swap short at random: two of three 1.7 runs on
-2026-10-13, in a different case each time. The pump holds the pawn's rest
-full.
+never moves while the pump ticks a pawn. A pawn's needs and its random
+mental-break check are gated on `IsHashIntervalTick(150, delta)`
+(`Pawn_NeedsTracker.cs:112`, `MentalBreaker.cs:253`), which reads that clock
+and the pawn's id, with a delta of at most 15 (`Thing.cs:727-732`). With the
+clock stopped the answer never changes. Most pawns' needs never move. About one
+in ten gets 150 ticks of need every 15 pumped ticks, and about one in 150 on
+every pumped tick. That cut swaps short at random in a different case each run,
+first through vanilla's involuntary sleep as rest drained (two of three 1.7
+runs on 2026-10-13), and, once the pump held rest full, through hunger. Measured
+on 1.7.4979, 2026-10-15: a colonist of the last kind went from 80% food to none
+inside 500 pumped ticks, was downed by malnutrition, and died at 1,114 and 1,334
+in two runs, after which the next swap threw on its missing job tracker. The
+fixture now hands out only colonists whose needs do not tick under a stopped
+clock (`DebugTools_Fixtures.NeedsTickWhilePumped`), about one roll in ten
+rerolled, and the rest top-up is gone.
+
+**A new colonist is not tended.** Vanilla tends a generated pawn's conditions
+only when it is not joining the player (`PawnGenerator.cs:1297`). A fixture
+colonist who rolled asthma, roughly one in seventy by thirty, starts untended,
+and anything tendable makes a pawn an urgent patient
+(`HealthAIUtility.ShouldSeekMedicalRestUrgent`). Nobody dresses an urgent
+patient for bed or changes one back before it, so the five cases that send
+their colonist to bed could each fail at random, and the two radius cases did.
+The fixture
+removes what a generated colonist needs tended
+(`DebugTools_Fixtures.RemoveTendableConditions`); the bed-rest, sleep and
+urgent-patient cases each did that for themselves before.
 
 ## Static checks
 
@@ -531,5 +557,11 @@ enclose, capableOf)` produces an undressed pawn for cases that watch the driver
 work, and can wall the pad into a proper room — which functional cases need,
 because `FindAvailableStand` walks `room.ContainedThings` and an open pad is the
 whole outdoors.
+
+A case that puts something past the pad takes the cell with
+`OpenGround(fix, cell)`, which clears it to bare soil and has `Teardown` clear
+it again. The pad finder checks one cell of margin around the pad and no more,
+so further out a map can have natural rock, and anything left there stays on the
+map for every case after.
 
 Assert with `Expect(condition, what)`, and pair every negative with a control.
