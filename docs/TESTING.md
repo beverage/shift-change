@@ -206,8 +206,8 @@ the engine fact that the optimizer's gate is that same field. Three cases cover
 the gizmo postfixes, which must hand the upstream sequence back untouched when
 they have nothing to add (`ChangeBackGateHandsTheChainBack`,
 `RemovalToggleGateLeavesForeignStandsAlone`), and still add the change-back
-button for a pawn in uniform, even with interception latched off
-(`ChangeBackGateStillAppends`).
+button for a pawn in uniform, with interception switched off and again with it
+latched off by its faults (`ChangeBackGateStillAppends`).
 
 **Riding along** (`HarnessRideAlong`). Jobs a uniform stays on for, each one a
 change-out the return trip used to make for nothing: feeding a patient or a

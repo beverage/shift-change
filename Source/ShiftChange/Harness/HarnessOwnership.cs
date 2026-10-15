@@ -612,21 +612,30 @@ namespace ShiftChange
                              && button.groupKey == Patch_ChangeBackGizmo.GroupKey,
                              "and the added one is ours, appended LAST");
 
-            // THE INVARIANT THAT HAD A COMMENT AND NO TEST. The fault latch
-            // stops the mod ACTING on its own; it must not also take away the
-            // player's manual way out, because a latched switch is exactly the
-            // moment every pawn already in uniform is stranded there.
+            // THE INVARIANT THAT HAD A COMMENT AND NO TEST. Interception
+            // going off stops the mod ACTING on its own; it must not also take
+            // away the player's manual way out, because that is exactly the
+            // moment every pawn already in uniform is stranded there. It goes
+            // off two ways, the standing switch and the fault latch, and each
+            // is asserted on its own so a gate on either one fails here.
             bool armedBefore = Patch_JobInterception.Enabled;
+            bool faultedBefore = Patch_JobInterception.faulted;
             try
             {
                 Patch_JobInterception.Enabled = false;
                 ok &= Expect(
                     Patch_ChangeBackGizmo.Postfix(chain, fix.Pawn).Count() == chain.Count + 1,
-                    "and it is STILL offered once interception has latched off");
+                    "and it is STILL offered with interception switched off");
+                Patch_JobInterception.Enabled = armedBefore;
+                Patch_JobInterception.faulted = true;
+                ok &= Expect(
+                    Patch_ChangeBackGizmo.Postfix(chain, fix.Pawn).Count() == chain.Count + 1,
+                    "and with interception latched off by its faults");
             }
             finally
             {
                 Patch_JobInterception.Enabled = armedBefore;
+                Patch_JobInterception.faulted = faultedBefore;
             }
 
             // A boxed stand keeps its ledger — that is the reinstall case's
