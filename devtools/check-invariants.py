@@ -423,6 +423,50 @@ def check_harness_gating():
                  % rel(path))
 
 
+# ------------------------------------------------------------------ dev folder
+
+# Source/ShiftChange/Dev/ holds what compiles only into a dev build: the scene
+# stages and the debug menu (SCENES), the hot-reload rig (DEBUG), and the
+# fixtures both dev callers share. Every file there is guarded whole, and no
+# file guarded whole by a dev symbol sits anywhere but Dev/ and Harness/, so
+# everything outside those two folders is what ships. An inline `#if DEBUG` in
+# a shipping file (HarmonyInit) is not a whole-file guard and stays allowed.
+DEV_SYMBOLS = {"SCENES", "DEBUG", "HARNESS"}
+
+
+def whole_file_guard(lines):
+    """The condition of the #if that opens a file's code, when its #endif closes it."""
+    code = [i for i, line in enumerate(lines)
+            if line.strip() and not line.lstrip().startswith("//")]
+    if not code or not lines[code[0]].startswith("#if"):
+        return None
+    depth = 0
+    for i in code:
+        directive = lines[i].strip()
+        if directive.startswith("#if"):
+            depth += 1
+        elif directive.startswith("#endif"):
+            depth -= 1
+            if depth == 0:
+                return lines[code[0]][3:].strip() if i == code[-1] else None
+    return None
+
+
+def check_dev_folder():
+    for path in cs_files():
+        guard = whole_file_guard(open(path, encoding="utf-8").read().split("\n"))
+        symbols = set(re.findall(r"[A-Za-z_]\w*", guard or ""))
+        dev_only = bool(symbols) and symbols <= DEV_SYMBOLS
+        if "/Dev/" in path:
+            if not dev_only:
+                fail("dev", "%s is in Dev/ but is not guarded whole by SCENES, DEBUG "
+                     "or HARNESS — it would ship" % rel(path))
+        elif dev_only and "/Harness/" not in path:
+            fail("dev", "%s is dev-only (`#if %s` around the whole file) but sits "
+                 "outside Dev/ — move it there, so the tree shows what ships"
+                 % (rel(path), guard))
+
+
 def main():
     check_hot_reload()
     check_translation_keys()
@@ -433,6 +477,7 @@ def main():
     check_private_tracking_refs()
     check_home_paths()
     check_harness_gating()
+    check_dev_folder()
 
     for note in notes:
         print("note: %s" % note)
