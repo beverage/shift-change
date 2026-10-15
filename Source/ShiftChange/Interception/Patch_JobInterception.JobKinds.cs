@@ -42,7 +42,8 @@ namespace ShiftChange
         /// A modded reading job with its own driver would therefore slip
         /// through, and dress a pawn for whichever room the book is shelved
         /// in. As of 1.6 none in practice does: Alpha Books' own read job
-        /// (<c>ABooks_Reading</c>, driver <c>JobDriver_ReadAlphaBook</c>)
+        /// (<c>ABooks_Reading</c>, driver <c>JobDriver_ReadAlphaBook</c>;
+        /// Workshop 3403180654, <c>1.6/Defs/JobDefs/Jobs_Misc.xml</c>)
         /// carries NO joyKind, so it fails the first test and never reaches
         /// this one — excluded a step earlier, by luck rather than by design.
         ///
@@ -65,8 +66,8 @@ namespace ShiftChange
         /// <summary>
         /// A sleep job the room trigger can honestly serve: a lay-down job
         /// whose target is an actual BED. The bed test is what keeps ground
-        /// sleep (no bed, and usually no valid target at all), mech dormancy
-        /// and Odyssey's deactivation out, since all three run the same
+        /// sleep (a lay-down on a cell, <c>JobGiver_GetRest.cs:127</c>), mech
+        /// dormancy and Odyssey's deactivation out, since all three run the same
         /// <see cref="JobDriver_LayDown"/> family: docs/DESIGN.md, "The sleep
         /// branch".
         ///
@@ -143,10 +144,15 @@ namespace ShiftChange
         /// own split, <see cref="HealthAIUtility.ShouldSeekMedicalRestUrgent"/>)
         /// never diverts unless the medical-emergency setting is on. And a
         /// pawn already on a bed never diverts: the work arm has no bed guard
-        /// of its own, because no other work job can start from a bed. Only
-        /// <c>PatientBedRest</c> is ever returned, so the <c>Patient</c> row in
-        /// the stand dialog stays inert. The argument, and the known cost of
-        /// the urgent refusal: docs/DESIGN.md, "The sleep branch".</para>
+        /// of its own, because no other work job can start from a bed. A job
+        /// begins on a bed only if its driver says it can
+        /// (<c>CanBeginNowWhileLyingDown</c>, false on the base driver,
+        /// <c>JobDriver.cs:303-306</c>), and vanilla's overrides are lying
+        /// down, lovin', deathrest, relaxing and watching a building, plus
+        /// breastfeeding for a downed mother, whom this mod never decides on.
+        /// Only <c>PatientBedRest</c> is ever returned, so the <c>Patient</c>
+        /// row in the stand dialog stays inert. The argument, and the known
+        /// cost of the urgent refusal: docs/DESIGN.md, "The sleep branch".</para>
         /// </summary>
         internal static WorkTypeDef MedicalRestWorkType(Pawn pawn, Job job, JobTag? tag)
         {
@@ -293,15 +299,17 @@ namespace ShiftChange
         /// down, which has its own deliberate policy; this only stops the
         /// return trip firing first.)
         ///
-        /// <para>It caches a driver on the job (<c>Job.GetCachedDriver</c>),
-        /// which is what vanilla's own callers do and what <see cref="Insert"/>
-        /// already does for its reservation dry run. <c>StartJob</c> builds the
-        /// real driver with <c>MakeDriver</c>, never the cached one, and pooled
-        /// jobs are <c>Clear()</c>ed before reuse, so the throwaway cannot leak
-        /// into a live job. A throwing driver constructor is caught by the
-        /// prefix's fail-open handler. Short-circuited behind
-        /// <see cref="OnABed"/>, so nothing is constructed at the ordinary job
-        /// boundary where the pawn is nowhere near a bed.</para>
+        /// <para>It caches a driver on the job (<c>Job.GetCachedDriver</c>,
+        /// <c>Job.cs:611-615</c>, reached from <c>CanBeginNow</c> at
+        /// <c>:647</c>), as vanilla's own callers do. <c>StartJob</c> builds the
+        /// real driver with <c>MakeDriver</c>, never the cached one
+        /// (<c>Pawn_JobTracker.cs:334</c>), and pooled jobs are <c>Clear()</c>ed
+        /// before reuse, which drops the cached driver (<c>Job.cs:292</c>), so
+        /// the throwaway cannot leak into a live job. A throwing driver
+        /// constructor is caught by the prefix's fail-open handler.
+        /// Short-circuited behind <see cref="OnABed"/>, so nothing is
+        /// constructed at the ordinary job boundary where the pawn is nowhere
+        /// near a bed.</para>
         /// </summary>
         internal static bool StaysInBed(Pawn pawn, Job job)
         {
@@ -317,7 +325,9 @@ namespace ShiftChange
         /// which they use: <c>JobGiver_MeditateInBed</c> puts the pawn's cell in
         /// A and the bed in B, while the lay-down family puts the bed in A.
         /// <c>OccupiedRect</c> rather than <c>Position</c> so a double bed's
-        /// second slot counts.</para>
+        /// second slot counts: slots run along the bed's head from its corner
+        /// (<c>BedUtility.cs:13-30</c>), so one of a double bed's two is not
+        /// its <c>Position</c>.</para>
         /// </summary>
         internal static bool TargetsBedUnder(Pawn pawn, Job job)
         {
