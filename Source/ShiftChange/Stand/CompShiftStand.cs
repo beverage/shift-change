@@ -27,6 +27,12 @@ namespace ShiftChange
     /// <see cref="CompAssignableToPawn_ShiftStand"/>; this comp records which
     /// specific items moved which way, so the return trip puts the right
     /// clothes back on the right pawn.
+    ///
+    /// The class is <c>partial</c>, across four files in Stand/. This one
+    /// holds the ledger, the stand's lifecycle, its ownership reads and save
+    /// and load. The other three hold what it dresses for and its settings
+    /// (.Triggers), where it serves (.Catchment) and what the player sees
+    /// (.Ui); docs/DEVELOPMENT.md maps them.
     /// </summary>
     public partial class CompShiftStand : ThingComp
     {

@@ -445,10 +445,14 @@ Folders by concern. Everything outside `Dev/` and `Harness/` ships, and `check-i
 
 #### `Stand/`
 
+`CompShiftStand` is one `partial` class across four files.
+
 | File | Role |
 |---|---|
-| `CompShiftStand.cs` | Per-stand work types, triggers and the checkout ledger, with its save, inspect pane and gizmos. Static registry of on-shift stands. |
+| `CompShiftStand.cs` | The checkout ledger and the stand's lifecycle: who has its uniform out, spawn, despawn, reinstall and landing, and save and load. Ownership reads (`AssignedOwners`, `StillOurs`). Static registry of on-shift stands. |
+| `CompShiftStand.Triggers.cs` | What the stand dresses for and its settings: work types from the room or ticked, the recreation and sleep triggers, automatic, custom and excluded, deposit only, full change and trade. The toggles keep the three triggers mutually exclusive. |
 | `CompShiftStand.Catchment.cs` | What the stand serves: its room, a radius or an allowed area, and `Covers`, the one membership test. The Serves setting with its labels and ring, and the static registry of radius and area stands. |
+| `CompShiftStand.Ui.cs` | What the player sees: the inspect pane, the gizmo, the "what this stand serves" labels, and the selection overlay. |
 | `Alert_ShiftStandServesNothing.cs` | The alert for stands set to serve something that serve nothing: in the open, area gone, or outside their area. |
 | `ServesMenuOption.cs` | A float-menu row that opens a section of the Serves menu with a gap. |
 | `Dialog_SetStandWorkTypes.cs` | Per-stand work type picker. |
