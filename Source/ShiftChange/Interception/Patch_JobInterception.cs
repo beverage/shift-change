@@ -20,6 +20,13 @@ namespace ShiftChange
     /// hence <see cref="inserting"/>. Why StartJob rather than
     /// <c>TryOpportunisticJob</c>, and why the insertion copies vanilla's own:
     /// docs/DESIGN.md, "Interception".
+    ///
+    /// The class is <c>partial</c>, across seven files in Interception/. This
+    /// one holds the kill switch, the fault latch, <see cref="TryInsertSwap"/>
+    /// with every step it calls in the order they run, and
+    /// <see cref="Insert"/>. The other six hold the change-back latch, the
+    /// mid-job catch-up, deliveries, job kinds, the stand search and places;
+    /// docs/DEVELOPMENT.md maps them.
     /// </summary>
     [HarmonyPatch(typeof(Pawn_JobTracker), nameof(Pawn_JobTracker.StartJob))]
     public static partial class Patch_JobInterception
@@ -42,11 +49,12 @@ namespace ShiftChange
         /// adding hooks: ask "does this ACT on its own, or protect something
         /// already in progress?"
         /// </summary>
-        // These five TweakValues SHIP, deliberately (decided 2026-08-17), and
-        // the sweep of the debug menu does not extend to them: the bar is
-        // destructiveness, not reachability, and they are how a player is
-        // walked through diagnosing a report. docs/DESIGN.md, "Development
-        // tooling".
+        // These four TweakValues SHIP, deliberately (decided 2026-08-17), as
+        // do DressMidJob (Patch_JobInterception.CatchUp.cs) and
+        // Patch_OutfitStandsPlusUseButton.Enabled, six in all. The sweep of
+        // the debug menu does not extend to them: the bar is destructiveness,
+        // not reachability, and they are how a player is walked through
+        // diagnosing a report. docs/DESIGN.md, "Development tooling".
         [TweakValue("ShiftChange")]
         public static bool Enabled = true;
 
