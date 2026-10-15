@@ -44,12 +44,13 @@ namespace ShiftChange
         // ReSharper disable once InconsistentNaming — Harmony injection.
         public static IEnumerable<Gizmo> Postfix(IEnumerable<Gizmo> values, Pawn __instance)
         {
-            // Deliberately NOT gated on Patch_JobInterception.Enabled. That
-            // flag latching false is precisely the moment this button matters
-            // most: automatic return trips have stopped, so without it every
-            // pawn currently in uniform is stranded there with no route back
-            // at all. The kill switch exists to stop the mod ACTING on its
-            // own; it must not also remove the player's manual remedy.
+            // Deliberately NOT gated on Patch_JobInterception.Enabled or
+            // faulted. Interception switched off, or latched off by its own
+            // faults, is precisely the moment this button matters most:
+            // automatic return trips have stopped, so without it every pawn
+            // currently in uniform is stranded there with no route back at
+            // all. Both exist to stop the mod ACTING on its own; neither may
+            // also remove the player's manual remedy.
             if (__instance == null || !__instance.IsColonistPlayerControlled)
             {
                 return values;

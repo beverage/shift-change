@@ -28,7 +28,7 @@ building.
 | Automatic work only | A player-forced job is a direct order. Sending the pawn to a wardrobe first makes orders feel broken. Applies in both directions. |
 | The room is the boundary | Ties the uniform to where the work is, so a pawn is never far from their civvies in a crisis. An unbounded "always wear X for work Y" mode reintroduces that distance and was rejected. |
 | Zero new art | Ownership is patched onto the vanilla def rather than shipped as a new building. Icons come from vanilla's UI atlas. |
-| Fail open | This patches the method that starts every job for every pawn. An unhandled exception there is a bricked colony. Every hook catches, logs once, disables the mod for the session, and lets vanilla proceed. |
+| Fail open | This patches the method that starts every job for every pawn. An unhandled exception there is a bricked colony. Every hook catches, logs, and lets vanilla proceed. Interception also counts its throws, and at `FaultLimit` (three) in one game takes itself out of service and tells the player, until a save is loaded or a game started. The `Enabled` tweak is a separate, standing switch that a load leaves alone. Neither gates what protects a pawn already in uniform, nor the Change back button. |
 
 ## RimWorld in five concepts
 

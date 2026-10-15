@@ -614,11 +614,12 @@ namespace ShiftChange
         // ReSharper disable once InconsistentNaming — Harmony field/instance injection.
         public static bool Prefix(Job newJob, JobTag? tag, Pawn ___pawn, Pawn_JobTracker __instance)
         {
-            // BEFORE the gate, not after. The fault latch is cleared by
-            // ResetSessionState, which only runs from here — gate first and a
-            // faulted mod could never notice the game had changed, so the
-            // latch would never lift and "cleared on save load" would be a
-            // comment rather than a behaviour. One reference comparison.
+            // BEFORE the gate, not after: the gate reads the fault latch, and
+            // until SessionGuard sees a new game the latch is the last game's.
+            // Other entry points call Ensure too (OnShiftStandFor, a stand's
+            // spawn, the optimizer patches), so this is not the only way a
+            // load lifts the latch, but it is the one that guarantees this
+            // job is decided on this game's state. One reference comparison.
             SessionGuard.Ensure();
 
             if (!Enabled || faulted || inserting)
@@ -1519,7 +1520,8 @@ namespace ShiftChange
                 // protected base ctor — unwinds AFTER vanilla has ended the
                 // pawn's current job and set curJob but BEFORE curDriver
                 // exists. Left alone, that tracker NREs every tick forever.
-                // Disable ourselves, release both jobs' claims, and hand the
+                // Count the fault (NoteFault latches interception off at
+                // FaultLimit), release both jobs' claims, and hand the
                 // pawn to vanilla's own error recovery. Return true so the
                 // original StartJob body does not run on top of the corrupt
                 // state — the original job is deliberately NOT enqueued.

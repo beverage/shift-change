@@ -307,9 +307,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The pawn this stand is reserved for, or null when it is a pool
-        /// stand. Distinct from <see cref="Borrower"/>: assignment is the
-        /// player's standing intent, borrowing is who is wearing it now.
+        /// The pawns this stand is reserved for: never null, and empty when it
+        /// is a pool stand, in which case it is the shared
+        /// <see cref="NoOwners"/>, so callers only read it. Distinct from
+        /// <see cref="Borrower"/>: assignment is the player's standing intent,
+        /// borrowing is who is wearing it now.
         /// </summary>
         public List<Pawn> AssignedOwners
         {

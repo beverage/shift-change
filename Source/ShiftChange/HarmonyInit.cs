@@ -18,8 +18,11 @@ namespace ShiftChange
     /// one colony exit vanilla routes past it.
     ///
     /// Both are wrapped so an exception degrades to vanilla behaviour rather
-    /// than breaking job assignment, which would brick the colony — the
-    /// interception patch disables itself outright on a throw.
+    /// than breaking job assignment, which would brick the colony. The
+    /// interception patch also counts its throws and, at
+    /// <see cref="Patch_JobInterception.FaultLimit"/>, takes itself out of
+    /// service until a save is loaded or a game started
+    /// (<see cref="Patch_JobInterception.faulted"/>).
     /// </summary>
     [StaticConstructorOnStartup]
     public static class HarmonyInit

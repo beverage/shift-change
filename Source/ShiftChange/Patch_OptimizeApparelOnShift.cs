@@ -41,13 +41,12 @@ namespace ShiftChange
     [HarmonyPatch(typeof(JobGiver_OptimizeApparel), "TryGiveJob")]
     public static class Patch_OptimizeApparelOnShift
     {
-        // Deliberately NOT gated on Patch_JobInterception.Enabled. That flag is
-        // the interception's kill switch and latches false on any throw inside
-        // the nested StartJob — including a throw from a NEIGHBOUR mod's patch.
-        // Tying this pause to it meant an unrelated mod's exception re-opened
-        // the recolor path on pawns still standing in their uniforms, which is
-        // verbatim the 2026-08-09 bug this patch exists to prevent, and the
-        // only unrecoverable consequence of self-disabling. A pawn who is on
+        // Deliberately NOT gated on Patch_JobInterception.Enabled or faulted.
+        // The fault latch trips on repeated throws inside the nested StartJob,
+        // a NEIGHBOUR mod's patch's included, so tying this pause to either
+        // flag would let an unrelated mod's exceptions re-open the recolor
+        // path on pawns still standing in their uniforms, which is verbatim
+        // the 2026-08-09 bug this patch exists to prevent. A pawn who is on
         // shift needs protecting whether or not interception is still running;
         // the ledger is the correct condition, and it is the one asked below.
         // ReSharper disable once InconsistentNaming — Harmony result injection.
@@ -98,10 +97,10 @@ namespace ShiftChange
     [HarmonyPatch(typeof(JobDriver_RecolorApparel), nameof(JobDriver_RecolorApparel.TryMakePreToilReservations))]
     public static class Patch_RecolorExecutionGuard
     {
-        // Not gated on Patch_JobInterception.Enabled either, and for the same
-        // reason as the giver pause above — this is the layer that catches
-        // recolor jobs scribed into the save before the pause existed, so it
-        // has to survive the interception switching itself off.
+        // Not gated on Patch_JobInterception.Enabled or faulted either, and
+        // for the same reason as the giver pause above — this is the layer
+        // that catches recolor jobs scribed into the save before the pause
+        // existed, so it has to keep working while interception is off.
         // ReSharper disable once InconsistentNaming — Harmony injection.
         public static bool Prefix(JobDriver_RecolorApparel __instance, ref bool __result)
         {

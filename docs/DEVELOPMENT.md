@@ -164,10 +164,12 @@ specifically so they are tunable in play.
 
 | Field | Default | Effect |
 |---|---|---|
-| `Enabled` | `true` | Master switch for all interception |
+| `Enabled` | `true` | Master switch for all interception. A save load leaves it as set |
+| `FaultLimit` | `3` | Throws in one game before interception takes itself out of service; loading a save or starting a game re-arms it |
 | `Verbose` | `false` | Log every decision, not just swaps. Noisy. |
 | `DressMidJob` | `true` | Mid-job catch-up when a stand frees up |
 | `RetryCooldownTicks` | `600` | Minimum ticks before reconsidering a pawn whose swap could not start |
+| `Patch_OutfitStandsPlusUseButton.Enabled` | `true` | Outfit Stands Plus' stand button reads our stand list; off hands it back its own walk over every building |
 
 Mod settings carry one player-facing toggle, `poolUnassignedStands` (default
 on). Settings live in vanilla's config file, so uninstalling leaves no trace in
