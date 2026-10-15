@@ -12,6 +12,154 @@ namespace ShiftChange
     public static partial class Patch_JobInterception
     {
         /// <summary>
+        /// What a job is to the outfit decision, by the first test it passes,
+        /// in the order <see cref="TryInsertSwap"/> asks them. The order is
+        /// behaviour: deliveries and ignored givers are decided before their
+        /// work type is read, and the work arm runs before the sleep and
+        /// recreation arms, so VisitSickPawn, Doctor work that carries a
+        /// joyKind, is Work. docs/DESIGN.md, "The gates".
+        /// </summary>
+        internal enum JobKind : byte
+        {
+            /// <summary>A giver-less follow-up (<see cref="JobRoomTargets.RidesAlong"/>).</summary>
+            RidesAlong,
+
+            /// <summary>A delivery (<see cref="JobRoomTargets.IsDelivery"/>).</summary>
+            Delivery,
+
+            /// <summary>A meal carried to a patient or a prisoner (<see cref="JobRoomTargets.IsMealRun"/>).</summary>
+            MealRun,
+
+            /// <summary>Any other job from a giver this mod ignores (<see cref="JobRoomTargets.Ignored"/>).</summary>
+            IgnoredGiver,
+
+            /// <summary>Work the work arm dresses for (<see cref="WorkTypeFor"/>).</summary>
+            Work,
+
+            /// <summary>A lay-down on a bed (<see cref="IsRestJob"/>) the work arm did not take.</summary>
+            Rest,
+
+            /// <summary>A recreation job (<see cref="IsRecreationJob"/>).</summary>
+            Recreation,
+
+            /// <summary>Anything else: eating, reading, sleeping on the ground, the walks.</summary>
+            Other,
+        }
+
+        /// <summary>
+        /// A job classified once (<see cref="Classify"/>): its kind, and the
+        /// answers some readers need beside it. Each field is its predicate's
+        /// answer whatever the kind, so a reader that looks past the kind, as
+        /// the return trip does for a delivery's work type, asks the same
+        /// question every other reader asks.
+        /// </summary>
+        internal readonly struct JobClass
+        {
+            internal readonly JobKind Kind;
+
+            /// <summary>
+            /// <see cref="WorkTypeFor"/>: the giver's work type, or the one a
+            /// giver-less medical lay-down or fishing job is charged to.
+            /// </summary>
+            internal readonly WorkTypeDef Work;
+
+            internal readonly bool PlayerForced;
+
+            /// <summary>
+            /// From an emergency giver whose job the medical-emergency setting
+            /// does not open (<see cref="EmergencyDressingAllowed"/>).
+            /// </summary>
+            internal readonly bool ExemptEmergency;
+
+            /// <summary><see cref="IsRecreationJob"/>, so true for VisitSickPawn, which is Work.</summary>
+            internal readonly bool RecreationJob;
+
+            /// <summary><see cref="IsRestJob"/>.</summary>
+            internal readonly bool RestJob;
+
+            /// <summary><see cref="IsOrdinarySleep"/>.</summary>
+            internal readonly bool OrdinarySleep;
+
+            /// <summary><see cref="Patch_JobInterception.UrgentPatient"/>.</summary>
+            internal readonly bool UrgentPatient;
+
+            /// <summary><see cref="IsIngestJob"/>.</summary>
+            internal readonly bool Ingest;
+
+            /// <summary><see cref="JobRoomTargets.IsIncidental"/>.</summary>
+            internal readonly bool Incidental;
+
+            /// <summary><see cref="IsLyingDown"/>.</summary>
+            internal readonly bool LyingDown;
+
+            internal JobClass(JobKind kind, WorkTypeDef work, bool playerForced, bool exemptEmergency,
+                              bool recreationJob, bool restJob, bool ordinarySleep, bool urgentPatient,
+                              bool ingest, bool incidental, bool lyingDown)
+            {
+                Kind = kind;
+                Work = work;
+                PlayerForced = playerForced;
+                ExemptEmergency = exemptEmergency;
+                RecreationJob = recreationJob;
+                RestJob = restJob;
+                OrdinarySleep = ordinarySleep;
+                UrgentPatient = urgentPatient;
+                Ingest = ingest;
+                Incidental = incidental;
+                LyingDown = lyingDown;
+            }
+
+            /// <summary>
+            /// A delivery or a meal run: judged by the sites it supplies rather
+            /// than where it starts. A delivery starts at the stack, and a meal
+            /// run wherever the meal is stored.
+            /// </summary>
+            internal bool HasSites => Kind == JobKind.Delivery || Kind == JobKind.MealRun;
+
+            /// <summary>
+            /// A delivery or any ignored giver's job, meal runs included: what
+            /// <see cref="KeepsTheUniformFor"/> decides for a colonist in uniform.
+            /// </summary>
+            internal bool DeliveryOrIgnored => HasSites || Kind == JobKind.IgnoredGiver;
+        }
+
+        /// <summary>
+        /// The one place a job's kind is decided. Called once per job boundary
+        /// the interception decides on, once for the job at the head of the
+        /// queue with that job's own tag, and once by the catch-up, which
+        /// looks at fewer kinds (<see cref="TryDressMidJob"/>). Never kept
+        /// across boundaries: whether a lay-down is medical rest depends on
+        /// the pawn's health at that moment, and on a setting.
+        /// </summary>
+        internal static JobClass Classify(Pawn pawn, Job job, JobTag? tag)
+        {
+            WorkGiverDef giver = job.workGiverDef;
+            WorkTypeDef work = WorkTypeFor(pawn, job, tag);
+            bool restJob = IsRestJob(job);
+            bool recreationJob = IsRecreationJob(job);
+            JobKind kind = JobRoomTargets.RidesAlong(job) ? JobKind.RidesAlong
+                : JobRoomTargets.IsDelivery(job) ? JobKind.Delivery
+                : JobRoomTargets.IsMealRun(job) ? JobKind.MealRun
+                : JobRoomTargets.Ignored(giver) ? JobKind.IgnoredGiver
+                : work != null ? JobKind.Work
+                : restJob ? JobKind.Rest
+                : recreationJob ? JobKind.Recreation
+                : JobKind.Other;
+            return new JobClass(
+                kind: kind,
+                work: work,
+                playerForced: job.playerForced,
+                exemptEmergency: giver?.emergency == true && !EmergencyDressingAllowed(giver),
+                recreationJob: recreationJob,
+                restJob: restJob,
+                ordinarySleep: IsOrdinarySleep(pawn, job, tag),
+                urgentPatient: UrgentPatient(pawn, job, tag),
+                ingest: IsIngestJob(job),
+                incidental: JobRoomTargets.IsIncidental(job),
+                lyingDown: IsLyingDown(job));
+        }
+
+        /// <summary>
         /// An ingest-family job — meals, drinks, drugs; anything driven by
         /// <see cref="JobDriver_Ingest"/> or a subclass. By driver class, not
         /// JobDefOf.Ingest, so modded ingest defs are covered too.
@@ -203,7 +351,7 @@ namespace ShiftChange
                 return false;
             }
             QueuedJob head = queue.Peek();
-            return head?.job != null && UrgentPatient(pawn, head.job, head.tag);
+            return head?.job != null && Classify(pawn, head.job, head.tag).UrgentPatient;
         }
 
         /// <summary>

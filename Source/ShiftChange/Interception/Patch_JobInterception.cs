@@ -230,6 +230,8 @@ namespace ShiftChange
             {
                 return false;
             }
+            // Every step below reads this, and none classifies the job again.
+            JobClass c = Classify(pawn, job, tag);
 
             // Sampled here, above every gate below, so the latch is tested at
             // every job boundary this mod decides on, including jobs that
@@ -239,16 +241,16 @@ namespace ShiftChange
             // MapToDecideOn has already passed over a pawn who is downed, in
             // a mental state or off the map; drafting drops the latch
             // outright (Patch_DraftClearsDressBlock).
-            UpdateChangeBackLatch(pawn, job);
+            UpdateChangeBackLatch(pawn, job, c);
 
             // The next four gates hold in BOTH directions, which is why they
             // sit above the return trip. Each lets the job start untouched.
-            // A delivery (JobRoomTargets.IsDelivery) and an ignored giver's job
-            // (JobRoomTargets.Ignored) are not among the jobs the first lets
-            // through, and are decided once the other three have run.
-            bool delivery = !job.playerForced && JobRoomTargets.IsDelivery(job);
-            bool ignored = !job.playerForced && !delivery && JobRoomTargets.Ignored(job.workGiverDef);
-            if (!delivery && !ignored && ExemptInEitherDirection(job))
+            // A delivery and an ignored giver's job are not among the jobs the
+            // first lets through, and are decided once the other three have
+            // run.
+            bool delivery = !c.PlayerForced && c.Kind == JobKind.Delivery;
+            bool ignored = !c.PlayerForced && (c.Kind == JobKind.MealRun || c.Kind == JobKind.IgnoredGiver);
+            if (!delivery && !ignored && ExemptInEitherDirection(c))
             {
                 return false;
             }
@@ -291,13 +293,13 @@ namespace ShiftChange
                 {
                     return delivery && DeliveryArm(job, tag, pawn, tracker, map);
                 }
-                if (KeepsTheUniformFor(job, dressed, map))
+                if (KeepsTheUniformFor(job, c, dressed, map))
                 {
                     return false;
                 }
             }
 
-            JobPlace target = SharedTargetPlace(job, map);
+            JobPlace target = SharedTargetPlace(job, c, map);
 
             // The return trip. Checked first: a pawn already in uniform who is
             // leaving should change back whatever the new job is.
@@ -315,7 +317,7 @@ namespace ShiftChange
                     }
                     return false;
                 }
-                return ReturnTrip(job, tag, pawn, tracker, onShift, target, map);
+                return ReturnTrip(job, tag, c, pawn, tracker, onShift, target, map);
             }
 
             // BELOW the return trip and above every dress arm: under threat,
@@ -325,20 +327,23 @@ namespace ShiftChange
                 return false;
             }
 
-            // The work arm runs first. The sleep arm turns medical lay-downs
-            // away because the work arm has already declined them, and
-            // VisitSickPawn, Doctor work that carries a joyKind, would
-            // otherwise go to the recreation arm.
-            WorkTypeDef work = WorkTypeFor(pawn, job, tag);
-            if (work != null)
+            // One arm per kind, and the kinds are tested in the arms' order
+            // (Classify): the work arm first, so VisitSickPawn, Doctor work
+            // that carries a joyKind, is work. The sleep arm turns medical
+            // lay-downs away because the work arm has already declined them.
+            // Deliveries, ignored givers and the jobs that ride along were
+            // settled above.
+            switch (c.Kind)
             {
-                return WorkArm(job, tag, pawn, tracker, work, target, map);
+                case JobKind.Work:
+                    return WorkArm(job, tag, pawn, tracker, c.Work, target, map);
+                case JobKind.Rest:
+                    return SleepArm(job, tag, c, pawn, tracker, target, map);
+                case JobKind.Recreation:
+                    return RecreationArm(job, tag, pawn, tracker, target, map);
+                default:
+                    return false;
             }
-            if (IsRestJob(job))
-            {
-                return SleepArm(job, tag, pawn, tracker, target, map);
-            }
-            return RecreationArm(job, tag, pawn, tracker, target, map);
         }
 
         /// <summary>
@@ -372,7 +377,7 @@ namespace ShiftChange
         /// The job starts as it is: no dressing for it, and no changing back
         /// first.
         /// </summary>
-        internal static bool ExemptInEitherDirection(Job job)
+        internal static bool ExemptInEitherDirection(JobClass c)
         {
             // Never divert a direct order or an emergency response, in EITHER
             // direction: the uniform rides along and the next ordinary job
@@ -384,10 +389,7 @@ namespace ShiftChange
             // emergencies stop being exempt, in both directions, and
             // firefighting never does. Why this sits above the return trip:
             // docs/DESIGN.md, "The gates"; the setting: "The sleep branch".
-            return job.playerForced
-                   || (job.workGiverDef?.emergency == true
-                       && !EmergencyDressingAllowed(job.workGiverDef))
-                   || JobRoomTargets.RidesAlong(job);
+            return c.PlayerForced || c.ExemptEmergency || c.Kind == JobKind.RidesAlong;
         }
 
         /// <summary>
@@ -454,13 +456,14 @@ namespace ShiftChange
         /// Where the job happens, read by job class, so both directions get
         /// the same answer.
         /// </summary>
-        internal static JobPlace SharedTargetPlace(Job job, Map map)
+        internal static JobPlace SharedTargetPlace(Job job, JobClass c, Map map)
         {
             // ONE room resolver per job class, consumed by BOTH directions:
             // with split reads the two arms disagreed about where a job
             // happens, and a pawn ping-ponged between stand and work forever
-            // (docs/DESIGN.md, "The recreation branch").
-            return IsRecreationJob(job) ? JoyTargetPlace(job, map) : TargetPlace(job, map);
+            // (docs/DESIGN.md, "The recreation branch"). By the recreation
+            // class, not the kind, so VisitSickPawn is read B-first too.
+            return c.RecreationJob ? JoyTargetPlace(job, map) : TargetPlace(job, map);
         }
 
         /// <summary>
@@ -468,7 +471,7 @@ namespace ShiftChange
         /// before this job, or let the uniform ride along. True if a swap
         /// started.
         /// </summary>
-        internal static bool ReturnTrip(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
+        internal static bool ReturnTrip(Job job, JobTag? tag, JobClass c, Pawn pawn, Pawn_JobTracker tracker,
                                         CompShiftStand onShift, JobPlace target, Map map)
         {
             Room standRoom = onShift.parent.GetRoom();
@@ -492,7 +495,7 @@ namespace ShiftChange
             // round, or a colonist bleeding out walks to the stand to change
             // before lying down. The same goes for an errand vanilla slips in
             // ahead of that lay-down, which it puts back in the queue untagged.
-            if (UrgentPatient(pawn, job, tag) || UrgentPatientNext(pawn, tracker))
+            if (c.UrgentPatient || UrgentPatientNext(pawn, tracker))
             {
                 return false;
             }
@@ -501,15 +504,15 @@ namespace ShiftChange
             // pawn means eat as-is; anything else is a sit-down break, so
             // change out first (decided 2026-08-08; docs/DESIGN.md, "Meal
             // breaks").
-            if (IsIngestJob(job))
+            if (c.Ingest)
             {
                 return MealBreak(job, tag, pawn, tracker, onShift, target, map);
             }
             // A delivery or a meal run the stand did not keep on above goes by
             // its sites and its stack, not by one place (SiteJobStaysDressed).
-            if (HasSites(job))
+            if (c.HasSites)
             {
-                if (SiteJobStaysDressed(job, tag, pawn, onShift, target, map))
+                if (SiteJobStaysDressed(job, c, pawn, onShift, target, map))
                 {
                     return false;
                 }
@@ -528,7 +531,7 @@ namespace ShiftChange
                     return false;
                 }
             }
-            else if (StaysDressed(job, tag, pawn, onShift, target, map))
+            else if (StaysDressed(job, c, pawn, onShift, target, map))
             {
                 return false;
             }
@@ -536,7 +539,7 @@ namespace ShiftChange
             // coming straight back to it, so changing out first is a round
             // trip to the stand for nothing. Below the meal branch on
             // purpose, which keeps its own policy. See QueuedAheadOfServedWork.
-            if (QueuedAheadOfServedWork(job, pawn, tracker, onShift, map))
+            if (QueuedAheadOfServedWork(job, c, pawn, tracker, onShift, map))
             {
                 if (Verbose)
                 {
@@ -584,18 +587,20 @@ namespace ShiftChange
         /// the incidental jobs alone; a sleep stand nothing, since staying in
         /// bed was settled above (docs/DESIGN.md, "Catchments").
         /// </summary>
-        internal static bool StaysDressed(Job job, JobTag? tag, Pawn pawn, CompShiftStand onShift,
+        internal static bool StaysDressed(Job job, JobClass c, Pawn pawn, CompShiftStand onShift,
                                           JobPlace target, Map map)
         {
             // The dress arms' own classification, in their order. A job this
             // stand would dress the pawn for must not change them back, or the
-            // next boundary dresses them again.
-            WorkTypeDef work = WorkTypeFor(pawn, job, tag);
+            // next boundary dresses them again. By the work type rather than
+            // the kind, because a delivery's or a meal run's colonist reaches
+            // this too (SiteJobStaysDressed), and is judged by its giver's work.
+            WorkTypeDef work = c.Work;
             bool served = work != null
                 ? onShift.HandlesWork(work)
-                : IsRestJob(job)
-                    ? IsOrdinarySleep(pawn, job, tag) && onShift.HandlesRest()
-                    : IsRecreationJob(job) && onShift.HandlesRecreation();
+                : c.RestJob
+                    ? c.OrdinarySleep && onShift.HandlesRest()
+                    : c.RecreationJob && onShift.HandlesRecreation();
             if (served)
             {
                 // An unreadable location stays dressed, as in room mode.
@@ -614,7 +619,7 @@ namespace ShiftChange
             }
             // Idling and the walks are judged where they go, and a wait, which
             // goes nowhere, where the pawn stands.
-            return JobRoomTargets.IsIncidental(job)
+            return c.Incidental
                    && onShift.Covers(target.IsValid ? target : JobPlace.At(pawn.Position), map);
         }
 
@@ -681,20 +686,19 @@ namespace ShiftChange
         /// Dress for bed at a sleep stand whose catchment covers the bed. True
         /// if a swap started.
         /// </summary>
-        internal static bool SleepArm(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
+        internal static bool SleepArm(Job job, JobTag? tag, JobClass c, Pawn pawn, Pawn_JobTracker tracker,
                                       JobPlace target, Map map)
         {
-            // The SLEEP arm. Disjoint from the other two by construction: a
-            // lay-down job carries no joyKind, and the tag test in
-            // IsOrdinarySleep keeps MEDICAL bed rest out. Reaching it means the
-            // work arm declined the job (MedicalRestWorkType resolved no work
-            // type), and a pyjama stand must not then take it as ordinary
-            // sleep. Its workGiverDef limb is a conservative catch for a
-            // modded giver with a null workType. Do not add
+            // The SLEEP arm, for a rest job the work arm did not take. The tag
+            // test in IsOrdinarySleep keeps MEDICAL bed rest out: reaching
+            // here means the work arm declined it (MedicalRestWorkType
+            // resolved no work type), and a pyjama stand must not then take it
+            // as ordinary sleep. Its workGiverDef limb is a conservative catch
+            // for a modded giver with a null workType. Do not add
             // HealthAIUtility.ShouldSeekMedicalRest here: it cannot tell "hurt"
             // from "night", and once killed bedtime for every wounded colonist.
             // Why each: docs/DESIGN.md, "The sleep branch".
-            if (!IsOrdinarySleep(pawn, job, tag))
+            if (!c.OrdinarySleep)
             {
                 return false;
             }
@@ -730,19 +734,18 @@ namespace ShiftChange
 
         /// <summary>
         /// Dress for recreation at a stand whose catchment covers where it
-        /// happens, if the job is recreation at all. True if a swap started.
+        /// happens. True if a swap started.
         /// </summary>
         internal static bool RecreationArm(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker,
                                            JobPlace target, Map map)
         {
-            // The RECREATION arm. Joy jobs carry no workGiverDef, so it is
-            // disjoint from the work arm by construction. The shared resolver
-            // has already read the room B-first (JoyTargetCell), where the
-            // pawn will sit, because this is a recreation job.
-            if (!IsRecreationJob(job))
-            {
-                return false;
-            }
+            // The RECREATION arm, for a recreation job the work arm did not
+            // take. Joy jobs carry no workGiverDef, so a joy giver's job never
+            // reaches the work arm: only JobGiver_Work stamps one
+            // (JobGiver_Work.cs:240, :334, :345), and a prioritized order
+            // (Pawn_JobTracker.cs:881). The shared resolver has already read
+            // the room B-first (JoyTargetCell), where the pawn will sit.
+            //
             // Vanilla hands joy to pawns lying in bed so they stay there, so
             // in-bed joy never pulls a patient out to a wardrobe. OnABed, not
             // pawn.InBed() (docs/DESIGN.md, "The recreation branch").

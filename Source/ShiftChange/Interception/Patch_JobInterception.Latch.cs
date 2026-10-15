@@ -60,7 +60,7 @@ namespace ShiftChange
         /// <c>Room.IsDoorway</c>, so in room mode a pawn caught mid-door reads
         /// as "left": a hair early, and they are in fact leaving.)
         /// </summary>
-        internal static void UpdateChangeBackLatch(Pawn pawn, Job job)
+        internal static void UpdateChangeBackLatch(Pawn pawn, Job job, JobClass c)
         {
             ChangeBackLatch latch;
             if (!ChangedBackAt.TryGetValue(pawn, out latch))
@@ -70,18 +70,18 @@ namespace ShiftChange
             CompShiftStand stand = latch.Stand != null && latch.Stand.Spawned
                 ? latch.Stand.TryGetComp<CompShiftStand>()
                 : null;
-            if (stand == null || !StillInside(stand, pawn, job))
+            if (stand == null || !StillInside(stand, pawn, job, c))
             {
                 ChangedBackAt.Remove(pawn);
                 return;
             }
             // The job tracker's pause between jobs finishes the last one, so
             // it neither lies down nor wakes anyone.
-            if (JobRoomTargets.RidesAlong(job))
+            if (c.Kind == JobKind.RidesAlong)
             {
                 return;
             }
-            if (IsLyingDown(job))
+            if (c.LyingDown)
             {
                 latch.LaidDown = true;
             }
@@ -101,7 +101,7 @@ namespace ShiftChange
         /// job tracker's pause after it, which names no place. None of that is
         /// leaving.
         /// </summary>
-        internal static bool StillInside(CompShiftStand stand, Pawn pawn, Job job)
+        internal static bool StillInside(CompShiftStand stand, Pawn pawn, Job job, JobClass c)
         {
             Map map = pawn.MapHeld;
             if (stand.Covers(pawn.Position, map))
@@ -120,7 +120,7 @@ namespace ShiftChange
                     return true;
                 }
             }
-            JobPlace place = SharedTargetPlace(job, map);
+            JobPlace place = SharedTargetPlace(job, c, map);
             return place.IsValid && stand.Covers(place, map);
         }
 
@@ -132,7 +132,12 @@ namespace ShiftChange
         internal static bool LyingDownNext(Pawn pawn)
         {
             JobQueue queue = pawn.jobs?.jobQueue;
-            return queue != null && queue.Count > 0 && IsLyingDown(queue.Peek()?.job);
+            if (queue == null || queue.Count == 0)
+            {
+                return false;
+            }
+            QueuedJob head = queue.Peek();
+            return head?.job != null && Classify(pawn, head.job, head.tag).LyingDown;
         }
 
         /// <summary>

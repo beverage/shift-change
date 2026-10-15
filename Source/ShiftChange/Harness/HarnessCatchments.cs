@@ -355,7 +355,9 @@ namespace ShiftChange
             {
                 return Expect(false, "a granite rock spawns in the stand's room");
             }
-            JobPlace place = Patch_JobInterception.SharedTargetPlace(JobOn(JobDefOf.Mine, mine, rock), fix.Map);
+            Job mineRock = JobOn(JobDefOf.Mine, mine, rock);
+            JobPlace place = Patch_JobInterception.SharedTargetPlace(
+                mineRock, Patch_JobInterception.Classify(fix.Pawn, mineRock, null), fix.Map);
             bool ok = Expect(rock.Position.GetRoom(fix.Map) == null && place.Cell == rock.Position
                              && place.RoomCell != rock.Position && place.RoomCell.GetRoom(fix.Map) != null,
                              "the rock's own cell has no room, so the job's room cell is a floor cell beside it (control)")

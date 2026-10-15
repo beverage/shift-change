@@ -12,17 +12,6 @@ namespace ShiftChange
     public static partial class Patch_JobInterception
     {
         /// <summary>
-        /// A job judged by the sites it supplies rather than where it starts:
-        /// a delivery (<see cref="JobRoomTargets.IsDelivery"/>), which starts at
-        /// the stack, or a meal run (<see cref="JobRoomTargets.IsMealRun"/>),
-        /// which starts wherever the meal is stored.
-        /// </summary>
-        internal static bool HasSites(Job job)
-        {
-            return JobRoomTargets.IsDelivery(job) || JobRoomTargets.IsMealRun(job);
-        }
-
-        /// <summary>
         /// A colonist on shift at <paramref name="stand"/> keeps its uniform on
         /// for this delivery or ignored giver's job: the stand serves its work
         /// (<see cref="ServesSiteWork"/>), and for a delivery or a meal run
@@ -35,14 +24,16 @@ namespace ShiftChange
         /// changed back at the next job there, after the walk out, rather than
         /// now, while the stand is near. docs/DESIGN.md, "Mod compatibility".
         /// </summary>
-        internal static bool KeepsTheUniformFor(Job job, CompShiftStand stand, Map map)
+        internal static bool KeepsTheUniformFor(Job job, JobClass c, CompShiftStand stand, Map map)
         {
-            return ServesSiteWork(job, stand) && (!HasSites(job) || SitesCovered(job, stand, map));
+            return ServesSiteWork(job, stand) && (!c.HasSites || SitesCovered(job, stand, map));
         }
 
         /// <summary>
         /// The stand serves the work type of the giver that handed out this
-        /// job, or construction for building materials or an item to install
+        /// job (every job asked about here has one, so this is
+        /// <see cref="JobClass.Work"/> wherever the giver names a work type),
+        /// or construction for building materials or an item to install
         /// (<c>HaulToContainer</c>) filed under a hauling work type: vanilla
         /// files the builder's fetch under Hauling when hauling outranks
         /// construction or the blueprint needs more skill, and Complex Jobs
@@ -105,7 +96,7 @@ namespace ShiftChange
         /// pass-through work at a work stand and nothing anywhere else.
         /// docs/DESIGN.md, "Mod compatibility".
         /// </summary>
-        internal static bool SiteJobStaysDressed(Job job, JobTag? tag, Pawn pawn, CompShiftStand onShift,
+        internal static bool SiteJobStaysDressed(Job job, JobClass c, Pawn pawn, CompShiftStand onShift,
                                                  JobPlace target, Map map)
         {
             if (ServesSiteWork(job, onShift))
@@ -116,7 +107,7 @@ namespace ShiftChange
             {
                 return EveryPlaceCovered(job, pawn, onShift, map);
             }
-            return StaysDressed(job, tag, pawn, onShift, target, map);
+            return StaysDressed(job, c, pawn, onShift, target, map);
         }
 
         /// <summary>
@@ -182,7 +173,7 @@ namespace ShiftChange
         /// trip keeps on for another reason, <see cref="SiteJobStaysDressed"/>,
         /// does not count, as no work the stand does not serve does); or other work the stand
         /// serves, inside its catchment, classified as the dress arms classify
-        /// it (<see cref="WorkTypeFor"/>), so fishing counts with no giver
+        /// it (<see cref="Classify"/>, with the queued job's own tag), so fishing counts with no giver
         /// stamped and no tag, as does an urgent patient's bed rest with the
         /// medical-emergency setting on (with it off,
         /// <see cref="UrgentPatientNext"/> keeps the uniform on). Vanilla's
@@ -193,10 +184,10 @@ namespace ShiftChange
         /// The signal, exactly, and both sources: docs/DESIGN.md, "Errands
         /// queued ahead of work".
         /// </summary>
-        internal static bool QueuedAheadOfServedWork(Job job, Pawn pawn, Pawn_JobTracker tracker,
+        internal static bool QueuedAheadOfServedWork(Job job, JobClass c, Pawn pawn, Pawn_JobTracker tracker,
                                                      CompShiftStand onShift, Map map)
         {
-            if (job.workGiverDef != null || IsRecreationJob(job) || IsRestJob(job))
+            if (job.workGiverDef != null || c.RecreationJob || c.RestJob)
             {
                 return false;
             }
@@ -216,16 +207,16 @@ namespace ShiftChange
             {
                 return true;
             }
-            if (JobRoomTargets.IsDelivery(next) || JobRoomTargets.Ignored(next.workGiverDef))
+            JobClass n = Classify(pawn, next, head.tag);
+            if (n.DeliveryOrIgnored)
             {
-                return KeepsTheUniformFor(next, onShift, map);
+                return KeepsTheUniformFor(next, n, onShift, map);
             }
-            WorkTypeDef work = WorkTypeFor(pawn, next, head.tag);
-            if (work == null || !onShift.HandlesWork(work))
+            if (n.Work == null || !onShift.HandlesWork(n.Work))
             {
                 return false;
             }
-            return onShift.Covers(SharedTargetPlace(next, map), map);
+            return onShift.Covers(SharedTargetPlace(next, n, map), map);
         }
     }
 }

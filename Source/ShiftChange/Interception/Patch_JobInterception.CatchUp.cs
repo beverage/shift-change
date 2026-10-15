@@ -103,20 +103,30 @@ namespace ShiftChange
                     continue;
                 }
                 WorkGiverDef giver = job.workGiverDef;
-                // The ignored-giver gate applies here too. StartJob's copy
-                // only stops a pawn being dressed as they TAKE such a job; a
-                // freed stand would otherwise reach across and pull them off
-                // one mid-haul, which is the same wardrobe detour by another
-                // route.
+                // Classified with no tag. Only a giver-less job's work type
+                // depends on one, and neither test below reads it: the work
+                // test needs a stamped giver, and the recreation class does
+                // not look at the tag.
+                JobClass c = Classify(pawn, job, null);
+                // FEWER KINDS THAN StartJob, on purpose: work from a stamped
+                // giver that is not an emergency, and recreation. A giver-less
+                // job the work arm takes, medical bed rest or unstamped
+                // fishing, is never caught up, and neither is any emergency,
+                // which the medical-emergency setting does not change.
+                // Deliveries and ignored givers are not Work, so they stay out:
+                // StartJob only stops a pawn being dressed as they TAKE such a
+                // job, and a freed stand would otherwise reach across and pull
+                // them off one mid-haul, the same wardrobe detour by another
+                // route. docs/DESIGN.md, "The mid-job catch-up".
                 bool forWork = giver?.workType != null && !giver.emergency
-                    && !JobRoomTargets.Ignored(giver) && !JobRoomTargets.IsDelivery(job)
-                    && stand.HandlesWork(giver.workType);
+                    && c.Kind == JobKind.Work && stand.HandlesWork(c.Work);
                 // The joy twin: a colonist already at recreation bare when
                 // this stand freed — the pool-party case — is caught up the
-                // same way. Joy jobs carry no workGiverDef, so the two arms
-                // are disjoint by construction.
+                // same way. Joy jobs carry no workGiverDef (RecreationArm says
+                // who stamps one), so the two arms are disjoint by
+                // construction.
                 bool forRecreation = !forWork && giver == null
-                    && stand.HandlesRecreation() && IsRecreationJob(job)
+                    && stand.HandlesRecreation() && c.RecreationJob
                     // The dress arm's bed guard applies here too: never pull a
                     // pawn out of bed. Its outdoor guard returned above.
                     && !OnABed(pawn);
@@ -124,10 +134,11 @@ namespace ShiftChange
                 // interrupts a pawn already doing the thing the freed stand
                 // dresses for, and the sleep equivalent is a colonist asleep
                 // in bed — who is excluded twice over before the arms are even
-                // consulted: LayDown sets casualInterruptible false, which the
-                // job filter above rejects, and the OnABed guard would reject
-                // them again. Waking someone to put pyjamas on is the one
-                // catch-up nobody wants.
+                // consulted: LayDown sets casualInterruptible false
+                // (Core/Defs/JobDefs/Jobs_Misc.xml), which the job filter above
+                // rejects, and the OnABed guard would reject them again.
+                // Waking someone to put pyjamas on is the one catch-up nobody
+                // wants.
                 if (!forWork && !forRecreation)
                 {
                     continue;
@@ -139,7 +150,7 @@ namespace ShiftChange
                 // dress/undress churn per stand-freed event (fix-verify,
                 // 2026-08-15). Every site answers "where does this job
                 // happen" identically or the two answers fight.
-                if (!stand.Covers(SharedTargetPlace(job, map), map))
+                if (!stand.Covers(SharedTargetPlace(job, c, map), map))
                 {
                     continue;
                 }
