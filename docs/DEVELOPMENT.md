@@ -408,47 +408,101 @@ flowchart LR
 
 ### `Source/ShiftChange/`
 
+Folders by concern. Everything outside `Dev/` and `Harness/` ships, and `check-invariants.py` holds that line: a file in `Dev/` must be dev-only, and a dev-only file anywhere else fails. Every file keeps the one `ShiftChange` namespace, so a file moves between folders without touching a def, a save or a patch.
+
 | File | Role |
 |---|---|
-| `Patch_JobInterception.cs` | Prefix on `StartJob`. Decides whether to divert, defers the original job, carries the mid-job catch-up. |
-| `JobDriver_SwapAtStand.cs` | Moves apparel, one direction at a time. Sets the forced flag on the way in, clears it on the way out. |
-| `SwapPlan.cs` | The single answer to "what would this swap move". Every wearability predicate lives here. |
-| `CompShiftStand.cs` | Per-stand work types and the checkout ledger. What the stand serves, its room, a radius or an allowed area, and `Covers`, the one membership test. Static registries of on-shift stands and of radius and area stands. |
-| `JobPlace.cs` | Where a job happens: the cell its target names and, for a solid target, the cell beside it with a room. |
-| `JobRoomTargets.cs` | Tables for jobs whose targets mislead: which end is the place, the ignored givers, deliveries, giver-less fishing, the ride-along, incidental and pass-through lists. |
-| `Alert_ShiftStandServesNothing.cs` | The alert for stands set to serve something that serve nothing: in the open, area gone, or outside their area. |
-| `ServesMenuOption.cs` | A float-menu row that opens a section of the Serves menu with a gap. |
-| `CompAssignableToPawn_ShiftStand.cs` | Ownership. Narrows candidates to pawns capable of the stand's work, swaps the vanilla assign window for ours, and keeps any other mod's owner list on the stand as a copy of ours (reconciling the two once for an older save). On a stand not used for shift changes, keeps a group from shift use until the player picks one colonist (`AssignSoleOwner`). |
-| `Dialog_AssignStandOwners.cs` | The owner list. Replaces `Dialog_AssignBuildingOwner` for stands only — multi-select, a gender column and a gender filter, none of which the vanilla window exposes a seam for. On a stand not used for shift changes, Assign is a pick that replaces the list, and Assign all is not drawn. |
-| `Interop_OutfitStandsPlus.cs` | Reflection bridge to Outfit Stands Plus. Silent-fail; absent mod means an inert file. |
-| `Patch_OutfitStandsPlusUseButton.cs` | Transpiler that swaps the walk over every colony building, in Outfit Stands Plus' per-colonist stand button, for a per-map list of the colony's stands kept in the same order. Applied by hand from `HarmonyInit`, and only while their original IL still makes that call; otherwise it leaves the button alone and says why. Its case is in `Harness/HarnessInterop.cs`. |
-| `Patch_ForeignOwnerGizmos.cs` | Hides the other mod's Set owner control on every stand carrying ours, in both modes. Its list is a copy of ours, so an edit made through it would only be overwritten. |
-| `Patch_AllowRemovingToggle.cs` | Holds the stand's "Allow removing items" off while it is in service. |
-| `Patch_ChangeBackGizmo.cs` | "Change back" command on a pawn in uniform, setting the latch per stand and trigger that the stand search honours; drafting drops it. |
-| `Patch_OptimizeApparelOnShift.cs` | Pauses the vanilla wardrobe optimizer while a pawn is checked out. |
-| `Patch_UnclaimStands.cs` | Releases stands when vanilla unclaims beds and thrones. Holds the reaper both it and the banish patch call. |
-| `Patch_BanishStands.cs` | Calls the same reaper for banishment, the one colony exit vanilla routes past `UnclaimAll`. |
-| `RoomWorkTypes.cs` | Room role to work type sets. Keyed by defName, silent-fail. |
-| `Dialog_SetStandWorkTypes.cs` | Per-stand work type picker. |
 | `ShiftChangeMod.cs` | Mod settings. |
 | `ShiftChangeDefOf.cs` | Def references. |
 | `SessionGuard.cs` | Clears session-scoped statics when the loaded game changes. Route any new static through it. |
 | `HarmonyInit.cs` | Patch bootstrap. |
+
+#### `Interception/`
+
+`Patch_JobInterception` is one `partial` class across seven files, so `[HarmonyPatch]` stays on one declaration.
+
+| File | Role |
+|---|---|
+| `Patch_JobInterception.cs` | Prefix on `StartJob`. The kill switch and fault latch, `TryInsertSwap` with its steps declared below it in the order they run (the gates, the return trip, the threat gate, then the work, sleep and recreation arms), and `Insert`, which defers the original job. |
+| `Patch_JobInterception.Latch.cs` | The change-back latch, and the record of the job a pawn was just dressed for. |
+| `Patch_JobInterception.CatchUp.cs` | The mid-job catch-up: a stand that comes free dresses the nearest colonist already doing what it serves. |
+| `Patch_JobInterception.Deliveries.cs` | Deliveries and meal runs, judged by where they go: the site rule that keeps a uniform on, the area stand's delivery arm, and an errand queued ahead of served work. |
+| `Patch_JobInterception.JobKinds.cs` | What kind of job this is: eating, recreation, sleep, medical rest and the urgent patient, beds, and where recreation happens. |
+| `Patch_JobInterception.StandSearch.cs` | Finding a stand: the trigger each one serves, and the nearest a pawn may use. |
+| `Patch_JobInterception.Places.cs` | Where a job happens and whether a catchment covers it: the shared resolver, `RoomBearing` for a solid target with no room of its own, and the coverage checks over every place a job names. |
+| `JobPlace.cs` | Where a job happens: the cell its target names and, for a solid target, the cell beside it with a room. |
+| `JobRoomTargets.cs` | Tables for jobs whose targets mislead: which end is the place, the ignored givers, deliveries, giver-less fishing, the ride-along, incidental and pass-through lists. |
+| `Patch_ChangeBackGizmo.cs` | "Change back" command on a pawn in uniform, setting the latch per stand and trigger that the stand search honours; drafting drops it. |
+
+#### `Swap/`
+
+| File | Role |
+|---|---|
+| `JobDriver_SwapAtStand.cs` | Moves apparel, one direction at a time. Sets the forced flag on the way in, clears it on the way out. |
+| `SwapPlan.cs` | The single answer to "what would this swap move". Every wearability predicate lives here. |
+| `Patch_OptimizeApparelOnShift.cs` | Pauses the vanilla wardrobe optimizer while a pawn is checked out. |
+| `Patch_ParkedKitOutscoresSpares.cs` | Stops a checked-out pawn re-arming from the colony's spare pile while their own kit sits parked in the stand. |
+
+#### `Stand/`
+
+| File | Role |
+|---|---|
+| `CompShiftStand.cs` | Per-stand work types, triggers and the checkout ledger, with its save, inspect pane and gizmos. Static registry of on-shift stands. |
+| `CompShiftStand.Catchment.cs` | What the stand serves: its room, a radius or an allowed area, and `Covers`, the one membership test. The Serves setting with its labels and ring, and the static registry of radius and area stands. |
+| `Alert_ShiftStandServesNothing.cs` | The alert for stands set to serve something that serve nothing: in the open, area gone, or outside their area. |
+| `ServesMenuOption.cs` | A float-menu row that opens a section of the Serves menu with a gap. |
+| `Dialog_SetStandWorkTypes.cs` | Per-stand work type picker. |
+| `RoomWorkTypes.cs` | Room role to work type sets. Keyed by defName, silent-fail. |
+| `RoomContentsWork.cs` | Work types a room earns from what stands in it, for rooms the engine gives no useful role. |
+| `WorkTypeLabels.cs` | One place to turn a work type into the name the player sees. |
+| `Patch_AllowRemovingToggle.cs` | Holds the stand's "Allow removing items" off while it is in service. |
+| `Patch_DepositOnlyHauling.cs` | Keeps haulers out of a deposit-only stand, which takes in only what the sleep change parks on it. |
+| `Patch_WithholdFromTrade.cs` | Keeps a shift stand's contents out of trade windows. |
+
+#### `Ownership/`
+
+| File | Role |
+|---|---|
+| `CompAssignableToPawn_ShiftStand.cs` | Ownership. Narrows candidates to pawns capable of the stand's work, swaps the vanilla assign window for ours, and keeps any other mod's owner list on the stand as a copy of ours (reconciling the two once for an older save). On a stand not used for shift changes, keeps a group from shift use until the player picks one colonist (`AssignSoleOwner`). |
+| `Dialog_AssignStandOwners.cs` | The owner list. Replaces `Dialog_AssignBuildingOwner` for stands only — multi-select, a gender column and a gender filter, none of which the vanilla window exposes a seam for. On a stand not used for shift changes, Assign is a pick that replaces the list, and Assign all is not drawn. |
+| `Patch_UnclaimStands.cs` | Releases stands when vanilla unclaims beds and thrones. Holds the reaper both it and the banish patch call. |
+| `Patch_BanishStands.cs` | Calls the same reaper for banishment, the one colony exit vanilla routes past `UnclaimAll`. |
+
+#### `Interop/`
+
+| File | Role |
+|---|---|
+| `Interop_OutfitStandsPlus.cs` | Reflection bridge to Outfit Stands Plus. Silent-fail; absent mod means an inert file. |
+| `Patch_OutfitStandsPlusUseButton.cs` | Transpiler that swaps the walk over every colony building, in Outfit Stands Plus' per-colonist stand button, for a per-map list of the colony's stands kept in the same order. Applied by hand from `HarmonyInit`, and only while their original IL still makes that call; otherwise it leaves the button alone and says why. Its case is in `Harness/HarnessInterop.cs`. |
+| `Patch_ForeignOwnerGizmos.cs` | Hides the other mod's Set owner control on every stand carrying ours, in both modes. Its list is a copy of ours, so an edit made through it would only be overwritten. |
+
+#### `Dev/`
+
+Each file here is guarded whole, by `SCENES`, `DEBUG` or `SCENES || HARNESS`, and none of it ships.
+
+| File | Role |
+|---|---|
 | `DebugTools_Fixtures.cs` | Fixture primitives — make a thing, a pawn, a garment. `SCENES \|\| HARNESS`: both dev-only callers gate independently and both build their fixtures from these. |
-| `Harness/DebugTools_LifecycleHarness.cs` | `HARNESS` only. The test suite: the runner, its assertions, its self-check, and the list that registers every case in the order they run. The other cases' bodies, which drive real engine entry points, live in the files beside it — see [TESTING.md](TESTING.md). Its `[DebugAction]` wrapper is `SCENES` on top of that. |
-| `Harness/DebugTools_SaveRoundTrip.cs` | `HARNESS` only. The four save/load cases. Separate file because they replace `Current.Game` and must run last. |
-| `Harness/HarnessCatchments.cs` | `HARNESS` only. The catchment cases: radius and area coverage, the dress and return paths in each mode, deliveries, the latch, the area UI. |
-| `Patch_HarnessAutoRun.cs` | `HARNESS` only. Runs the harness and quits, when launched with `-shiftchange-harness`. Neither it nor the flag exists in a shipping build. |
 | `DebugTools_Menu.cs` | `SCENES` only. The mod's entire debug-menu surface: one "Dev tools…" submenu. Absent in Release, so the category never renders. |
 | `DebugTools_DemoStage.cs` | `SCENES` only. The demo stage. Test fixture and film set. Clears 13×16 before building. |
 | `DebugTools_PreviewStage.cs` | `SCENES` only. The title-card stage, sized to crop to Workshop cards. Clears 32×10 before building. |
 | `DebugTools_PoolStage.cs` | `SCENES` only. The pool fixture for the recreation arm, plus **Drain recreation** for forcing a joy roll. |
 | `DebugTools_RecRoomStage.cs` | `SCENES` only. The black-tie games room: eight guests, eight stands, four joyKinds. Unlocks the research tree so the set can be redressed by hand. |
+| `DebugTools_SleepStage.cs` | `SCENES` only. Bedtime in prestige cataphract, in the two shapes the gallery needs. |
 | `DebugTools_ExportScene.cs` | `SCENES` only. Turns a hand-dressed room into the C# that rebuilds it. Pure inspection — reads the map, writes a file. |
 | `DebugTools_Explain.cs` | `SCENES` only. Reports why a pawn is or is not taking recreation, one gate at a time. |
 | `HotReloadVisibility.cs` | Debug only. `InternalsVisibleTo` grants for the reload twins. |
 | `EcrWatchdog.cs` | Debug only. Polls for rebuilds, because Mono's `FileSystemWatcher` never fires on macOS. |
 | `Patch_ModeBadge.cs` | Debug only. The on-screen live/lab badge. |
+
+#### `Harness/`
+
+| File | Role |
+|---|---|
+| `DebugTools_LifecycleHarness.cs` | `HARNESS` only. The test suite: the runner, its assertions, its self-check, and the list that registers every case in the order they run. The other cases' bodies, which drive real engine entry points, live in the files beside it — see [TESTING.md](TESTING.md). Its `[DebugAction]` wrapper is `SCENES` on top of that. |
+| `DebugTools_SaveRoundTrip.cs` | `HARNESS` only. The four save/load cases. Separate file because they replace `Current.Game` and must run last. |
+| `HarnessCatchments.cs` | `HARNESS` only. The catchment cases, one `partial` class: `.Radius` for coverage and dressing in a ring, `.ReturnTrip`, `.Deliveries`, `.Area`, `.AreaUi` for the alert and the Serves menu, and `.Latch`. The main file holds the cases true in every mode and the helpers several files share. |
+| `Patch_HarnessAutoRun.cs` | `HARNESS` only. Runs the harness and quits, when launched with `-shiftchange-harness`. Neither it nor the flag exists in a shipping build. |
 
 ### Content
 
