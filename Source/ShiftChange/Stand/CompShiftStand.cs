@@ -12,6 +12,22 @@ namespace ShiftChange
         {
             compClass = typeof(CompShiftStand);
         }
+
+        /// <summary>
+        /// Asks the engine to tell this stand's comps when its map is removed,
+        /// for <see cref="CompShiftStand.Notify_MapRemoved"/>. Map removal never
+        /// despawns a building, and <c>ThingWithComps.Notify_MyMapRemoved</c>
+        /// passes the news on to comps only for a def that sets
+        /// <c>notifyMapRemoved</c>. Set here, where the engine resolves each
+        /// def's comps, rather than in the patch files: every def that carries
+        /// this comp gets it, whichever mod added the comp, and no def can end
+        /// up with the field written twice.
+        /// </summary>
+        public override void ResolveReferences(ThingDef parentDef)
+        {
+            base.ResolveReferences(parentDef);
+            parentDef.notifyMapRemoved = true;
+        }
     }
 
     /// <summary>
@@ -331,10 +347,17 @@ namespace ShiftChange
                     OnShiftStands[borrower] = this;
                     if (!respawningAfterLoad)
                     {
-                        // Set back down, not loaded. PostDeSpawn took the
-                        // forced flags off so a box that never came back could
-                        // not pin anyone; the box DID come back, so put them
-                        // on again and the shift resumes exactly as it stood.
+                        // Set back down, not loaded: a reinstall from a box,
+                        // or a gravship landing. A box had the forced flags
+                        // taken off (PostDeSpawn) so a box that never came
+                        // back could not pin anyone; it did come back, so they
+                        // go on again and the shift resumes as it stood. A
+                        // flight never took them off, so on a landing this only
+                        // re-sets one cleared by hand since dressing. That
+                        // changes nothing while the shift lasts: the wardrobe
+                        // optimizer, the one reader that acts on the flag, is
+                        // paused for anyone on shift, and every way out of the
+                        // shift clears it.
                         //
                         // Load-gated deliberately: on a load the flags are the
                         // pawn's own scribed state, and re-forcing there would
@@ -364,9 +387,9 @@ namespace ShiftChange
                 // them — uniform and civvies swapped for good.
                 //
                 // The ledger is re-registered on landing by PostSpawnSetup, and
-                // PostSwapMap below handles a borrower who did not come along.
-                // Vanilla's own comp on this same building guards the identical
-                // case (CompAssignableToPawn.cs:199).
+                // PostSwapMap below decides about a borrower who did not come
+                // along. Vanilla's own comp on this same building guards the
+                // identical case (CompAssignableToPawn.cs:199).
                 return;
             }
             if (mode == DestroyMode.Vanish)
@@ -412,11 +435,19 @@ namespace ShiftChange
         /// <summary>
         /// The stand has been set back down on a new map after a gravship
         /// flight. The ledger was kept across the trip on purpose (see
-        /// <see cref="PostDeSpawn"/>), so the only open question is whether the
-        /// borrower came too — a colonist left behind cannot walk back for
-        /// their clothes, and their uniform would stay force-worn forever.
+        /// <see cref="PostDeSpawn"/>), so the only open question is where the
+        /// borrower is.
         ///
-        /// Mirrors vanilla's <c>CompAssignableToPawn.PostSwapMap</c>
+        /// <para>Not on any map: left on one the takeoff abandoned, with no
+        /// grav anchor. They cannot come back for their clothes and the uniform
+        /// would stay force-worn forever, so the ledger is released. On another
+        /// map that is still there, kept by an anchor: the shift stays
+        /// suspended, uniform forced and wardrobe paused, until they share a
+        /// map again, and then resumes on its own. A player's mistake or an
+        /// emergency split them, and putting it right is the player's to do
+        /// (decided 2026-10-16; docs/DESIGN.md, "Ownership and the ledger").</para>
+        ///
+        /// The test is vanilla's own, from <c>CompAssignableToPawn.PostSwapMap</c>
         /// (<c>CompAssignableToPawn.cs:222-230</c>) on the same building.
         /// </summary>
         public override void PostSwapMap()
@@ -434,9 +465,40 @@ namespace ShiftChange
                 ReleaseBorrower();
                 return;
             }
-            // Idempotent with PostSpawnSetup's own rebuild; ordering between
-            // the two is not guaranteed and both must leave the registry right.
+            // PostSpawnSetup registered it already, since the landing spawns
+            // everything before it calls this (GravshipPlacementUtility);
+            // repeated so this method leaves the registry right on its own.
             OnShiftStands[borrower] = this;
+        }
+
+        /// <summary>
+        /// The stand's map is being removed with the stand still on it: a
+        /// takeoff from a map with no grav anchor leaves it behind
+        /// (<c>GravshipUtility.AbandonMap</c>), or any other map is abandoned
+        /// or closed. Removal never despawns a building, so
+        /// <see cref="PostDeSpawn"/> never runs: <c>Thing.Notify_MyMapRemoved</c>
+        /// marks the stand discarded, and this is the only word it gets. The
+        /// def flag that asks for it is set by
+        /// <see cref="CompProperties_ShiftStand.ResolveReferences"/>.
+        ///
+        /// <para>The stand and the parked clothes go with the map, so the
+        /// shift can never end and the ledger is released, forced flags first.
+        /// A borrower who flew away keeps the uniform as ordinary clothing. One
+        /// left on the map is lost with it, and the release costs nothing.
+        /// Without this the registry dropped the lost stand quietly
+        /// (<see cref="OnShiftStandFor"/>) and the uniform stayed forced with
+        /// no ledger left to clear it. It runs during the takeoff, so no save
+        /// can come between the loss and the release.</para>
+        ///
+        /// <para>Not <see cref="AbandonLedger"/>: its catch-up sweeps the
+        /// stand's map for someone to dress, and that map is being removed. A
+        /// stand boxed on the map hears this too, since removal reaches things
+        /// inside containers.</para>
+        /// </summary>
+        public override void Notify_MapRemoved()
+        {
+            base.Notify_MapRemoved();
+            ReleaseBorrower();
         }
 
         /// <summary>

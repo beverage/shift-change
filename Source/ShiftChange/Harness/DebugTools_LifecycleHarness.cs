@@ -178,8 +178,20 @@ namespace ShiftChange
             // First: every case below takes for granted what this checks.
             Case(map, pad, "the fixture colonist is healthy and holds still under the stopped clock, and ground past the pad is ground",
                  HarnessFixtureChecks.FixtureColonistHoldsStill);
-            Case(map, pad, "gravship flight keeps the ledger", GravshipFlight);
+            Case(map, pad, "gravship flight keeps the ledger, and the shift ends normally after landing",
+                 GravshipFlight);
             Case(map, pad, "gravship flight without the borrower releases it", GravshipFlightLeftBehind);
+            // Flights that leave the borrower and the stand on two maps. The
+            // second map is a pocket map (HarnessFixtures.SecondMap).
+            Case(map, pad, "a stand that flies without its borrower keeps the shift, and ends it normally when they meet again",
+                 StandFliesWithoutItsBorrower);
+            Case(map, pad, "a borrower who flies without their stand keeps the shift, and ends it normally on coming back",
+                 BorrowerFliesWithoutTheirStand);
+            Case(map, pad, "a stand lost with the map it was left on stops pinning its borrower's uniform",
+                 BuildOnSecondMap, fix => StandLostWithItsMap(fix, map, pad));
+            Case(map, pad, "a boxed stand lost with its map releases its ledger too",
+                 BuildOnSecondMap, fix => BoxedStandLostWithItsMap(fix, map, pad));
+            Case("every stand def asks to hear when its map is removed", StandDefsHearMapRemoval);
             Case(map, pad, "teardown (deconstruct, burn) releases the ledger", TeardownReleases);
             Case(map, pad, "reinstalling mid-shift keeps the ledger and the return trip",
                  ReinstallKeepsTheLedger);
@@ -572,6 +584,13 @@ namespace ShiftChange
             /// <see cref="Teardown"/>.
             /// </summary>
             internal List<IntVec3> Claimed = new List<IntVec3>();
+
+            /// <summary>
+            /// A second map a case made, so that a flight can leave the
+            /// borrower and their stand apart (<see cref="HarnessFixtures.SecondMap"/>).
+            /// <see cref="Teardown"/> removes it if the case did not.
+            /// </summary>
+            internal Map Pocket;
         }
 
         /// <summary>

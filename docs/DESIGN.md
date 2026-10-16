@@ -517,6 +517,7 @@ stateDiagram-v2
     OnShift --> Free: undress
     OnShift --> Free: borrower dies, is captured, or leaves the map
     OnShift --> Free: player presses Change back
+    OnShift --> Free: the stand is lost with its map
 ```
 
 `Free` means the ledger is empty and the stand is claimable. `OnShift` means it
@@ -525,6 +526,31 @@ snapshot. When the stand itself despawns, the mode decides: a gravship flight
 and a minify keep the ledger, because the stand keeps its contents, and a
 teardown releases it. The reasoning for each is on `CompShiftStand.PostDeSpawn`,
 beside the branches.
+
+**A gravship flight suspends a shift; it does not end one.** Nothing can touch a
+pawn's gear in flight, since a gravship in flight is a world object with no gear
+tab, so a flight that carries the borrower and the stand together changes
+nothing: the shift carries on after landing as it stood. A flight can also part
+them, when the stand flies and the borrower stays, or the other way round, and
+the map left behind has a grav anchor and so is kept. The shift then stays
+suspended, uniform forced, wardrobe optimizer paused and Change back greyed,
+until the two share a map again, when it resumes on its own (decided
+2026-10-16). A split like that comes from a mistake or an emergency, so putting
+it right is the player's job: bring them together, or dress the colonist by
+hand, after which the return trip takes back whatever of the uniform is still
+worn. Nothing reconciles automatically while they are apart.
+
+The ledger is released only when it can no longer be honoured. A borrower left
+on a map the takeoff abandoned is on no map at all, and the stand's
+`PostSwapMap` releases them on landing. A stand left on a map that is then
+removed is never despawned: the engine marks it discarded, so `PostDeSpawn`
+never runs. It hears about the loss through the engine's map-removed hook
+instead (`CompShiftStand.Notify_MapRemoved`), which the engine calls only for a
+def that sets `notifyMapRemoved`, so `CompProperties_ShiftStand` sets it on
+every def carrying the comp. The release happens during the takeoff itself, so
+no save can come between the loss and the release. Before the hook, the registry
+dropped the lost stand quietly and the uniform stayed forced, with nothing left
+that would ever clear it.
 
 **Ownership must end when vanilla thinks it ends.** `Pawn_Ownership.UnclaimAll()`
 is called on death, trade, kidnap and map exit (`Pawn.cs:2341, :2565, :2599,
