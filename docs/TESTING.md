@@ -97,7 +97,7 @@ does.
 
 ## What the cases assert
 
-A hundred and four cases. This section is a map: the detail lives with each case, in
+A hundred and eleven cases. This section is a map: the detail lives with each case, in
 the comment on its method under `Source/ShiftChange/Harness/`, and the report
 prints the cases in the order `DebugTools_LifecycleHarness.Run` registers them.
 
@@ -111,10 +111,17 @@ than on an edit.
 
 **Lifecycle** (`HarnessLifecycle`). Engine events fired at a hand-assembled,
 checked-out stand, asserting where the ledger lands: a gravship flight with the
-borrower aboard and without (`GravshipFlight`, `GravshipFlightLeftBehind`),
-teardown (`TeardownReleases`), a reinstall, which must keep the ledger and the
-return trip (`ReinstallKeepsTheLedger`) and the stand's owner, mode and flag
-(`ReinstallKeepsConfiguration`), and the borrower's death and banishment
+borrower aboard, after which the return leg must end the shift normally
+(`GravshipFlight`), and without them (`GravshipFlightLeftBehind`). Three more
+flights leave the borrower and the stand on different maps: the stand flies
+alone and comes back (`StandFliesWithoutItsBorrower`), the borrower flies alone
+and comes back (`BorrowerFliesWithoutTheirStand`), and the borrower flies while
+the stand is lost with the map it stayed on, standing or boxed
+(`StandLostWithItsMap`, `BoxedStandLostWithItsMap`). `StandDefsHearMapRemoval`
+checks that every stand def asks for the map-removed hook that last pair relies
+on. Then teardown (`TeardownReleases`), a reinstall, which must keep the ledger
+and the return trip (`ReinstallKeepsTheLedger`) and the stand's owner, mode and
+flag (`ReinstallKeepsConfiguration`), and the borrower's death and banishment
 (`DeathReaps`, `BanishmentReaps`). `FaultLatchRecovers` drives real throws
 through the interception prefix until the fault latch trips, then re-arms it
 the way a load does.
@@ -404,7 +411,10 @@ room under `OpenGround`. "Four engine traps" says why each is there.
 - **A real gravship launch.** The flight case drives `DeSpawn(WillReplace)` →
   `Spawn` → `PostSwapMap`, which is what the engine does, but no gravship is
   built or flown, so the area rebind is tested against an area re-created by
-  hand on the same map, not one the landing copied.
+  hand on the same map, not one the landing copied. The cases that need a
+  second map use a pocket map (`HarnessFixtures.SecondMap`), and remove it with
+  `PocketMapUtility.DestroyPocketMap` where a takeoff would abandon the origin.
+  Both reach the same map removal, but neither is a takeoff.
 - **The walk.** Fixtures stage the pawn on the stand's interaction cell, so
   pathing and interruption mid-walk are untested. See the traps below.
 - **Mod compatibility.** `--full` proves the suite passes with one large mod

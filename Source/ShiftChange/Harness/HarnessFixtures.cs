@@ -892,8 +892,137 @@ namespace ShiftChange
                     map.zoneManager.ZoneAt(cell)?.Delete();
                     GenDebug.ClearArea(CellRect.SingleCell(cell), map);
                 }
+                // After the pawn and the stand, which may be standing on it.
+                // Caught, because this runs in the case's finally: a throw here
+                // would end the whole run, every case after this one included.
+                if (fix.Pocket != null && Find.Maps.Contains(fix.Pocket))
+                {
+                    try
+                    {
+                        RemoveSecondMap(fix.Pocket);
+                    }
+                    catch (Exception e)
+                    {
+                        Fail("teardown could not remove the second map: " + e);
+                    }
+                }
             }
             GenDebug.ClearArea(pad, map);
+        }
+
+        /// <summary>Side of the square map <see cref="SecondMap"/> makes.</summary>
+        internal const int SecondMapSize = 50;
+
+        /// <summary>
+        /// A second map, for a gravship flight that leaves the borrower and
+        /// their stand on different maps. A pocket map, the one kind the engine
+        /// makes without a world tile, made as vanilla's own "Generate pocket
+        /// map" debug action makes one (<c>PocketMapUtility.GeneratePocketMap</c>).
+        /// Odyssey's <c>SpacePocket</c>, because the harness needs Odyssey
+        /// anyway and that generator only lays terrain. Removing it
+        /// (<see cref="RemoveSecondMap"/>) reaches <c>Game.DeinitAndRemoveMap</c>,
+        /// where an origin map abandoned after a takeoff also ends up.
+        ///
+        /// <para>Its generator turns the region and room updater off, and a
+        /// gravship landing turns it back on before it spawns anything
+        /// (<c>GravshipPlacementUtility.PlaceGravshipInMap</c>). So does this,
+        /// so a stand set down here gets a room as a landed one would.</para>
+        ///
+        /// <para>And it builds the map's drawing sections, as looking at the
+        /// map would. A map is drawn into sections only the first time it is
+        /// drawn (<c>MapDrawer.RegenerateEverythingNow</c>), and
+        /// <c>MapDrawer.Dispose</c> walks them with no null check, so removing a
+        /// map nobody ever looked at throws (1.6.4871 and 1.7.4980 alike).
+        /// Vanilla's own debug action makes its new pocket map the current
+        /// map, and an origin map in play has always been drawn.</para>
+        ///
+        /// <para>Null when Odyssey's generator is missing. The caller puts the
+        /// map on <see cref="Fixture.Pocket"/>, so <see cref="Teardown"/>
+        /// removes it.</para>
+        /// </summary>
+        internal static Map SecondMap(Map source)
+        {
+            MapGeneratorDef generator = DefDatabase<MapGeneratorDef>.GetNamedSilentFail("SpacePocket");
+            if (generator == null)
+            {
+                return null;
+            }
+            Map map = PocketMapUtility.GeneratePocketMap(
+                new IntVec3(SecondMapSize, 1, SecondMapSize), generator, null, source);
+            map.regionAndRoomUpdater.Enabled = true;
+            map.mapDrawer.RegenerateEverythingNow();
+            return map;
+        }
+
+        /// <summary>
+        /// Remove a <see cref="SecondMap"/>, destroying any pawn still on it
+        /// first: map removal passes the pawns it finds to the world
+        /// (<c>MapDeiniter.PassPawnsToWorld</c>), which would keep a fixture
+        /// colonist in the game after the case.
+        ///
+        /// <para>Also drops the redraw the map queued for itself. A new map
+        /// asks for its first full redraw once the long event it was made in
+        /// is over (<c>Map.FinalizeInit</c>, through
+        /// <c>LongEventHandler.ExecuteWhenFinished</c>). The headless run is
+        /// itself one of those queued actions, so the redraw would run after
+        /// the harness, on a map already gone, and log a failure for every
+        /// layer of every section. <see cref="SecondMap"/> drew the map
+        /// already. The queue is walked by index and this map's entries sit
+        /// after the running harness's, so taking them out is safe; a run
+        /// from the debug menu queues nothing, since there the redraw runs at
+        /// once.</para>
+        /// </summary>
+        internal static void RemoveSecondMap(Map away)
+        {
+            List<Action> queued = AccessTools.Field(typeof(LongEventHandler), "toExecuteWhenFinished")
+                ?.GetValue(null) as List<Action>;
+            queued?.RemoveAll(action => action != null && action.Target == away);
+
+            List<Pawn> left = away.mapPawns.AllPawns.ToList();
+            for (int i = 0; i < left.Count; i++)
+            {
+                CompShiftStand.OnShiftStands.Remove(left[i]);
+                if (!left[i].Destroyed)
+                {
+                    left[i].Destroy();
+                }
+            }
+            PocketMapUtility.DestroyPocketMap(away);
+        }
+
+        /// <summary>
+        /// <see cref="Build"/> on a <see cref="SecondMap"/>: the stand and its
+        /// borrower, on shift, both on the second map, for a case that flies
+        /// the borrower to the harness's own map and leaves the stand behind.
+        /// The fixture's <c>Map</c> is the second map, so the case is handed
+        /// the harness's map and pad itself.
+        /// </summary>
+        internal static Fixture BuildOnSecondMap(Map map, CellRect pad)
+        {
+            Map away = SecondMap(map);
+            if (away == null)
+            {
+                return null;
+            }
+            Fixture fix = null;
+            try
+            {
+                fix = Build(away, CellRect.CenteredOn(away.Center, PadSize / 2));
+            }
+            finally
+            {
+                // A build that threw or came back empty leaves no fixture to
+                // carry the map to Teardown, so it goes here.
+                if (fix == null)
+                {
+                    RemoveSecondMap(away);
+                }
+            }
+            if (fix != null)
+            {
+                fix.Pocket = away;
+            }
+            return fix;
         }
 
         /// <summary>

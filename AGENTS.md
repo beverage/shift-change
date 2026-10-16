@@ -75,8 +75,8 @@ devtools/run-harness.sh --with-after=khamenman.outfitstandsplus   # the same, lo
 
 It asserts where the ledger lands after each despawn/death/banishment event, by
 firing the engine's real entry points at a throwaway fixture, and exits non-zero
-if a case fails. Touch `PostDeSpawn`, `PostSwapMap`, `ReleaseBorrower`,
-`AbandonLedger` or `Patch_UnclaimStands` and run it.
+if a case fails. Touch `PostDeSpawn`, `PostSwapMap`, `Notify_MapRemoved`,
+`ReleaseBorrower`, `AbandonLedger` or `Patch_UnclaimStands` and run it.
 
 A harness pass is not a play observation, and a `GAP` line is a known failure
 being tracked, not a pass. **Six gaps are expected on the default list**: the

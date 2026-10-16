@@ -33,11 +33,23 @@ namespace ShiftChange
         /// <c>WillReplace</c> despawn; the ledger must survive with them, or
         /// the pawn lands in a uniform with no way out. Why the stand keeps
         /// its contents in that mode: <see cref="CompShiftStand.PostDeSpawn"/>.
+        ///
+        /// <para>Nothing can touch a pawn's gear during the flight itself: the
+        /// gravship in flight is a world object with no gear tab. So the shift
+        /// picks up on landing exactly where it stood: the next meal break
+        /// sends the borrower to the stand on its own, and the return leg ends
+        /// the shift as it would have without the flight.</para>
         /// </summary>
         internal static bool GravshipFlight(Fixture fix)
         {
             IntVec3 standCell = fix.Stand.Position;
             IntVec3 pawnCell = fix.Pawn.Position;
+            Apparel uniform = FirstIssued(fix);
+            List<Apparel> parked = new List<Apparel>(fix.Comp.StoredOwnerApparelForReading);
+            if (uniform == null || parked.Count == 0)
+            {
+                return Expect(false, "the fixture is mid-shift with clothes parked");
+            }
 
             fix.Stand.DeSpawn(DestroyMode.WillReplace);
             fix.Pawn.DeSpawn(DestroyMode.WillReplace);
@@ -46,19 +58,319 @@ namespace ShiftChange
             fix.Stand.PostSwapMap();
             fix.Pawn.PostSwapMap();
 
-            return Expect(fix.Comp.OnShift, "stand still reads on-shift")
-                 & Expect(fix.Comp.Borrower == fix.Pawn, "borrower survived the flight")
-                 & Expect(fix.Comp.StoredOwnerApparelForReading.Count == fix.StoredCount,
-                          "parked civvies still in the ledger")
-                 & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == fix.Comp,
-                          "registry points back at the stand (Change back works)");
+            bool ok = Expect(fix.Comp.OnShift, "stand still reads on-shift")
+                    & Expect(fix.Comp.Borrower == fix.Pawn, "borrower survived the flight")
+                    & Expect(fix.Comp.StoredOwnerApparelForReading.Count == fix.StoredCount,
+                             "parked civvies still in the ledger")
+                    & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == fix.Comp,
+                             "registry points back at the stand (Change back works)")
+                    & Expect(MealBreakSendsThemBack(fix),
+                             "and the next meal break sends them to the stand on its own");
+            return ok & ShiftEndsNormally(fix, uniform, parked);
         }
 
         /// <summary>
-        /// The other half of the flight: the stand came, the borrower did not.
-        /// Nobody can walk back for their clothes, so the ledger has to go —
-        /// and critically the FORCED flags have to come off with it, or the
-        /// pawn is pinned into the uniform with every route out closed.
+        /// A flight from a map with a grav anchor, which the takeoff keeps
+        /// rather than abandons (<c>WorldComponent_GravshipController.TakeoffEnded</c>):
+        /// the stand flies, and the borrower stays behind, spawned, on a map
+        /// that is still there.
+        ///
+        /// <para>Decided 2026-10-16: the shift stays suspended while they are
+        /// apart, the uniform forced and the wardrobe optimizer paused, since a
+        /// player's mistake or an emergency split them and putting things
+        /// right is the player's to do. Once they share a map again it resumes
+        /// on its own, and the return leg ends it normally. The pause keys on
+        /// the registry entry, which is what is asserted here; the optimizer
+        /// itself is not run.</para>
+        /// </summary>
+        internal static bool StandFliesWithoutItsBorrower(Fixture fix)
+        {
+            Apparel uniform = FirstIssued(fix);
+            List<Apparel> parked = new List<Apparel>(fix.Comp.StoredOwnerApparelForReading);
+            if (uniform == null || parked.Count == 0)
+            {
+                return Expect(false, "the fixture is mid-shift with clothes parked");
+            }
+            Map home = fix.Map;
+            IntVec3 standCell = fix.Stand.Position;
+            Map away = SecondMap(home);
+            if (away == null)
+            {
+                return Expect(false, "a second map was made");
+            }
+            fix.Pocket = away;
+
+            Fly(fix.Stand, away, away.Center);
+            bool ok = Expect(fix.Stand.Map == away, "the stand landed on the second map")
+                    & Expect(fix.Pawn.Spawned && fix.Pawn.Map == home,
+                             "and the borrower is still spawned on the first, which the takeoff kept")
+                    & Expect(fix.Comp.OnShift && fix.Comp.Borrower == fix.Pawn,
+                             "the shift is kept while they are apart")
+                    & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == fix.Comp,
+                             "and the registry still sends the borrower to the stand")
+                    & Expect(StillForced(fix, uniform), "the uniform stays forced while they are apart")
+                    & Expect(!MealBreakSendsThemBack(fix),
+                             "and a meal break does not send them after a stand on another map");
+            for (int i = 0; i < parked.Count; i++)
+            {
+                ok &= Expect(fix.Stand.HeldItems.Contains(parked[i]),
+                             parked[i].def.defName + " flew with the stand");
+            }
+
+            Fly(fix.Stand, home, standCell);
+            ok &= Expect(fix.Stand.Map == home, "the stand flew back")
+                & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == fix.Comp,
+                         "and the registry still sends the borrower to it")
+                & Expect(MealBreakSendsThemBack(fix),
+                         "and the next meal break sends them to the stand on its own");
+            return ok & ShiftEndsNormally(fix, uniform, parked);
+        }
+
+        /// <summary>
+        /// The mirror of <see cref="StandFliesWithoutItsBorrower"/>: the
+        /// borrower flies and the stand stays on the anchored map. The stand
+        /// is never told, since it never moved and nothing of ours hears a
+        /// pawn's <c>PostSwapMap</c>. Suspended while they are apart and
+        /// resumed once the borrower flies back, as decided there.
+        /// </summary>
+        internal static bool BorrowerFliesWithoutTheirStand(Fixture fix)
+        {
+            Apparel uniform = FirstIssued(fix);
+            List<Apparel> parked = new List<Apparel>(fix.Comp.StoredOwnerApparelForReading);
+            if (uniform == null || parked.Count == 0)
+            {
+                return Expect(false, "the fixture is mid-shift with clothes parked");
+            }
+            Map home = fix.Map;
+            Map away = SecondMap(home);
+            if (away == null)
+            {
+                return Expect(false, "a second map was made");
+            }
+            fix.Pocket = away;
+
+            Fly(fix.Pawn, away, away.Center);
+            bool ok = Expect(fix.Pawn.Map == away, "the borrower landed on the second map")
+                    & Expect(fix.Stand.Spawned && fix.Stand.Map == home,
+                             "and the stand is still on the first, which the takeoff kept")
+                    & Expect(fix.Comp.OnShift && fix.Comp.Borrower == fix.Pawn,
+                             "the shift is kept while they are apart")
+                    & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == fix.Comp,
+                             "and the registry still sends the borrower to the stand")
+                    & Expect(fix.Pawn.apparel.WornApparel.Contains(uniform),
+                             "and the borrower still wears the uniform")
+                    & Expect(StillForced(fix, uniform), "forced, while they are apart")
+                    & Expect(!MealBreakSendsThemBack(fix),
+                             "and a meal break does not send them after a stand on another map");
+
+            Fly(fix.Pawn, home, fix.Stand.InteractionCell);
+            ok &= Expect(fix.Pawn.Map == home, "the borrower flew back")
+                & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == fix.Comp,
+                         "and the registry still sends them to the stand")
+                & Expect(MealBreakSendsThemBack(fix),
+                         "and the next meal break sends them to the stand on its own");
+            return ok & ShiftEndsNormally(fix, uniform, parked);
+        }
+
+        /// <summary>
+        /// The borrower flies, and the stand stays on a map with no grav
+        /// anchor, which the takeoff abandons (<c>GravshipUtility.AbandonMap</c>).
+        /// Map removal never despawns a building: <c>Thing.Notify_MyMapRemoved</c>
+        /// marks it discarded, so <see cref="CompShiftStand.PostDeSpawn"/>
+        /// never runs and nothing releases the ledger. The parked clothes are
+        /// gone with the map and the shift cannot end. What must not outlive
+        /// it is the forced flag on the uniform, which then pins the borrower
+        /// into it with no route out (see <see cref="CompShiftStand.ReleaseBorrower"/>).
+        ///
+        /// <para>Built on the second map (<see cref="BuildOnSecondMap"/>); the
+        /// borrower flies to the harness's own, and the second map is removed
+        /// by the same <c>Game.DeinitAndRemoveMap</c> an abandoned map
+        /// reaches.</para>
+        /// </summary>
+        internal static bool StandLostWithItsMap(Fixture fix, Map home, CellRect pad)
+        {
+            Apparel uniform = FirstIssued(fix);
+            if (uniform == null)
+            {
+                return Expect(false, "the fixture is mid-shift");
+            }
+            Map origin = fix.Pocket;
+
+            Fly(fix.Pawn, home, new IntVec3(pad.minX + 3, 0, pad.minZ + 1));
+            bool ok = Expect(fix.Pawn.Map == home, "the borrower landed on the harness's map")
+                    & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == fix.Comp,
+                             "and is still on shift at the stand left behind");
+
+            RemoveSecondMap(origin);
+            fix.Pocket = null;
+            ok &= Expect(!Find.Maps.Contains(origin), "the map the stand was left on is gone")
+                & Expect(fix.Stand.Discarded, "and the stand with it, discarded rather than despawned")
+                & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == null,
+                         "the registry no longer sends the borrower to it")
+                & Expect(fix.Pawn.apparel.WornApparel.Contains(uniform),
+                         "the uniform stays on, now as their own clothing");
+            if (fix.Pawn.outfits != null)
+            {
+                ok &= Expect(!fix.Pawn.outfits.forcedHandler.IsForced(uniform),
+                             "and is no longer force-worn, so their wardrobe can replace it");
+            }
+            return ok & Expect(!fix.Comp.OnShift && fix.Comp.Borrower == null,
+                               "the lost stand's own ledger was released, not merely forgotten");
+        }
+
+        /// <summary>
+        /// <see cref="StandLostWithItsMap"/>, with the stand in a box: minified
+        /// mid-shift, and the box left on the map that is removed. Removal
+        /// reaches things inside containers (<c>Map.GetChildHolders</c>), so the
+        /// boxed stand hears it too. The minify already took the forced flag off
+        /// (<see cref="CompShiftStand.PostDeSpawn"/>); what this asserts is the
+        /// ledger released with the box rather than left naming the borrower.
+        /// </summary>
+        internal static bool BoxedStandLostWithItsMap(Fixture fix, Map home, CellRect pad)
+        {
+            Apparel uniform = FirstIssued(fix);
+            if (uniform == null)
+            {
+                return Expect(false, "the fixture is mid-shift");
+            }
+            Map origin = fix.Pocket;
+            IntVec3 boxCell = fix.Stand.Position;
+            MinifiedThing box = fix.Stand.MakeMinified();
+            if (box == null)
+            {
+                return Expect(false, "the stand minified");
+            }
+            GenSpawn.Spawn(box, boxCell, origin);
+
+            Fly(fix.Pawn, home, new IntVec3(pad.minX + 3, 0, pad.minZ + 1));
+            bool ok = Expect(box.Spawned && box.Map == origin, "the box is on the map that will go")
+                    & Expect(fix.Comp.OnShift && fix.Comp.Borrower == fix.Pawn,
+                             "and its stand still holds the ledger (control)");
+
+            RemoveSecondMap(origin);
+            fix.Pocket = null;
+            ok &= Expect(box.Discarded && fix.Stand.Discarded, "the box and the stand in it went with the map")
+                & Expect(!fix.Comp.OnShift && fix.Comp.Borrower == null,
+                         "and the boxed stand's ledger was released")
+                & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == null,
+                         "the registry no longer sends the borrower to it");
+            if (fix.Pawn.outfits != null)
+            {
+                ok &= Expect(!fix.Pawn.outfits.forcedHandler.IsForced(uniform),
+                             "and the uniform is not force-worn");
+            }
+            return ok;
+        }
+
+        /// <summary>
+        /// Every stand def carrying our comp asks to hear when its map is
+        /// removed (<see cref="CompProperties_ShiftStand.ResolveReferences"/>).
+        /// A def fact rather than a lifecycle one: without the flag the engine
+        /// never calls <see cref="CompShiftStand.Notify_MapRemoved"/>, and
+        /// <see cref="StandLostWithItsMap"/> covers only the vanilla stand. Under
+        /// <c>--with=khamenman.outfitstandsplus</c> this reaches that mod's
+        /// stands as well.
+        /// </summary>
+        internal static bool StandDefsHearMapRemoval()
+        {
+            List<ThingDef> defs = Patch_JobInterception.StandDefs;
+            bool ok = Expect(defs.Count > 0, "the stand family resolves (control)");
+            for (int i = 0; i < defs.Count; i++)
+            {
+                ok &= Expect(defs[i].notifyMapRemoved,
+                             defs[i].defName + " asks to hear when its map is removed");
+            }
+            return ok;
+        }
+
+        /// <summary>
+        /// One thing's gravship flight, in the engine's order:
+        /// <c>PreSwapMap</c> and a <c>WillReplace</c> despawn at takeoff
+        /// (<c>GravshipUtility.GenerateGravship</c>), <c>GenSpawn.Spawn</c> on
+        /// the landing map, then <c>PostSwapMap</c>
+        /// (<c>GravshipPlacementUtility.PostSwapMap</c>). For a flight that
+        /// carries one of the pair; <see cref="GravshipFlight"/> interleaves
+        /// the two, as the engine does when both are aboard.
+        /// </summary>
+        internal static void Fly(Thing thing, Map to, IntVec3 cell)
+        {
+            Rot4 rot = thing.Rotation;
+            thing.PreSwapMap();
+            thing.DeSpawn(DestroyMode.WillReplace);
+            GenSpawn.Spawn(thing, cell, to, rot);
+            thing.PostSwapMap();
+        }
+
+        /// <summary>
+        /// The return leg, run for real at the stand, and what it has to
+        /// leave: the uniform back on the stand and every parked garment back
+        /// on the borrower. A shift that ends as it would have without the
+        /// flight is the behaviour; the ledger checks before it are state.
+        /// </summary>
+        internal static bool ShiftEndsNormally(Fixture fix, Apparel uniform, List<Apparel> parked)
+        {
+            fix.Pawn.Position = fix.Stand.InteractionCell;
+            if (!RunSwap(fix))
+            {
+                return Expect(false, "the return leg ran to completion");
+            }
+            bool ok = Expect(!fix.Comp.OnShift, "the return leg ended the shift");
+            for (int i = 0; i < parked.Count; i++)
+            {
+                ok &= Expect(fix.Pawn.apparel.WornApparel.Contains(parked[i]),
+                             parked[i].def.defName + " is back on the pawn");
+            }
+            return ok & Expect(fix.Stand.HeldItems.Contains(uniform),
+                               "and the uniform is back on the stand");
+        }
+
+        /// <summary>
+        /// Whether a meal break would send the borrower to the stand right now:
+        /// the automatic return trip, asked of the real interception and left
+        /// with no trace (<see cref="Probe"/>). A meal on the ground is a
+        /// sit-down break, which changes them out first wherever they eat
+        /// (<c>MealBreakChangesOut</c>), so the one thing this asks of a flight
+        /// is whether the stand is within reach. The probe clears the retry
+        /// cooldown a refusal stamps; in play that cooldown delays the first
+        /// change back after a reunion by up to
+        /// <see cref="Patch_JobInterception.RetryCooldownTicks"/>.
+        /// </summary>
+        internal static bool MealBreakSendsThemBack(Fixture fix)
+        {
+            ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
+            if (mealDef == null || !fix.Pawn.Spawned)
+            {
+                return false;
+            }
+            Thing meal = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), fix.Pawn.Position, fix.Pawn.Map);
+            bool sent = Probe(fix, IngestJob(meal));
+            if (!meal.Destroyed)
+            {
+                meal.Destroy();
+            }
+            return sent;
+        }
+
+        /// <summary>Whether the borrower's uniform still carries the forced flag.</summary>
+        internal static bool StillForced(Fixture fix, Apparel uniform)
+        {
+            return fix.Pawn.outfits != null && fix.Pawn.outfits.forcedHandler.IsForced(uniform);
+        }
+
+        /// <summary>The first garment the fixture issued, or null.</summary>
+        internal static Apparel FirstIssued(Fixture fix)
+        {
+            return fix.Comp.IssuedUniformForReading.Count > 0
+                ? fix.Comp.IssuedUniformForReading[0]
+                : null;
+        }
+
+        /// <summary>
+        /// The other half of the flight: the stand came, the borrower did not,
+        /// left on a map the takeoff abandoned. Nobody can walk back for their
+        /// clothes, so the ledger has to go — and critically the FORCED flags
+        /// have to come off with it, or the pawn is pinned into the uniform
+        /// with every route out closed.
         /// </summary>
         internal static bool GravshipFlightLeftBehind(Fixture fix)
         {
