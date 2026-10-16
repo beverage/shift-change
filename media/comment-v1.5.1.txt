@@ -1,0 +1,5 @@
+v1.5.1 update:
+
+Fixed: a colonist who flew off on a gravship while their outfit stand stayed on a map without a grav anchor kept the uniform force-worn for good. It is now ordinary clothing their apparel policy can replace, and the same goes for a stand lost with any other abandoned map. A colonist already stuck this way needs Clr. forced on the Assign tab once.
+
+A gravship carrying a colonist and their stand together works as before.
