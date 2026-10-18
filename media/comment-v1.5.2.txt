@@ -1,0 +1,7 @@
+v1.5.2 update:
+
+On a ship in space, colonists no longer change out of a vacsuit or power armor for a job that takes them through vacuum, such as a bill whose ingredients lie outside the ship, and anyone already in uniform changes back first. A stand whose outfit protects as well, like a vacsuit stand by the airlock, still dresses them.
+
+A colonist cut off from their stand by vacuum is no longer sent across it to change. Orders run as given, with a message when one sends a colonist into vacuum in clothes that protect less than their own.
+
+On a planet, and on a ship whose rooms all connect through air, nothing changes.
