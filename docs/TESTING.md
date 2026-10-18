@@ -97,7 +97,7 @@ does.
 
 ## What the cases assert
 
-A hundred and eleven cases. This section is a map: the detail lives with each case, in
+A hundred and twelve cases. This section is a map: the detail lives with each case, in
 the comment on its method under `Source/ShiftChange/Harness/`, and the report
 prints the cases in the order `DebugTools_LifecycleHarness.Run` registers them.
 
@@ -125,6 +125,14 @@ flag (`ReinstallKeepsConfiguration`), and the borrower's death and banishment
 (`DeathReaps`, `BanishmentReaps`). `FaultLatchRecovers` drives real throws
 through the interception prefix until the fault latch trips, then re-arms it
 the way a load does.
+
+**Vacuum** (`HarnessVacuum`). The second map the flights use is Odyssey's
+`SpacePocket`, an `Orbit` map, so the game treats it as space. `VacuumMapStages`
+checks the ground every vacuum case stands on: a walled, roofed room there holds
+air, while the open floor past its door, and the doorway itself, read as vacuum.
+A region walk that may only step into air stays in the room. Its control is a
+walk from the same start that may step anywhere, which reaches the floor
+outside.
 
 **The swap** (`HarnessSwap`). These stage an undressed pawn, and every one but
 `DecencyGuardIsOptIn` runs `JobDriver_SwapAtStand` for real, through the pawn's

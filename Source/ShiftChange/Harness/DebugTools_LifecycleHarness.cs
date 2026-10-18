@@ -191,6 +191,9 @@ namespace ShiftChange
                  BuildOnSecondMap, fix => StandLostWithItsMap(fix, map, pad));
             Case(map, pad, "a boxed stand lost with its map releases its ledger too",
                  BuildOnSecondMap, fix => BoxedStandLostWithItsMap(fix, map, pad));
+            // The vacuum gate's ground: the second map is a vacuum map.
+            Case("a room on the second map, a vacuum map, holds air while the open floor past its door does not",
+                 () => HarnessVacuum.VacuumMapStages(map));
             Case("every stand def asks to hear when its map is removed", StandDefsHearMapRemoval);
             Case(map, pad, "teardown (deconstruct, burn) releases the ledger", TeardownReleases);
             Case(map, pad, "reinstalling mid-shift keeps the ledger and the return trip",
