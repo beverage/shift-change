@@ -423,13 +423,14 @@ Folders by concern. Everything outside `Dev/` and `Harness/` ships, and `check-i
 
 | File | Role |
 |---|---|
-| `Patch_JobInterception.cs` | Prefix on `StartJob`. The kill switch and fault latch, `TryInsertSwap` with its steps declared below it in the order they run (the gates, the return trip, the threat gate, then the work, sleep and recreation arms), and `Insert`, which defers the original job. |
+| `Patch_JobInterception.cs` | Prefix on `StartJob`. The kill switch and fault latch, `TryInsertSwap` with its steps declared below it in the order they run (the gates, the vacuum gate, the return trip, the threat gate, then the work, sleep and recreation arms), and `Insert`, which defers the original job. |
 | `Patch_JobInterception.Latch.cs` | The change-back latch, and the record of the job a pawn was just dressed for. |
 | `Patch_JobInterception.CatchUp.cs` | The mid-job catch-up: a stand that comes free dresses the nearest colonist already doing what it serves. |
 | `Patch_JobInterception.Deliveries.cs` | Deliveries and meal runs, judged by where they go: the site rule that keeps a uniform on, the area stand's delivery arm, and an errand queued ahead of served work. |
 | `Patch_JobInterception.JobKinds.cs` | What kind of job this is: `Classify`, the one place a job's kind is decided, and the predicates it asks (eating, recreation, sleep, medical rest and the urgent patient, beds, and where recreation happens). |
-| `Patch_JobInterception.StandSearch.cs` | Finding a stand: the trigger each one serves, and the nearest a pawn may use. |
-| `Patch_JobInterception.Places.cs` | Where a job happens and whether a catchment covers it: the shared resolver, `RoomBearing` for a solid target with no room of its own, and the coverage checks over every place a job names. |
+| `Patch_JobInterception.StandSearch.cs` | Finding a stand: the trigger each one serves, and the nearest a pawn may use, passing over one whose outfit would strip vacuum protection the job needs. |
+| `Patch_JobInterception.Places.cs` | Where a job happens and whether a catchment covers it: the shared resolver, `RoomBearing` for a solid target with no room of its own, `ReadPlace`, the one reading of a place a job names that the coverage checks and the vacuum walk share, and the coverage checks over every place a job names. |
+| `Patch_JobInterception.Vacuum.cs` | The vacuum gate: on a vacuum map, whether every place a job names can be reached through air and through doors the colonist may pass (the air walk), asked by the stand search before a swap that would take protection away, and before a colonist goes on into vacuum in a uniform that protects less; whether the walk back to the stand stays in air; and the messages, at most one an hour per colonist, for an order into vacuum and for a colonist who cannot get back to their own clothes. |
 | `JobPlace.cs` | Where a job happens: the cell its target names and, for a solid target, the cell beside it with a room. |
 | `JobRoomTargets.cs` | Tables for jobs whose targets mislead: which end is the place, the ignored givers, deliveries, giver-less fishing, the ride-along, incidental and pass-through lists. |
 | `Patch_ChangeBackGizmo.cs` | "Change back" command on a pawn in uniform, setting the latch per stand and trigger that the stand search honours; drafting drops it. |
@@ -506,6 +507,7 @@ Each file here is guarded whole, by `SCENES`, `DEBUG` or `SCENES || HARNESS`, an
 | `DebugTools_LifecycleHarness.cs` | `HARNESS` only. The test suite: the runner, its assertions, its self-check, and the list that registers every case in the order they run. The other cases' bodies, which drive real engine entry points, live in the files beside it — see [TESTING.md](TESTING.md). Its `[DebugAction]` wrapper is `SCENES` on top of that. |
 | `DebugTools_SaveRoundTrip.cs` | `HARNESS` only. The four save/load cases. Separate file because they replace `Current.Game` and must run last. |
 | `HarnessCatchments.cs` | `HARNESS` only. The catchment cases, one `partial` class: `.Radius` for coverage and dressing in a ring, `.ReturnTrip`, `.Deliveries`, `.Area`, `.AreaUi` for the alert and the Serves menu, and `.Latch`. The main file holds the cases true in every mode and the helpers several files share. |
+| `HarnessVacuum.cs` | `HARNESS` only. The vacuum cases, on the second map, which is a vacuum map: the ground they stand on, then a staged ship of a room, open floor and a second room, and the cases a review of the gate added (each dress path, doors, a stranded colonist, the cooldown, an urgent patient, a stand on another map). |
 | `HarnessJobKinds.cs` | `HARNESS` only. The job classifier as a table: every job shape the other cases build, and the kind and work type it must get. |
 | `HarnessFixtureChecks.cs` | `HARNESS` only. What every case takes for granted about its fixture: a colonist who needs no doctor and whose needs hold still under the stopped clock, and open ground past the pad. Registered first. |
 | `Patch_HarnessAutoRun.cs` | `HARNESS` only. Runs the harness and quits, when launched with `-shiftchange-harness`. Neither it nor the flag exists in a shipping build. |

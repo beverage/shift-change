@@ -535,6 +535,74 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// What these garments add to their wearer's vacuum resistance, counted
+        /// as the stat counts gear (<c>StatWorker.StatOffsetFromGear</c>).
+        /// </summary>
+        internal static float VacuumResistanceOf(List<Apparel> items)
+        {
+            float sum = 0f;
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (items[i] != null)
+                {
+                    sum += StatWorker.StatOffsetFromGear(items[i], StatDefOf.VacuumResistance);
+                }
+            }
+            return sum;
+        }
+
+        /// <summary>
+        /// The pawn's vacuum resistance before the stat clamps it to 1. Genes and
+        /// implants add to it as gear does, so a pawn immune without their suit
+        /// still reads at 1 or over once the suit's share is taken off, where the
+        /// clamped stat would hide that.
+        /// </summary>
+        internal static float UnclampedVacuumResistance(Pawn pawn)
+        {
+            return StatDefOf.VacuumResistance.Worker.GetValueUnfinalized(StatRequest.For(pawn));
+        }
+
+        /// <summary>Vacuum never harms this pawn, whatever they wear (<c>Pawn.HarmedByVacuum</c>).</summary>
+        internal static bool ImmuneToVacuum(Pawn pawn)
+        {
+            return pawn.RaceProps.IsMechanoid || (pawn.IsMutant && !pawn.mutant.Def.breathesAir);
+        }
+
+        /// <summary>
+        /// Swapping <paramref name="leaving"/> for <paramref name="arriving"/>
+        /// leaves the pawn less protected from vacuum than they are, and below a
+        /// resistance of 1, where vacuum stops harming. Harm grows all the way
+        /// to 1, so the line is 1, not the 0.75 at which vanilla starts routing
+        /// work around vacuum. docs/DESIGN.md, "Vacuum".
+        /// </summary>
+        internal static bool LeavesThemLessProtected(Pawn pawn, List<Apparel> leaving, List<Apparel> arriving)
+        {
+            if (ImmuneToVacuum(pawn))
+            {
+                return false;
+            }
+            float change = VacuumResistanceOf(arriving) - VacuumResistanceOf(leaving);
+            return change < 0f && UnclampedVacuumResistance(pawn) + change < 1f;
+        }
+
+        /// <summary>
+        /// The same question asked of a pawn already on shift: the clothes they
+        /// parked would protect them from vacuum better than the uniform they
+        /// wear, and as they stand they are below a resistance of 1. Read off
+        /// the ledger, so it answers exactly as
+        /// <see cref="LeavesThemLessProtected"/> answered before the swap.
+        /// </summary>
+        internal static bool UniformLeavesThemLessProtected(Pawn pawn, List<Apparel> issued, List<Apparel> parked)
+        {
+            if (ImmuneToVacuum(pawn))
+            {
+                return false;
+            }
+            float gain = VacuumResistanceOf(parked) - VacuumResistanceOf(issued);
+            return gain > 0f && UnclampedVacuumResistance(pawn) < 1f;
+        }
+
+        /// <summary>
         /// Cheap yes/no for the stand selector: would sending this pawn here
         /// accomplish anything? Uses shared scratch lists — safe because the
         /// selector runs to completion before any job is started.

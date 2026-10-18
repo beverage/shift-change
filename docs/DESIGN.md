@@ -1182,6 +1182,122 @@ nearly every map, and a room stand in the open serves nothing, so in room mode
 the row reaches only a stand beside a walled pond. A hut on the shore serving a
 radius, or an area painted over the water, is the setup it was for.
 
+## Vacuum
+
+**On a vacuum map, a swap never takes away protection a job is going to need.**
+Reported from play on a gravship in orbit (2026-10-11): a crafter changed at an
+indoor bench, swapping power armor for an apron, then walked out of the ship for
+the bill's ingredients and was burnt or killed. Every arm decides from the one
+place a job happens, so a bill's ingredients (`targetQueueB`), the haul that
+carries its product to storage, and an errand queued ahead of served work all
+went wherever they went in the uniform.
+
+Vanilla does not catch it. Checked against 1.6.4871 and 1.7.4980, identical:
+
+- The pathfinder has no vacuum term, and pawn paths are planned at
+  `Danger.Deadly`.
+- `Region.DangerFor` rates a room over 0.5 vacuum Deadly for a pawn below 0.75
+  resistance, but `Region.Allows` applies danger only below `Deadly`, and the
+  bill's ingredient search traverses at `Deadly` (`TraverseParms.For(pawn)`), as
+  orders and paths do.
+- `JobGiver_FindOxygen` acts only when the job's guessed destination is in
+  vacuum, and for a bill the guess is the bench, so a pressurized bench silences
+  it for the whole ingredient run.
+
+A vanilla colonist in ordinary clothes dies the same way. What the swap does is
+take off the suit that was covering it.
+
+**Harm stops only at 1.** `VacuumResistance` is a flat sum of gear, genes and
+hediffs, clamped to 1. Exposure grows with 1 − resistance in vacuum of 0.5 or
+more, `HarmedByVacuum` is anything below 1, and `ConcernedByVacuum`, below 0.75,
+is only where vanilla starts to avoid vacuum. The line here is 1. Power armor and
+its helmet come to 0.97, about half an hour from death in full vacuum; the helmet
+alone 0.67, about two and a half minutes.
+
+**The question** (`AirRouteFor`) reads the map, not a path: every place the job
+names, its three targets and both queues, read as the catchment checks read them
+(`ReadPlace`, which both share), must be reachable from where the trip starts
+through regions whose room reads below 0.5 and that the colonist may pass. A
+region walk, stepping only into such regions, and through a door only as
+reachability would (`Region.Allows`): a door they cannot open, or one forbidden
+to them, is no way through, however much air lies behind it. A place in vacuum
+fails, and so does a safe place that only vacuum leads to. A doorway reads the
+mean of the rooms on its two sides, so the door between air and open space stops
+the walk too. A place on another map fails. A walk that cannot be made, with no
+region to start from, the map's region updater off, or at its region cap
+(4,000), decides nothing, which is the cautious answer each way: nobody is
+dressed, and nobody is sent to change. It is a gate of its own, never part of
+the shared room resolver, which must not read the map.
+
+**Only when the swap makes it worse** (`SwapPlan`, where wearability lives):
+
+| Direction | Fires when | Walk from |
+|---|---|---|
+| Dressing (`LeavesThemLessProtected`) | the plan lowers the pawn's apparel vacuum resistance and leaves them below 1 | the stand |
+| Changing back (`UniformLeavesThemLessProtected`) | the parked kit beats the issued one, and as they stand they are below 1 | where they stand |
+
+Both read resistance before the stat's clamp (`GetValueUnfinalized`), so a pawn
+immune by a gene or an implant still reads immune with a suit taken off.
+Mechanoids and mutants that do not breathe are never affected. The two rows
+are one question asked each way round, so a job one direction refuses the other
+does not undo, and nobody bounces. A vacsuit stand by an exterior door still
+dresses, and a colonist with no protection to lose is dressed as before.
+
+**Where it sits.** For a pawn in uniform, once in `TryInsertSwap`, above every
+exemption but an order's, emergencies and the giver-less errands included
+(decided 2026-10-16), above the cooldown, so a swap that could not start a moment
+ago does not wave the next job into vacuum, and above the just-dressed-for pass,
+the delivery block and the return trip, so nothing that keeps a uniform on can
+keep it on into vacuum. It starts the return swap itself. Two gates still come
+first, and they are the exceptions to "every exemption": a lord's duty and a
+swap already under way. No swap can start under either: a lord reissues the job
+on its own clock and pre-empts one, and a swap is never stacked on a swap. The
+return trip's two refusals hold in it too: nobody is pulled out of bed
+(`StaysInBed`), and an urgent patient goes straight to bed, whatever lies
+between.
+
+**Dressing asks it inside the stand search** (`Consider`), of a candidate that
+would win, so a stand whose outfit would strip the protection is passed over and
+the next one can win: the vacsuit stand by the airlock, behind the nearer apron.
+The delivery arm's search and the mid-job catch-up ask the same. The plan is the
+one `WouldDress` just built, read off its scratch lists, not built again.
+
+**Cut off from the stand.** Changing back is worth something only when the walk
+to the stand stays in air; otherwise that walk is the crossing the gate exists to
+prevent. So a colonist in uniform whom vacuum separates from their stand is not
+sent back across it, by the gate or by the ordinary return trip
+(`ReturnCrossesVacuum`), and a job they can do where they are keeps the uniform
+on. When their next job does go through vacuum, a message says their own clothes
+are across vacuum too, or not on this map at all, since nothing the mod does
+will change it.
+
+**An order runs as given,** as always, and a message says when it takes the
+colonist through vacuum in a uniform that protects less than their own clothes.
+A drafted colonist's moves are orders too and never reach the gates, so the
+message is asked before `MapToDecideOn` returns for them, with the guards that
+would have applied. One message per colonist an in-game hour at most
+(`VacuumWarningTicks`): a drafted colonist starts a forced job on every click and
+every attack, and vanilla answers a repeated message by flashing it and playing
+its sound again.
+
+**What it does not change.** Off a vacuum map (`map.Biome.inVacuum`) it never
+fires, and where every stop connects through air nothing changes: both were
+promised to the player who reported it. It changes clothing, not routes: vanilla
+still sends the colonist through vacuum, in their own gear.
+
+**The known gap** is the shortcut. Where air and vacuum both connect two places,
+the walk passes, and the pathfinder, having no vacuum term, may cross the vacuum
+because it is shorter. Closing it needs the real path, at the boundary or where
+the pawn takes it up (`Pawn_PathFollower`), and would change behaviour on a
+connected ship, so it stays out until a player reports it.
+
+**Testing on a vacuum map.** The harness's second map (`SecondMap`) is Odyssey's
+`SpacePocket`: a pocket map takes its generator's biome, and that one is `Orbit`.
+`Space` terrain cannot be walked but still carries air-exchange regions in the
+outdoor room, so a staged corridor needs walls down both sides as well as a roof,
+or it reads as open space. The clock stands still, so a room's vacuum stays
+where a case sets it.
+
 ## Mod compatibility
 
 Five tables, each keyed by defName and each allowed to miss. A name no loaded

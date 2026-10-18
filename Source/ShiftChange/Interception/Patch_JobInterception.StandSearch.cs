@@ -84,9 +84,14 @@ namespace ShiftChange
         /// <para>A candidate the change-back latch holds is passed over
         /// (<see cref="LatchBlocks"/>), so the latch never hides a stand it
         /// does not reach.</para>
+        ///
+        /// <para>Given the <paramref name="job"/>, a candidate whose outfit
+        /// would strip vacuum protection the job needs is passed over too
+        /// (<see cref="Consider"/>), so a vacsuit stand further off can still
+        /// win where the nearest stand would take the suit off.</para>
         /// </summary>
         internal static CompShiftStand FindAvailableStand(JobPlace place, Map map, Pawn pawn,
-            WorkTypeDef work, StandTrigger trigger = StandTrigger.Work)
+            WorkTypeDef work, StandTrigger trigger = StandTrigger.Work, Job job = null)
         {
             CompShiftStand best = null;
             bool bestIsPersonal = false;
@@ -107,7 +112,8 @@ namespace ShiftChange
                         CompShiftStand comp = thing.TryGetComp<CompShiftStand>();
                         if (comp != null && comp.serves == CatchmentKind.Room && comp.Covers(place, map))
                         {
-                            Consider(comp, pawn, work, trigger, ref best, ref bestIsPersonal, ref bestDistance);
+                            Consider(comp, pawn, work, trigger, ref best, ref bestIsPersonal, ref bestDistance,
+                                     job);
                         }
                     }
                 }
@@ -119,7 +125,7 @@ namespace ShiftChange
                 Thing thing = comp.parent;
                 if (thing != null && thing.Spawned && thing.Map == map && comp.Covers(place, map))
                 {
-                    Consider(comp, pawn, work, trigger, ref best, ref bestIsPersonal, ref bestDistance);
+                    Consider(comp, pawn, work, trigger, ref best, ref bestIsPersonal, ref bestDistance, job);
                 }
             }
             return best;
@@ -138,10 +144,12 @@ namespace ShiftChange
         /// <summary>
         /// One candidate through every gate of <see cref="FindAvailableStand"/>,
         /// kept if it beats the best so far: a personal stand over a shared one,
-        /// then the nearer.
+        /// then the nearer. Given the <paramref name="job"/> it is dressing for,
+        /// a candidate that would strip vacuum protection the job needs is not
+        /// kept, and the search goes on to the next.
         /// </summary>
         internal static void Consider(CompShiftStand comp, Pawn pawn, WorkTypeDef work, StandTrigger trigger,
-            ref CompShiftStand best, ref bool bestIsPersonal, ref int bestDistance)
+            ref CompShiftStand best, ref bool bestIsPersonal, ref int bestDistance, Job job = null)
         {
             Thing thing = comp.parent;
             if (comp.OnShift || !Handles(comp, trigger, work) || !comp.CanBeClaimedBy(pawn))
@@ -167,6 +175,9 @@ namespace ShiftChange
             {
                 return;
             }
+            // Read off the plan WouldDress has just built, before anything
+            // builds another. The walk it may lead to is asked last, below.
+            bool lessProtected = job != null && PlanLowersVacuumProtection(pawn, thing.Map);
             // Outside this pawn's allowed area. The swap could not get there (see
             // StandForbiddenTo), and because a personal stand outranks a shared
             // one below, leaving it in would let a forbidden personal stand beat
@@ -192,14 +203,25 @@ namespace ShiftChange
 
             bool personal = comp.IsAssignedTo(pawn);
             int distance = pawn.Position.DistanceToSquared(thing.Position);
-            if (best == null
-                || (personal && !bestIsPersonal)
-                || (personal == bestIsPersonal && distance < bestDistance))
+            if (best != null
+                && !(personal && !bestIsPersonal)
+                && !(personal == bestIsPersonal && distance < bestDistance))
             {
-                best = comp;
-                bestIsPersonal = personal;
-                bestDistance = distance;
+                return;
             }
+            // NO STAND THAT STRIPS VACUUM PROTECTION THE JOB NEEDS. A region
+            // walk, so asked only of a stand that would otherwise win, and only
+            // when its plan lowers the pawn's protection on a vacuum map.
+            // Passing it over here, not after the search, lets another stand
+            // win: the vacsuit stand by the airlock, behind the nearer apron.
+            // docs/DESIGN.md, "Vacuum".
+            if (lessProtected && DressingTripGoesThroughVacuum(job, pawn, comp, thing.Map))
+            {
+                return;
+            }
+            best = comp;
+            bestIsPersonal = personal;
+            bestDistance = distance;
         }
 
         /// <summary>

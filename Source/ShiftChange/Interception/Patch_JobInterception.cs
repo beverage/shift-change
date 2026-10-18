@@ -171,6 +171,7 @@ namespace ShiftChange
         internal static void ResetSessionState()
         {
             LastBlockedTick.Clear();
+            LastVacuumWarningTick.Clear();
             ChangedBackAt.Clear();
             DressedFor.Clear();
             // Re-arm after a fault. Deliberately NOT `Enabled = true`: that
@@ -228,6 +229,9 @@ namespace ShiftChange
             Map map = MapToDecideOn(job, pawn);
             if (map == null)
             {
+                // A drafted colonist's moves are orders, and never reach the
+                // gates below; the vacuum warning still applies to them.
+                WarnIfOrderedIntoVacuum(job, pawn);
                 return false;
             }
             // Every step below reads this, and none classifies the job again.
@@ -247,11 +251,16 @@ namespace ShiftChange
             // sit above the return trip. Each lets the job start untouched.
             // A delivery and an ignored giver's job are not among the jobs the
             // first lets through, and are decided once the other three have
-            // run.
+            // run. An order goes first, and of the jobs the gates let through,
+            // only an order, a lord's and one handed over mid-swap go by the
+            // vacuum gate below without being asked; the cooldown waits below
+            // it.
             bool delivery = !c.PlayerForced && c.Kind == JobKind.Delivery;
             bool ignored = !c.PlayerForced && (c.Kind == JobKind.MealRun || c.Kind == JobKind.IgnoredGiver);
-            if (!delivery && !ignored && ExemptInEitherDirection(c))
+            bool exempt = !delivery && !ignored && ExemptInEitherDirection(c);
+            if (exempt && c.PlayerForced)
             {
+                WarnIfOrderedIntoVacuum(job, pawn);
                 return false;
             }
             if (UnderLordDuty(pawn, job))
@@ -262,7 +271,48 @@ namespace ShiftChange
             {
                 return false;
             }
+
+            // NO UNIFORM INTO VACUUM. A colonist on shift whose next job goes
+            // through vacuum, in a uniform that protects less than their own
+            // clothes, changes back first, when the stand can be reached
+            // through air; when it cannot, the walk to change would be the
+            // crossing itself, so the player is told instead. Only on a vacuum
+            // map. docs/DESIGN.md, "Vacuum".
+            //
+            // Above every exemption but an order's, emergencies and errands
+            // included (decided 2026-10-16), above the cooldown, so a swap
+            // that could not start a moment ago does not wave the next job
+            // into vacuum, and above every step below that would keep the
+            // uniform on. Two things still come first, because no swap can
+            // start under them: a lord, which reissues the job and pre-empts
+            // one, and a swap already under way, which is never stacked on.
+            // And the return trip's two refusals hold here too: nobody is
+            // pulled out of bed (StaysInBed), and an urgent patient goes
+            // straight to bed.
+            CompShiftStand worn = CompShiftStand.OnShiftStandFor(pawn);
+            if (worn != null && VacuumMap(map) && !StaysInBed(pawn, job)
+                && !c.UrgentPatient && !UrgentPatientNext(pawn, tracker))
+            {
+                UniformInVacuum outcome = UniformIntoVacuum(job, pawn, worn, map);
+                if (outcome == UniformInVacuum.ChangeBack)
+                {
+                    if (Verbose)
+                    {
+                        Log.Message($"[ShiftChange] {pawn.LabelShort} changes back before {job.def.defName}: " +
+                                    "it goes through vacuum, and their own clothes protect them better");
+                    }
+                    return Insert(pawn, tracker, worn, job, tag, "return (vacuum)");
+                }
+                if (outcome != UniformInVacuum.Fine && !WarnedLately(pawn))
+                {
+                    WarnOfVacuum(pawn, outcome, ordered: false);
+                }
+            }
             if (CoolingDown(pawn))
+            {
+                return false;
+            }
+            if (exempt)
             {
                 return false;
             }
@@ -548,6 +598,11 @@ namespace ShiftChange
                 }
                 return false;
             }
+            // Never across vacuum to change, whatever the return is for.
+            if (ReturnCrossesVacuum(pawn, onShift, map))
+            {
+                return false;
+            }
             return Insert(pawn, tracker, onShift, job, tag, "return");
         }
 
@@ -572,6 +627,10 @@ namespace ShiftChange
             // carve-outs read the stand's CURRENT configuration, not why the
             // pawn was dressed (docs/DESIGN.md, "Meal breaks").
             if (onShift.HandlesRecreation() && onShift.Covers(target, map))
+            {
+                return false;
+            }
+            if (ReturnCrossesVacuum(pawn, onShift, map))
             {
                 return false;
             }
@@ -667,8 +726,10 @@ namespace ShiftChange
                 return false;
             }
 
-            // The search holds the change-back latch, per candidate.
-            CompShiftStand stand = FindAvailableStand(target, map, pawn, work);
+            // The search holds the change-back latch, per candidate, and the
+            // vacuum gate: given the job, it passes over a stand whose outfit
+            // would strip protection the trip needs.
+            CompShiftStand stand = FindAvailableStand(target, map, pawn, work, StandTrigger.Work, job);
             if (stand == null)
             {
                 if (Verbose)
@@ -718,8 +779,8 @@ namespace ShiftChange
             // resolves the one map-spanning, edge-touching room rather than
             // null, so a room stand in open ground would serve every bedroll
             // on the map, and the search skips such a room for sleep. It holds
-            // the change-back latch too, per candidate.
-            CompShiftStand restStand = FindAvailableStand(target, map, pawn, null, StandTrigger.Rest);
+            // the change-back latch too, per candidate, and the vacuum gate.
+            CompShiftStand restStand = FindAvailableStand(target, map, pawn, null, StandTrigger.Rest, job);
             if (restStand == null)
             {
                 if (Verbose)
@@ -762,8 +823,8 @@ namespace ShiftChange
             // map; the search skips such a room for recreation. A walled roofless
             // yard is its own room and stays eligible, and a radius needs no
             // guard (docs/DESIGN.md, "The recreation branch"). The search holds
-            // the change-back latch too, per candidate.
-            CompShiftStand recStand = FindAvailableStand(target, map, pawn, null, StandTrigger.Recreation);
+            // the change-back latch too, per candidate, and the vacuum gate.
+            CompShiftStand recStand = FindAvailableStand(target, map, pawn, null, StandTrigger.Recreation, job);
             if (recStand == null)
             {
                 if (Verbose)
