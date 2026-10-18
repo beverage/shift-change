@@ -194,6 +194,42 @@ namespace ShiftChange
             // The vacuum gate's ground: the second map is a vacuum map.
             Case("a room on the second map, a vacuum map, holds air while the open floor past its door does not",
                  () => HarnessVacuum.VacuumMapStages(map));
+            Case(map, pad, "a bill fetching through vacuum keeps a crafter in their vacsuit, where one inside dresses them",
+                 HarnessVacuum.StageShip, HarnessVacuum.IngredientInVacuumKeepsTheirGear);
+            Case(map, pad, "a bill fetching from a safe room only vacuum leads to keeps them in their vacsuit too",
+                 HarnessVacuum.StageShip, HarnessVacuum.SafeRoomAcrossVacuumKeepsTheirGear);
+            Case(map, pad, "on a ship whose rooms all connect through air, the same bill dresses them",
+                 HarnessVacuum.StageConnectedShip, HarnessVacuum.ConnectedShipChangesNothing);
+            Case(map, pad, "a crafter in uniform changes back before a bill through vacuum, and not before one inside",
+                 HarnessVacuum.StageShip, HarnessVacuum.OnShiftChangesBackBeforeVacuum);
+            Case(map, pad, "a crafter with no vacuum protection to lose is dressed as before",
+                 HarnessVacuum.StageShip, HarnessVacuum.UnprotectedCrafterIsUnaffected);
+            Case(map, pad, "an order through vacuum runs as given, and only a warning says so",
+                 HarnessVacuum.StageShip, HarnessVacuum.OrderIntoVacuumRunsAsGiven);
+            Case(map, pad, "an emergency through vacuum sends a colonist in uniform to change first",
+                 HarnessVacuum.StageShip, HarnessVacuum.EmergencyIntoVacuumChangesBackFirst);
+            Case(map, pad, "off a vacuum map, a crafter in a vacsuit is dressed for a bill fetching from outside, as before",
+                 HarnessVacuum.StageEnclosedCrafter, HarnessVacuum.PlanetMapChangesNothing);
+            Case(map, pad, "a stand holding a vacsuit dresses an unsuited crafter for a bill through vacuum",
+                 HarnessVacuum.StageShip, HarnessVacuum.VacsuitStandStillDresses);
+            Case(map, pad, "a vacsuit stand across the room wins over a nearer one that would take the suit off",
+                 HarnessVacuum.StageShip, HarnessVacuum.ProtectiveStandWinsOverANearerOne);
+            Case(map, pad, "an area stand painted over open floor does not dress for a delivery from out there",
+                 HarnessVacuum.StageShip, HarnessVacuum.AreaDeliveryAcrossVacuumKeepsTheirGear);
+            Case(map, pad, "a freed stand does not catch up a crafter on a job fetching through vacuum",
+                 HarnessVacuum.StageShip, HarnessVacuum.FreedStandSkipsAJobThroughVacuum);
+            Case(map, pad, "an errand ahead of the stand's work rides along in uniform, but not into vacuum",
+                 HarnessVacuum.StageConnectedShip, HarnessVacuum.ErrandAheadOfWorkChangesBackBeforeVacuum);
+            Case(map, pad, "the air walk does not pass a door forbidden to the colonist",
+                 HarnessVacuum.StageConnectedShip, HarnessVacuum.ForbiddenDoorIsNoWayThrough);
+            Case(map, pad, "a colonist cut off from their stand by vacuum is not sent across it to change",
+                 HarnessVacuum.StageShip, HarnessVacuum.StrandedColonistIsNotSentAcrossToChange);
+            Case(map, pad, "a cooldown does not wave a colonist in uniform into vacuum",
+                 HarnessVacuum.StageShip, HarnessVacuum.CooldownDoesNotWaveThemIntoVacuum);
+            Case(map, pad, "an urgent patient goes straight to a bed across vacuum",
+                 HarnessVacuum.StageShip, HarnessVacuum.UrgentPatientGoesStraightToBedAcrossVacuum);
+            Case(map, pad, "a colonist whose stand is on another map is warned before vacuum",
+                 HarnessVacuum.StageCrafterAtHome, HarnessVacuum.StandOnAnotherMapStillWarns);
             Case("every stand def asks to hear when its map is removed", StandDefsHearMapRemoval);
             Case(map, pad, "teardown (deconstruct, burn) releases the ledger", TeardownReleases);
             Case(map, pad, "reinstalling mid-shift keeps the ledger and the return trip",

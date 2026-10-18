@@ -97,7 +97,7 @@ does.
 
 ## What the cases assert
 
-A hundred and twelve cases. This section is a map: the detail lives with each case, in
+A hundred and thirty cases. This section is a map: the detail lives with each case, in
 the comment on its method under `Source/ShiftChange/Harness/`, and the report
 prints the cases in the order `DebugTools_LifecycleHarness.Run` registers them.
 
@@ -133,6 +133,46 @@ air, while the open floor past its door, and the doorway itself, read as vacuum.
 A region walk that may only step into air stays in the room. Its control is a
 walk from the same start that may step anywhere, which reaches the floor
 outside.
+
+The rest stage a ship there (`StageShip`): the room with a stand holding a
+duster, a crafter in a vacsuit and its helmet, a crafting spot, and a door onto
+three cells of open floor leading to a second room. A bill fetching from the open
+floor leaves the crafter in their own gear, and the same bill fetching from the
+room dresses them (`IngredientInVacuumKeepsTheirGear`). So does a bill fetching
+from the second room, safe but only reached through vacuum
+(`SafeRoomAcrossVacuumKeepsTheirGear`). On a ship whose floor is a walled, roofed
+corridor holding air, that bill dresses them, which is the promise that a
+connected ship changes nothing (`ConnectedShipChangesNothing`). Once dressed, a
+crafter changes back before a bill through vacuum and keeps the duster on for one
+inside (`OnShiftChangesBackBeforeVacuum`). A crafter with no protection to lose
+is dressed as before (`UnprotectedCrafterIsUnaffected`). An order through vacuum
+runs as given, and its message goes up on screen once: a second order within the
+hour says nothing more, and a drafted move is warned about too
+(`OrderIntoVacuumRunsAsGiven`). An emergency through vacuum sends a colonist in
+uniform back to change, and the same emergency inside does not
+(`EmergencyIntoVacuumChangesBackFirst`). On the harness's own map, the crafter in
+a vacsuit is dressed for a bill fetching from outside the room, as before
+(`PlanetMapChangesNothing`).
+
+The rest came out of a review of the gate. A stand holding a vacsuit dresses an
+unsuited crafter for a bill through vacuum, and the gate then leaves them be in
+it (`VacsuitStandStillDresses`). The stand search passes over the nearer duster
+stand for a vacsuit stand across the room, where without the job the nearer one
+wins (`ProtectiveStandWinsOverANearerOne`). An area stand painted over the open
+floor does not dress for a delivery from out there
+(`AreaDeliveryAcrossVacuumKeepsTheirGear`), and a freed stand does not catch up
+a crafter already on a job fetching through vacuum
+(`FreedStandSkipsAJobThroughVacuum`). On the connected ship, an errand ahead of
+the stand's work rides along until the corridor is opened to vacuum
+(`ErrandAheadOfWorkChangesBackBeforeVacuum`), and a forbidden door is no way
+through for the walk (`ForbiddenDoorIsNoWayThrough`). A colonist cut off from
+their stand by vacuum is not sent across it to change, and is warned instead
+(`StrandedColonistIsNotSentAcrossToChange`). A cooldown holds a meal break's
+change back but not the one before vacuum (`CooldownDoesNotWaveThemIntoVacuum`).
+An urgent patient goes straight to a bed across vacuum
+(`UrgentPatientGoesStraightToBedAcrossVacuum`). And a colonist flown to a vacuum
+map without their stand is warned before vacuum, by job or by order
+(`StandOnAnotherMapStillWarns`).
 
 **The swap** (`HarnessSwap`). These stage an undressed pawn, and every one but
 `DecencyGuardIsOptIn` runs `JobDriver_SwapAtStand` for real, through the pawn's
