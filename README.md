@@ -356,6 +356,14 @@ stands are the mechanized ones from
   colonist's allowed area is passed over, and a colonist whose stand ends up
   outside it keeps the outfit on until it is back inside. The stand's inspect
   pane says so. Change back is an order, so it still works.
+- **Nobody goes into vacuum in clothes that protect them less than their own.**
+  On a ship in space, a colonist whose job crosses vacuum (fetching a bill's
+  ingredients from outside, for one) does it in their own gear instead of the
+  stand's outfit, and one already in uniform changes back first. A stand whose
+  outfit protects as well, like a vacsuit stand by the airlock, still dresses
+  them. Nobody is sent back across vacuum to change, and an order runs as given,
+  with a message when it sends someone into vacuum in work clothes. Where every
+  room connects through air, nothing changes.
 - If a stand serving its room frees up while someone is already working there
   out of uniform, they'll step over and change, unless they're mid-treatment on
   a patient. A stand serving a radius or an area waits for their next job

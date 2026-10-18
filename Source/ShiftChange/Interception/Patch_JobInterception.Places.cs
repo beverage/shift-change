@@ -43,20 +43,57 @@ namespace ShiftChange
         internal static bool PlaceCovered(LocalTargetInfo place, CompShiftStand stand, Map map,
                                           ref bool named)
         {
-            // A thing on another map, as a delivery across levels would name,
-            // is outside this one's catchment whatever its coordinates read.
+            JobPlace read;
+            switch (ReadPlace(place, map, out read))
+            {
+                case PlaceRead.Unreadable:
+                    return true;
+                case PlaceRead.OtherMap:
+                    // Outside this map's catchment whatever its coordinates read.
+                    named = true;
+                    return false;
+                default:
+                    named = true;
+                    return stand.Covers(read, map);
+            }
+        }
+
+        /// <summary>What <see cref="ReadPlace"/> made of a place a job names.</summary>
+        internal enum PlaceRead
+        {
+            /// <summary>No cell on this map: an empty target, or one out of bounds.</summary>
+            Unreadable,
+
+            /// <summary>A thing on another map, as a delivery across levels would name.</summary>
+            OtherMap,
+
+            /// <summary>A place on this map.</summary>
+            Here,
+        }
+
+        /// <summary>
+        /// One place a job names, read the one way every check that reads a
+        /// job's places reads it: a thing where it is held, and a solid place
+        /// at its own cell with the room cell beside it
+        /// (<see cref="RoomBearing"/>). The catchment checks
+        /// (<see cref="PlaceCovered"/>) and the vacuum walk
+        /// (<see cref="AddAirTarget"/>) both read places through this, so the
+        /// two cannot come to disagree about where a job goes.
+        /// </summary>
+        internal static PlaceRead ReadPlace(LocalTargetInfo place, Map map, out JobPlace read)
+        {
+            read = JobPlace.Invalid;
             if (place.HasThing && place.Thing.MapHeld != null && place.Thing.MapHeld != map)
             {
-                named = true;
-                return false;
+                return PlaceRead.OtherMap;
             }
             IntVec3 cell = place.HasThing ? place.Thing.PositionHeld : place.Cell;
             if (!cell.IsValid || !cell.InBounds(map))
             {
-                return true;
+                return PlaceRead.Unreadable;
             }
-            named = true;
-            return stand.Covers(new JobPlace(cell, RoomBearing(cell, place, map)), map);
+            read = new JobPlace(cell, RoomBearing(cell, place, map));
+            return PlaceRead.Here;
         }
 
         /// <summary><see cref="PlaceCovered"/> for every entry of a target queue.</summary>

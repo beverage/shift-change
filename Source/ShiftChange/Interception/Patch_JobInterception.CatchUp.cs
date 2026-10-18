@@ -158,6 +158,9 @@ namespace ShiftChange
                 {
                     continue;
                 }
+                // Read off the plan WouldDress has just built, before anything
+                // builds another; the walk it may lead to is asked last.
+                bool lessProtected = PlanLowersVacuumProtection(pawn, map);
                 // The second dress path, and it needs the same latch: without
                 // it, a stand returning to the pool re-dresses the very pawn
                 // the player just pulled out of this room.
@@ -177,11 +180,19 @@ namespace ShiftChange
                     continue;
                 }
                 int distance = pawn.Position.DistanceToSquared(parent.Position);
-                if (distance < bestDistance)
+                if (distance >= bestDistance)
                 {
-                    best = pawn;
-                    bestDistance = distance;
+                    continue;
                 }
+                // What is left of the job may still go through vacuum. A region
+                // walk, so asked only of a colonist who would otherwise be the
+                // one caught up.
+                if (lessProtected && DressingTripGoesThroughVacuum(job, pawn, stand, map))
+                {
+                    continue;
+                }
+                best = pawn;
+                bestDistance = distance;
             }
 
             if (best == null)

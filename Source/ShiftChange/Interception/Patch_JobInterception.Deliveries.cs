@@ -147,7 +147,9 @@ namespace ShiftChange
                 if (comp.serves == CatchmentKind.Area && thing != null && thing.Spawned && thing.Map == map
                     && EveryPlaceCovered(job, pawn, comp, map))
                 {
-                    Consider(comp, pawn, work, StandTrigger.Work, ref best, ref bestIsPersonal, ref bestDistance);
+                    // Given the job, since an area can be painted across vacuum.
+                    Consider(comp, pawn, work, StandTrigger.Work, ref best, ref bestIsPersonal, ref bestDistance,
+                             job);
                 }
             }
             if (best == null)
