@@ -13,16 +13,11 @@ namespace ShiftChange
             compClass = typeof(CompShiftStand);
         }
 
-        /// <summary>
-        /// Asks the engine to tell this stand's comps when its map is removed,
-        /// for <see cref="CompShiftStand.Notify_MapRemoved"/>. Map removal never
-        /// despawns a building, and <c>ThingWithComps.Notify_MyMapRemoved</c>
-        /// passes the news on to comps only for a def that sets
-        /// <c>notifyMapRemoved</c>. Set here, where the engine resolves each
-        /// def's comps, rather than in the patch files: every def that carries
-        /// this comp gets it, whichever mod added the comp, and no def can end
-        /// up with the field written twice.
-        /// </summary>
+        /// <summary>Sets <c>notifyMapRemoved</c> on every def that carries this comp, for
+        /// <see cref="CompShiftStand.Notify_MapRemoved"/>: map removal never despawns a
+        /// building, and <c>ThingWithComps.Notify_MyMapRemoved</c> tells comps only when the
+        /// def asks. Here rather than in the patches, so it reaches whichever mod added the
+        /// comp.</summary>
         public override void ResolveReferences(ThingDef parentDef)
         {
             base.ResolveReferences(parentDef);
@@ -31,134 +26,74 @@ namespace ShiftChange
     }
 
     /// <summary>
-    /// The Shift Change half of a vanilla outfit stand: which work type it
-    /// dresses for, and the checkout ledger for whoever currently has its
-    /// uniform out.
-    ///
-    /// The ledger exists because the stand itself has no idea whose clothes it
-    /// holds — <see cref="Building_OutfitStand"/> scribes only its container,
-    /// its storage settings and <c>allowRemovingItems</c>, and vanilla's own
-    /// <c>JobDriver_UseOutfitStand</c> hands any wearable item to whoever turns
-    /// up. Ownership comes from the sibling
-    /// <see cref="CompAssignableToPawn_ShiftStand"/>; this comp records which
-    /// specific items moved which way, so the return trip puts the right
-    /// clothes back on the right pawn.
-    ///
-    /// The class is <c>partial</c>, across four files in Stand/. This one
-    /// holds the ledger, the stand's lifecycle, its ownership reads and save
-    /// and load. The other three hold what it dresses for and its settings
-    /// (.Triggers), where it serves (.Catchment) and what the player sees
-    /// (.Ui); docs/DEVELOPMENT.md maps them.
+    /// Shift Change's half of a vanilla outfit stand: what it dresses for, and a ledger
+    /// of the garments that went between it and its borrower, because
+    /// <see cref="Building_OutfitStand"/> records nothing about whose clothes it holds.
+    /// Partial: settings in .Triggers, what it serves in .Catchment, display in .Ui.
     /// </summary>
     public partial class CompShiftStand : ThingComp
     {
-        /// <summary>The owner's own clothes, currently parked in the stand.</summary>
+        /// <summary>The borrower's own clothes, currently parked in the stand.</summary>
         internal List<Apparel> storedOwnerApparel = new List<Apparel>();
 
-        /// <summary>The stand's clothes, currently worn by the owner.</summary>
+        /// <summary>The stand's clothes, currently worn by the borrower.</summary>
         internal List<Apparel> issuedUniform = new List<Apparel>();
 
-        /// <summary>
-        /// The subset of <see cref="storedOwnerApparel"/> that was FORCE-WORN
-        /// when it was checked in. Vanilla clears the forced flag on every
-        /// removal (<c>Pawn_ApparelTracker.Notify_ApparelRemoved:784-790</c>),
-        /// so without this record a force-worn duster comes back from a shift
-        /// as ordinary policy-managed clothing and the optimizer swaps it away.
-        /// </summary>
+        /// <summary>The parked garments that were force-worn, since vanilla's
+        /// <c>Pawn_ApparelTracker.Notify_ApparelRemoved</c> clears the flag.</summary>
         internal List<Apparel> storedForcedApparel = new List<Apparel>();
 
-        /// <summary>
-        /// Who currently has this stand's uniform on. This — not the assigned
-        /// owner — is the truth for the return trip, because an unassigned
-        /// stand is a POOL stand that anyone capable may borrow.
-        /// </summary>
+        /// <summary>Who wears this stand's uniform now. The return trip follows this,
+        /// not the assigned owner, because a pool stand lends to anyone.</summary>
         internal Pawn borrower;
 
-        /// <summary>
-        /// Stands that currently have a uniform out on a pawn, so the return
-        /// trip can be found without sweeping the map. Keyed by BORROWER and
-        /// rebuilt on load, since <see cref="PostSpawnSetup"/> runs for every
-        /// comp on both paths.
-        /// </summary>
+        /// <summary>Stands with a uniform out, keyed by borrower, so the return trip needs
+        /// no map sweep. Not saved; <see cref="PostSpawnSetup"/> refills it.</summary>
         internal static readonly Dictionary<Pawn, CompShiftStand> OnShiftStands =
             new Dictionary<Pawn, CompShiftStand>();
 
         public Building_OutfitStand Stand => parent as Building_OutfitStand;
 
-        /// <summary>
-        /// This stand has something out on a pawn, so the return trip has
-        /// work to do.
-        ///
-        /// <para>EITHER half of the ledger counts, not just the issued one: a
-        /// deposit-only stand issues nothing, and keyed on
-        /// <see cref="issuedUniform"/> alone it would never be claimed, so
-        /// nothing would hand its contents back. Why the widening is safe for
-        /// every older save: docs/DESIGN.md, "The sleep branch".</para>
-        /// </summary>
+        /// <summary>The ledger is open: a uniform is out, or a pawn's own clothes are parked.
+        /// Either half counts: a deposit-only stand issues nothing and still owes the parked
+        /// garments back.</summary>
         public bool OnShift => issuedUniform.Count > 0 || storedOwnerApparel.Count > 0;
 
         public Pawn Borrower => borrower;
 
-        /// <summary>
-        /// Is this pawn still the colony's, for ledger purposes?
-        ///
-        /// <b>Faction, never spawnedness.</b> Banishment on a spawned colonist
-        /// runs <c>pawn.SetFaction(null)</c> and stops
-        /// (<c>PawnBanishUtility.cs:66-69</c>) — faction is the only field it
-        /// touches, so faction is what we test. The mirror image is why
-        /// spawnedness is the wrong axis: a gravship flight despawns the
-        /// borrower with <c>WillReplace</c> and never touches their faction,
-        /// and the stand is set back down BEFORE the pawns are
-        /// (<c>GravshipPlacementUtility.cs:35-36</c>) — so at the moment
-        /// <see cref="PostSpawnSetup"/> asks this on landing, a perfectly good
-        /// borrower is despawned. Testing spawnedness here would destroy a
-        /// live ledger on every landing.
-        ///
-        /// The <c>HostFaction</c> clause is vanilla's phrasing, from
-        /// <c>CompAssignableToPawn.PlayerCanSeeAssignments</c>
-        /// (<c>:28</c>) and <c>Banish</c>'s own entry guard (<c>:22</c>).
-        /// </summary>
+        /// <summary>Whether the pawn still belongs to the colony, as a member, guest or
+        /// prisoner, by vanilla's own test (<c>CompAssignableToPawn.PlayerCanSeeAssignments</c>,
+        /// <c>PawnBanishUtility.Banish</c>). Faction, never spawnedness: a banished colonist
+        /// can stay spawned and leaves the faction, while a gravship flight despawns the
+        /// borrower without touching it, and a landing sets the stand down before its pawns,
+        /// so at <see cref="PostSpawnSetup"/> a live borrower may still be despawned.</summary>
         internal static bool StillOurs(Pawn pawn)
         {
             if (pawn == null)
             {
                 return false;
             }
-            // Not Faction.OfPlayer — it logs an error when it cannot resolve
-            // (Faction.cs:214-224). Not Faction.OfPlayerSilentFail either: it
-            // ends in Find.FactionManager.OfPlayer (Faction.cs:259) and
-            // Find.FactionManager dereferences World.factionManager unguarded
-            // (Find.cs:188), so it throws when Find.World is null. This chain
-            // is null-safe (Find.cs:100-109) and silent.
+            // Not Faction.OfPlayer, which logs an error when it cannot resolve, nor
+            // OfPlayerSilentFail, which throws when Find.World is null; this does neither.
             Faction player = Find.World?.factionManager?.OfPlayer;
             if (player == null)
             {
-                // Cannot tell, so keep the ledger. A predicate that reaps when
-                // it does not know is one that eats live ledgers.
+                // Cannot tell, so keep the ledger.
                 return true;
             }
             return pawn.Faction == player || pawn.HostFaction == player;
         }
 
-        /// <summary>
-        /// The pawns this stand is reserved for: never null, and empty when it
-        /// is a pool stand, in which case it is the shared
-        /// <see cref="NoOwners"/>, so callers only read it. Distinct from
-        /// <see cref="Borrower"/>: assignment is the player's standing intent,
-        /// borrowing is who is wearing it now.
-        /// </summary>
+        /// <summary>The pawns this stand is reserved for, empty for a pool stand. Never null:
+        /// the assignable comp's own list, or the shared <see cref="NoOwners"/> on a stand
+        /// without one, so callers only read it.</summary>
         public List<Pawn> AssignedOwners
         {
             get
             {
-                // OUR comp by exact type first, never "the first assignable".
-                // Outfit Stands Plus adds a second CompAssignableToPawn
-                // subclass to this same def, and comp order follows patch
-                // order — reading whichever came first meant our Set owner
-                // dialog could write a list this property never read. The
-                // base-typed fallback is deliberate: a stand carrying only a
-                // foreign assignable (an Outfit Stands Plus stand, say)
-                // still gets owner semantics from it.
+                // Ours by exact type first: Outfit Stands Plus adds a second
+                // CompAssignableToPawn to this def, and comp order follows patch
+                // order. The fallback serves a stand with only a foreign one.
                 CompAssignableToPawn comp = parent.TryGetComp<CompAssignableToPawn_ShiftStand>()
                     ?? parent.TryGetComp<CompAssignableToPawn>();
                 return comp?.AssignedPawnsForReading ?? NoOwners;
@@ -171,18 +106,6 @@ namespace ShiftChange
 
         public bool IsPool => AssignedOwners.Count == 0;
 
-        /// <summary>
-        /// Unassigned means pool: any pawn may take it — unless the player
-        /// turned pooling off in mod settings, in which case an unassigned
-        /// stand is inert and only explicit assignment participates. One or
-        /// more owners means the stand serves that set and nobody outside it,
-        /// which is what keeps a surgeon's tailored kit off a passing hauler
-        /// and a gown off the wrong colonist.
-        ///
-        /// Note the consequence at the edges: lose every owner — death,
-        /// banishment, the reaper — and the list empties, so the stand falls
-        /// back to being a pool stand rather than staying inert.
-        /// </summary>
         public bool CanBeClaimedBy(Pawn pawn)
         {
             List<Pawn> owners = AssignedOwners;
@@ -193,11 +116,6 @@ namespace ShiftChange
             return ShiftChangeMod.PoolingEnabled;
         }
 
-        /// <summary>
-        /// Whether the stand holds anything to change into. An empty pool stand
-        /// would otherwise be claimed, walked to, and swapped with — a wasted
-        /// trip that looks like a bug.
-        /// </summary>
         public bool HasWearable
         {
             get
@@ -219,29 +137,12 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>
-        /// Holds the one invariant the mod's contents protection rests on:
-        /// while a stand is in service, vanilla's "Allow removing items" flag
-        /// is off.
-        ///
-        /// <para>Called on spawn and from EVERY entry into service, which is
-        /// what makes this an invariant rather than a load-time migration. The
-        /// documented way to reach the flag is to set a stand to "Not used for
-        /// shift changes", flip it, and put the stand back — and that last step
-        /// always lands in one of the three callers, so the window that round
-        /// trip used to leave open is closed.</para>
-        ///
-        /// <para>Hold this and <c>IApparelSource.ApparelSourceEnabled</c> is
-        /// false by construction, because it IS this flag
-        /// (<c>Building_OutfitStand.cs:104</c>) and
-        /// <c>JobGiver_OptimizeApparel:149</c> is its only reader in the whole
-        /// engine. That is why no Harmony patch on that property is needed:
-        /// the protection falls out of the invariant. Do not add one without
-        /// first breaking this.</para>
-        ///
-        /// <para>Leaving service is deliberately untouched. An excluded stand
-        /// is ordinary vanilla furniture and the player owns its flag.</para>
-        /// </summary>
+        /// <summary>Keeps vanilla's "Allow removing items" flag off while the stand is in
+        /// service; called on spawn and on every entry into service. The flag is what
+        /// <c>IApparelSource.ApparelSourceEnabled</c> returns, and
+        /// <c>JobGiver_OptimizeApparel</c> is the only reader of that property, so this
+        /// alone keeps the optimizer out of the stand. Out of service, the flag is the
+        /// player's.</summary>
         internal void EnforceRemovalFlag()
         {
             if (!excluded)
@@ -265,9 +166,7 @@ namespace ShiftChange
             {
                 return null;
             }
-            // A stand that was destroyed while its uniform was out leaves a
-            // stale entry; drop it rather than hand back a comp whose parent
-            // is gone.
+            // A stand destroyed while its uniform was out leaves a stale entry.
             if (comp == null || comp.parent == null || comp.parent.Destroyed
                 || !comp.OnShift || comp.borrower != pawn)
             {
@@ -286,41 +185,16 @@ namespace ShiftChange
                 CatchmentStands.Add(this);
             }
 
-            // Unconditional, not load-only: this also covers a stand
-            // reinstalled from a minified box. A fresh build defaults to the
-            // flag off, so the ordinary case is a no-op.
+            // Unconditional, not load-only: a stand set down from a box needs it too.
             EnforceRemovalFlag();
 
-            // Rebuild from the BORROWER, not the assigned owner. Inferring it
-            // from ownership was only ever right by coincidence — reassign a
-            // stand while its uniform is out and the return trip would have
-            // pointed at the wrong pawn.
             if (OnShift && (borrower == null || borrower.Dead || !StillOurs(borrower)))
             {
-                // Nobody left to honour the ledger. Three ways in: a save from
-                // before pooling (borrower null), a borrower who DIED while
-                // this stand sat in a box, or a borrower who left the
-                // colony without reaching Pawn_Ownership.UnclaimAll —
-                // banishment, which Patch_BanishStands now catches eagerly.
-                // This branch is the repair path for saves that predate that
-                // patch, and the backstop for any other faction-loss route we
-                // do not hook.
-                //
-                // The death clause is load-bearing since the ledger started
-                // riding along inside a minified box: both reapers find their
-                // stands by sweeping listerThings
-                // (Patch_UnclaimStands.ReapStandsFor, StandsBorrowedBy), and a
-                // boxed stand is on no map's lister, so a borrower who dies
-                // mid-haul reaches us only here. Dead, not spawnedness — see
-                // StillOurs for why that axis is wrong on this method.
-                //
-                // ReleaseBorrower rather than clearing the lists by hand: it
-                // takes the FORCED flags off too, and a banished pawn is alive
-                // and standing on the map in our force-worn uniform. It
-                // null-guards the holder, so the pre-pooling case still works.
-                // Not AbandonLedger — that fires Notify_StandFreed, which
-                // sweeps the map for a catch-up dress, and running that from
-                // inside Map.FinalizeLoading is a fine way to break a load.
+                // Nobody left to honour the ledger: no borrower (older saves), one who
+                // died while the stand was boxed, when no map's lister holds it for
+                // StandsBorrowedBy to find, or one who left the colony by a route no patch
+                // catches. Not AbandonLedger: its map sweep is unsafe inside
+                // Map.FinalizeLoading.
                 ReleaseBorrower();
             }
             else if (borrower != null && OnShift)
@@ -330,13 +204,9 @@ namespace ShiftChange
                     && incumbent != null && incumbent != this && incumbent.OnShift
                     && incumbent.borrower == borrower)
                 {
-                    // Two stands both claiming the same borrower, and only one
-                    // can be their return trip. The incumbent keeps them; this
-                    // ledger is the stale copy (a stand reinstalled from a box
-                    // it was minified into mid-shift, carrying a checkout that
-                    // has since moved on), so drop it rather than silently
-                    // stealing the registry entry and stranding the uniform
-                    // the other stand is still holding clothes for.
+                    // Another stand holds this borrower's checkout, so this one is
+                    // a stale copy, from a box set down after the shift moved on. Taking
+                    // the entry would strand the checkout the other stand still holds.
                     storedOwnerApparel.Clear();
                     issuedUniform.Clear();
                     storedForcedApparel.Clear();
@@ -347,21 +217,13 @@ namespace ShiftChange
                     OnShiftStands[borrower] = this;
                     if (!respawningAfterLoad)
                     {
-                        // Set back down, not loaded: a reinstall from a box,
-                        // or a gravship landing. A box had the forced flags
-                        // taken off (PostDeSpawn) so a box that never came
-                        // back could not pin anyone; it did come back, so they
-                        // go on again and the shift resumes as it stood. A
-                        // flight never took them off, so on a landing this only
-                        // re-sets one cleared by hand since dressing. That
-                        // changes nothing while the shift lasts: the wardrobe
-                        // optimizer, the one reader that acts on the flag, is
-                        // paused for anyone on shift, and every way out of the
-                        // shift clears it.
-                        //
-                        // Load-gated deliberately: on a load the flags are the
-                        // pawn's own scribed state, and re-forcing there would
-                        // overrule a player who cleared one by hand mid-shift.
+                        // Set back down, not loaded. From a box, PostDeSpawn took the
+                        // flags off; after a gravship landing nothing did, so this only
+                        // re-sets one cleared by hand, which changes nothing while the
+                        // shift lasts: the optimizer, the one reader that acts on the
+                        // flag, is paused for anyone on shift, and every way out of the
+                        // shift clears it. Not on a load, where the flags are the pawn's
+                        // own saved state and the player may have cleared one.
                         ForceIssued(borrower);
                     }
                 }
@@ -371,90 +233,46 @@ namespace ShiftChange
         public override void PostDeSpawn(Map map, DestroyMode mode = DestroyMode.Vanish)
         {
             base.PostDeSpawn(map, mode);
-            // Off the map whatever the mode; PostSpawnSetup puts it back.
+            // Before the early returns, whatever the mode; PostSpawnSetup puts it back.
             CatchmentStands.Remove(this);
             if (mode == DestroyMode.WillReplace)
             {
-                // NOT a teardown — the stand is being lifted to another map and
-                // will be put back down intact. Odyssey's gravship despawns
-                // everything aboard this way (GravshipUtility.cs:389,397), and
-                // Building_OutfitStand.DeSpawn deliberately KEEPS its contents
-                // in this mode (:392), so the stand, the parked civvies and the
-                // borrower all survive the flight. Releasing here destroyed
-                // only the record of who owned what: the cook landed
-                // permanently in whites with no return trip, and her next shift
-                // read her own clothes as the room's uniform and force-wore
-                // them — uniform and civvies swapped for good.
-                //
-                // The ledger is re-registered on landing by PostSpawnSetup, and
-                // PostSwapMap below decides about a borrower who did not come
-                // along. Vanilla's own comp on this same building guards the
-                // identical case (CompAssignableToPawn.cs:199).
+                // A gravship flight: Odyssey's gravship despawns everything aboard in this
+                // mode, and Building_OutfitStand.DeSpawn keeps its contents, so the ledger
+                // stays, as vanilla's CompAssignableToPawn keeps its owners. Released here,
+                // the borrower's parked clothes would stay in the stand unrecorded and be
+                // issued as its kit, and the uniform could never go back. PostSpawnSetup
+                // re-registers it on landing, and PostSwapMap decides about a borrower who
+                // did not come along.
                 return;
             }
             if (mode == DestroyMode.Vanish)
             {
-                // Minified into a box — uninstalled, or the middle of a
-                // Reinstall. The stand is coming back, and critically its
-                // CONTENTS come with it: Vanish keeps them exactly as
-                // WillReplace does (Building_OutfitStand.cs:390-397), and
-                // minifying is a Vanish (MinifyUtility.MakeMinified:15).
-                //
-                // So the ledger rides along too. The alternative shipped
-                // once and was wrong in play: releasing here left the
-                // borrower's civvies inside the box with nothing saying whose
-                // they were, so the stand landed reading them as its own kit
-                // and the pawn could never hand the uniform back. Ejecting
-                // them to the floor first was no better — same permanent
-                // swap, clothes underfoot instead of in a crate. Contents
-                // kept means ledger kept; that is the same rule the
-                // WillReplace branch above already follows, and this is
-                // simply the other mode that obeys it.
-                //
-                // The one thing that must NOT ride along is the FORCED flag.
-                // A box can be sold, burnt or left in a stockpile forever,
-                // and a pawn pinned into a force-worn uniform has no route
-                // out (see ReleaseBorrower). Unforced, the worst case is that
-                // the optimizer swaps the uniform off while the stand is in
-                // transit, which PlanUndress already tolerates — it returns
-                // only what the pawn still wears. PostSpawnSetup puts the
-                // flags back on landing.
+                // Minified: MinifyUtility.MakeMinified despawns with Vanish, which
+                // keeps the contents too, so the ledger rides along in the box, for the
+                // same reason. Only
+                // the forced flags come off, since the box may never be set down. If the
+                // optimizer then takes the uniform off in transit, PlanUndress returns
+                // only what the pawn still wears.
                 UnforceIssued(borrower);
                 return;
             }
-            // Deconstructed or burnt down. These DROP the container
-            // (Building_OutfitStand.cs:392), so the civvies are already on the
-            // floor and the stand is genuinely gone — the ledger cannot be
-            // honoured. Dropping the registry entry alone was not enough: it
-            // left the uniform FORCE-WORN, and forced is what makes the
-            // uniform stick. See ReleaseBorrower for why that is a trap with
-            // no way out.
+            // Deconstructed or destroyed: the contents are dropped, so release.
             ReleaseBorrower();
         }
 
         /// <summary>
-        /// The stand has been set back down on a new map after a gravship
-        /// flight. The ledger was kept across the trip on purpose (see
-        /// <see cref="PostDeSpawn"/>), so the only open question is where the
-        /// borrower is.
-        ///
-        /// <para>Not on any map: left on one the takeoff abandoned, with no
-        /// grav anchor. They cannot come back for their clothes and the uniform
-        /// would stay force-worn forever, so the ledger is released. On another
-        /// map that is still there, kept by an anchor: the shift stays
-        /// suspended, uniform forced and wardrobe paused, until they share a
-        /// map again, and then resumes on its own. A player's mistake or an
-        /// emergency split them, and putting it right is the player's to do
-        /// (decided 2026-10-16; docs/DESIGN.md, "Ownership and the ledger").</para>
-        ///
-        /// The test is vanilla's own, from <c>CompAssignableToPawn.PostSwapMap</c>
-        /// (<c>CompAssignableToPawn.cs:222-230</c>) on the same building.
+        /// After a gravship landing: rebinds the served area, and settles a borrower who
+        /// did not come along. One on no map, left on a map the takeoff abandoned, can never
+        /// come back for their clothes, so the ledger is released. One on a map a grav
+        /// anchor kept stays on shift, uniform forced and wardrobe paused, until they share a
+        /// map again (docs/DESIGN.md, "Ownership and the ledger"). The test is vanilla's
+        /// own, from <c>CompAssignableToPawn.PostSwapMap</c> on the same building.
         /// </summary>
         public override void PostSwapMap()
         {
             base.PostSwapMap();
-            // FIRST, ahead of the early return below: an idle stand rebinds
-            // too, and an idle stand is the common case.
+            // Before the early return: an idle stand rebinds too.
             RebindAfterLanding();
             if (borrower == null || !OnShift)
             {
@@ -465,35 +283,21 @@ namespace ShiftChange
                 ReleaseBorrower();
                 return;
             }
-            // PostSpawnSetup registered it already, since the landing spawns
-            // everything before it calls this (GravshipPlacementUtility);
-            // repeated so this method leaves the registry right on its own.
+            // PostSpawnSetup registered it already, since a landing spawns everything
+            // before it calls this; repeated so this method leaves the registry correct by
+            // itself.
             OnShiftStands[borrower] = this;
         }
 
         /// <summary>
-        /// The stand's map is being removed with the stand still on it: a
-        /// takeoff from a map with no grav anchor leaves it behind
-        /// (<c>GravshipUtility.AbandonMap</c>), or any other map is abandoned
-        /// or closed. Removal never despawns a building, so
-        /// <see cref="PostDeSpawn"/> never runs: <c>Thing.Notify_MyMapRemoved</c>
-        /// marks the stand discarded, and this is the only word it gets. The
-        /// def flag that asks for it is set by
-        /// <see cref="CompProperties_ShiftStand.ResolveReferences"/>.
-        ///
-        /// <para>The stand and the parked clothes go with the map, so the
-        /// shift can never end and the ledger is released, forced flags first.
-        /// A borrower who flew away keeps the uniform as ordinary clothing. One
-        /// left on the map is lost with it, and the release costs nothing.
-        /// Without this the registry dropped the lost stand quietly
-        /// (<see cref="OnShiftStandFor"/>) and the uniform stayed forced with
-        /// no ledger left to clear it. It runs during the takeoff, so no save
-        /// can come between the loss and the release.</para>
-        ///
-        /// <para>Not <see cref="AbandonLedger"/>: its catch-up sweeps the
-        /// stand's map for someone to dress, and that map is being removed. A
-        /// stand boxed on the map hears this too, since removal reaches things
-        /// inside containers.</para>
+        /// The stand's map is being removed with the stand on it: left behind by a takeoff
+        /// from a map with no grav anchor, or any map abandoned or closed. Removal never
+        /// despawns a building, so <see cref="PostDeSpawn"/> never runs and this is the
+        /// stand's only notice, asked for by
+        /// <see cref="CompProperties_ShiftStand.ResolveReferences"/>. The stand and the
+        /// parked clothes go with the map, so the ledger is released and the borrower keeps
+        /// the uniform as ordinary clothing. Not <see cref="AbandonLedger"/>: its catch-up
+        /// sweeps the map being removed. A stand boxed on the map hears this too.
         /// </summary>
         public override void Notify_MapRemoved()
         {
@@ -501,19 +305,10 @@ namespace ShiftChange
             ReleaseBorrower();
         }
 
-        /// <summary>
-        /// Take the forced flag off every issued garment the holder still has
-        /// on. Split out so <see cref="AbandonLedger"/> shares it with
-        /// <see cref="ReleaseBorrower"/>: "ledger cleared ⇒ forced flags
-        /// cleared" is one invariant, not a property that happened to hold on
-        /// the routes we had thought about.
-        ///
-        /// It did not matter while every abandonment followed a DEATH, where
-        /// the flags go with the corpse. Banishment leaves the pawn alive,
-        /// spawned and wearing the uniform, and forced is what makes a uniform
-        /// stick — so an abandonment that skipped this pinned a living
-        /// colonist into it with every route back out already closed.
-        /// </summary>
+        /// <summary>Takes the forced flag off the issued garments the holder still wears.
+        /// Every path that drops the ledger while the uniform may still be worn calls it,
+        /// since a forced uniform with no ledger is stuck
+        /// (<see cref="ReleaseBorrower"/>).</summary>
         internal void UnforceIssued(Pawn holder)
         {
             if (holder == null)
@@ -531,14 +326,9 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>
-        /// The mirror of <see cref="UnforceIssued"/>, for the one case that
-        /// takes the flags off without ending the shift: a stand minified into
-        /// a box and set back down again. Only garments the holder is STILL
-        /// wearing are re-forced — the optimizer is free to have swapped one
-        /// away while the stand was in transit, and that is precisely the
-        /// escape hatch the unforcing exists to leave open.
-        /// </summary>
+        /// <summary>The reverse of <see cref="UnforceIssued"/>, again only for garments the
+        /// holder still wears: the optimizer may have taken one off while the stand was
+        /// boxed.</summary>
         internal void ForceIssued(Pawn holder)
         {
             if (holder == null)
@@ -556,21 +346,10 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>
-        /// Hand the uniform to whoever is wearing it and free the stand.
-        ///
-        /// Clearing the ledger without clearing the forced flags pins the
-        /// borrower into the uniform permanently, because every route back out
-        /// keys off the ledger — the automatic return trip, the Change back
-        /// button, and the optimizer pause all look the pawn up in
-        /// <see cref="OnShiftStands"/> — while vanilla's own
-        /// <c>JobGiver_OptimizeApparel</c> skips force-worn apparel by design.
-        /// Remove the ledger and all four close at once, leaving the Assign
-        /// tab's "Clear forced apparel" as the only remedy: lossy, and nobody
-        /// finds it. So the flags come off first, and the garments stay on the
-        /// pawn as ordinary policy-managed clothing that vanilla will replace
-        /// in its own time.
-        /// </summary>
+        /// <summary>Frees the stand, leaving the uniform on its wearer as ordinary clothing.
+        /// The forced flags come off first: every way out of a uniform finds the pawn
+        /// through <see cref="OnShiftStands"/>, and <c>JobGiver_OptimizeApparel</c> never
+        /// removes forced apparel, so a forced uniform with no ledger is stuck.</summary>
         internal void ReleaseBorrower()
         {
             Pawn holder = borrower;
@@ -598,36 +377,25 @@ namespace ShiftChange
             Scribe_Values.Look(ref depositOnly, "depositOnly", defaultValue: false);
             if (Scribe.mode == LoadSaveMode.LoadingVars)
             {
-                // Read-only: saves from before the set redesign carried a
-                // single def under this name. Folded into the list below.
+                // Load only: older saves hold a single work type under this key.
                 Scribe_Defs.Look(ref workTypeOverrideLegacy, "workTypeOverride");
             }
             Scribe_Values.Look(ref excluded, "excluded", defaultValue: false);
             Scribe_Values.Look(ref fullChange, "fullChange", defaultValue: false);
-            // defaultValue: true is what carries the protection into saves
-            // that predate it. ScribeExtractor.ValueFromNode hands back the
-            // default when the node is absent (Scribe_Values.cs:88), and the
-            // saver omits the node whenever the value MATCHES the default
-            // (:70-78) — so the only thing ever written here is a deliberate
-            // opt-out, and a save round trip never manufactures one.
+            // Defaults true, so a save without the node loads protected. Scribe_Values
+            // reads a missing node as the default and writes none for a default value.
             Scribe_Values.Look(ref withholdFromTrade, "withholdFromTrade", defaultValue: true);
-            // Prefixed, unlike the older keys above: comps scribe flat into the
-            // stand's node, beside any other mod's comp on the same building.
+            // Prefixed: comps scribe flat into the stand's node, beside other mods' comps.
             Scribe_Values.Look(ref serves, "shiftChangeServes", CatchmentKind.Room);
             Scribe_Values.Look(ref serveRadius, "shiftChangeServeRadius", DefaultServeRadius);
-            // The area by reference, as a pawn's allowed area is saved. One that
-            // is gone, deleted or with its map gone from the game, is dropped
-            // first: the saver warns of a reference to anything not saved in
-            // full, and the loader of one it cannot resolve. The label stays and
-            // keeps naming it. Not dropped for being on another map than the
-            // stand: a stand boxed in a caravan is on none, and dropped there it
-            // came home serving nothing, with nothing to bind it again but a
-            // gravship landing. Nothing is written without a binding, so a
-            // stand that never served an area saves exactly as before.
+            // By reference. An area the save will not write in full (deleted, or its
+            // map gone) is dropped first, or the reference fails on load; the label
+            // stays. Not tested against the stand's map: a boxed stand is on none.
             if (Scribe.mode == LoadSaveMode.Saving && !AreaSavedInFull(serveArea))
             {
                 serveArea = null;
             }
+            // No node without a binding, so a stand that serves no area writes nothing here.
             if (Scribe.mode != LoadSaveMode.Saving || serveArea != null)
             {
                 Scribe_References.Look(ref serveArea, "shiftChangeServeArea");
@@ -636,11 +404,8 @@ namespace ShiftChange
 
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
-                // Anything burnt, stolen or removed by hand while we were not
-                // looking comes back null. Dropping it here is the whole of
-                // the orphan story on this side: the ledger simply forgets,
-                // and vanilla's own eviction handles the leftovers in the
-                // container.
+                // A garment destroyed while the ledger still named it, or a work type from a
+                // removed mod, loads back as null; the ledger and the settings forget it.
                 storedOwnerApparel = storedOwnerApparel ?? new List<Apparel>();
                 issuedUniform = issuedUniform ?? new List<Apparel>();
                 storedForcedApparel = storedForcedApparel ?? new List<Apparel>();
@@ -656,10 +421,8 @@ namespace ShiftChange
                 workTypeOverrideLegacy = null;
 
                 serveRadius = Mathf.Clamp(serveRadius, MinServeRadius, MaxServeRadius);
-                // The same canonical state the setters keep: another catchment
-                // only with something ticked. Reached by a hand-edited save,
-                // or by one whose ticked work types all came from a mod since
-                // removed: their nulls were stripped just above.
+                // Only a stand with something ticked leaves room mode, as in the setters.
+                // After the null-strip above: ticks from a removed mod no longer count.
                 if (serves != CatchmentKind.Room && (excluded || !HasCustomSet))
                 {
                     serves = CatchmentKind.Room;
@@ -667,10 +430,6 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>
-        /// Records a completed dressing: <paramref name="stored"/> went into
-        /// the stand, <paramref name="issued"/> came out onto the pawn.
-        /// </summary>
         public void NotifyDressed(Pawn pawn, List<Apparel> stored, List<Apparel> issued, List<Apparel> storedForced)
         {
             storedOwnerApparel.Clear();
@@ -682,11 +441,8 @@ namespace ShiftChange
             {
                 storedForcedApparel.AddRange(storedForced);
             }
-            // OnShift, not issuedUniform: a deposit-only trip issues nothing
-            // and still has to claim the stand, or nothing ever hands the
-            // stored garments back. Everything else is unchanged — a trip that
-            // moved nothing in EITHER direction leaves both lists empty and
-            // still does not claim.
+            // OnShift, not issuedUniform: a deposit-only trip issues nothing and must still
+            // claim the stand, or nothing hands the parked clothes back.
             if (OnShift)
             {
                 borrower = pawn;
@@ -694,9 +450,6 @@ namespace ShiftChange
             }
             else
             {
-                // Nothing moved at all (empty stand, nothing wearable, nothing
-                // the filter would take). Do not claim the stand for a swap
-                // that did not happen.
                 borrower = null;
             }
         }
@@ -708,18 +461,12 @@ namespace ShiftChange
             storedForcedApparel.Clear();
             borrower = null;
             OnShiftStands.Remove(pawn);
-            // NOT Notify_StandFreed: this runs from a toil finish action,
-            // while the pawn who just undressed still holds the stand's
-            // reservation. JobDriver_SwapAtStand announces from a global finish
-            // action instead, after the release (docs/DESIGN.md, "The mid-job
-            // catch-up").
+            // Not Notify_StandFreed: in a toil finish action the pawn still holds the
+            // stand's reservation. JobDriver_SwapAtStand announces after its release.
         }
 
-        /// <summary>
-        /// Whether this garment was force-worn at check-in, and should have the
-        /// flag restored when it comes back on. Consult BEFORE
-        /// <see cref="NotifyUndressed"/> clears the ledger.
-        /// </summary>
+        /// <summary>Whether this garment was force-worn when parked. Read it before
+        /// <see cref="NotifyUndressed"/> clears the ledger.</summary>
         public bool WasForcedWhenStored(Apparel apparel)
         {
             return storedForcedApparel.Contains(apparel);
@@ -729,26 +476,17 @@ namespace ShiftChange
 
         public List<Apparel> IssuedUniformForReading => issuedUniform;
 
-        /// <summary>
-        /// Clears the ledger without a return trip — the borrower is gone
-        /// (dead, traded, kidnapped, off the map). Their clothes stay in the
-        /// stand as ordinary contents, and the next claimant's first swap lets
-        /// vanilla's <c>TryDropThingsToMakeRoomForThingOfDef</c> evict whatever
-        /// conflicts. Frees the stand back into the pool.
-        /// </summary>
-        /// <param name="announce">
-        /// Raise the catch-up for whoever is working bare in this room. The
-        /// reaper paths (death, trade, kidnap, banishment) want this: the
-        /// borrower is gone and their claims went with them. The job driver
-        /// passes false and announces later itself, once the stand's
-        /// reservation is released (docs/DESIGN.md, "The mid-job catch-up").
-        /// </param>
+        /// <summary>Clears the ledger without a return trip and frees the stand: for a
+        /// borrower who is gone (dead, traded, kidnapped, banished, off the map), and
+        /// for one the swap driver could not change back, who keeps the uniform. Their
+        /// clothes stay in the stand, and the next claimant's swap evicts whatever conflicts,
+        /// through <c>Building_OutfitStand.TryDropThingsToMakeRoomForThingOfDef</c>.</summary>
+        /// <param name="announce">Raise the catch-up now; the swap driver defers it until
+        /// the stand's reservation is released.</param>
         public void AbandonLedger(Pawn formerBorrower, bool announce = true)
         {
-            // On death and trade this is a no-op that costs nothing. On
-            // banishment it is the whole point: that pawn is alive, spawned,
-            // and would otherwise keep the force-worn uniform forever with the
-            // ledger — and so every route out of it — already gone.
+            // Nothing to do for a dead or traded borrower, whose flags left with them; a
+            // banished one is alive and still in the uniform.
             UnforceIssued(borrower ?? formerBorrower);
             if (formerBorrower != null)
             {
@@ -758,18 +496,14 @@ namespace ShiftChange
             issuedUniform.Clear();
             storedForcedApparel.Clear();
             borrower = null;
-            // Freed by abandonment rather than a return trip, but freed all
-            // the same. Excluding the former borrower matters here: an owner
-            // unassigned mid-shift is still WEARING the untracked uniform and
-            // must not be the one interrupted to claim it again.
+            // Excludes the former borrower, who still wears the uniform.
             if (announce)
             {
                 Patch_JobInterception.Notify_StandFreed(this, formerBorrower);
             }
         }
 
-        /// <summary>Every stand on every map that this pawn has out on loan.
-        /// Sweeps the whole patched family, not just the vanilla def.</summary>
+        /// <summary>Every stand on every map that this pawn has out on loan.</summary>
         public static IEnumerable<CompShiftStand> StandsBorrowedBy(Pawn pawn)
         {
             if (pawn == null)

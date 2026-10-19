@@ -12,84 +12,61 @@ namespace ShiftChange
     public static partial class Patch_JobInterception
     {
         /// <summary>
-        /// What a job is to the outfit decision, by the first test it passes,
-        /// in the order <see cref="TryInsertSwap"/> asks them. The order is
-        /// behaviour: deliveries and ignored givers are decided before their
-        /// work type is read, and the work arm runs before the sleep and
-        /// recreation arms, so VisitSickPawn, Doctor work that carries a
-        /// joyKind, is Work. docs/DESIGN.md, "The gates".
+        /// What a job is to the outfit decision: the first test it passes, in the
+        /// order <see cref="Classify"/> tests them. The order is behaviour: a
+        /// delivery or an ignored giver's job is never Work, and VisitSickPawn,
+        /// Doctor work with a joyKind, is Work. docs/DESIGN.md, "The gates".
         /// </summary>
         internal enum JobKind : byte
         {
-            /// <summary>A giver-less follow-up (<see cref="JobRoomTargets.RidesAlong"/>).</summary>
             RidesAlong,
 
-            /// <summary>A delivery (<see cref="JobRoomTargets.IsDelivery"/>).</summary>
             Delivery,
 
-            /// <summary>A meal carried to a patient or a prisoner (<see cref="JobRoomTargets.IsMealRun"/>).</summary>
             MealRun,
 
-            /// <summary>Any other job from a giver this mod ignores (<see cref="JobRoomTargets.Ignored"/>).</summary>
             IgnoredGiver,
 
-            /// <summary>Work the work arm dresses for (<see cref="WorkTypeFor"/>).</summary>
             Work,
 
-            /// <summary>A lay-down on a bed (<see cref="IsRestJob"/>) the work arm did not take.</summary>
             Rest,
 
-            /// <summary>A recreation job (<see cref="IsRecreationJob"/>).</summary>
             Recreation,
 
-            /// <summary>Anything else: eating, reading, sleeping on the ground, the walks.</summary>
+            /// <summary>Anything else: eating, reading, sleeping on the ground, walks.</summary>
             Other,
         }
 
-        /// <summary>
-        /// A job classified once (<see cref="Classify"/>): its kind, and the
-        /// answers some readers need beside it. Each field is its predicate's
-        /// answer whatever the kind, so a reader that looks past the kind, as
-        /// the return trip does for a delivery's work type, asks the same
-        /// question every other reader asks.
-        /// </summary>
+        /// <summary>A job's classification, made once per decision; each field holds its
+        /// predicate's answer whatever the kind.</summary>
         internal readonly struct JobClass
         {
             internal readonly JobKind Kind;
 
-            /// <summary>
-            /// <see cref="WorkTypeFor"/>: the giver's work type, or the one a
-            /// giver-less medical lay-down or fishing job is charged to.
-            /// </summary>
+            /// <summary>The giver's work type, or the one charged for giver-less medical rest or
+            /// fishing.</summary>
             internal readonly WorkTypeDef Work;
 
             internal readonly bool PlayerForced;
 
-            /// <summary>
-            /// From an emergency giver whose job the medical-emergency setting
-            /// does not open (<see cref="EmergencyDressingAllowed"/>).
-            /// </summary>
+            /// <summary>An emergency giver's job that the medical-emergency setting does not
+            /// open.</summary>
             internal readonly bool ExemptEmergency;
 
-            /// <summary><see cref="IsRecreationJob"/>, so true for VisitSickPawn, which is Work.</summary>
+            /// <summary><see cref="IsRecreationJob"/>, so true for VisitSickPawn, which is
+            /// Work.</summary>
             internal readonly bool RecreationJob;
 
-            /// <summary><see cref="IsRestJob"/>.</summary>
             internal readonly bool RestJob;
 
-            /// <summary><see cref="IsOrdinarySleep"/>.</summary>
             internal readonly bool OrdinarySleep;
 
-            /// <summary><see cref="Patch_JobInterception.UrgentPatient"/>.</summary>
             internal readonly bool UrgentPatient;
 
-            /// <summary><see cref="IsIngestJob"/>.</summary>
             internal readonly bool Ingest;
 
-            /// <summary><see cref="JobRoomTargets.IsIncidental"/>.</summary>
             internal readonly bool Incidental;
 
-            /// <summary><see cref="IsLyingDown"/>.</summary>
             internal readonly bool LyingDown;
 
             internal JobClass(JobKind kind, WorkTypeDef work, bool playerForced, bool exemptEmergency,
@@ -109,27 +86,17 @@ namespace ShiftChange
                 LyingDown = lyingDown;
             }
 
-            /// <summary>
-            /// A delivery or a meal run: judged by the sites it supplies rather
-            /// than where it starts. A delivery starts at the stack, and a meal
-            /// run wherever the meal is stored.
-            /// </summary>
+            /// <summary>A delivery or a meal run, judged by the sites it supplies, not by where it
+            /// starts.</summary>
             internal bool HasSites => Kind == JobKind.Delivery || Kind == JobKind.MealRun;
 
-            /// <summary>
-            /// A delivery or any ignored giver's job, meal runs included: what
-            /// <see cref="KeepsTheUniformFor"/> decides for a colonist in uniform.
-            /// </summary>
             internal bool DeliveryOrIgnored => HasSites || Kind == JobKind.IgnoredGiver;
         }
 
         /// <summary>
-        /// The one place a job's kind is decided. Called once per job boundary
-        /// the interception decides on, once for the job at the head of the
-        /// queue with that job's own tag, and once by the catch-up, which
-        /// looks at fewer kinds (<see cref="TryDressMidJob"/>). Never kept
-        /// across boundaries: whether a lay-down is medical rest depends on
-        /// the pawn's health at that moment, and on a setting.
+        /// The one place a job's kind is decided. Never kept across job boundaries:
+        /// whether a lay-down is medical rest depends on the pawn's health then, and a setting.
+        /// A queued job is classified with its own tag.
         /// </summary>
         internal static JobClass Classify(Pawn pawn, Job job, JobTag? tag)
         {
@@ -159,11 +126,8 @@ namespace ShiftChange
                 lyingDown: IsLyingDown(job));
         }
 
-        /// <summary>
-        /// An ingest-family job — meals, drinks, drugs; anything driven by
-        /// <see cref="JobDriver_Ingest"/> or a subclass. By driver class, not
-        /// JobDefOf.Ingest, so modded ingest defs are covered too.
-        /// </summary>
+        /// <summary>An ingest job, matched by driver class rather than JobDefOf.Ingest so modded
+        /// ingest defs count too.</summary>
         internal static bool IsIngestJob(Job job)
         {
             Type driver = job.def?.driverClass;
@@ -171,34 +135,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A recreation job the room trigger can honestly serve: it carries a
-        /// <c>joyKind</c>, and its driver is not a reading driver, which
-        /// picks its spot mid-job. This classifies the JOB CLASS, not the arm
-        /// that serves it, so VisitSickPawn (Doctor work with joyKind Social)
-        /// is in class and every room-resolver site reads it B-first. Why
-        /// joyKind, and why consumption and reading stay outside:
-        /// docs/DESIGN.md, "The recreation branch".
-        ///
-        /// <para><b>The reading exclusion is NARROWER than the principle behind
-        /// it, and knowingly so.</b> What disqualifies reading is not that it
-        /// is reading — it is that the job CHOOSES ITS SPOT MID-JOB, so the
-        /// target it carries at StartJob is not where the activity ends up
-        /// happening. Nothing in the engine flags that behaviour, so there is
-        /// no way to ask for it directly; the driver class is the only handle,
-        /// and it only catches vanilla's own.
-        ///
-        /// A modded reading job with its own driver would therefore slip
-        /// through, and dress a pawn for whichever room the book is shelved
-        /// in. As of 1.6 none in practice does: Alpha Books' own read job
-        /// (<c>ABooks_Reading</c>, driver <c>JobDriver_ReadAlphaBook</c>;
-        /// Workshop 3403180654, <c>1.6/Defs/JobDefs/Jobs_Misc.xml</c>)
-        /// carries NO joyKind, so it fails the first test and never reaches
-        /// this one — excluded a step earlier, by luck rather than by design.
-        ///
-        /// If a report ever arrives of a stand firing while somebody reads,
-        /// this is the shape of it, and the fix is to widen the test — either
-        /// by naming the offending driver too, or by deferring the room
-        /// decision for any job whose target moves after it starts.</para>
+        /// A recreation job whose room is known as it starts: it carries a <c>joyKind</c>, and
+        /// its driver is not <see cref="JobDriver_Reading"/> or derived from it, since reading
+        /// picks its spot mid-job. A modded reading job with a driver of its own and a
+        /// <c>joyKind</c> would pass; Alpha Books' carries no <c>joyKind</c>. VisitSickPawn
+        /// passes though it is work, so every room resolver reads it B-first.
         /// </summary>
         internal static bool IsRecreationJob(Job job)
         {
@@ -212,18 +153,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A sleep job the room trigger can honestly serve: a lay-down job
-        /// whose target is an actual BED. The bed test is what keeps ground
-        /// sleep (a lay-down on a cell, <c>JobGiver_GetRest.cs:127</c>), mech
-        /// dormancy and Odyssey's deactivation out, since all three run the same
-        /// <see cref="JobDriver_LayDown"/> family: docs/DESIGN.md, "The sleep
-        /// branch".
-        ///
-        /// <para>By driver class rather than by JobDef, matching
-        /// <see cref="IsIngestJob"/>, so a modded sleep job that reuses
-        /// vanilla's driver is covered. One that does not is not — the same
-        /// known limit the reading exclusion carries, and the same shape of
-        /// fix if a report ever arrives.</para>
+        /// A lay-down on a bed. The bed test keeps out ground sleep, mech dormancy and
+        /// Odyssey's deactivation, which share the <see cref="JobDriver_LayDown"/> family. A
+        /// modded sleep job with a driver of its own does not pass.
         /// </summary>
         internal static bool IsRestJob(Job job)
         {
@@ -233,27 +165,19 @@ namespace ShiftChange
                    && job.targetA.Thing is Building_Bed;
         }
 
-        /// <summary>
-        /// A rest job the sleep arm takes: no giver, and not a medical lay-down
-        /// (<see cref="IsMedicalLayDown"/>). Medical bed rest is the work arm's,
-        /// and a giver with no work type is a modded one the sleep arm leaves
-        /// alone (docs/DESIGN.md, "The sleep branch"). The return trip asks it
-        /// too (StaysDressed), so both directions answer alike.
-        /// </summary>
+        /// <summary>A rest job the sleep arm takes: from no giver, and not a medical lay-down,
+        /// whether or not the work arm takes it. The return trip asks it too, so both
+        /// directions agree.</summary>
         internal static bool IsOrdinarySleep(Pawn pawn, Job job, JobTag? tag)
         {
             return IsRestJob(job) && job.workGiverDef == null && !IsMedicalLayDown(pawn, job, tag);
         }
 
         /// <summary>
-        /// A lay-down in a bed for medical reasons: tagged
-        /// <c>RestingForMedicalReasons</c>, as the patient givers hand it out,
-        /// or the same job put back in the queue with no tag for a patient who
-        /// needs a bed urgently. Vanilla's <c>StartJob</c> drops the tag when it
-        /// slips a haul in ahead of the lay-down
-        /// (<c>Pawn_JobTracker.TryOpportunisticJob</c>). A recuperating
-        /// patient's lay-down put back that way cannot be told from ordinary
-        /// sleep, and reads as sleep.
+        /// A lay-down tagged <c>RestingForMedicalReasons</c> by the patient givers, or untagged
+        /// for an urgent patient: vanilla requeues it without its tag when it slips a haul in
+        /// ahead (<c>Pawn_JobTracker.TryOpportunisticJob</c>). Urgent only, because
+        /// <c>HealthAIUtility.ShouldSeekMedicalRest</c> cannot tell hurt from night.
         /// </summary>
         internal static bool IsMedicalLayDown(Pawn pawn, Job job, JobTag? tag)
         {
@@ -269,12 +193,8 @@ namespace ShiftChange
                    && pawn != null && HealthAIUtility.ShouldSeekMedicalRestUrgent(pawn);
         }
 
-        /// <summary>
-        /// A lay-down of any kind, on a bed or the ground: the
-        /// <see cref="JobDriver_LayDown"/> family. What the change-back
-        /// latch counts as sleep, so unlike <see cref="IsRestJob"/> it needs
-        /// no bed.
-        /// </summary>
+        /// <summary>Any lay-down, on a bed or the ground: what the change-back latch counts as
+        /// sleep.</summary>
         internal static bool IsLyingDown(Job job)
         {
             Type driver = job?.def?.driverClass;
@@ -282,25 +202,13 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The work type a medical lay-down should be charged to, or null when
-        /// this job is not one or must not divert. This is the whole of the
-        /// hospital-gown trigger: the patient givers' jobs arrive with no
-        /// giver, so the <c>RestingForMedicalReasons</c> tag is what it
-        /// resolves from.
-        ///
-        /// <para>Two refusals, both load-bearing. An urgent case (vanilla's
-        /// own split, <see cref="HealthAIUtility.ShouldSeekMedicalRestUrgent"/>)
-        /// never diverts unless the medical-emergency setting is on. And a
-        /// pawn already on a bed never diverts: the work arm has no bed guard
-        /// of its own, because no other work job can start from a bed. A job
-        /// begins on a bed only if its driver says it can
-        /// (<c>CanBeginNowWhileLyingDown</c>, false on the base driver,
-        /// <c>JobDriver.cs:303-306</c>), and vanilla's overrides are lying
-        /// down, lovin', deathrest, relaxing and watching a building, plus
-        /// breastfeeding for a downed mother, whom this mod never decides on.
-        /// Only <c>PatientBedRest</c> is ever returned, so the <c>Patient</c>
-        /// row in the stand dialog stays inert. The argument, and the known
-        /// cost of the urgent refusal: docs/DESIGN.md, "The sleep branch".</para>
+        /// The work type a medical lay-down is charged to, since the patient givers' jobs
+        /// carry no giver: always PatientBedRest, so the Patient row in the stand dialog
+        /// stays inert.
+        /// Null for a pawn already on a bed: this is the work arm's only bed guard, as no
+        /// other work job this mod decides on can start from a bed
+        /// (<c>JobDriver.CanBeginNowWhileLyingDown</c>). Null for an urgent patient too,
+        /// while medical emergency dressing is off.
         /// </summary>
         internal static WorkTypeDef MedicalRestWorkType(Pawn pawn, Job job, JobTag? tag)
         {
@@ -308,10 +216,8 @@ namespace ShiftChange
             {
                 return null;
             }
-            // The bed guard is UNCONDITIONAL and stays that way. The setting
-            // below is about whether an emergency may be delayed; nothing in
-            // it argues for hauling a patient off a bed they are already lying
-            // on, which is a different behaviour with a different failure.
+            // Holds whatever the setting: that lets an emergency wait, not a patient be hauled off
+            // a bed.
             if (OnABed(pawn))
             {
                 return null;
@@ -324,11 +230,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A medical lay-down (<see cref="IsMedicalLayDown"/>) for a patient
-        /// who needs a bed urgently
-        /// (<see cref="HealthAIUtility.ShouldSeekMedicalRestUrgent"/>), with
-        /// the medical-emergency setting off: nobody is dressed for it, and
-        /// nobody on shift is changed back before it.
+        /// An urgent patient's lay-down with the medical-emergency setting off: nobody is
+        /// dressed for it, and nobody on shift is changed back before it.
         /// </summary>
         internal static bool UrgentPatient(Pawn pawn, Job job, JobTag? tag)
         {
@@ -337,12 +240,8 @@ namespace ShiftChange
                    && HealthAIUtility.ShouldSeekMedicalRestUrgent(pawn);
         }
 
-        /// <summary>
-        /// The pawn's next queued job is an urgent patient's lay-down
-        /// (<see cref="UrgentPatient"/>): whatever starts now is an errand
-        /// vanilla slipped in ahead of going to bed, and changing out first
-        /// would delay the patient anyway.
-        /// </summary>
+        /// <summary>The next job is an urgent patient's lay-down, so this one is an errand slipped
+        /// in ahead.</summary>
         internal static bool UrgentPatientNext(Pawn pawn, Pawn_JobTracker tracker)
         {
             JobQueue queue = tracker?.jobQueue;
@@ -355,13 +254,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Work types whose emergencies the medical-emergency setting covers.
-        /// Named, because <c>emergency</c> alone would include firefighting and
-        /// walk colonists to a wardrobe while the base burns; the [FSF] Complex
-        /// Jobs names are belt and braces against a future repoint. Same
-        /// silent-fail contract as <see cref="RoomWorkTypes.CompatDefaults"/>:
-        /// an absent name is a mod that is not installed. docs/DESIGN.md,
-        /// "The sleep branch".
+        /// Work types whose emergencies the medical-emergency setting opens. Named, as
+        /// firefighting is an emergency too. FSFNurse and FSFSurgeon are Complex Jobs'
+        /// medical types, in case it ever moves an emergency giver onto them. A name with no
+        /// def is a mod that is not installed, and is skipped.
         /// </summary>
         internal static readonly string[] MedicalWorkTypeNames =
         {
@@ -391,10 +287,6 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>
-        /// May this emergency giver's job be delayed for a change, because the
-        /// player asked for that and this is medical work?
-        /// </summary>
         internal static bool EmergencyDressingAllowed(WorkGiverDef giver)
         {
             return ShiftChangeMod.MedicalEmergencyDressingEnabled
@@ -403,19 +295,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Is this pawn physically on a bed right now?
-        ///
-        /// <para><b>Not <c>pawn.InBed()</c>, and the difference is the whole
-        /// point.</b> At an ordinary job boundary it reads FALSE for a colonist
-        /// lying in their own bed, and true only at the wake-up, the opposite
-        /// of what every guard here means (<c>RestUtility.cs:505</c>,
-        /// <c>Pawn_JobTracker.cs:501</c>, <c>Toils_LayDown.cs:74</c>).
-        /// docs/DESIGN.md, "The sleep branch".</para>
-        ///
-        /// <para>Position answers the question <c>curJob</c> cannot. A pawn
-        /// merely walking across a bed tile also passes, which is why the
-        /// return trip pairs this with <see cref="StaysInBed"/> rather than
-        /// using it alone.</para>
+        /// A bed stands on the pawn's cell. Not <c>pawn.InBed()</c>, which needs a current
+        /// job: at an ordinary job boundary <c>Pawn_JobTracker</c> has cleared it, so
+        /// <c>InBed()</c> reads false for a pawn lying in their own bed, and true only at the
+        /// wake-up. A pawn walking across a bed passes too, so the return trip asks
+        /// <see cref="StaysInBed"/>.
         /// </summary>
         internal static bool OnABed(Pawn pawn)
         {
@@ -436,28 +320,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The pawn is on a bed AND this incoming job is one they can do
-        /// without getting off it: <c>Job.CanBeginNow(pawn, whileLyingDown:
-        /// true)</c> (false on the base driver, <c>JobDriver.cs:303-306</c>),
-        /// or a job whose own target is the bed under them
-        /// (<see cref="TargetsBedUnder"/>), because the drivers' own list is
-        /// incomplete. Staying in bed means stay dressed; getting up means
-        /// change back while still beside the stand. docs/DESIGN.md, "The
-        /// sleep branch". (Eating still reaches the ingest branch further
-        /// down, which has its own deliberate policy; this only stops the
-        /// return trip firing first.)
-        ///
-        /// <para>It caches a driver on the job (<c>Job.GetCachedDriver</c>,
-        /// <c>Job.cs:611-615</c>, reached from <c>CanBeginNow</c> at
-        /// <c>:647</c>), as vanilla's own callers do. <c>StartJob</c> builds the
-        /// real driver with <c>MakeDriver</c>, never the cached one
-        /// (<c>Pawn_JobTracker.cs:334</c>), and pooled jobs are <c>Clear()</c>ed
-        /// before reuse, which drops the cached driver (<c>Job.cs:292</c>), so
-        /// the throwaway cannot leak into a live job. A throwing driver
-        /// constructor is caught by the prefix's fail-open handler.
-        /// Short-circuited behind <see cref="OnABed"/>, so nothing is
-        /// constructed at the ordinary job boundary where the pawn is nowhere
-        /// near a bed.</para>
+        /// The pawn is on a bed and this job keeps them there: it may begin while they lie
+        /// down, or it targets that bed, since not every in-bed driver says so.
+        /// <c>CanBeginNow</c> caches a throwaway driver on the job, which <c>StartJob</c> never
+        /// uses and <c>Job.Clear()</c> drops; <see cref="OnABed"/> goes first so none is built
+        /// away from a bed. A throwing driver constructor is caught by the prefix's fail-open
+        /// handler, which the interceptor's calls run under.
         /// </summary>
         internal static bool StaysInBed(Pawn pawn, Job job)
         {
@@ -466,16 +334,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// This job's own target is the bed the pawn is lying on — so whatever
-        /// its driver claims, doing it does not mean getting up.
-        ///
-        /// <para>Both A and B, because the in-bed job givers disagree about
-        /// which they use: <c>JobGiver_MeditateInBed</c> puts the pawn's cell in
-        /// A and the bed in B, while the lay-down family puts the bed in A.
-        /// <c>OccupiedRect</c> rather than <c>Position</c> so a double bed's
-        /// second slot counts: slots run along the bed's head from its corner
-        /// (<c>BedUtility.cs:13-30</c>), so one of a double bed's two is not
-        /// its <c>Position</c>.</para>
+        /// The job targets the bed under the pawn. Both targets: the lay-downs put the bed in
+        /// A, and <c>JobGiver_MeditateInBed</c> puts it in B. <c>OccupiedRect</c>, as one of a
+        /// double bed's two slots is not its <c>Position</c>.
         /// </summary>
         internal static bool TargetsBedUnder(Pawn pawn, Job job)
         {
@@ -489,12 +350,8 @@ namespace ShiftChange
             return b != null && b.Spawned && b.OccupiedRect().Contains(at);
         }
 
-        /// <summary>
-        /// Where a recreation job happens: <c>targetB</c> FIRST, the cell the
-        /// pawn occupies while the joy ticks, then the work-style
-        /// <see cref="TargetPlace"/>, since where B is unset A is already the
-        /// venue. docs/DESIGN.md, "The recreation branch".
-        /// </summary>
+        /// <summary>Where a recreation job happens: targetB, where the pawn sits, else
+        /// <see cref="TargetPlace"/> (A, the venue, or the queue).</summary>
         internal static JobPlace JoyTargetPlace(Job job, Map map)
         {
             IntVec3 cell = job.targetB.HasThing ? job.targetB.Thing.PositionHeld : job.targetB.Cell;
@@ -505,17 +362,13 @@ namespace ShiftChange
             return TargetPlace(job, map);
         }
 
-        /// <summary>The room cell of <see cref="JoyTargetPlace"/>.</summary>
         internal static IntVec3 JoyTargetCell(Job job, Map map)
         {
             return JoyTargetPlace(job, map).RoomCell;
         }
 
-        /// <summary>
-        /// The job's food source is already on the pawn — in inventory (the
-        /// same test the driver itself uses for eatingFromInventory,
-        /// JobDriver_Ingest.cs:86) or in their hands.
-        /// </summary>
+        /// <summary>The pawn already holds the food: in hand, or in inventory by the same test
+        /// <see cref="JobDriver_Ingest"/> uses for eating from inventory.</summary>
         internal static bool FoodSourceIsOnPawn(Job job, Pawn pawn)
         {
             Thing food = job.targetA.Thing;
