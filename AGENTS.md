@@ -218,6 +218,34 @@ check out main before a play session that should see only released
 behavior, and mind that two simultaneous code threads need two checkouts
 (`git worktree`), not two branches of one tree.
 
+## Comments
+
+Write comments for a reader who has this repository and nothing else: no
+decompiled game, and none of the history.
+
+- A comment states the fact this code depends on, in plain words, and stops
+  there: what a reader needs to understand the code and not to break it. Leave
+  out what is true but secondary: consequences elsewhere, background,
+  alternatives not taken.
+- A fact about code this mod does not own (the game, a DLC, another mod) stays
+  at the site that depends on it, wherever a reader who did not know it would
+  "fix" the code into a bug. State it in words, naming the types and methods
+  involved, with no `File.cs:123` citation: line numbers move with every game
+  update, and a contributor has no decompile to follow them into.
+- A member summary says what the member is for, in one line where possible. An
+  inline comment explains a line that is not obvious, and nothing that is.
+- No history: no dates, no "used to" or "was once", no story of the bug or the
+  review that produced the code, no capitals or bold for emphasis. History
+  belongs in git and the release notes. A harness case may say in one sentence
+  that it guards a past bug.
+- The reason lives at the site. Point at `docs/DESIGN.md` only for an argument
+  that spans several files and is already written there, and never restate it.
+- Aim for about one comment line per five or six lines of code, and keep lines
+  within 100 columns.
+
+Many older comments do not follow this yet and are being rewritten, comments
+only. Do not copy their style into new code.
+
 ## Commits
 
 One line, no body: an emoji, then an imperative subject.
