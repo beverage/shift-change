@@ -8,38 +8,19 @@ using Verse.Sound;
 namespace ShiftChange
 {
     /// <summary>
-    /// The stand's owner list. Replaces vanilla's
-    /// <see cref="Dialog_AssignBuildingOwner"/> for outfit stands only — our
-    /// own gizmo opens this instead, and no other assignable building in the
-    /// load order is touched.
+    /// The owner list for outfit stands, opened by our own gizmo in place of vanilla's
+    /// <see cref="Dialog_AssignBuildingOwner"/>.
     ///
-    /// <para><b>Why not the vanilla dialog.</b> Three things were wanted and
-    /// none of them can be reached from outside it. It closes the window after
-    /// a single assignment, which is correct for a one-owner building and
-    /// wrong for a list (<c>Dialog_AssignBuildingOwner.cs</c>: the
-    /// <c>Close()</c> is gated on <c>MaxAssignedPawnsCount == 1</c>); its row
-    /// drawers are <c>private</c>, so a gender column cannot be added by
-    /// subclassing; and a filter needs a header row it has no seam for. The
-    /// alternative was a Harmony patch on the vanilla dialog, which would have
-    /// changed beds, thrones and graves for every mod in the load order to
-    /// give outfit stands a feature. Owning ~100 lines of layout is the
-    /// cheaper of the two.</para>
+    /// <para>Vanilla's dialog keeps its row drawers private, has no seam for a header row, and
+    /// its Assign calls <c>TryAssignPawn</c>, which on a stand always adds. So the gender
+    /// column, filter, bulk buttons and the one-owner pick (<see cref="SingleOwner"/>) need a
+    /// window of our own.</para>
     ///
-    /// <para><b>Why a filter at all.</b> A stand serves whoever can wear
-    /// something on it, and a lot of apparel is gender-locked — Royalty's
-    /// formal vest and top hat are Male, its ladies hat Female. Without a
-    /// restriction a shared stand holding a gown dresses a man in it and skips
-    /// the hat. Restricting by hand is fine for four colonists and prohibitive
-    /// for forty, which is what <see cref="Filter"/> and Assign all shown are
-    /// for: two clicks to make a stand the women's stand.</para>
-    ///
-    /// <para><b>One owner on a stand not used for shift changes.</b> There
-    /// Assign is a pick (<see cref="Assign"/>,
-    /// <see cref="CompAssignableToPawn_ShiftStand.SingleOwnerOnly"/>): the
-    /// colonist replaces the whole list, a group kept from shift use included,
-    /// and Assign all is not drawn. Unassign and Remove all owners work as
-    /// anywhere else. The gender tabs stay: they still help find one colonist
-    /// in a long list.</para>
+    /// <para>The gender filter exists because apparel can be gender-locked (Royalty's formal
+    /// vest and top hat are male, its ladies hat female), so a stand shared by both genders
+    /// needs a restriction. <see cref="Filter"/> plus Assign all shown makes a stand a
+    /// women's stand in two clicks. On a stand not used for shift changes, Assign replaces
+    /// the whole list with one colonist; a group kept from shift use stays until then.</para>
     /// </summary>
     public class Dialog_AssignStandOwners : Window
     {
@@ -50,9 +31,8 @@ namespace ShiftChange
         internal const float SeparatorHeight = 7f;
         internal const float ButtonPadding = 26f;
 
-        /// <summary>Which candidates the list offers. Assigned pawns are never
-        /// filtered out — hiding an owner you might want to remove is how a
-        /// filter becomes a trap.</summary>
+        /// <summary>Which candidates the list offers. Assigned pawns are always shown, so an
+        /// owner can always be removed.</summary>
         internal enum Filter
         {
             All,
@@ -87,14 +67,15 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>Assign is a pick here; see the class summary.</summary>
+        /// <summary>True on a stand not used for shift changes, where Assign replaces the owner
+        /// list and Assign all is not drawn
+        /// (<see cref="CompAssignableToPawn_ShiftStand.SingleOwnerOnly"/>).</summary>
         internal bool SingleOwner =>
             (assignable as CompAssignableToPawn_ShiftStand)?.SingleOwnerOnly ?? false;
 
         /// <summary>
-        /// What a row's Assign button does: on a stand not used for shift
-        /// changes, make <paramref name="pawn"/> the only owner; everywhere
-        /// else, add them to the list.
+        /// A row's Assign button: makes <paramref name="pawn"/> the only owner when
+        /// <see cref="SingleOwner"/>, otherwise adds them to the list.
         /// </summary>
         internal void Assign(Pawn pawn)
         {
@@ -159,9 +140,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Filter on the left, bulk actions on the right. "Assign all shown"
-        /// respects the filter, which is the whole point — it is the two-click
-        /// path to a women's stand in a colony of forty.
+        /// Filter tabs on the left, bulk actions on the right. Assign all shown respects the
+        /// filter.
         /// </summary>
         internal void DoHeader(Rect rect)
         {
@@ -178,9 +158,7 @@ namespace ShiftChange
 
             List<Pawn> shown = Candidates();
 
-            // Width from the text, not a guessed constant: "Remove all owners"
-            // already overflowed 130 px in English, and every translation is a
-            // different length.
+            // Sized from the label text, since translations differ in length.
             string clearLabel = "ShiftChange.ClearOwners".Translate();
             float clearWidth = Text.CalcSize(clearLabel).x + ButtonPadding;
             Rect clear = new Rect(rect.xMax - clearWidth, rect.y, clearWidth, 30f);
@@ -194,9 +172,8 @@ namespace ShiftChange
                 SoundDefOf.Click.PlayOneShotOnCamera();
             }
 
-            // Not drawn where Assign is a pick. A group built out of shift use
-            // would drive nothing of ours and fit no Outfit Stands Plus slot,
-            // so it would reach nobody at all.
+            // Not drawn where Assign is a pick: a group on such a stand drives nothing of ours
+            // and exceeds Outfit Stands Plus's one slot per stand, so it would reach nobody.
             if (SingleOwner)
             {
                 return;
@@ -230,9 +207,7 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Portrait, gender, name, action — the gender glyph in a column of its
-        /// own rather than appended to the label, so the eye can run down it
-        /// while scanning a long colony.
+        /// One row: portrait, gender glyph, name, and the Assign or Unassign button.
         /// </summary>
         internal void DrawRow(Pawn pawn, ref float y, Rect viewRect, int i, bool isAssigned)
         {
@@ -262,10 +237,8 @@ namespace ShiftChange
             string label = isAssigned ? "BuildingUnassign" : "BuildingAssign";
             if (Widgets.ButtonText(button, label.Translate()))
             {
-                // No Close() either way. Vanilla shuts itself after one
-                // assignment because a bed has one slot; a stand's owner list
-                // is a set, and closing after each pick is what made building
-                // one prohibitive.
+                // The window stays open after a pick: a stand takes a list of owners, where
+                // vanilla closes after one assignment on a one-slot building.
                 if (isAssigned)
                 {
                     assignable.TryUnassignPawn(pawn);
