@@ -6,19 +6,20 @@ using Verse.AI;
 namespace ShiftChange
 {
     /// <summary>
-    /// Swaps a pawn into, or back out of, their own stand's outfit.
+    /// Swaps a pawn into, or back out of, their own stand's outfit, moving only what the stand's
+    /// ledger says, in one direction at a time.
     ///
-    /// Vanilla's <c>JobDriver_UseOutfitStand</c> cannot be reused for this even
-    /// though it looks identical: it claims every wearable item in the stand
-    /// and pushes displaced clothing back into the same anonymous bag, so two
-    /// pawns sharing a stand swap each other's clothes. This driver moves only
-    /// what the stand's ledger says, in one direction at a time.
+    /// Vanilla's <c>JobDriver_UseOutfitStand</c> cannot be reused: it claims every wearable item
+    /// in the stand and pushes displaced clothing back into the same anonymous bag, so two pawns
+    /// sharing a stand would swap each other's clothes.
     ///
-    /// The forced-apparel flag is what makes the swap stick —
-    /// <c>JobGiver_OptimizeApparel</c> would otherwise undo it at the next
-    /// opportunity, and vanilla's own driver sets the same flag
-    /// (<c>JobDriver_UseOutfitStand.cs:91</c>). We must therefore also CLEAR it
-    /// on the way back out, or the uniform is pinned to the pawn forever.
+    /// Dressing sets the forced-apparel flag, because <c>JobGiver_OptimizeApparel</c> would undo
+    /// the swap otherwise (vanilla's own driver sets it too). Undressing must clear it, or the
+    /// uniform stays pinned to the pawn.
+    ///
+    /// Every failure path must leave the pawn in the wrong clothes at worst, never in none. A swap
+    /// may remove a garment that a royal title or ideology role requires; that is deliberately
+    /// neither guarded nor warned about (docs/DESIGN.md, "The forced-apparel lifecycle").
     /// </summary>
     public class JobDriver_SwapAtStand : JobDriver
     {
@@ -26,10 +27,9 @@ namespace ShiftChange
         internal bool undressing;
 
         /// <summary>
-        /// Set by <see cref="DoTransfer"/> when this trip actually returned a
-        /// uniform, and consumed by the global finish action that announces
-        /// it. Not scribed, and does not need to be: both run inside the same
-        /// job teardown, in the same tick, with no save point between them.
+        /// The stand this trip freed, for <see cref="AnnounceFreedStand"/>; set by
+        /// <see cref="DoTransfer"/> or <see cref="NothingToWear"/>. Not scribed: the finish action
+        /// that reads it runs in the same tick.
         /// </summary>
         internal CompShiftStand freedStand;
         internal List<Apparel> toWear = new List<Apparel>();
@@ -84,17 +84,15 @@ namespace ShiftChange
             {
                 duration += (int)(apparel.GetStatValue(StatDefOf.EquipDelay) * 60f);
             }
-            // Outfit Stands Plus' powered stands advertise faster swaps —
-            // honor their factor so a shift change is never slower than a
-            // manual swap at the same stand. No-op everywhere else.
+            // Outfit Stands Plus scales a swap at any stand carrying its comp, vanilla's included;
+            // apply its factor so a shift change is never slower than a manual swap there. No-op
+            // without that mod.
             duration = Interop_OutfitStandsPlus.ApplySwapSpeedFactor(Stand, duration);
         }
 
         /// <summary>
-        /// Going on shift: stand's clothes on, own clothes into the stand. The
-        /// decision of what moves lives in <see cref="SwapPlan"/>, shared with
-        /// the stand selector so the two can never disagree about what counts
-        /// as wearable.
+        /// Going on shift: stand's clothes on, own clothes into the stand. <see cref="SwapPlan"/>
+        /// decides what moves, shared with the stand selector so the two agree on wearability.
         /// </summary>
         internal void PlanDress(CompShiftStand comp)
         {
@@ -106,8 +104,7 @@ namespace ShiftChange
         {
             foreach (Apparel apparel in comp.IssuedUniformForReading)
             {
-                // Only what the pawn still actually wears — anything shed,
-                // burnt or stolen in between is simply not there to return.
+                // Only what the pawn still wears; anything shed, burnt or stolen since is gone.
                 if (apparel != null && pawn.apparel.WornApparel.Contains(apparel) && !pawn.apparel.IsLocked(apparel))
                 {
                     toStore.Add(apparel);
@@ -115,12 +112,9 @@ namespace ShiftChange
             }
             foreach (Apparel apparel in comp.StoredOwnerApparelForReading)
             {
-                // SwapPlan.CanWear, not a local predicate: this asked only
-                // PawnCanWear and so admitted garments vanilla's Wear() then
-                // refused for want of a body part or a biocode — after the
-                // stand had already let go of them. Wearability lives in
-                // SwapPlan and nowhere else (its class doc); this line was
-                // the one place that had quietly grown a second opinion.
+                // SwapPlan.CanWear, not a local predicate: wearability is decided only there. It
+                // also checks body parts and biocoding, which Wear() enforces only after the
+                // stand has let go.
                 if (apparel != null && apparel.ParentHolder == Stand && SwapPlan.CanWear(pawn, apparel))
                 {
                     toWear.Add(apparel);
@@ -128,30 +122,19 @@ namespace ShiftChange
             }
         }
 
-        // Royal titles and ideology roles can REQUIRE a garment, and this swap
-        // may remove one: deliberately neither guarded nor warned about
-        // (docs/DESIGN.md, "The forced-apparel lifecycle").
-
         protected override IEnumerable<Toil> MakeNewToils()
         {
-            // GLOBAL finish action, deliberately — not a toil one. The tracker
-            // releases this job's reservations at
-            // Pawn_JobTracker.CleanupCurrentJob:492 and only then runs the
-            // driver's global finish actions at :497
-            // (JobDriver.Cleanup:274-280); a toil finish action runs earlier
-            // still, while this pawn holds the stand (docs/DESIGN.md, "The
-            // mid-job catch-up").
-            //
-            // Registered here rather than in Notify_Starting because
-            // SetupToils re-enumerates this on load, and a swap interrupted by
-            // a save should still announce the stand when it finishes.
+            // A global finish action, not a toil one: Pawn_JobTracker.CleanupCurrentJob releases
+            // this job's reservations before it runs the driver's global finish actions, while a
+            // toil's finish action runs earlier, with this pawn still holding the stand
+            // (docs/DESIGN.md, "The mid-job catch-up"). Registered here, not in Notify_Starting,
+            // because SetupToils re-enumerates this method on load, so a swap interrupted by a
+            // save still announces the stand when it finishes.
             AddFinishAction(AnnounceFreedStand);
 
             this.FailOnBurningImmobile(TargetIndex.A);
-            // Driver-level, not toil-level. Scoped to the Goto alone, a stand
-            // deconstructed or burnt down during the WAIT toil left the job
-            // running to its transfer, which then posted the pawn's clothes
-            // into a container that had already dumped its contents.
+            // Both conditions are driver-level so they also cover the wait toil: a stand
+            // deconstructed or burnt there has dumped its contents, and the transfer must not run.
             this.FailOnDespawnedNullOrForbidden(TargetIndex.A);
             yield return Toils_Goto.GotoThing(TargetIndex.A, PathEndMode.InteractionCell);
 
@@ -174,73 +157,31 @@ namespace ShiftChange
             if (stand == null || comp == null || !stand.Spawned || stand.Destroyed
                 || pawn?.apparel == null || pawn.Dead)
             {
-                // The stand or the pawn stopped existing between the last toil
-                // and this finish action. Nothing has moved yet, so there is
-                // nothing to unwind — and posting clothes into a despawned
-                // container would lose them.
+                // Nothing has moved yet; clothes posted into a despawned container would be lost.
                 return;
             }
 
-            // RE-VALIDATE BEFORE ANYTHING COMES OFF. The plan was built back in
-            // Notify_Starting and the walk is long enough for the world to
-            // change under it: the uniform hauled away, a garment burnt, the
-            // pawn's jaw lost to a raider on the way. Stripping first and only
-            // then discovering the incoming set is empty is what left a naked
-            // colonist standing at a stand that now advertised their own
-            // civvies as the room's uniform.
-            //
-            // An empty incoming set does NOT by itself mean the swap has to be
-            // abandoned. On the return trip it also happens when the dress trip
-            // displaced nothing at all — a stand whose stock shares no apparel
-            // layer with what the pawn arrived in (a Shell-layer lab coat over
-            // a shirt and trousers, a headgear-only stand on a bare head)
-            // stores nothing, so there is nothing to hand back. The pawn is
-            // still wearing their own clothes UNDER the uniform, and taking the
-            // uniform off is both safe and the whole point of the trip.
-            // Abandoning here instead donated the uniform permanently: forced
-            // cleared, ledger dropped, and the stand left reading empty so it
-            // never dressed anyone again.
-            //
-            // So the test is what is underneath, not what the ledger says.
-            // Give up only when the uniform is all the pawn has on.
+            // Re-validate before anything comes off: the walk is long enough for the uniform to
+            // be hauled away or a garment to burn, and stripping first would leave the pawn naked.
             toWear.RemoveAll(a => a == null || a.ParentHolder != stand || !SwapPlan.CanWear(pawn, a));
 
-            // ARRIVAL RE-CHECK FOR DECENCY, mirroring the one deposit-only has
-            // had since it shipped. The plan was built back in Notify_Starting
-            // and toWear may have just shrunk on the line above — a garment
-            // hauled off the stand, or a body part lost on the walk. A plan
-            // that kept them covered when it was made can therefore arrive
-            // here no longer doing so, and the retention pass has to run
-            // against what is actually left rather than against what was
-            // promised.
-            //
-            // Dress direction only. The return trip's guard below is
-            // deliberately a different question (see WearingAnythingBesides:
-            // there the alternative is donating the uniform permanently), and
-            // deposit-only issues nothing, so it has no incoming set to weigh
-            // and is already answered by the strict test underneath.
+            // Dress direction only: toWear may have just shrunk, so the decency pass runs again
+            // on what is left, and may hold more garments back or refuse. The return trip's guard
+            // below asks a different question (see WearingAnythingBesides), and deposit-only
+            // issues nothing, so the test below covers it.
             if (!undressing && !comp.DepositOnly
                 && !SwapPlan.KeepThemDecent(pawn, toWear, toStore))
             {
                 NothingToWear(comp);
                 return;
             }
-            // A DEPOSIT-ONLY stand hands nothing out by design, so an empty
-            // incoming set is not evidence that anything went wrong — it
-            // belongs on the same side of this test as the return trip. Both
-            // then answer the one question that actually matters here: will
-            // the pawn still be dressed when this is over.
-            //
-            // DEPOSIT-ONLY ASKS THAT QUESTION THE STRICT WAY. WearingAnythingBesides
-            // is a garment count, which is fine where it has always been used —
-            // the return trip's last-resort recovery, where the alternative is
-            // donating the uniform permanently. On the deposit path it is the
-            // arrival re-check for a plan SwapPlan built with WouldBeNude, and
-            // a comment here used to claim the two tested the same thing. They
-            // did not: a pawn who lost their shirt and trousers during the walk
-            // would pass the count on a shield belt alone and be stripped by
-            // the very check meant to stop it (verification pass, 2026-09-03).
-            // One predicate, one answer, on both sides of the walk.
+            // On the return trip and at a deposit-only stand an empty incoming set is expected, so
+            // both ask whether the pawn stays dressed. On the return trip it can mean the dress
+            // trip displaced nothing (a stand sharing no apparel layer with the pawn's own
+            // clothes), and the uniform should still come off; giving up would donate it
+            // permanently. Deposit-only is judged by coverage (WouldBeNude, as BuildDeposit
+            // planned it), not by WearingAnythingBesides's garment count: a shield belt alone
+            // passes the count and leaves a pawn who has no shirt or trousers bare.
             bool stillDressed = comp.DepositOnly
                 ? !SwapPlan.WouldBeNude(pawn, toStore)
                 : WearingAnythingBesides(toStore);
@@ -251,9 +192,10 @@ namespace ShiftChange
                 return;
             }
 
-            // Off the pawn first, exactly as vanilla orders it — the stand has
-            // room for one outfit, so the outgoing set must leave before the
-            // incoming set can be deposited later in the same pass.
+            // The pawn's garments come off first, as in vanilla's own driver: Wear() drops any
+            // worn garment the new one conflicts with on the floor, not into the stand. They are
+            // posted into the stand last, since it holds one outfit and what leaves it must go
+            // before they arrive.
             List<Apparel> stored = new List<Apparel>();
             List<Apparel> storedForced = new List<Apparel>();
             foreach (Apparel apparel in toStore)
@@ -266,10 +208,8 @@ namespace ShiftChange
                     }
                     else if (pawn.outfits != null && pawn.outfits.forcedHandler.IsForced(apparel))
                     {
-                        // Capture BEFORE Remove: Notify_ApparelRemoved clears
-                        // the forced flag on every removal
-                        // (Pawn_ApparelTracker.cs:784-790), so this is the last
-                        // moment the fact exists anywhere.
+                        // Capture before Remove: Pawn_ApparelTracker.Notify_ApparelRemoved clears
+                        // the forced flag on every removal, so this is the last moment it is known.
                         storedForced.Add(apparel);
                     }
                     pawn.apparel.Remove(apparel);
@@ -289,14 +229,11 @@ namespace ShiftChange
                     continue;
                 }
                 pawn.apparel.Wear(apparel);
-                // Wear() returns nothing and can decline silently: it calls
-                // DeSpawnOrDeselect() and only THEN checks body parts,
-                // biocoding and PawnCanWear (Pawn_ApparelTracker.cs:434-450),
-                // logging a warning and returning on each. By that point the
-                // stand has already let go, so an unchecked call deletes a
-                // colonist's clothing from the world. SwapPlan.CanWear asked
-                // all three above, but the pawn can lose a body part during
-                // the walk — so the outcome is the only thing worth trusting.
+                // Wear() returns nothing and can decline silently: it calls DeSpawnOrDeselect on
+                // the garment first, then checks body parts, biocoding and PawnCanWear, logging a
+                // warning and returning on each. The stand has already let go, so an unchecked
+                // call deletes the garment. Trust the outcome, not SwapPlan.CanWear: a body part
+                // can be lost on the walk.
                 if (!pawn.apparel.WornApparel.Contains(apparel))
                 {
                     PutBack(stand, apparel);
@@ -304,47 +241,31 @@ namespace ShiftChange
                 }
                 if (!undressing)
                 {
-                    // Forced, or JobGiver_OptimizeApparel undoes this at once.
+                    // Forced, or JobGiver_OptimizeApparel undoes the swap at once.
                     pawn.outfits?.forcedHandler?.SetForced(apparel, forced: true);
                 }
                 else if (comp.WasForcedWhenStored(apparel))
                 {
-                    // Restore what check-in destroyed: this garment was
-                    // force-worn before the shift, so it comes back force-worn
-                    // — otherwise the player's explicit choice is silently
-                    // downgraded to policy-managed and the optimizer swaps it
-                    // away. Must run before NotifyUndressed clears the ledger.
+                    // Force-worn before the shift and cleared at check-in, so restore it or the
+                    // player's choice becomes policy-managed. Must precede NotifyUndressed, which
+                    // clears the ledger WasForcedWhenStored reads.
                     pawn.outfits?.forcedHandler?.SetForced(apparel, forced: true);
                 }
                 issued.Add(apparel);
             }
 
-            // NOTHING WENT ON, AND THE CLOTHES ARE ALREADY OFF. Every incoming
-            // garment was declined late by Wear() — a body part lost during the
-            // walk, a biocode that changed hands. At this point `stored` is held
-            // by nothing: off the pawn, not yet in the stand.
+            // Nothing went on (typically Wear() declined every incoming garment late) and the
+            // pawn's own clothes are off, held by nothing. Posting them into the stand would put
+            // the pawn on shift with nothing issued, since NotifyDressed claims the stand for
+            // anything parked, and they would work without those clothes, bare under full
+            // change, until the return trip: the optimizer is paused while they are on shift,
+            // so nothing re-dresses them. So re-dress them and record nothing. Re-wearing checks
+            // CanWear first, since Wear() detaches before it checks; what cannot go back on is
+            // put in the stand, where a player can retrieve it.
             //
-            // Falling through would post it into the stand and record a ledger
-            // with no borrower against it (NotifyDressed only sets a borrower
-            // when something was issued), so the pawn's own clothes end up
-            // locked in a rack nothing will ever hand back. With FULL CHANGE
-            // that is every garment they own, and it leaves them naked — which
-            // breaks the standing rule that the worst case on any failure path
-            // here is a pawn in the WRONG clothes, never a pawn without them.
-            //
-            // So dress them again and record nothing: the trip accomplished
-            // exactly as much as it should have. Re-wear goes through CanWear
-            // first, because the same late refusal that got us here would
-            // otherwise delete the garment — Wear() detaches before it checks.
-            // Anything that genuinely cannot go back on goes into the stand
-            // rather than nowhere; that is still a garment the player can
-            // retrieve, which an unheld one is not.
-            // Deposit-only is exempt: issuing nothing is the whole point, and
-            // this recovery would put the armour straight back on the pawn it
-            // was just taken off, every night, forever. The invariant it
-            // protects still holds there by a different route — BuildDeposit
-            // refuses a plan that would strip the pawn bare, and the guard
-            // above re-checks the same thing on arrival.
+            // Deposit-only is exempt: it issues nothing by design, so this would put the armour
+            // straight back on the pawn each time it is taken off. BuildDeposit and the arrival
+            // check above keep that pawn dressed instead.
             if (!undressing && !comp.DepositOnly && issued.Count == 0 && stored.Count > 0)
             {
                 foreach (Apparel apparel in stored)
@@ -356,8 +277,7 @@ namespace ShiftChange
                         {
                             if (storedForced.Contains(apparel))
                             {
-                                // Remove() cleared the forced flag on the way
-                                // off and nothing else restores it.
+                                // Remove() cleared the forced flag; nothing else restores it.
                                 pawn.outfits?.forcedHandler?.SetForced(apparel, forced: true);
                             }
                             continue;
@@ -370,8 +290,8 @@ namespace ShiftChange
 
             foreach (Apparel apparel in stored)
             {
-                // Vanilla's own eviction: anything already in the stand that
-                // cannot be worn together with this gets dropped near it.
+                // Vanilla's eviction: drops anything in the stand that cannot be worn with this
+                // garment, near the stand.
                 stand.TryDropThingsToMakeRoomForThingOfDef(apparel.def);
                 PutBack(stand, apparel);
             }
@@ -379,8 +299,7 @@ namespace ShiftChange
             if (undressing)
             {
                 comp.NotifyUndressed(pawn);
-                // Announced later, from the global finish action, once this
-                // pawn's claim on the stand has actually been released.
+                // Announced from the global finish action, once the pawn's claim is released.
                 freedStand = comp;
             }
             else
@@ -390,37 +309,23 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The plan came up empty on arrival. Nothing has been moved yet, so
-        /// the two directions want opposite things.
-        ///
-        /// On the return trip this is the LAST RESORT only. An empty incoming
-        /// set has two causes and they want opposite handling: the pawn's own
-        /// clothes are gone (burnt, hauled off, no longer fit), or the dress
-        /// trip displaced nothing in the first place and there was never
-        /// anything to give back. The caller separates them with
-        /// <see cref="WearingAnythingBesides"/> and only sends the first case
-        /// here — see the guard in <see cref="DoTransfer"/> for why the second
-        /// must not arrive.
+        /// The plan came up empty on arrival, with nothing moved yet. Dressing records nothing.
+        /// The return trip lands here only as a last resort, when taking the uniform off would
+        /// leave the pawn bare (<see cref="WearingAnythingBesides"/>, or coverage at a
+        /// deposit-only stand, as <see cref="DoTransfer"/> checks).
         /// </summary>
         internal void NothingToWear(CompShiftStand comp)
         {
             if (!undressing)
             {
-                // Dressing at a stand with nothing this pawn can put on. No
-                // state changed, so there is nothing to record — they work in
-                // their own clothes, which is exactly what the selector's
-                // WouldDress check exists to avoid and this is its backstop.
+                // Nothing this pawn can put on: no state changed, so there is nothing to record.
+                // This backstops the stand selector's WouldDress check.
                 return;
             }
 
-            // The return trip with nothing to return to: their own clothes
-            // burnt, were hauled off, or no longer fit. Stripping the uniform
-            // regardless would leave the pawn naked — and the standing rule is
-            // that the worst case of any failure path here is a pawn in the
-            // WRONG clothes, never a pawn without them. So hand the uniform
-            // over as ordinary clothing (forced cleared, so vanilla's
-            // optimizer will re-dress them from the stockpile in the normal
-            // way) and free the stand back into the pool.
+            // Their own clothes burnt, were hauled off, or no longer fit, and stripping the
+            // uniform would leave the pawn naked. So hand it over as ordinary clothing (forced
+            // cleared, so the optimizer re-dresses them from the stockpile) and free the stand.
             List<Apparel> uniform = comp.IssuedUniformForReading;
             for (int i = 0; i < uniform.Count; i++)
             {
@@ -429,23 +334,18 @@ namespace ShiftChange
                     pawn.outfits?.forcedHandler?.SetForced(uniform[i], forced: false);
                 }
             }
-            // Deferred, for the same reason as the normal return trip: this
-            // runs from a toil finish action, so the pawn still holds the
-            // stand and nobody else could reserve it yet.
+            // Announced later through freedStand, as on the normal return trip: this runs in a
+            // toil finish action, so the pawn still holds the stand and nobody else can reserve it.
             comp.AbandonLedger(pawn, announce: false);
             freedStand = comp;
         }
 
         /// <summary>
-        /// Tell the catch-up that this stand is back in the pool — from the
-        /// job's teardown, after the tracker has released this pawn's claim on
-        /// it, so a colonist already working bare in the room can actually
-        /// reserve it.
-        ///
-        /// Fires for any end condition, because the only thing that arms it is
-        /// <see cref="DoTransfer"/> having genuinely returned a uniform. A swap
-        /// that failed, was interrupted, or never reached its last toil leaves
-        /// <see cref="freedStand"/> null and announces nothing.
+        /// Tells the catch-up this stand is back in the pool, from the job's teardown, after the
+        /// tracker has released this pawn's claim, so a colonist already working bare in the room
+        /// can reserve it. Runs for any end condition, but only a return trip that freed the stand
+        /// sets <see cref="freedStand"/>, so a dress trip, or a swap interrupted before its
+        /// transfer, announces nothing.
         /// </summary>
         internal void AnnounceFreedStand(JobCondition condition)
         {
@@ -459,12 +359,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Is the pawn wearing anything that is not in <paramref name="set"/>?
-        /// Asked of the outgoing set on the return trip: true means the uniform
-        /// can come off without stripping them, false means it is all they have
-        /// on. Deliberately counts garments rather than body coverage — the
-        /// standing rule is only that a failure path never leaves a pawn
-        /// NAKED, and one surviving shirt satisfies it.
+        /// Is the pawn wearing anything that is not in <paramref name="set"/>? Asked of the
+        /// outgoing set on the return trip: false means the uniform is all they have on. It counts
+        /// garments, not body coverage, because the rule is only that a pawn is never left naked,
+        /// and one surviving shirt satisfies it.
         /// </summary>
         internal bool WearingAnythingBesides(List<Apparel> set)
         {
@@ -480,12 +378,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Put a garment somewhere real. Called wherever a transfer step can
-        /// leave an item held by neither the stand nor the pawn — the stand
-        /// first, then the ground beside it, then the ground beside the pawn.
-        /// Doing nothing in that state deletes the item from the world, so
-        /// this never gives up silently. (Vanilla's own stand driver takes the
-        /// unchecked gamble; we do not.)
+        /// Puts a garment somewhere real, for any transfer step that can leave it held by neither
+        /// the stand nor the pawn: the stand first, then the ground beside it, then the ground
+        /// beside the pawn. Doing nothing there deletes the item from the world, so this never
+        /// gives up silently (vanilla's own stand driver takes that gamble).
         /// </summary>
         internal void PutBack(Building_OutfitStand stand, Apparel apparel)
         {

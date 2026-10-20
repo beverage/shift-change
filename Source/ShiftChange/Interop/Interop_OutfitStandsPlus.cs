@@ -7,15 +7,13 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// Soft bridge to Outfit Stands Plus' swap-speed comp. Their powered
-    /// stands advertise faster changes, and their own use-driver honors that
-    /// through <c>OutfitStandsPlusMainComp.ApplyEquipSpeedFactor</c> — a
-    /// shift change at the same stand should not be mysteriously slower than
-    /// a manual swap. No assembly reference: the type is resolved by name
-    /// once, and the whole bridge collapses to a no-op when the mod is
-    /// absent, or has renamed or reshaped the comp. Any surprise thrown
-    /// inside their code disables the bridge for the session instead of
-    /// faulting the swap.
+    /// Outfit Stands Plus scales swap time by a factor from its settings, one for powered and
+    /// one for unpowered stands, through <c>OutfitStandsPlusMainComp.ApplyEquipSpeedFactor</c>.
+    /// Its comp sits on vanilla's stands as well as its own. This applies the same factor to a
+    /// shift change, so it is never slower than a manual swap at the same stand.
+    /// No assembly reference: the type is found by name, and the bridge does nothing when the
+    /// mod is absent or has renamed or reshaped the comp. An exception thrown inside their code
+    /// turns the bridge off for the session instead of failing the swap.
     /// </summary>
     internal static class Interop_OutfitStandsPlus
     {
@@ -31,8 +29,7 @@ namespace ShiftChange
             }
             if (!resolved)
             {
-                // Once per session. A missing type stays missing; no point
-                // re-asking the assembly list on every swap.
+                // Once per session: a mod that is absent stays absent.
                 resolved = true;
                 compType = GenTypes.GetTypeInAnyAssembly("OutfitStandsPlus.ThingComps.OutfitStandsPlusMainComp");
                 if (compType != null)

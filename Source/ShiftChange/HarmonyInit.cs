@@ -7,22 +7,12 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// Applies Shift Change's patches once at game start.
+    /// Applies the mod's Harmony patches once at game start: every attribute patch through
+    /// PatchAll, then the Outfit Stands Plus patch by hand.
     ///
-    /// The load-bearing residents: <see cref="Patch_JobInterception"/>, which
-    /// inserts the swap ahead of automatic work (and the return trip on the way
-    /// out), and the reaper pair — <see cref="Patch_UnclaimStands"/>, which
-    /// releases a pawn's assigned and borrowed stands when vanilla unclaims
-    /// their beds and thrones (death, trade, kidnap, map exit), and
-    /// <see cref="Patch_BanishStands"/>, which calls the same reaper for the
-    /// one colony exit vanilla routes past it.
-    ///
-    /// Both are wrapped so an exception degrades to vanilla behaviour rather
-    /// than breaking job assignment, which would brick the colony. The
-    /// interception patch also counts its throws and, at
-    /// <see cref="Patch_JobInterception.FaultLimit"/>, takes itself out of
-    /// service until a save is loaded or a game started
-    /// (<see cref="Patch_JobInterception.faulted"/>).
+    /// A patch target that does not resolve makes PatchAll throw. The game logs one
+    /// static-constructor error, and the attribute patches after the failed one are lost along
+    /// with the Outfit Stands Plus patch.
     /// </summary>
     [StaticConstructorOnStartup]
     public static class HarmonyInit
@@ -31,16 +21,13 @@ namespace ShiftChange
         {
             Harmony harmony = new Harmony("MrBeverage.ShiftChange");
             harmony.PatchAll();
-            // By hand rather than by attribute: its target is in another mod
-            // that may not be installed, and it decides at startup whether to
-            // apply at all.
+            // By hand, not by attribute: its target is in Outfit Stands Plus, which may not be
+            // installed, and TryApply decides at startup whether to apply at all.
             Patch_OutfitStandsPlusUseButton.TryApply(harmony);
 #if DEBUG
-            // ECR hot reload is compiled into Debug builds only — see
-            // docs/DEVELOPMENT.md. Route its logging into the dev
-            // log so a swap landing (or failing) is visible, not an act of
-            // faith. The watchdog replaces ECR's FileSystemWatcher trigger,
-            // which never fires under Unity's Mono on macOS.
+            // Hot reload through ECR is compiled into Debug builds only (docs/DEVELOPMENT.md).
+            // Its log goes to the dev log, so a swap that landed or failed shows. The watchdog
+            // stands in for ECR's file watcher, which never fires under Unity's Mono on macOS.
             EcrLog.messageCallback = s => Log.Message("[ShiftChange/ECR] " + s);
             EcrLog.errorCallback = s => Log.Error("[ShiftChange/ECR] " + s);
             EcrWatchdog.Start();
@@ -48,16 +35,12 @@ namespace ShiftChange
         }
 
 #if DEBUG
-        // ECR invokes any static parameterless method with this name after a
-        // reload — the heartbeat that a swap actually landed. It is also the
-        // QUARANTINE: ECR redirects EVERY method, not just changed ones, and
-        // a twin body cannot call an abstract base's implicit (protected)
-        // constructor — so any post-reload instantiation of our JobDriver
-        // detonates inside vanilla's StartJob and wedges the pawn's tracker
-        // (2026-08-08, in play). From the first reload onward this session is
-        // a UI lab, not a colony: all gameplay interception goes dark, and
-        // behaviour testing happens on a clean Release restart, as the
-        // discipline always said — now enforced by code instead of memory.
+        // ECR calls any static parameterless method of this name after a reload, so the warning
+        // below shows that a swap landed. The method is also the quarantine: ECR loads each
+        // reload as a new assembly and redirects every method into its twin there, not only the
+        // changed ones, and a twin cannot call an abstract base class's implicit protected
+        // constructor. A JobDriver of ours created after a reload therefore throws inside
+        // vanilla's StartJob and wedges the pawn's job tracker.
         internal static void OnEditCompileReload()
         {
             Patch_JobInterception.Enabled = false;

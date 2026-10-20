@@ -12,47 +12,40 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// Lets Outfit Stands Plus' per-colonist stand button find its stands
-    /// without walking every building the player owns, every frame: a
-    /// transpiler swaps that one call for <see cref="Stands"/>, a per-map list
-    /// kept in the walk's order, because the order is behaviour. Why, how the
-    /// list stays current, and when the patch applies: docs/DESIGN.md,
-    /// "Outfit Stands Plus' stand button".
+    /// Lets Outfit Stands Plus' per-colonist stand button find its stands without walking every
+    /// building the player owns on every frame a colonist is selected. A transpiler swaps that
+    /// one call for <see cref="Stands"/>, a per-map list kept in the walk's order. The order is
+    /// behaviour: a colonist who owns two stands gets two buttons that merge into one, and a
+    /// click sends them to the stand whose button came first. Why, how the list stays current
+    /// and when the patch applies: docs/DESIGN.md, "Outfit Stands Plus' stand button".
     ///
-    /// <para><see cref="Enabled"/> off, or an exception while reading the list,
-    /// hands the call back to the walk. <see cref="HarmonyInit"/> applies all
-    /// of it by hand rather than by attribute, because its target may not
-    /// exist; with the mod absent this does nothing and logs nothing.</para>
+    /// <para><see cref="HarmonyInit"/> applies the patch by hand rather than by attribute,
+    /// because its target may not exist.</para>
     /// </summary>
     public static class Patch_OutfitStandsPlusUseButton
     {
-        /// <summary>
-        /// Off hands the call back to their walk. A diagnostic like the other
-        /// shipped TweakValues, reset at the next launch.
-        /// </summary>
+        /// <summary>Off hands the call back to their walk; reset at the next launch.</summary>
         [TweakValue("ShiftChange")]
         public static bool Enabled = true;
 
         internal static bool applied;
 
         /// <summary>
-        /// Why it stood aside, for the log. Null when it applied, and when the
-        /// mod is not loaded at all.
+        /// Why the patch stood aside, for the log; null when it applied or the mod is absent.
         /// </summary>
         internal static string standingAside;
 
         internal static Type useCompType;
 
-        /// <summary>Their <c>CompGetGizmosExtra</c>.</summary>
+        /// <summary>Their use comp's <c>CompGetGizmosExtra</c>.</summary>
         internal static MethodInfo target;
 
         /// <summary>
-        /// The method that makes the call: their iterator's <c>MoveNext</c>,
-        /// since <see cref="target"/> is an iterator and only builds it.
+        /// The method holding the call: the compiler-generated <c>MoveNext</c> of their iterator,
+        /// since <see cref="target"/> only builds the iterator.
         /// </summary>
         internal static MethodInfo walkSite;
 
-        /// <summary>How many calls the transpiler replaced the last time it ran.</summary>
         internal static int callsReplaced;
 
         internal static readonly ConditionalWeakTable<ListerBuildings, List<Building_OutfitStand>> standsByLister =
@@ -71,9 +64,8 @@ namespace ShiftChange
                 standingAside = Resolve();
                 if (standingAside == null)
                 {
-                    // The list's upkeep first. Alone it is inert: it only
-                    // touches lists that Stands has built, and nothing calls
-                    // Stands until the transpiler is in.
+                    // Upkeep first: the postfixes only touch lists that Stands has built, and
+                    // nothing calls Stands until the transpiler is in.
                     harmony.Patch(AccessTools.Method(typeof(ListerBuildings), nameof(ListerBuildings.Add)),
                         postfix: new HarmonyMethod(typeof(Patch_OutfitStandsPlusUseButton), nameof(ListerAddPostfix)));
                     harmony.Patch(AccessTools.Method(typeof(ListerBuildings), nameof(ListerBuildings.Remove)),
@@ -94,9 +86,8 @@ namespace ShiftChange
             {
                 standingAside = "patching it failed (" + e.GetType().Name + ": " + e.Message + ")";
             }
-            // The count and the method go in the line so a player's log says what
-            // was changed, not only that something was: their method makes the
-            // walk once today, and any other number means it has changed.
+            // The line names the method and the count so a log shows what changed. Their method
+            // makes the call once, so any other count means it has changed.
             Log.Message(applied
                 ? "[ShiftChange] Outfit Stands Plus: its colonist stand button now reads a list of the colony's "
                   + "stands instead of walking every building (replaced " + callsReplaced
@@ -107,13 +98,13 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Finds the method making the call. Null means it may apply; anything
-        /// else is the reason it will not, for the log.
+        /// Finds the method making the call. Null means the patch may apply; anything else is
+        /// the reason it will not, for the log.
         /// </summary>
         internal static string Resolve()
         {
-            // DeclaredOnly: a lookup that walks up the hierarchy would find
-            // ThingComp's own CompGetGizmosExtra if theirs were ever removed.
+            // DeclaredOnly: a lookup that walks up the hierarchy would find ThingComp's own
+            // CompGetGizmosExtra if their comp ever stopped declaring it.
             target = useCompType.GetMethod("CompGetGizmosExtra",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly,
                 null, Type.EmptyTypes, null);
@@ -137,9 +128,8 @@ namespace ShiftChange
         /// <summary>
         /// The call this replaces:
         /// <c>ListerBuildings.AllBuildingsColonistOfClass&lt;Building_OutfitStand&gt;()</c>.
-        /// Compared by name and type argument rather than by reference, so it
-        /// does not depend on how the runtime caches a constructed generic
-        /// method.
+        /// Compared by name and type argument rather than by reference, so it does not depend
+        /// on how the runtime caches a constructed generic method.
         /// </summary>
         internal static bool IsTheWalk(CodeInstruction instruction)
         {
@@ -159,9 +149,8 @@ namespace ShiftChange
             {
                 if (IsTheWalk(instruction))
                 {
-                    // The lister is already on the stack as the call's
-                    // receiver, and becomes Stands' one argument. The
-                    // instruction keeps its labels.
+                    // The lister is already on the stack as the call's receiver and becomes
+                    // Stands' one argument. Editing in place keeps the instruction's labels.
                     instruction.opcode = OpCodes.Call;
                     instruction.operand = stands;
                     replaced++;
@@ -171,10 +160,7 @@ namespace ShiftChange
             callsReplaced = replaced;
         }
 
-        /// <summary>
-        /// Called by their method in place of the walk: the same stands, in the
-        /// same order.
-        /// </summary>
+        /// <summary>Called in place of their walk: the same stands, in the same order.</summary>
         public static IEnumerable<Building_OutfitStand> Stands(ListerBuildings lister)
         {
             if (Enabled)
@@ -194,9 +180,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The colony's stands on this lister's map, in the colony building
-        /// list's order. Built from that list the first time it is asked for,
-        /// kept current by the two postfixes afterwards.
+        /// The colony's stands on this lister's map, in the colony building list's order. Built
+        /// from that list on first use, kept current by the two postfixes, swept on each read.
         /// </summary>
         internal static List<Building_OutfitStand> StandsOf(ListerBuildings lister)
         {
@@ -226,8 +211,7 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Walks the list by index, as the engine's own walk does, so a change
-        /// to it partway through cannot throw.
+        /// Walks by index, as the engine's own walk does, so a mid-walk change cannot throw.
         /// </summary>
         internal static IEnumerable<Building_OutfitStand> ByIndex(List<Building_OutfitStand> stands)
         {
@@ -240,7 +224,7 @@ namespace ShiftChange
         // ReSharper disable once InconsistentNaming — Harmony injection.
         public static void ListerAddPostfix(ListerBuildings __instance, Building b)
         {
-            // As Add does: the colony list takes a building only if it is the
+            // Mirrors ListerBuildings.Add: the colony list takes a building only if it is the
             // player's, and appends it.
             if (b is Building_OutfitStand stand && b.Faction == Faction.OfPlayer
                 && standsByLister.TryGetValue(__instance, out List<Building_OutfitStand> stands)
@@ -261,8 +245,7 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The compiler-generated <c>MoveNext</c> holding an iterator method's
-        /// body, or null if the method is not an iterator.
+        /// The compiler-generated <c>MoveNext</c> of an iterator method, or null if it is not one.
         /// </summary>
         internal static MethodInfo IteratorBody(MethodInfo method)
         {

@@ -5,10 +5,8 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// What a swap at a given stand would actually move, for a given pawn: one
-    /// function for the stand selector and the job driver both, because as two
-    /// they disagreed (docs/DESIGN.md, "Wearability: one authority").
-    ///
+    /// What a swap at a given stand would move for a given pawn. The stand selector and the
+    /// job driver both ask here, so they cannot form different plans for the same stand.
     /// Any predicate about wearability belongs here and nowhere else.
     /// </summary>
     internal static class SwapPlan
@@ -17,18 +15,12 @@ namespace ShiftChange
         internal static readonly List<Apparel> ScratchStore = new List<Apparel>();
 
         /// <summary>
-        /// Every gate vanilla's own <c>Wear</c> applies, asked BEFORE anything
-        /// is committed.
-        ///
-        /// <c>Pawn_ApparelTracker.Wear</c> is void and bails on each of these —
-        /// no body parts, biocoded to someone else, <c>PawnCanWear</c> false —
-        /// but it calls <c>newApparel.DeSpawnOrDeselect()</c> first
-        /// (<c>Pawn_ApparelTracker.cs:434-450</c>). So a garment that fails one
-        /// of them is ALREADY detached when the check fires: taken out of the
-        /// stand, never put on the pawn, held by nothing, gone from the world
-        /// with a single dev-log warning. Asking in advance is what stops that;
-        /// the driver verifies the outcome afterwards regardless, because the
-        /// pawn can lose a body part during the walk.
+        /// Every gate vanilla's own <c>Wear</c> applies, asked before anything is committed.
+        /// <c>Pawn_ApparelTracker.Wear</c> is void and bails on each of these (no body parts,
+        /// biocoded to someone else, <c>PawnCanWear</c> false), but it calls
+        /// <c>newApparel.DeSpawnOrDeselect()</c> first. A garment that fails one is already
+        /// detached when the check fires: out of the stand, not on the pawn, held by nothing,
+        /// and gone from the world with a single dev-log warning.
         /// </summary>
         public static bool CanWear(Pawn pawn, Apparel apparel)
         {
@@ -39,11 +31,7 @@ namespace ShiftChange
                    && !(CompBiocodable.IsBiocoded(apparel) && !CompBiocodable.IsBiocodedFor(apparel, pawn));
         }
 
-        /// <summary>
-        /// Fills <paramref name="toWear"/> with what the pawn would take off the
-        /// stand and <paramref name="toStore"/> with what they would take off
-        /// themselves to make room.
-        /// </summary>
+        /// <summary>Fills toWear (off the stand) and toStore (off the pawn, for room).</summary>
         /// <returns>true if the swap would move anything at all.</returns>
         public static bool BuildDress(Pawn pawn, Building_OutfitStand stand,
                                       List<Apparel> toWear, List<Apparel> toStore)
@@ -56,11 +44,8 @@ namespace ShiftChange
                 return false;
             }
 
-            // The deposit-only stand issues nothing, so it cannot go through
-            // the pass below — which is built around "what could this pawn put
-            // on" and returns false the moment the answer is nothing. See
-            // BuildDeposit for why that is a whole separate plan rather than a
-            // flag threaded through this one.
+            // A deposit-only stand issues nothing, so it cannot use the pass below, which gives
+            // up as soon as nothing can be worn.
             if (IsDepositOnly(stand))
             {
                 return BuildDeposit(pawn, stand, toStore);
@@ -79,13 +64,10 @@ namespace ShiftChange
 
                 bool canTake = true;
 
-                // Against candidates already accepted this pass, not only the
-                // worn list. The stand's one-outfit invariant normally makes
-                // two conflicting garments impossible to stock — but that
-                // invariant lives in Building_OutfitStand's own code
-                // (HasRoomForApparelOfDef), not here, and if a storage mod
-                // relaxes it, Wear() would silently drop the earlier garment
-                // on the floor. Checked first because it needs no
+                // Against candidates already accepted this pass, not only the worn list: a
+                // storage mod can relax the stand's one-outfit invariant
+                // (Building_OutfitStand.HasRoomForApparelOfDef), and Wear would then silently
+                // drop the earlier garment on the floor. Checked first because it has no
                 // displacement bookkeeping to roll back.
                 for (int k = 0; k < toWear.Count; k++)
                 {
@@ -108,8 +90,8 @@ namespace ShiftChange
                     {
                         continue;
                     }
-                    // Vanilla's own gate, and the only one it applies
-                    // (JobDriver_UseOutfitStand.cs:49-53).
+                    // Vanilla's stand driver (JobDriver_UseOutfitStand) applies this gate and no
+                    // other when taking worn items off.
                     if (pawn.apparel.IsLocked(wornItem))
                     {
                         canTake = false;
@@ -123,8 +105,7 @@ namespace ShiftChange
 
                 if (!canTake)
                 {
-                    // Undo anything this candidate provisionally displaced —
-                    // it is not coming off after all.
+                    // Undo what this candidate provisionally displaced; it is not going on.
                     toStore.RemoveRange(storeCountBefore, toStore.Count - storeCountBefore);
                     continue;
                 }
@@ -134,21 +115,11 @@ namespace ShiftChange
                 }
             }
 
-            // Full change: everything else comes off too, so the pawn's
-            // insulation becomes entirely the stand's kit rather than the kit
-            // layered over their own clothes.
-            //
-            // Gated on toWear being non-empty: a stand that would issue NOTHING
-            // must still decline, so the selector never sends a pawn on a trip
-            // that cannot dress them. Undressing into a rack with nothing
-            // issued is deposit-only's plan (BuildDeposit, behind the sleep
-            // trigger), never a side effect of this pass, and DoTransfer
-            // refuses on its own anyway, before a garment comes off, when a
-            // dress trip's incoming set is empty.
-            //
-            // IsLocked is the one garment that stays, matching the conflict
-            // pass above and vanilla's own stand driver
-            // (JobDriver_UseOutfitStand.cs:49-53).
+            // Full change: everything else comes off too, so the pawn's insulation is entirely
+            // the stand's kit. Gated on toWear being non-empty: a stand that would issue nothing
+            // must decline, so the selector never sends a pawn on a trip that cannot dress them
+            // (undressing with nothing issued is BuildDeposit's plan). A locked garment stays
+            // on, as in the conflict pass.
             if (toWear.Count > 0 && IsFullChange(stand))
             {
                 for (int j = 0; j < worn.Count; j++)
@@ -161,10 +132,8 @@ namespace ShiftChange
                 }
             }
 
-            // LAST, so it sees the finished plan — the conflict pass and the
-            // full-change pass both feed it. Not a full-change guard: an
-            // ordinary swap can strip a colonist too (docs/DESIGN.md, "The
-            // dress path asks the same question and answers it differently").
+            // Last, so it sees the finished plan from both passes above. It guards every swap,
+            // not only a full change: an ordinary conflict swap can strip a colonist too.
             if (!KeepThemDecent(pawn, toWear, toStore))
             {
                 toWear.Clear();
@@ -175,22 +144,16 @@ namespace ShiftChange
             return toWear.Count > 0;
         }
 
-        /// <summary>
-        /// Read from the stand rather than passed in by the caller, so the
-        /// selector and the driver cannot form different plans for the same
-        /// stand — the disagreement this whole file exists to prevent.
-        /// </summary>
+        /// <summary>Read from the stand, so the selector and the driver plan alike.</summary>
         internal static bool IsFullChange(Building_OutfitStand stand)
         {
             return stand?.TryGetComp<CompShiftStand>()?.FullChange == true;
         }
 
         /// <summary>
-        /// Read from the stand for the same reason as <see cref="IsFullChange"/>
-        /// — one source, so the selector and the driver cannot disagree.
-        /// <see cref="CompShiftStand.DepositOnly"/> is itself gated on the
-        /// stand being a SLEEP stand, which is what keeps the undress-only
-        /// plan out of the work and recreation arms.
+        /// Read from the stand, like <see cref="IsFullChange"/>.
+        /// <see cref="CompShiftStand.DepositOnly"/> is true only for a sleep stand, which keeps
+        /// the undress-only plan out of the work and recreation arms.
         /// </summary>
         internal static bool IsDepositOnly(Building_OutfitStand stand)
         {
@@ -198,18 +161,13 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The plan for a stand that hands nothing out: the pawn parks the
-        /// garments this stand's STORAGE FILTER accepts and keeps the rest on.
-        ///
-        /// <para>The filter is the whole control surface, and a fresh stand's
-        /// filter accepts almost everything worn, so the safety of this path
-        /// rests ENTIRELY on <see cref="WouldBeNude"/> below (docs/DESIGN.md,
-        /// "The sleep branch").</para>
-        ///
-        /// <para>Conflicts with whatever the stand already holds are NOT
-        /// resolved here, matching the dress path: the driver calls
-        /// <c>TryDropThingsToMakeRoomForThingOfDef</c> before each PutBack, so
-        /// eviction is vanilla's and happens once, at transfer time.</para>
+        /// The plan for a stand that hands nothing out: the pawn parks the garments this stand's
+        /// storage filter accepts and keeps the rest on. A new stand's filter accepts nearly
+        /// everything worn, so the safety of this path rests entirely on
+        /// <see cref="WouldBeNude(Pawn, List{Apparel})"/> (docs/DESIGN.md, "The sleep branch").
+        /// Conflicts with what the stand already holds are not resolved here, as on the dress
+        /// path: the driver calls <c>TryDropThingsToMakeRoomForThingOfDef</c> before each
+        /// PutBack, so vanilla evicts once, at transfer time.
         /// </summary>
         /// <returns>true if anything would be deposited.</returns>
         internal static bool BuildDeposit(Pawn pawn, Building_OutfitStand stand, List<Apparel> toStore)
@@ -223,16 +181,14 @@ namespace ShiftChange
                 {
                     continue;
                 }
-                // Vanilla's own gate, the same one the conflict pass and
-                // vanilla's stand driver apply (JobDriver_UseOutfitStand.cs:49-53).
+                // Locked garments stay on: the one gate vanilla's stand driver applies.
                 if (pawn.apparel.IsLocked(item))
                 {
                     continue;
                 }
-                // Both halves of "would this stand take it": the player's
-                // filter, and the def's fixed settings underneath it — a
-                // modded stand may refuse a category outright, and depositing
-                // into one would only bounce the garment back onto the floor.
+                // Both halves of "would this stand take it": the player's filter, and the def's
+                // fixed settings underneath it. A modded stand may refuse a category outright,
+                // and depositing into one would only bounce the garment back onto the floor.
                 if (settings != null && !settings.AllowedToAccept(item))
                 {
                     continue;
@@ -249,14 +205,11 @@ namespace ShiftChange
                 return false;
             }
 
-            // NEVER STRIP THEM BARE. The standing rule on every path through
-            // this file is that the worst case is a pawn in the WRONG clothes,
-            // never a pawn without them. Asked by coverage, not by counting
-            // garments: utility apparel (a shield belt, a smokepop belt, a jump
-            // pack) covers neither Torso nor Legs, and is exactly what the
-            // stand's DEFAULT filter excludes. Declining outright rather than
-            // holding a garment back is deliberate, unlike the dress path.
-            // Both: docs/DESIGN.md, "The sleep branch".
+            // Never strip the pawn bare: on every path through this file the worst case is a
+            // pawn in the wrong clothes, not a pawn without them. Judged by coverage, not by
+            // garment count: utility apparel (a shield belt, a jump pack) covers neither Torso
+            // nor Legs and is what the stand's default filter excludes, so a count would call
+            // the pawn dressed on a belt alone.
             if (WouldBeNude(pawn, toStore))
             {
                 toStore.Clear();
@@ -266,20 +219,13 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Would depositing <paramref name="leaving"/> make this pawn
-        /// psychologically nude?
-        ///
-        /// <para>A transcription of <c>Pawn_ApparelTracker.PsychologicallyNude</c>
-        /// (<c>:186-228</c>) and the <c>HasBasicApparel</c> it calls
-        /// (<c>:667-688</c>), evaluated against the apparel that would REMAIN
-        /// rather than against what is worn now. Vanilla's standard, not a
-        /// stricter one: docs/DESIGN.md, "The sleep branch".</para>
-        ///
-        /// <para>Transcribed rather than called because the engine's version
-        /// asks about <c>wornApparel</c> and the question here is
-        /// hypothetical. Keep the two in step: this is what decides whether a
-        /// colonist takes the Naked thought every night for the rest of the
-        /// game.</para>
+        /// Would depositing <paramref name="leaving"/> make this pawn psychologically nude?
+        /// A transcription of <c>Pawn_ApparelTracker.PsychologicallyNude</c> and the
+        /// <c>HasBasicApparel</c> it calls, evaluated against the apparel that would remain,
+        /// because the engine's version asks about <c>wornApparel</c> and the question here is
+        /// hypothetical. It is vanilla's standard, not a stricter one: a test requiring torso
+        /// and legs for everyone would refuse a man left in trousers, which vanilla accepts.
+        /// Keep the two in step: the engine's answer is what gives a colonist the Naked thought.
         /// </summary>
         internal static bool WouldBeNude(Pawn pawn, List<Apparel> leaving)
         {
@@ -287,14 +233,13 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The same question, asked about a plan that ALSO puts garments on:
-        /// the set to judge is <c>worn - leaving + arriving</c>. The deposit
-        /// form above would report every ordinary uniform swap as nudity,
-        /// because the uniform is not on the pawn yet.
+        /// The same question for a plan that also puts garments on: the set to judge is
+        /// <c>worn - leaving + arriving</c>. The deposit form above would report every ordinary
+        /// uniform swap as nudity, because the uniform is not on the pawn yet.
         /// </summary>
         internal static bool WouldBeNude(Pawn pawn, List<Apparel> leaving, List<Apparel> arriving)
         {
-            // Vanilla's two exemptions, in its order.
+            // Vanilla never counts a pawn with no gender, or a wild man, as nude.
             if (pawn.gender == Gender.None || pawn.IsWildMan())
             {
                 return false;
@@ -302,7 +247,7 @@ namespace ShiftChange
 
             Coverage(pawn, leaving, arriving, out bool hasShirt, out bool hasPants);
 
-            // A pawn with no legs left cannot be trouserless (vanilla, :198-213).
+            // Vanilla counts a pawn with no legs left as trousered.
             if (!hasPants)
             {
                 bool anyLegs = false;
@@ -324,12 +269,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Which of vanilla's two decency groups a hypothetical outfit covers.
-        /// Layer is deliberately not consulted: <c>HasBasicApparel</c>
-        /// (<c>:667-688</c>) scans every worn garment for <c>Torso</c> and
-        /// <c>Legs</c> regardless of layer, so a Belt-layer item declaring
-        /// Torso counts as a shirt. Ours has to agree with it, not improve on
-        /// it.
+        /// Which of vanilla's two decency groups a hypothetical outfit covers. Layer is
+        /// deliberately not consulted: <c>HasBasicApparel</c> scans every worn garment for
+        /// <c>Torso</c> and <c>Legs</c> regardless of layer, so a Belt-layer item declaring
+        /// Torso counts as a shirt. Ours has to agree with it, not improve on it.
         /// </summary>
         internal static void Coverage(Pawn pawn, List<Apparel> leaving, List<Apparel> arriving,
                                       out bool hasShirt, out bool hasPants)
@@ -375,19 +318,13 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Hold back whatever the plan must leave on to keep a dressed colonist
-        /// dressed. Returns false only when that is impossible, in which case
-        /// the caller must abandon the swap.
-        ///
-        /// <para>The rule is "never make it worse": a colonist already nude is
-        /// left alone, and only a plan that takes a decent colonist and leaves
-        /// them indecent is intervened on. The innermost garment is held back,
-        /// rather than the swap declined as the deposit path does; why:
-        /// docs/DESIGN.md, "The dress path asks the same question and answers
-        /// it differently".</para>
-        ///
-        /// <para>Two passes at most: vanilla asks about exactly two body part
-        /// groups, so at most one garment is needed for each.</para>
+        /// Holds back whatever the plan must leave on to keep a dressed colonist dressed.
+        /// Returns false only when that is impossible, in which case the caller must abandon
+        /// the swap. The rule is "never make it worse": a colonist already nude is left alone.
+        /// The innermost garment is held back, rather than the swap declined as the deposit path
+        /// does (docs/DESIGN.md, "The dress path asks the same question and answers it
+        /// differently"). Two passes at most: vanilla asks about exactly two body part groups,
+        /// so at most one garment is needed for each.
         /// </summary>
         internal static bool KeepThemDecent(Pawn pawn, List<Apparel> toWear, List<Apparel> toStore)
         {
@@ -395,16 +332,12 @@ namespace ShiftChange
             {
                 return true;
             }
-            // The global override. This guard can contradict a deliberate
-            // configuration, and for a colony built around nudity it would do
-            // so constantly, so it is defeatable outright.
+            // The mod setting: a colony built around nudity would fight this guard constantly.
             if (!ShiftChangeMod.DecencyEnabled)
             {
                 return true;
             }
-            // And the per-pawn exemption, which is the common case: one nudist
-            // in an otherwise ordinary colony should not cost the whole
-            // setting.
+            // The per-pawn exemption, so one nudist does not force the setting off for everyone.
             if (PrefersNudity(pawn))
             {
                 return true;
@@ -413,8 +346,7 @@ namespace ShiftChange
             {
                 return true;
             }
-            // Already indecent before we touched them: not ours to fix, and not
-            // ours to refuse over.
+            // Already nude before the swap: not this plan's doing, so not ours to fix or refuse.
             if (WouldBeNude(pawn, null, null))
             {
                 return true;
@@ -457,12 +389,13 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Is being undressed what this colonist actually wants? Vanilla's own
-        /// answer, the trait test <c>JobGiver_PrisonerGetDressed:15</c> uses,
-        /// plus Ideology's nudity precepts, which that test does not reach and
-        /// which are read per pawn, by gender. Why each half, and why vanilla's
-        /// warmth clause is not copied: docs/DESIGN.md, "The dress path asks
-        /// the same question and answers it differently".
+        /// Is being undressed what this colonist wants? Vanilla's own answer, the test
+        /// <c>JobGiver_PrisonerGetDressed</c> uses (can the pawn get the <c>ClothedNudist</c>
+        /// thought), plus Ideology's nudity precepts: a pawn with no Nudist trait in a nudist
+        /// ideoligion gets no such thought, so the precepts are read per pawn, by gender.
+        /// Vanilla's prisoner check also requires the pawn to be warm enough; that clause is
+        /// left out on purpose (docs/DESIGN.md, "The dress path asks the same question and
+        /// answers it differently").
         /// </summary>
         internal static bool PrefersNudity(Pawn pawn)
         {
@@ -481,11 +414,7 @@ namespace ShiftChange
                    && pawn.Ideo.IdeoPrefersNudityForGender(pawn.gender);
         }
 
-        /// <summary>
-        /// Would keeping this garment on cover something the plan currently
-        /// leaves bare? Asked by trial rather than by reasoning about groups,
-        /// so it cannot drift from <see cref="Coverage"/>.
-        /// </summary>
+        /// <summary>Would keeping this garment on cover something the plan leaves bare?</summary>
         internal static bool ReducesExposure(Pawn pawn, Apparel candidate,
                                              List<Apparel> toWear, List<Apparel> toStore)
         {
@@ -511,10 +440,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The lowest draw order this garment occupies. Vanilla's layers are a
-        /// clean total order (OnSkin 0, Middle 100, Shell 200, Belt 300,
-        /// Overhead 400, EyeCover 500) and modded layers slot in by their own
-        /// value, so this ranks any garment from any mod without a table.
+        /// The lowest <c>drawOrder</c> of the layers this garment occupies. Vanilla numbers its
+        /// layers from the skin outward (OnSkin 0, Middle 100, Shell 200, then Belt, Overhead and
+        /// EyeCover), so the lowest is the innermost. Modded layers carry their own, so this ranks
+        /// any garment from any mod without a table.
         /// </summary>
         internal static int InnermostLayer(Apparel apparel)
         {
@@ -534,10 +463,7 @@ namespace ShiftChange
             return lowest;
         }
 
-        /// <summary>
-        /// What these garments add to their wearer's vacuum resistance, counted
-        /// as the stat counts gear (<c>StatWorker.StatOffsetFromGear</c>).
-        /// </summary>
+        /// <summary>What these garments add to their wearer's vacuum resistance.</summary>
         internal static float VacuumResistanceOf(List<Apparel> items)
         {
             float sum = 0f;
@@ -552,28 +478,28 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The pawn's vacuum resistance before the stat clamps it to 1. Genes and
-        /// implants add to it as gear does, so a pawn immune without their suit
-        /// still reads at 1 or over once the suit's share is taken off, where the
-        /// clamped stat would hide that.
+        /// The pawn's vacuum resistance before the stat clamps it to 1. Genes and implants add
+        /// to it as gear does, so a pawn immune without their suit still reads at 1 or over
+        /// once the suit's share is taken off, where the clamped stat would hide that.
         /// </summary>
         internal static float UnclampedVacuumResistance(Pawn pawn)
         {
             return StatDefOf.VacuumResistance.Worker.GetValueUnfinalized(StatRequest.For(pawn));
         }
 
-        /// <summary>Vacuum never harms this pawn, whatever they wear (<c>Pawn.HarmedByVacuum</c>).</summary>
+        /// <summary>
+        /// Vacuum never harms this pawn, whatever they wear (<c>Pawn.HarmedByVacuum</c>).
+        /// </summary>
         internal static bool ImmuneToVacuum(Pawn pawn)
         {
             return pawn.RaceProps.IsMechanoid || (pawn.IsMutant && !pawn.mutant.Def.breathesAir);
         }
 
         /// <summary>
-        /// Swapping <paramref name="leaving"/> for <paramref name="arriving"/>
-        /// leaves the pawn less protected from vacuum than they are, and below a
-        /// resistance of 1, where vacuum stops harming. Harm grows all the way
-        /// to 1, so the line is 1, not the 0.75 at which vanilla starts routing
-        /// work around vacuum. docs/DESIGN.md, "Vacuum".
+        /// Swapping <paramref name="leaving"/> for <paramref name="arriving"/> leaves the pawn
+        /// less protected from vacuum than they are, and below a resistance of 1, where vacuum
+        /// stops harming. Harm grows all the way to 1, so the line is 1, not the 0.75 at which
+        /// vanilla starts routing work around vacuum. docs/DESIGN.md, "Vacuum".
         /// </summary>
         internal static bool LeavesThemLessProtected(Pawn pawn, List<Apparel> leaving, List<Apparel> arriving)
         {
@@ -586,10 +512,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The same question asked of a pawn already on shift: the clothes they
-        /// parked would protect them from vacuum better than the uniform they
-        /// wear, and as they stand they are below a resistance of 1. Read off
-        /// the ledger, so it answers exactly as
+        /// The same question for a pawn already on shift: the clothes they parked would protect
+        /// them from vacuum better than the uniform they wear, and they are below a resistance
+        /// of 1. Read off the ledger, so it answers exactly as
         /// <see cref="LeavesThemLessProtected"/> answered before the swap.
         /// </summary>
         internal static bool UniformLeavesThemLessProtected(Pawn pawn, List<Apparel> issued, List<Apparel> parked)
@@ -603,9 +528,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Cheap yes/no for the stand selector: would sending this pawn here
-        /// accomplish anything? Uses shared scratch lists — safe because the
-        /// selector runs to completion before any job is started.
+        /// Cheap yes/no for the stand selector: would sending this pawn here accomplish
+        /// anything? Builds the plan into the shared scratch lists, so it stands only until the
+        /// next call. Safe because the selector runs to completion before any job is started.
         /// </summary>
         public static bool WouldDress(Pawn pawn, Building_OutfitStand stand)
         {

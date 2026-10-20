@@ -10,9 +10,8 @@ namespace ShiftChange
 
         /// <summary>
         /// Vanilla's medical bed-rest work type, which
-        /// <see cref="Patch_JobInterception.MedicalRestWorkType"/> charges a
-        /// tagged lay-down to. Core, not an expansion, so no MayRequire.
-        /// <c>WorkTypeDefOf</c> does not carry it.
+        /// <see cref="Patch_JobInterception.MedicalRestWorkType"/> charges a tagged lay-down to.
+        /// It is a Core def, so no MayRequire, and <c>WorkTypeDefOf</c> does not carry it.
         /// </summary>
         public static WorkTypeDef PatientBedRest;
 

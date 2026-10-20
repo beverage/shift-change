@@ -8,47 +8,31 @@ using Verse.AI;
 namespace ShiftChange
 {
     /// <summary>
-    /// Pauses vanilla's wardrobe optimizer for pawns in uniform.
+    /// Pauses vanilla's wardrobe optimizer for pawns in uniform. On shift the worn apparel is the
+    /// stand's kit, and <c>JobGiver_OptimizeApparel.TryGiveJob</c> issues a <c>RecolorApparel</c>
+    /// job whenever any worn apparel has a <c>DesiredColor</c> and a styling station and dye are
+    /// reachable, which would dye the staged uniform for good. That recolor is vanilla
+    /// Ideology's: Dubs Paint Shop recolors through its own comp and never sets
+    /// <c>DesiredColor</c>.
     ///
-    /// The trigger case, found in play 2026-08-09: an on-shift pawn walked
-    /// off to a styling station and dyed their WORK OUTFIT to their
-    /// favourite colour. The job is vanilla Ideology, not the paint mod it
-    /// resembles: <c>JobGiver_OptimizeApparel.TryGiveJob</c> issues a
-    /// <c>RecolorApparel</c> job (<c>JobGiver_OptimizeApparel.cs:84</c>)
-    /// whenever any WORN apparel has a <c>DesiredColor</c> and a styling
-    /// station plus dye are reachable — on the same 6,000–9,000-tick
-    /// <c>nextApparelOptimizeTick</c> cadence as wardrobe optimization,
-    /// which is why it reads as random. (Dubs Paint Shop is innocent: it
-    /// paints via its own comp instantly or through its Art work givers, and
-    /// never touches <c>DesiredColor</c> — in vanilla the only setter is the
-    /// styling station dialog, <c>Dialog_StylingStation.cs:765</c>.)
+    /// <para>The rest of the giver has nothing to do either: the uniform is force-worn, so the
+    /// giver leaves it alone, and the pawn's own clothes are parked in the stand, out of a
+    /// worn-apparel scan's sight. So the whole giver is skipped while a pawn is checked out.
+    /// <c>nextApparelOptimizeTick</c> is left alone, so the first think cycle after changing back
+    /// optimizes the pawn's own clothes as normal.</para>
     ///
-    /// While on shift the worn apparel IS the stand's kit, so that recolor
-    /// permanently redyes a staged uniform — and the optimizer has no other
-    /// legitimate business either: the uniform is force-worn precisely so
-    /// this giver leaves it alone, and the pawn's own wardrobe is parked in
-    /// the stand where a worn-apparel scan cannot see it. So the whole giver
-    /// is skipped while a pawn is checked out; <c>nextApparelOptimizeTick</c>
-    /// is left untouched, so the first think cycle after changing back out
-    /// optimizes (and dyes) the civvies as normal.
-    ///
-    /// Deliberately NOT blocked: the styling station's float-menu order,
-    /// which calls <c>TryCreateRecolorJob</c> directly
-    /// (<c>Building_StylingStation.cs:30-34</c>) and never passes through
-    /// this giver — a player's explicit order proceeds, the same
-    /// direct-order rule the job interception follows.
+    /// <para>The styling station's float-menu order calls <c>TryCreateRecolorJob</c> directly
+    /// and never passes through this giver, but <see cref="Patch_RecolorExecutionGuard"/> still
+    /// refuses that order while the pawn is on shift, at its reservations.</para>
     /// </summary>
     [HarmonyPatch(typeof(JobGiver_OptimizeApparel), "TryGiveJob")]
     public static class Patch_OptimizeApparelOnShift
     {
-        // Deliberately NOT gated on Patch_JobInterception.Enabled or faulted.
-        // The fault latch trips on repeated throws inside the nested StartJob,
-        // a NEIGHBOUR mod's patch's included, so tying this pause to either
-        // flag would let an unrelated mod's exceptions re-open the recolor
-        // path on pawns still standing in their uniforms, which is verbatim
-        // the 2026-08-09 bug this patch exists to prevent. A pawn who is on
-        // shift needs protecting whether or not interception is still running;
-        // the ledger is the correct condition, and it is the one asked below.
+        // Not gated on Patch_JobInterception.Enabled or faulted. The fault latch also counts
+        // throws from a neighbouring mod's patch inside the nested StartJob, so gating on either
+        // would let an unrelated mod's exceptions re-open the recolor path for pawns still in
+        // uniform. The ledger, asked below, is the condition: a pawn on shift needs protecting
+        // whether or not interception is running.
         // ReSharper disable once InconsistentNaming — Harmony result injection.
         public static bool Prefix(Pawn pawn, ref Job __result)
         {
@@ -66,8 +50,7 @@ namespace ShiftChange
             }
             catch (Exception e)
             {
-                // This giver is consulted on every think cycle, so a throw
-                // here recurs forever rather than once. Fail open.
+                // Fail open: this giver is consulted on every think cycle, so a throw recurs.
                 Log.Error("[ShiftChange] optimizer pause threw for "
                           + pawn.LabelShort + ", letting vanilla run: " + e);
                 return true;
@@ -78,29 +61,23 @@ namespace ShiftChange
     }
 
     /// <summary>
-    /// Second layer, at EXECUTION: the giver pause above stops new recolor
-    /// jobs being issued, but a RecolorApparel job that already exists still
-    /// runs — curJob and the job queue are scribed into the save, so a job
-    /// issued in a pre-pause session resumes after load and dyes the uniform
-    /// anyway (a stand's toque came back favourite-colour green, 2026-08-09).
-    /// The driver never re-checks its apparel queue: it dyes whatever the
-    /// job names, wherever it now sits (JobDriver_RecolorApparel.cs:74) —
-    /// including garments a swap has since parked in a stand.
+    /// Cancels a <c>RecolorApparel</c> job when it starts. The giver pause stops new ones, but
+    /// the job queue is saved with the pawn, so a queued job survives a load, and the driver
+    /// never re-checks its apparel queue: it dyes whatever the job names, wherever that now
+    /// sits, garments a swap has since parked in a stand included. A job already running when
+    /// the game saved resumes without asking for reservations, so this does not reach it.
     ///
-    /// Failing TryMakePreToilReservations is the clean kill: vanilla treats
-    /// a failed reservation at job start as routine (races do it constantly)
-    /// and the think tree simply picks another job. Blocked when the pawn is
-    /// on shift (worn apparel is the uniform) or when any queued garment is
-    /// parked in an outfit stand (the post-undress legacy case). Off shift,
-    /// on their own clothes, recoloring runs untouched.
+    /// <para>Failing <c>TryMakePreToilReservations</c> is the clean kill: a queued job that fails
+    /// it is ended quietly as no longer valid, and the pawn picks another job. A player's order
+    /// fails it too, with a log warning. The job is blocked while the pawn is on shift (the worn
+    /// apparel is the uniform) and when any queued garment is parked in an outfit stand; off
+    /// shift, in their own clothes, recoloring runs as normal.</para>
     /// </summary>
     [HarmonyPatch(typeof(JobDriver_RecolorApparel), nameof(JobDriver_RecolorApparel.TryMakePreToilReservations))]
     public static class Patch_RecolorExecutionGuard
     {
-        // Not gated on Patch_JobInterception.Enabled or faulted either, and
-        // for the same reason as the giver pause above — this is the layer
-        // that catches recolor jobs scribed into the save before the pause
-        // existed, so it has to keep working while interception is off.
+        // Not gated on Patch_JobInterception.Enabled or faulted, for the same reason as the
+        // giver pause above: it has to keep working while interception is off.
         // ReSharper disable once InconsistentNaming — Harmony injection.
         public static bool Prefix(JobDriver_RecolorApparel __instance, ref bool __result)
         {

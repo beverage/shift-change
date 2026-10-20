@@ -6,46 +6,38 @@ namespace ShiftChange
     public class ShiftChangeSettings : ModSettings
     {
         /// <summary>
-        /// When true (the default), an unassigned stand in a work room is a
-        /// pool stand any capable colonist may claim. When false, only stands
-        /// explicitly assigned to a colonist ever dress anyone — every
-        /// unassigned stand behaves exactly like vanilla furniture. The one
-        /// global knob, for players who want participation strictly opt-in
-        /// per stand.
+        /// When true (the default), an unassigned stand in a work room is a pool stand that any
+        /// capable colonist may claim. When false, only a stand assigned to a colonist dresses
+        /// anyone, and every unassigned stand behaves like vanilla furniture.
         /// </summary>
         public bool poolUnassignedStands = true;
 
         /// <summary>
-        /// When true, a stand will not leave a colonist without basic clothing:
-        /// it holds back the innermost garments vanilla's own decency rule asks
-        /// for and deposits the rest. When false a stand does exactly what its
-        /// settings say, which is how every version up to v1.3.0 behaved.
+        /// When true, a stand will not leave a colonist without basic clothing: it holds back
+        /// the innermost garments vanilla's own decency rule asks for and deposits the rest.
+        /// When false a stand does exactly what its settings say.
         ///
-        /// <para><b>OFF by default, permanently</b> (settled 2026-09-12): a
-        /// distribution decision, not a default waiting for the right release,
-        /// so do not re-open it as release sequencing. The reasoning, and the
-        /// cost accepted with it: docs/DESIGN.md, "The dress path asks the same
-        /// question and answers it differently".</para>
+        /// <para>Off by default, and it stays off. Most players meet the mod inside a mod pack
+        /// and did not choose it, so a default that changes how their colonists dress is not
+        /// ours to turn on; this is not a default waiting for a release. The cost accepted with
+        /// that: docs/DESIGN.md, "The dress path asks the same question and answers it
+        /// differently".</para>
         ///
-        /// <para>Individual nudists and nudism ideoligions are exempt either
-        /// way (<see cref="SwapPlan.PrefersNudity"/>) — that detection is not
-        /// what this switch controls.</para>
+        /// <para>Nudists and nudist ideoligions are exempt whichever way this is set
+        /// (<see cref="SwapPlan.PrefersNudity"/>).</para>
         /// </summary>
         public bool keepColonistsDecent = false;
 
         /// <summary>
-        /// When true, a MEDICAL emergency no longer exempts a colonist from
-        /// dressing: a doctor takes an emergency tend in scrubs, and a patient
-        /// in critical condition stops for the gown on the way to bed. Off by
-        /// default, which is the behaviour every version up to now had, on the
-        /// same distribution reasoning as <see cref="keepColonistsDecent"/>.
+        /// When true, a medical emergency no longer exempts a colonist from dressing: a doctor
+        /// takes an emergency tend in scrubs, and a patient in critical condition stops for the
+        /// gown on the way to bed. Off by default, on the same reasoning as
+        /// <see cref="keepColonistsDecent"/>.
         ///
-        /// <para>Never firefighting, though vanilla flags that an emergency
-        /// too, which is why the covered work types are named in
-        /// <see cref="Patch_JobInterception.MedicalWorkTypeNames"/>; and it
-        /// relaxes both directions, so a doctor in another room's uniform may
-        /// change BACK first as well. Both: docs/DESIGN.md, "The sleep
-        /// branch".</para>
+        /// <para>Never firefighting, though vanilla flags that an emergency too, so the covered
+        /// work types are named in <see cref="Patch_JobInterception.MedicalWorkTypeNames"/>. It
+        /// applies in both directions: a doctor in another room's uniform may change back first
+        /// as well. Both: docs/DESIGN.md, "The sleep branch".</para>
         /// </summary>
         public bool medicalEmergenciesChangeFirst = false;
 
@@ -61,37 +53,31 @@ namespace ShiftChange
 
     public class ShiftChangeMod : Mod
     {
-        // Explicit backing field, NOT an auto-property: the compiler names an
-        // auto-property's backing field <Settings>k__BackingField and makes it
-        // PRIVATE with no syntax to widen it — unreachable through the IVT
-        // grants, so a hot-swapped getter throws FieldAccessException (found
-        // in play 2026-08-08, the one member the internal sweep couldn't
-        // touch). Auto-properties are banned in this codebase for that reason.
+        // An explicit field, never an auto-property: the compiler makes an auto-property's
+        // backing field private, with no syntax to widen it, so InternalsVisibleTo cannot reach
+        // it and a hot-swapped getter throws FieldAccessException.
         internal static ShiftChangeSettings settings;
 
         public static ShiftChangeSettings Settings => settings;
 
         /// <summary>
-        /// The single read point for the toggle. Null-tolerant so comp code
-        /// can never crash on ordering; defaults to pooling on.
+        /// The read point for <see cref="ShiftChangeSettings.poolUnassignedStands"/>.
+        /// Null-tolerant, so a read before the settings load cannot throw; it gives the default,
+        /// pooling on.
         /// </summary>
         public static bool PoolingEnabled => Settings == null || Settings.poolUnassignedStands;
 
         /// <summary>
-        /// The single read point for the decency guard. Null-tolerant for the
-        /// same reason as <see cref="PoolingEnabled"/> — but note the fallback
-        /// is the OPPOSITE way round: this defaults OFF, so settings that have
-        /// not loaded yet must read as off too, or a stand would briefly behave
-        /// differently from how the player configured it.
+        /// The read point for <see cref="ShiftChangeSettings.keepColonistsDecent"/>. Unloaded
+        /// settings read as off, which is its default (that of <see cref="PoolingEnabled"/> is
+        /// on): a null-tolerant read has to agree with the default.
         /// </summary>
         public static bool DecencyEnabled => Settings != null && Settings.keepColonistsDecent;
 
         /// <summary>
-        /// The single read point for the medical-emergency carve-out. Defaults
-        /// OFF when settings have not loaded, for the same reason
-        /// <see cref="DecencyEnabled"/> does: unloaded must read as the
-        /// conservative answer, and here that is "an emergency is never
-        /// delayed".
+        /// The read point for <see cref="ShiftChangeSettings.medicalEmergenciesChangeFirst"/>.
+        /// Unloaded settings read as off, the default, as for <see cref="DecencyEnabled"/>: no
+        /// emergency is delayed by settings that have not loaded.
         /// </summary>
         public static bool MedicalEmergencyDressingEnabled =>
             Settings != null && Settings.medicalEmergenciesChangeFirst;
@@ -103,7 +89,7 @@ namespace ShiftChange
 
         public override string SettingsCategory()
         {
-            // The Options → Mod settings entry name. A proper noun; not keyed.
+            // The Mod settings entry name: a proper noun, so it has no translation key.
             return "Shift Change";
         }
 
