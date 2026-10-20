@@ -593,8 +593,8 @@ namespace ShiftChange
         /// An owner who dies while their stand is boxed must not own it again when it is set down.
         /// Death reaches the reaper, but the reaper scans spawned stands only, so the boxed
         /// stand's parked owner list keeps the pawn; the base comp then offers each parked owner
-        /// back through <c>CanSetUninstallAssignedPawn</c>, which tests <c>IsColonist</c>, and a
-        /// dead colonist keeps the player faction. Minified and set down as
+        /// back through <c>CanSetUninstallAssignedPawn</c>, and a dead colonist still passes
+        /// <c>IsColonist</c>. Guards a past bug. Minified and set down as
         /// <see cref="ReinstallKeepsConfiguration"/> does it.
         /// </summary>
         internal static bool DeadOwnerNotRestoredOnReinstall(Fixture fix)
@@ -632,9 +632,8 @@ namespace ShiftChange
             GenSpawn.Spawn(fix.Stand, to, map, rot);
 
             ok &= Expect(fix.Stand.Spawned, "the stand is set down again (control)")
-                & ExpectKnownGap(!assignable.AssignedPawnsForReading.Contains(fix.Pawn),
-                                 "the dead colonist does not own the reinstalled stand",
-                                 "CanSetUninstallAssignedPawn passes a dead colonist");
+                & Expect(!assignable.AssignedPawnsForReading.Contains(fix.Pawn),
+                         "the dead colonist does not own the reinstalled stand");
 
             assignable.TryUnassignPawn(fix.Pawn);
             return ok;

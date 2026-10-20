@@ -122,8 +122,7 @@ checks that every stand def asks for the map-removed hook that last pair relies
 on. Then teardown (`TeardownReleases`), a reinstall, which must keep the ledger
 and the return trip (`ReinstallKeepsTheLedger`) and the stand's owner, mode and
 flag (`ReinstallKeepsConfiguration`), but not an owner who died while it was boxed
-(`DeadOwnerNotRestoredOnReinstall`, a known gap on every list: the reinstall test
-passes a dead colonist), and the borrower's death and banishment
+(`DeadOwnerNotRestoredOnReinstall`), and the borrower's death and banishment
 (`DeathReaps`, `BanishmentReaps`). `FaultLatchRecovers` drives real throws
 through the interception prefix until the fault latch trips, then re-arms it
 the way a load does.
