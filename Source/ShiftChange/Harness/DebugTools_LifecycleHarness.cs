@@ -236,6 +236,8 @@ namespace ShiftChange
                  ReinstallKeepsTheLedger);
             Case(map, pad, "reinstalling a stand keeps its owner, mode and flag",
                  ReinstallKeepsConfiguration);
+            Case(map, pad, "an owner who dies while their stand is boxed does not own it again",
+                 DeadOwnerNotRestoredOnReinstall);
             Case(map, pad, "borrower death reaps the ledger", DeathReaps);
             Case(map, pad, "borrower banishment reaps the ledger", BanishmentReaps);
             Case(map, pad, "repeated faults disable interception, a load re-arms it", FaultLatchRecovers);
@@ -798,10 +800,6 @@ namespace ShiftChange
         /// An assertion we expect to fail, with the reason recorded. Counted
         /// separately so a green run stays meaningful — and so that the day it
         /// starts passing, the harness says so instead of staying quiet.
-        ///
-        /// Nothing calls this today: banishment was the last gap and it is
-        /// closed. Kept because the counting semantics are fiddly enough to get
-        /// wrong twice, and the next gap will want them.
         /// </summary>
         internal static bool ExpectKnownGap(bool condition, string what, string why)
         {

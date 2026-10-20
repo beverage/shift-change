@@ -590,6 +590,57 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// An owner who dies while their stand is boxed must not own it again when it is set down.
+        /// Death reaches the reaper, but the reaper scans spawned stands only, so the boxed
+        /// stand's parked owner list keeps the pawn; the base comp then offers each parked owner
+        /// back through <c>CanSetUninstallAssignedPawn</c>, which tests <c>IsColonist</c>, and a
+        /// dead colonist keeps the player faction. Minified and set down as
+        /// <see cref="ReinstallKeepsConfiguration"/> does it.
+        /// </summary>
+        internal static bool DeadOwnerNotRestoredOnReinstall(Fixture fix)
+        {
+            CompAssignableToPawn assignable =
+                fix.Stand.TryGetComp<CompAssignableToPawn_ShiftStand>();
+            if (assignable == null)
+            {
+                return Expect(false, "the stand carries our assignable comp");
+            }
+
+            assignable.TryAssignPawn(fix.Pawn);
+            bool ok = Expect(assignable.AssignedPawnsForReading.Contains(fix.Pawn),
+                             "the colonist owns the stand (control)");
+
+            Map map = fix.Map;
+            IntVec3 from = fix.Stand.Position;
+            IntVec3 to = new IntVec3(from.x, 0, from.z + 2);
+            Rot4 rot = fix.Stand.Rotation;
+
+            MinifiedThing box = fix.Stand.MakeMinified();
+            if (box == null)
+            {
+                return ok & Expect(false, "the stand minified");
+            }
+            ok &= Expect(assignable.AssignedPawnsForReading.Count == 0,
+                         "boxed, the owner is parked off the list (control)");
+
+            fix.Pawn.Kill(null);
+            ok &= Expect(fix.Pawn.Dead, "the owner dies while the stand is boxed (control)")
+                & Expect(fix.Pawn.IsColonist, "and still counts as a colonist, dead (control)");
+
+            box.InnerThing = null;
+            box.Destroy();
+            GenSpawn.Spawn(fix.Stand, to, map, rot);
+
+            ok &= Expect(fix.Stand.Spawned, "the stand is set down again (control)")
+                & ExpectKnownGap(!assignable.AssignedPawnsForReading.Contains(fix.Pawn),
+                                 "the dead colonist does not own the reinstalled stand",
+                                 "CanSetUninstallAssignedPawn passes a dead colonist");
+
+            assignable.TryUnassignPawn(fix.Pawn);
+            return ok;
+        }
+
+        /// <summary>
         /// Death runs <c>Pawn.Kill</c> → <c>Pawn.Destroy(KillFinalize)</c> →
         /// <c>Pawn_Ownership.UnclaimAll</c> (<c>Pawn.cs:2350-2352</c>), which
         /// <see cref="Patch_UnclaimStands"/> hooks. Cheap to arrange in play,
