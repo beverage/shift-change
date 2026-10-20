@@ -5,22 +5,20 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// "Shift stand serves nothing": every stand set to serve something that
-    /// dresses nobody, because its allowed area is gone, it stands outside that
-    /// area, or it serves its room while standing in the open, where the room is
-    /// all the open ground on the map (docs/DESIGN.md, "Catchments"). Deleting
-    /// an area tells pawns and nothing else, and a stand that has quietly
+    /// Lists every stand set to serve something that dresses nobody: its allowed area is gone,
+    /// it stands outside that area, or it serves its room while standing in the open, where the
+    /// room is all the open ground on the map (docs/DESIGN.md, "Catchments"). Deleting an area
+    /// notifies only pawns (and clears the paint tool's selection), and a stand that has
     /// stopped dressing anyone looks like one with no work nearby.
     ///
-    /// <para>An alert rather than a message: it stays up until the stand is
-    /// fixed, and it needs no hook on the area's removal, since vanilla asks
-    /// every alert about once every 24 frames. Vanilla also creates every
-    /// alert subclass itself, so nothing registers this one, and alerts are
-    /// not saved, so it can be renamed freely.</para>
+    /// <para>Polling suits it: the alert stays up until the stand is fixed and needs no hook on
+    /// the area's removal, since vanilla asks every alert about once every 24 frames. Vanilla
+    /// instantiates every leaf Alert subclass itself, so nothing registers this one, and alerts
+    /// are not saved, so the class renames freely.</para>
     ///
     /// <para>It reads every stand on every map rather than
-    /// <see cref="CompShiftStand.CatchmentStands"/>: a stand in the open serves
-    /// its room, so that registry never holds it.</para>
+    /// <see cref="CompShiftStand.CatchmentStands"/>: a stand in the open serves its room, so
+    /// that registry never holds it.</para>
     /// </summary>
     public class Alert_ShiftStandServesNothing : Alert
     {

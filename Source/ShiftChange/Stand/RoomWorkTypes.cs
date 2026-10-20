@@ -5,27 +5,26 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// Maps a room's role to the SET of work types a stand in that room
-    /// dresses for by default: a set because rooms host families of work
-    /// (decided 2026-08-08), and never the base-wide work that only passes
-    /// through a room. The table and the reasoning behind each row:
-    /// docs/DESIGN.md, "Rooms to work types".
+    /// Maps a room's role to the set of work types a stand in that room dresses for by
+    /// default. A set, because a room hosts several kinds of work; base-wide work that only
+    /// passes through a room (hauling, cleaning) is left out. The table and the reasoning
+    /// behind each row: docs/DESIGN.md, "Rooms to work types".
     ///
-    /// Resolved by defName rather than through <see cref="RoomRoleDefOf"/>
-    /// because <c>Kitchen</c> has no DefOf field even though the def ships in
-    /// Core, and silent-fail lookups mean a role or work type removed by
-    /// another mod drops out of the table instead of throwing at startup.
+    /// Resolved by defName rather than through <see cref="RoomRoleDefOf"/>, because
+    /// <c>Kitchen</c> has no DefOf field though the def ships in Core. Lookups fail
+    /// silently, so a role or work type another mod removed drops out of the table instead
+    /// of throwing at startup.
     /// </summary>
     public static class RoomWorkTypes
     {
         internal static readonly List<WorkTypeDef> None = new List<WorkTypeDef>();
 
         /// <summary>
-        /// role defName → work type defNames. VANILLA ONLY: every name here
-        /// is required to exist, and the harness asserts it, because a name
-        /// that stops resolving empties a role's list and the mod then does
-        /// nothing at all — green harness, no log line. Mod-supplied types
-        /// belong in <see cref="CompatDefaults"/>, which is allowed to miss.
+        /// Role defName to work type defNames, vanilla only. Every name must exist, and the
+        /// harness asserts it: a name that stops resolving narrows or empties a role's list with
+        /// no log line, and an emptied Hospital or Kitchen row leaves automatic stands in those
+        /// rooms with nothing to dress for. Names from other mods go in
+        /// <see cref="CompatDefaults"/>, which is allowed to miss.
         /// </summary>
         internal static readonly Dictionary<string, string[]> Defaults =
             new Dictionary<string, string[]>
@@ -38,40 +37,32 @@ namespace ShiftChange
             };
 
         /// <summary>
-        /// Work types folded into <see cref="Defaults"/> when another mod
-        /// supplies them: today [FSF] Complex Jobs
-        /// (<c>FrozenSnowFox.ComplexJobs</c>), which moves vanilla work onto
-        /// finer types of its own. A SEPARATE table because these may be absent
-        /// and those may not, and the harness guards only the second. Why:
+        /// Work types folded into <see cref="Defaults"/> when another mod supplies them:
+        /// [FSF] Complex Jobs (<c>FrozenSnowFox.ComplexJobs</c>), which moves vanilla work
+        /// onto finer types of its own. A separate table, because these names may be absent
+        /// and the vanilla ones may not, and the harness asserts only the vanilla ones. Why:
         /// docs/DESIGN.md, "Mod compatibility".
         ///
-        /// <para>A row earns its place only where the type inherits work from
-        /// <see cref="Defaults"/> AND that work lands in this role's room,
-        /// checked against each bench's <c>workTableRoomRole</c> rather than
-        /// assumed. Hence the brewery counts as Workshop, not Kitchen, even
-        /// though brewing is what leaves Cooking; hence the drug lab is
-        /// Laboratory. Deliberately absent: <c>FSFPaint</c> and
-        /// <c>FSFSmoothing</c>, which collect the base-wide pass-through work
-        /// these sets exclude on purpose, and <c>FSFMechanoids</c>, whose
-        /// gestators are Laboratory-roled but whose work is vanilla SMITHING —
-        /// no lab stand dressed for it in vanilla either, so covering it here
-        /// would be a new feature wearing a compatibility fix's clothes.</para>
+        /// <para>A row belongs only where the type inherits work from <see cref="Defaults"/>
+        /// and that work lands in this role's room, checked against each bench's
+        /// <c>workTableRoomRole</c>. So the brewery counts as Workshop, not Kitchen, though
+        /// brewing is what leaves Cooking, and the drug lab is Laboratory. Left out on
+        /// purpose: <c>FSFPaint</c> and <c>FSFSmoothing</c>, which collect the base-wide work
+        /// the sets exclude, and <c>FSFMechanoids</c>, whose gestators are Laboratory-roled
+        /// but whose work is vanilla Smithing, so a lab stand never dressed for it.</para>
         ///
-        /// <para><c>FSFSlaughter</c> exists only when Complex Jobs' own XML
-        /// Extensions option is switched on, so it is absent even with that
-        /// mod installed and left unconfigured. That is the normal case for
-        /// this table, not a defect.</para>
+        /// <para><c>FSFSlaughter</c> exists only when Complex Jobs' own XML Extensions option
+        /// is switched on, so it is absent even with that mod installed. That is the normal
+        /// case for this table, not a defect.</para>
         ///
-        /// <para><c>FSFTaming</c> is deliberately NOT here, and the reason is
-        /// the room gate rather than the work. Taming targets a WILD animal
-        /// (<c>WorkGiver_Tame</c> reads the Tame designation), the gate keys
-        /// on where that animal is standing, and a Barn is an enclosed room
-        /// scored by its animal BEDS, so a Tame target is out on the map
-        /// rather than in it (a wild animal that wanders inside is the only
-        /// exception, and not what a row would be for). Vanilla's own <c>Handling</c> row has never fired for
-        /// taming either; listing the split would inherit that fiction rather
-        /// than fix anything. <c>FSFTraining</c> stays, because Train targets
-        /// a TAME animal, which lives in the barn.</para>
+        /// <para><c>FSFTaming</c> is absent on purpose, and the reason is the room gate rather
+        /// than the work. Taming (<c>WorkGiver_Tame</c>, which reads the Tame designation)
+        /// targets a wild animal, and the gate keys on where the target stands. A barn is an
+        /// enclosed room scored by its animal beds, so the target is out on the map rather
+        /// than in it; a wild animal that wanders inside is the only exception. Vanilla's
+        /// <c>Handling</c> row never fired for taming either, and a row here would inherit
+        /// that. <c>FSFTraining</c> stays, because training targets a tame animal, which
+        /// lives in the barn.</para>
         /// </summary>
         internal static readonly Dictionary<string, string[]> CompatDefaults =
             new Dictionary<string, string[]>
@@ -93,10 +84,9 @@ namespace ShiftChange
         internal static Dictionary<RoomRoleDef, List<WorkTypeDef>> resolved;
 
         /// <summary>
-        /// Appends each name the loaded def set actually has, skipping
-        /// duplicates so a type named by both tables lands once. Silent-fail
-        /// is the contract: an absent name is a mod that is not installed, and
-        /// the row simply narrows.
+        /// Appends each name the loaded def set has, skipping duplicates so a type named by
+        /// both tables lands once. A name that does not resolve is a mod that is not
+        /// installed, so the row narrows rather than failing.
         /// </summary>
         internal static void AddResolvable(List<WorkTypeDef> into, string[] names)
         {
@@ -146,9 +136,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The work types a stand in a room of this role dresses for by
-        /// default. Empty is the ordinary case for bedrooms, dining rooms and
-        /// unroled space — not an error. Never null; treat as read-only.
+        /// The work types a stand in a room of this role dresses for by default. Empty for
+        /// bedrooms, dining rooms and unroled space, which is not an error. Never null; the
+        /// list is shared, so treat it as read-only.
         /// </summary>
         public static List<WorkTypeDef> ForRole(RoomRoleDef role)
         {
@@ -161,15 +151,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Role defNames whose rooms dress for RECREATION by default — the
-        /// joy-branch parallel of <see cref="Defaults"/>. Vanilla
-        /// RecRoom plus the third-party pool roles already sighted in the
-        /// wild (Gerrymon's Hotspring Expanded); silent-fail as ever, so an
-        /// absent mod just drops its rows. Biotech's Playroom is deliberately
-        /// NOT here — auto-dressing toddlers is its own decision, not a
-        /// default. Pure pool rooms are typically ROLELESS (GoSwimming is
-        /// terrain-driven, so RoomRoleWorker_RecRoom counts nothing in them)
-        /// and use the manual toggle instead.
+        /// Role defNames whose rooms dress for recreation by default: vanilla RecRoom and the
+        /// pool roles of Gerrymon's Hotspring Expanded, which drop out when that mod is
+        /// absent. Biotech's Playroom is left out on purpose, since auto-dressing toddlers
+        /// should be a choice, not a default. A pure pool room usually has no role (swimming,
+        /// <c>GoSwimming</c>, is terrain-driven, so <c>RoomRoleWorker_RecRoom</c> counts
+        /// nothing in it) and takes the manual toggle.
         /// </summary>
         internal static readonly string[] RecreationRoles =
         {
@@ -190,15 +177,11 @@ namespace ShiftChange
                     foreach (string roleName in RecreationRoles)
                     {
                         RoomRoleDef role = DefDatabase<RoomRoleDef>.GetNamedSilentFail(roleName);
-                        // DISJOINTNESS IS LOAD-BEARING: automatic-mode
-                        // exclusivity (work XOR recreation, decided
-                        // 2026-08-16) holds only because no role appears in
-                        // BOTH tables — the toggles enforce it for custom
-                        // mode, but automatic mode answers straight from
-                        // these tables. Work wins on a collision, so a
-                        // future row added to both cannot silently
-                        // resurrect the dual-purpose stand (verified
-                        // impossible today; guarded anyway).
+                        // A stand dresses for one purpose, work or recreation. The toggles
+                        // enforce that in custom mode, but automatic mode answers straight
+                        // from these tables, so a role may sit in only one of them. Work wins
+                        // on a collision, so a row added to both cannot produce a
+                        // dual-purpose stand.
                         if (role != null && !Resolved.ContainsKey(role))
                         {
                             resolvedRecreation.Add(role);
@@ -216,10 +199,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Role defNames whose rooms dress for SLEEP by default — the third
-        /// trigger's parallel of <see cref="Defaults"/> and
-        /// <see cref="RecreationRoles"/>. Bedroom only, on purpose; why not
-        /// Barracks or the prison roles: docs/DESIGN.md, "The sleep branch".
+        /// Role defNames whose rooms dress for sleep by default. Bedroom only, on purpose; why
+        /// not Barracks or the prison roles: docs/DESIGN.md, "The sleep branch".
         /// </summary>
         internal static readonly string[] RestRoles =
         {
@@ -238,14 +219,10 @@ namespace ShiftChange
                     foreach (string roleName in RestRoles)
                     {
                         RoomRoleDef role = DefDatabase<RoomRoleDef>.GetNamedSilentFail(roleName);
-                        // Same load-bearing disjointness as the recreation
-                        // table, now three-way: automatic mode answers
-                        // straight from these tables, so a role appearing in
-                        // two of them would resurrect the dual-purpose stand
-                        // the exclusivity rule exists to prevent. Work wins,
-                        // then recreation, then rest — the order matters only
-                        // because a collision must resolve the same way every
-                        // time, and today none exists.
+                        // The same rule across all three tables: a role in two of them would
+                        // make an automatic stand dress for two purposes. Work wins, then
+                        // recreation, then rest, so a collision resolves the same way every
+                        // time.
                         if (role != null && !Resolved.ContainsKey(role)
                             && !ResolvedRecreation.Contains(role))
                         {

@@ -7,27 +7,13 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// The work-type picker for one stand — a checkbox per visible work type,
-    /// because a stand covers a SET of work: a workshop runs crafting,
-    /// tailoring, smithing and art; a lab runs research and drug synthesis
-    /// (which is Crafting work). A float menu of single choices could not say
-    /// that (decided 2026-08-08).
+    /// The settings window for one stand: a checkbox per visible work type, because a stand covers
+    /// a set of work (a workshop runs crafting, tailoring, smithing and art).
     ///
-    /// Sized to the MODLIST, not to vanilla (same day): heavily modded games
-    /// carry 40+ work types, so the window derives its column count from the
-    /// list length and its height from the resulting rows, clamped to the
-    /// screen — the scrollbar appears only when the clamp bites. Checkboxes
-    /// sit at a FIXED x just after the widest label: a straight, scannable
-    /// line per column, close enough to its own labels that a box cannot read
-    /// as belonging to the next column (the failure mode of far-right
-    /// alignment). Box-before-label would be clearer still, but vanilla never
-    /// does it, so neither do we.
-    ///
-    /// Three states, kept canonical by <see cref="CompShiftStand.ToggleWork"/>:
-    /// automatic (empty override — the room's defaults apply, and follow the
-    /// room if its role changes), a custom set, or excluded. The checkboxes
-    /// always show the EFFECTIVE set, so ticking one while automatic seeds the
-    /// custom set from the room's defaults rather than starting from nothing.
+    /// Three states, kept canonical by <see cref="CompShiftStand.ToggleWork"/>: automatic (empty
+    /// override; the room's defaults apply and follow the room if its role changes), a custom set,
+    /// or excluded. The checkboxes always show the effective set, so ticking one while automatic
+    /// seeds the custom set from the room's defaults rather than starting from nothing.
     /// </summary>
     public class Dialog_SetStandWorkTypes : Window
     {
@@ -38,62 +24,33 @@ namespace ShiftChange
         internal const float ColumnGutter = 36f;
         internal const float ScrollbarAllowance = 20f;
         /// <summary>
-        /// Everything above the scrolling work-type grid: title, the two mode
-        /// radios, the full-change row, the explainer and the recreation row.
-        /// Grow this when a row is added above the grid, or the grid silently
-        /// loses the height instead — <see cref="DoWindowContents"/> hands it
-        /// whatever is left.
-        ///
-        /// <para>160 was title + radios + explainer. The full-change row and
-        /// the recreation row each cost a row plus its separator, and both
-        /// landed in the same merge — hence 226 rather than either branch's
-        /// own figure. The withhold-from-trade row added one bare
-        /// <see cref="RowHeight"/> on top of that: it shares full change's
-        /// separator instead of taking one of its own. The sleep row and its
-        /// gap took it to 282.</para>
-        ///
-        /// <para>This is the MAXIMUM, not the exact figure for every state.
-        /// The deposit-only row and the hidden full-change row that goes with
-        /// it are both inside the trigger-exclusive branch, which draws no
-        /// work grid at all — so they spend slack the grid has already given
-        /// up. Over-reserving costs whitespace at the bottom of one layout;
-        /// under-reserving clips a control, which is why the const tracks the
-        /// tallest arrangement rather than the common one.</para>
+        /// Estimated height of the fixed rows above the grid (title, radios, full-change, trade,
+        /// explainer, recreation and sleep rows), used by <see cref="InitialSize"/> until the body
+        /// has been measured. Raise it when a fixed row is added above the grid. Err high: too much
+        /// costs whitespace for one frame, too little clips a row until the body has been measured.
         /// </summary>
         internal const float HeaderAllowance = 282f;
         internal const float MinWindowWidth = 420f;
 
         /// <summary>
-        /// What <c>Widgets.RadioButtonLabeled</c> reserves on the right for the
-        /// button itself (<c>Widgets.RadioButtonSize</c> plus its gap), so the
-        /// label height can be measured against the width it will really get.
+        /// Width the automatic row's label gives up on the right for its radio button, plus a gap.
         /// </summary>
         internal const float RadioButtonWidth = 28f;
 
-        /// <summary>
-        /// Extra height the automatic label needed beyond one row, measured in
-        /// <see cref="DoWindowContents"/> and consumed by
-        /// <see cref="InitialSize"/>. Zero until the first frame draws, which is
-        /// harmless: <see cref="FitToMode"/> re-fits the window every frame.
-        /// </summary>
+        /// <summary>Extra height the automatic label's wrap needed beyond one row.</summary>
         internal float autoLabelOverflow;
 
         /// <summary>Rows a column aims for before the dialog grows another column.</summary>
         internal const int TargetRows = 14;
 
-        /// <summary>
-        /// Height, in grid rows, reserved for the note that replaces the grid
-        /// when there are no work types to list at all.
-        /// </summary>
+        /// <summary>Grid rows reserved for the note that replaces an empty grid.</summary>
         internal const int EmptyNoteRows = 3;
 
         /// <summary>
-        /// Mirror of <c>Verse.Window.Margin</c>'s default (18f,
-        /// <c>Window.cs:104</c>), NOT a read of it: Margin is a protected base
-        /// member, and hot-swapped bodies live on a twin type that the
-        /// protected-access rule does not recognise as a subclass — reading it
-        /// post-swap throws MethodAccessException (found in play 2026-08-08).
-        /// We never override Margin, so the default is exact.
+        /// Mirrors the default of <c>Window.Margin</c> (18) instead of reading it: Margin is
+        /// protected, and a hot-swapped method body in a Debug build runs on a twin type that the
+        /// protected-access rule does not treat as a subclass, so reading it there throws
+        /// MethodAccessException. We never override Margin, so the default is exact.
         /// </summary>
         internal const float WindowMargin = 18f;
 
@@ -105,21 +62,10 @@ namespace ShiftChange
         internal Vector2 scroll;
 
         /// <summary>
-        /// Height the body actually took when it last drew, fed back into
-        /// <see cref="InitialSize"/>. Zero until the first frame, which is
-        /// harmless: the constants estimate it and <see cref="FitToMode"/>
-        /// re-fits the window every frame.
-        ///
-        /// <para>This exists because the estimate was WRONG in the direction
-        /// that hides controls. Every row here is a wrapping label whose height
-        /// depends on the window width, which depends on the work-type count,
-        /// and the window is then clamped to 85% of the screen. Below about
-        /// 460px of UI height — 1920x1080 at 3x UI scale, or a 1366x768 laptop
-        /// at 2x — the fixed rows needed more than the clamped window had, and
-        /// everything from the trigger rows down was drawn outside it and
-        /// clipped away. No exception, nothing in the log, and the window kept
-        /// the height it had reserved, so it read as a blank panel. Reported by
-        /// a player and reproduced at four UI sizes, 2026-09-11.</para>
+        /// Height the body took when it last drew; zero until the first frame.
+        /// <see cref="InitialSize"/> prefers it to the constants, which are only an estimate: every
+        /// row is a wrapping label, so heights depend on the window width, and the window is
+        /// clamped to 85% of the screen.
         /// </summary>
         internal float measuredBody;
 
@@ -136,16 +82,15 @@ namespace ShiftChange
             absorbInputAroundWindow = true;
             closeOnClickedOutside = true;
 
-            // Alphabetical by the label actually shown — scanning for a known
-            // name beats work-tab priority order once the list is long.
-            // Invisible types (Patient, BasicWorker) are noise.
+            // Alphabetical by the label shown. Only types the work tab shows
+            // (WorkTypeDef.visible): every vanilla type is, Patient and BasicWorker included, but
+            // another mod can hide some (see the note for an empty grid in DrawBody).
             works = DefDatabase<WorkTypeDef>.AllDefsListForReading
                 .Where(w => w.visible)
                 .OrderBy(LabelOf)
                 .ToList();
 
-            // The checkbox column sits just past the widest label, so measure
-            // them all once. Capped so one modded novel of a label cannot
+            // The widest label sets the cell width, capped so one very long modded label cannot
             // stretch every column; the draw side truncates to match.
             GameFont previousFont = Text.Font;
             Text.Font = GameFont.Small;
@@ -157,47 +102,28 @@ namespace ShiftChange
             Text.Font = previousFont;
             cellWidth = Mathf.Min(widestLabel + LabelGap, MaxLabelWidth) + CheckboxSize;
 
-            // Enough columns to keep each near TargetRows, clamped to what the
-            // screen can hold side by side.
             int wanted = Mathf.Max(1, Mathf.CeilToInt(works.Count / (float)TargetRows));
             float usableWidth = UI.screenWidth * 0.9f - WindowMargin * 2f - ScrollbarAllowance;
             int fitting = Mathf.Max(1, Mathf.FloorToInt((usableWidth + ColumnGutter) / (cellWidth + ColumnGutter)));
             columns = Mathf.Clamp(wanted, 1, fitting);
-            // With no work types at all the grid draws a note instead of rows
-            // (see the empty branch in DoWindowContents), so reserve the note's
-            // lines rather than the one phantom row the row maths would give
-            // it — at this dialog's minimum width the sentence wraps.
+            // With no work types the grid draws a note instead of rows (see DrawBody), so reserve
+            // the note's lines (it wraps at the minimum width) rather than the one row the row
+            // maths gives.
             rowsPerColumn = works.Count > 0
                 ? Mathf.Max(1, Mathf.CeilToInt(works.Count / (float)columns))
                 : EmptyNoteRows;
         }
 
-        /// <summary>
-        /// Title plus the two mode radios — everything an EXCLUDED stand has.
-        /// </summary>
+        /// <summary>Title plus the two mode radios: everything an excluded stand shows.</summary>
         internal const float ModeOnlyAllowance = 96f;
 
-        /// <summary>
-        /// A stand excluded from shift changes has no shift-change settings, so
-        /// the window holds nothing but the two radios that let you bring it
-        /// back. Deliberately not "greyed out": a disabled control still
-        /// advertises a setting, and this stand does not have one.
-        /// </summary>
+        /// <summary>True for an excluded stand: only the title and the two radios show.</summary>
         internal bool ModeOnly => comp.IsExcluded;
 
         /// <summary>
-        /// Height for the two rows that only some stands draw: the
-        /// deposit-only checkbox on a sleep stand, and the note under the grid
-        /// for a recreation or sleep trigger: that an automatic stand's came
-        /// from the room, or that ticking a work type switches a ticked one.
-        ///
-        /// <para>Computed rather than folded into
-        /// <see cref="HeaderAllowance"/> because both are conditional and the
-        /// constant is spent on every stand in the colony — reserving 60px
-        /// unconditionally would put a band of dead space under the work grid
-        /// of every ordinary workshop stand. <see cref="FitToMode"/> re-reads
-        /// this every frame, so a row appearing the moment its box is ticked
-        /// grows the window on the same frame.</para>
+        /// Height for the two conditional rows: the deposit-only checkbox on a sleep stand, and the
+        /// note under the grid for a recreation or sleep trigger. Kept out of
+        /// <see cref="HeaderAllowance"/> so other stands reserve nothing for them.
         /// </summary>
         internal float TriggerRowsAllowance
         {
@@ -214,10 +140,8 @@ namespace ShiftChange
                 }
                 if (!comp.HidesWorkList && (comp.HandlesRecreation() || comp.HandlesRest()))
                 {
-                    // TWO rows, not one. The note is drawn with
-                    // Listing_Standard.Label, which wraps, and the English
-                    // string takes two lines at the clamped minimum width — a
-                    // single RowHeight here let it overrun the grid.
+                    // Two rows: the note wraps, and the English text takes two lines at the minimum
+                    // width.
                     extra += RowHeight * 2f + 4f;
                 }
                 return extra;
@@ -232,11 +156,6 @@ namespace ShiftChange
                     + (columns - 1) * ColumnGutter + ScrollbarAllowance;
                 width = Mathf.Clamp(width, MinWindowWidth, UI.screenWidth * 0.9f);
 
-                // MEASURED body first, the constants only until one exists.
-                // HeaderAllowance is a guess at a stack of rows whose real
-                // height depends on how the labels wrap, and a guess that runs
-                // under the screen clamp below is how the body came to be drawn
-                // outside its own window (reproduced 2026-09-11).
                 float body = ModeOnly
                     ? ModeOnlyAllowance
                     : (measuredBody > 0f
@@ -252,10 +171,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Toggling the mode while the dialog is OPEN has to resize it — the
-        /// engine reads <see cref="InitialSize"/> once, in PreOpen
-        /// (<c>Window.cs</c>), so without this the window keeps whatever height
-        /// it opened at and the collapse leaves a tall empty box.
+        /// Sets the open window's height to <see cref="InitialSize"/>'s. The engine reads it only
+        /// when the window opens (PreOpen) and on a resolution change, so without this a mode
+        /// change leaves the window at the height it opened with.
         /// </summary>
         internal void FitToMode()
         {
@@ -271,16 +189,8 @@ namespace ShiftChange
             float footer = CloseButSize.y + 10f;
             Rect content = new Rect(inRect.x, inRect.y, inRect.width, inRect.height - footer);
 
-            // ONE scroll view, around the WHOLE body, and only when the body
-            // does not fit. Nothing below this point can be pushed outside the
-            // window: the scroll view is the overflow, rather than the grid
-            // being handed "whatever is left" and the rest running off the
-            // bottom when that was negative (reproduced 2026-09-11).
-            //
-            // It also means the grid no longer nests a scroll view inside this
-            // one. A window with no clipped region at all is the common case
-            // now, which is one less thing to depend on a graphics backend
-            // clipping the way we assume.
+            // One scroll view around the whole body, and only when it does not fit: it absorbs any
+            // overflow, so no row is drawn outside the window.
             bool scrolling;
             Rect body = BodyRect(measuredBody, content, out scrolling);
             if (scrolling)
@@ -296,15 +206,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The rect the body listing is drawn into, and whether it scrolls.
+        /// The rect the body listing draws into, and whether it scrolls. The listing is never
+        /// handed a rect shorter than the body it has to draw.
         ///
-        /// <para>Static and free of any GUI call ON PURPOSE: this is the one
-        /// piece of the layout the release gate can assert, and the harness
-        /// runs from <c>Game.FinalizeInit</c> where there is no GUI context to
-        /// draw in. Its invariant is the whole bug in one line — the listing is
-        /// never handed a rect shorter than the body it has to draw, because
-        /// that is the condition under which <c>Listing.NewColumnIfNeeded</c>
-        /// moves the remaining rows into a column outside the window.</para>
+        /// <para>Static and free of GUI calls so the harness can assert it: the harness runs from
+        /// <c>Game.FinalizeInit</c>, where there is no GUI context to draw in.</para>
         /// </summary>
         internal static Rect BodyRect(float measuredBody, Rect content, out bool scrolling)
         {
@@ -314,30 +220,18 @@ namespace ShiftChange
                 : content;
         }
 
-        /// <summary>
-        /// Draws every control and returns the height it used, which
-        /// <see cref="DoWindowContents"/> feeds back to size the window and to
-        /// decide whether the body needs to scroll.
-        /// </summary>
+        /// <summary>Draws every control; returns the height used, which sizes the window.</summary>
         internal float DrawBody(Rect content)
         {
             Listing_Standard listing = new Listing_Standard();
             listing.Begin(content);
 
-            // NEVER let the listing wrap, and this is the whole bug rather than
-            // a precaution. Listing.GetRect calls NewColumnIfNeeded on EVERY
-            // row (Verse/Listing.cs:62-68), which starts a second column at
-            // `curX + ColumnWidth + 17` the moment a row does not fit
-            // (:54-60). Our listing is full width, so that column begins
-            // outside the window and every row from there on is clipped away
-            // whole: the header looks perfect and the trigger rows and grid
-            // simply are not there. That is what a player photographed.
-            //
-            // It also breaks the measurement that fixes it. NewColumn resets
-            // curY to 0 (:50) and CurHeight is curY (:30), so a wrapped listing
-            // reports the LAST column's height, not the total — measuredBody
-            // would come back too small, the scroll view would never engage,
-            // and the repair would silently not apply on the screens it is for.
+            // Never let the listing wrap. Listing.GetRect calls NewColumnIfNeeded on every row,
+            // which starts a second column at curX + ColumnWidth + 17 as soon as a row does not
+            // fit. This listing is full width, so that column begins outside the window and every
+            // later row is clipped away. Starting a column also resets curY to 0, and CurHeight
+            // reads curY, so a wrapped listing reports the last column's height, not the total, and
+            // the measured body comes back too small.
             listing.maxOneColumn = true;
 
             Text.Font = GameFont.Medium;
@@ -345,25 +239,18 @@ namespace ShiftChange
             Text.Font = GameFont.Small;
             listing.Gap(4f);
 
-            // Mode radios. The automatic label names what the room currently
-            // resolves to — BOTH halves, works and recreation — so
-            // "automatic" is never a mystery box.
             RoomRoleDef roomRole = comp.parent.Spawned ? comp.parent.GetRoom()?.Role : null;
-            // The comp's own answer, not ForRole's: automatic work can come
-            // from the room's CONTENTS as well as its role (RoomContentsWork),
-            // and a line that only read the role would tell a reactor-hall
-            // stand it resolves to "nothing" while it is busily resolving to
-            // nuclear loading. Deliberately NOT HandlesWork/HandlesRecreation
-            // — those answer for the CURRENT mode, and this label's whole job
-            // is to show what automatic would give even while a custom set is
-            // in force.
+            // The comp's AutomaticWorkTypes, not RoomWorkTypes.ForRole: automatic work also comes
+            // from the room's contents (RoomContentsWork), not only its role. Not HandlesWork or
+            // HandlesRecreation either: those answer for the current mode, and this label shows
+            // what automatic would give even while a custom set is in force.
             List<WorkTypeDef> roomDefaults = comp.parent.Spawned
                 ? comp.AutomaticWorkTypes
                 : CompShiftStand.NoWork;
             List<string> autoParts = roomDefaults
                 .Select(w => WorkTypeLabels.Of(w)).ToList();
-            // Work wins, exactly as in the comp — mirror its guard or the
-            // label would promise a recreation trigger the stand will not fire.
+            // Work wins, as in HandlesRecreation and HandlesRest: mirror that guard or the label
+            // would promise a trigger the stand will not fire.
             bool autoTriggers = roomDefaults.Count == 0;
             if (autoTriggers && RoomWorkTypes.RecreationForRole(roomRole))
             {
@@ -379,40 +266,26 @@ namespace ShiftChange
                 : "ShiftChange.None".Translate().RawText);
             if (roomDefaults.Count == 0)
             {
-                // Name what the game itself thinks this room is, so "nothing"
-                // stops reading as a detection failure. The room-role scorer
-                // has quirks no player can guess from here — one prisoner bed
-                // in or adjacent to a hospital zeroes its Hospital score
-                // outright (RoomRoleWorker_Hospital.GetScore) — and this
-                // label is where they can at least see WHICH role won.
+                // Name the role the game inferred, so "nothing" does not read as a detection
+                // failure: the room-role scorer has quirks a player cannot guess (a humanlike
+                // prisoner bed in or next to the room zeroes its Hospital score when
+                // RoomRoleWorker_Hospital.GetScore meets it before any medical bed).
                 autoLabel += "; " + (roomRole != null
                     ? (string)"ShiftChange.RoomReadsAs".Translate(roomRole.label)
                     : (string)"ShiftChange.NoRoomRole".Translate());
             }
 
-            // MEASURE the automatic label, do not assume one row. It names the
-            // room's resolved activities AND, when there are none, the role the
-            // game actually inferred — which on a two-column dialog wraps to a
-            // second line and gets clipped at a fixed RowHeight (the top line
-            // vanishes, so the row reads as a truncated fragment). Vanilla's
-            // radio draws its button on the right, so the label owns everything
-            // but that.
+            // Measure the label rather than assume one row: it can wrap, and a wrapped line is
+            // clipped at a fixed RowHeight.
             float autoLabelWidth = content.width - RadioButtonWidth;
             float autoRowHeight = Mathf.Max(RowHeight, Text.CalcHeight(autoLabel, autoLabelWidth));
-            // Fed back into InitialSize so the window grows by however much the
-            // wrap cost; FitToMode below applies it on the same frame.
             autoLabelOverflow = autoRowHeight - RowHeight;
-            // NOT Widgets.RadioButtonLabeled for this row. That helper draws the
-            // label across the FULL rect (Widgets.cs:1405) and then paints the
-            // button on top at rect.xMax - 24 (:1416) — it reserves nothing. A
-            // one-line label is unaffected because it simply ends before the
-            // button, but this one wraps, and the first line then runs
-            // underneath it and loses its last few characters. Compose the two
-            // halves instead so the label owns a rect the button is not in.
+            // Not Widgets.RadioButtonLabeled: it draws the label across the whole rect and then
+            // paints the button over it at xMax - 24, reserving no width. A wrapping label would
+            // run under the button and lose its last characters, so the label and the button are
+            // composed separately.
             Rect autoRect = listing.GetRect(autoRowHeight);
-            // Automatic reads the room, so it is room mode only: greyed and
-            // inert while the stand serves a radius or an area, with the reason on hover
-            // (docs/DESIGN.md, "Catchments").
+            // Automatic reads the room, so it only works in room mode.
             bool autoAvailable = comp.serves == CatchmentKind.Room;
             if (!autoAvailable)
             {
@@ -421,8 +294,9 @@ namespace ShiftChange
             Widgets.Label(new Rect(autoRect.x, autoRect.y,
                                    autoRect.width - RadioButtonWidth, autoRect.height),
                           autoLabel);
-            // Disabled for real: the radio draws greyed, and GUI.enabled false
-            // makes both clicks below refuse, so no accept tick plays.
+            // On 1.6, GUI.enabled false makes both click targets refuse, so no sound plays. 1.7's
+            // GUI ignores GUI.enabled and RadioButton's disabled flag only greys it, so there
+            // the click lands and plays its sound: the autoAvailable test below is what refuses it.
             bool wasEnabled = GUI.enabled;
             GUI.enabled = autoAvailable;
             bool autoClicked = Widgets.RadioButton(autoRect.xMax - 24f,
@@ -445,11 +319,9 @@ namespace ShiftChange
                 comp.SetExcluded();
             }
 
-            // NOTHING BELOW HERE ON AN EXCLUDED STAND. The rest of this window
-            // configures shift changes, and this stand does not do them — so it
-            // has no full-change setting, no trigger, and no work types, and
-            // showing them disabled would claim otherwise. The two radios above
-            // are the whole control surface until one of them brings it back.
+            // An excluded stand shows nothing below the radios. The rest of this window configures
+            // shift changes, which it does not do, and a disabled control would still advertise a
+            // setting it lacks.
             if (ModeOnly)
             {
                 float modeOnlyHeight = listing.CurHeight;
@@ -459,19 +331,12 @@ namespace ShiftChange
 
             listing.GapLine();
 
-            // Full change is a property of what the rack HOLDS, not of which
-            // work it serves, so it sits outside the mode radios rather than
-            // becoming a fourth mode.
-            // DISABLED under deposit-only, not hidden. A deposit-only stand
-            // issues no outfit, so SwapPlan's deposit branch returns before the
-            // full-change pass can run and the setting genuinely does nothing —
-            // but hiding the row moved every row below it by 26px on the frame
-            // the box was ticked, which put the Sleeping checkbox under the
-            // cursor mid-double-click. ToggleRest on an already-on trigger
-            // falls through to SetExcluded, so one stray click turned the stand
-            // off entirely and collapsed the window (adversarial review,
-            // 2026-09-03). A greyed row states the same fact and cannot move
-            // anything.
+            // Full change is a property of what the rack holds, so it sits outside the mode radios.
+            // Under deposit-only it is disabled, not hidden (a deposit-only stand issues no outfit,
+            // so SwapPlan returns from its deposit branch before the full-change pass): a hidden
+            // row would shift every row below it, and a double-click landing on the shifted
+            // Sleeping box would turn the stand off, because ToggleRest on an already-on trigger
+            // falls through to SetExcluded.
             bool full = comp.FullChange;
             bool fullInert = comp.DepositOnly;
             Rect fullRect = listing.GetRect(RowHeight);
@@ -484,11 +349,8 @@ namespace ShiftChange
                 ? "ShiftChange.FullChangeDepositNote".Translate()
                 : "ShiftChange.FullChangeDesc".Translate());
 
-            // Directly under full change and inside its separator, because both
-            // are properties of what the rack HOLDS rather than of which work it
-            // serves. The ModeOnly return above hides the row for an excluded
-            // stand, which is also exactly where CompShiftStand.BlocksTrade
-            // stops applying — one condition, not two that can drift apart.
+            // Inside full change's separator. The ModeOnly return above hides this row for exactly
+            // the stands where CompShiftStand.BlocksTrade stops applying: one condition, not two.
             bool withhold = comp.WithholdFromTrade;
             Rect tradeRect = listing.GetRect(RowHeight);
             Widgets.CheckboxLabeled(tradeRect, "ShiftChange.WithholdFromTrade".Translate(), ref withhold);
@@ -502,11 +364,8 @@ namespace ShiftChange
             listing.Label(comp.ByCatchment("ShiftChange.WorkTypesExplainer").Translate());
             listing.Gap(4f);
 
-            // Recreation is one trigger, not a work type — the room is the
-            // selector (a robe stand serves the sauna by standing in it), so
-            // a single row covers every joy activity. Above the work
-            // grid rather than inside it: it is not a WorkTypeDef and must
-            // not look like a modded one.
+            // Recreation is one trigger, not a work type: the room is the selector, so one row
+            // covers every joy activity. It sits above the grid because it is not a WorkTypeDef.
             bool recreationOn = comp.HandlesRecreation();
             bool recreationWas = recreationOn;
             Widgets.CheckboxLabeled(listing.GetRect(RowHeight),
@@ -516,15 +375,10 @@ namespace ShiftChange
                 comp.ToggleRecreation();
             }
 
-            // Sleep is the third trigger and takes the same shape for the same
-            // reason: the room is the selector, so one row covers going to bed
-            // however the pawn got there.
-            //
-            // Medical bed rest is deliberately NOT this row. It is a real
-            // WorkTypeDef — vanilla's PatientBedRest, whose gerund label reads
-            // "resting in bed" — and it stays down in the grid, so a hospital
-            // stand and a pyjama stand remain separately configurable and
-            // neither one silently claims the other's jobs.
+            // Sleep is the third trigger, shaped like recreation: the room is the selector. Medical
+            // bed rest is not this row: it is a real work type (vanilla's PatientBedRest, labelled
+            // "resting in bed") and stays in the grid, so a hospital stand and a pyjama stand are
+            // configured separately.
             bool restOn = comp.HandlesRest();
             bool restWas = restOn;
             Widgets.CheckboxLabeled(listing.GetRect(RowHeight),
@@ -535,19 +389,9 @@ namespace ShiftChange
             }
             listing.Gap(4f);
 
-            // All three triggers are mutually exclusive (decided
-            // 2026-08-16: one stand, one outfit, one purpose) — while
-            // recreation or sleep is on the work grid is HIDDEN rather than
-            // greyed: an interactable-looking list that would silently untick
-            // the trigger is a trap; an absent one is a statement. Re-queried
-            // after the toggles above so the grid vanishes the same frame a
-            // box is ticked.
-            // The deposit-only row belongs to whichever stand currently serves
-            // sleep, automatic or explicit. Only under sleep, because this is
-            // the only trigger where parking gear without taking any on is a
-            // coherent thing to want — the same reason
-            // CompShiftStand.DepositOnly gates itself on HandlesRest rather
-            // than trusting this row to be its only writer.
+            // Deposit-only belongs to whichever stand serves sleep, automatic or explicit, and to
+            // no other trigger: parking gear without taking any on is only coherent for sleep. The
+            // row stays with the trigger rows it controls, though ticking a work type removes it.
             if (comp.HandlesRest())
             {
                 bool deposit = comp.DepositOnly;
@@ -562,19 +406,12 @@ namespace ShiftChange
                 listing.Gap(4f);
             }
 
-            // The grid is hidden only when the player EXPLICITLY chose a
-            // trigger. It used to be hidden whenever one was active, and since
-            // a stand in a bedroom picks up sleep from the room's role, that
-            // left every bedroom stand with no reachable path to a work type:
-            // grid hidden, unticking Sleeping fell through to SetExcluded and
-            // collapsed the window, and Automatic put the room's default back
-            // (adversarial review, 2026-09-03). An automatic stand's trigger is
-            // the room's suggestion, and ticking a work type is how a player
-            // overrides it — ToggleWork clears the other half, so the exclusive
-            // switch still happens, it is just reachable now. The same holds
-            // for an explicit trigger the room would suggest anyway: a bedroom
-            // stand moved to an area has its Sleeping ticked for real, and
-            // keeps the list too.
+            // An explicit trigger the room would not suggest hides the work list (HidesWorkList):
+            // ticking a work type would silently drop it, so the list is hidden, not greyed, since
+            // a list that looks interactable and does that is a trap. An automatic stand's
+            // trigger, or a ticked one the room suggests anyway, keeps the list, with the note
+            // below the grid saying that ticking a work type replaces it. The test runs after the
+            // toggles above, so the list vanishes on the frame a box is ticked.
             if (comp.HidesWorkList)
             {
                 GUI.color = Color.gray;
@@ -587,41 +424,20 @@ namespace ShiftChange
                 listing.End();
                 return exclusiveHeight;
             }
-            // The trigger note (from the room, or ticked) is drawn BELOW the
-            // grid, not above it. Ticking a work type overrides the trigger,
-            // which correctly makes
-            // both this note and the deposit-only row vanish — and above the
-            // grid that shortened the header by ~80px on the next frame, moving
-            // every cell up three rows under a cursor that was mid-click. Below
-            // it, the note can appear and disappear without the grid ever
-            // moving. The deposit row cannot go here: it is a control for the
-            // trigger rows it sits under, so it keeps its place and its 30px
-            // of movement.
             bool roomTrigger = comp.HandlesRecreation() || comp.HandlesRest();
 
-            // The grid takes the height it NEEDS. It used to take
-            // `content.height - listing.CurHeight`, which is fine while the
-            // window is big enough to hold the rows above it and goes NEGATIVE
-            // when the screen clamp cuts the window below what those rows need
-            // — at which point the grid drew nothing and everything after it
-            // landed outside the window, which is how it was reported. The
-            // body scroll view absorbs
-            // the overflow instead, so nothing here can underflow and the note
-            // below no longer has to be reserved out of the grid's share.
+            // The grid takes the height it needs, not what is left of the window; the body's scroll
+            // view absorbs any overflow.
             float labelWidth = cellWidth - CheckboxSize;
             Rect grid = listing.GetRect(works.Count > 0
                 ? rowsPerColumn * RowHeight
                 : EmptyNoteRows * RowHeight);
 
-            // An empty grid has to SAY it is empty. The list is every work type
-            // the game will show, and another mod can empty it: Personal Work
-            // Categories (densevoid.hui.personalworkcat) flips
-            // WorkTypeDef.visible off for every category its selected preset
-            // leaves without a work giver, and that happens before we or the
-            // work tab ever read the database. A blank box under the explainer
-            // reads as this dialog having broken, which sends the player to the
-            // wrong mod — so name where else the same types are missing, and
-            // the player can check in one click (reported 2026-09-11).
+            // An empty grid has to say so. Another mod can empty the list: Personal Work Categories
+            // (densevoid.hui.personalworkcat) sets WorkTypeDef.visible false for every category its
+            // selected preset leaves without a work giver, before this code or the work tab reads
+            // the database. A blank box would read as this dialog being broken, so the note says
+            // the same types are missing from the work tab too.
             if (works.Count == 0)
             {
                 GUI.color = Color.gray;
@@ -640,10 +456,8 @@ namespace ShiftChange
                         RowHeight - 2f);
                     bool on = comp.HandlesWork(work);
                     bool was = on;
-                    // Default placement puts the box at the cell's right edge —
-                    // which, with the cell sized to the widest label, is a fixed
-                    // aligned column just past the text, and the gutter beyond it
-                    // is dead space no box can wander into.
+                    // Vanilla's CheckboxLabeled puts the box at the cell's right edge; with the
+                    // cell sized to the widest label, the boxes form one column just past the text.
                     Widgets.CheckboxLabeled(cell, LabelOf(work).Truncate(labelWidth - 4f), ref on);
                     if (on != was)
                     {
@@ -652,9 +466,10 @@ namespace ShiftChange
                 }
             }
 
-            // Only an automatic stand's trigger comes from the room. One ticked
-            // for real, which the room would suggest anyway, reaches the grid
-            // too (HidesWorkList), and says what ticking a work type does.
+            // The trigger note goes below the grid, not above it: ticking a work type removes the
+            // note and the deposit-only row, and above the grid that would shift every cell up
+            // under the cursor. It shows for an automatic stand's trigger and for an explicit one
+            // the room would suggest anyway, and says what ticking a work type does.
             if (roomTrigger)
             {
                 GUI.color = Color.gray;
@@ -671,9 +486,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The Serves row's height, and the slider's in radius mode, for the
-        /// estimate <see cref="InitialSize"/> uses before the body is first
-        /// measured: a separator, the row, and the slider.
+        /// Estimated height of the Serves row for <see cref="InitialSize"/>: a separator, the row,
+        /// and in radius mode the slider.
         /// </summary>
         internal float ServesAllowance =>
             12f + RowHeight + (comp.serves == CatchmentKind.Radius ? RowHeight + 8f : 0f);
@@ -682,12 +496,9 @@ namespace ShiftChange
         internal const float PaintButtonWidth = 90f;
 
         /// <summary>
-        /// Where the stand serves: in radius mode with the slider for how far,
-        /// in area mode with the Paint button at the end of the row. Last in
-        /// the window, below the triggers, because they come first: a stand
-        /// leaves room mode only with something ticked, so the row is greyed
-        /// until it serves something. Last also means nothing above it moves
-        /// when the slider appears (docs/DESIGN.md, "Catchments").
+        /// Where the stand serves: the row, with a slider in radius mode and the Paint button in
+        /// area mode. Last in the window, so nothing above it moves when the slider appears
+        /// (docs/DESIGN.md, "Catchments").
         /// </summary>
         internal void DrawServes(Listing_Standard listing)
         {
@@ -699,15 +510,14 @@ namespace ShiftChange
                 DrawPaint(row.RightPartPixels(PaintButtonWidth));
                 row.width -= PaintButtonWidth + 6f;
             }
-            // ButtonText's active flag only refuses the click: it draws the
-            // button exactly as a live one. The tint is what greys it.
+            // ButtonText's active flag only refuses the click and draws a live-looking button; the
+            // tint is what greys it.
             if (!canChoose)
             {
                 GUI.color = Widgets.InactiveColor;
             }
-            // Cut to fit, with the whole row first in the tooltip: an area's
-            // name is the player's own and runs to 28 characters, and beside
-            // Paint a label too wide is drawn centred and clipped at both ends.
+            // Cut to fit, with the whole row first in the tooltip: area names run to 28 characters,
+            // and a label too wide for ButtonText is drawn centred and clipped at both ends.
             string label = "ShiftChange.ServesRow".Translate(comp.ServesLabel());
             string shown = label.Truncate(row.width - 10f);
             bool clicked = Widgets.ButtonText(row, shown, active: canChoose);
@@ -750,9 +560,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The Paint button, greyed while the stand's area is gone, since there
-        /// is nothing left to paint. Binding and painting stay separate steps:
-        /// picking an area in the menu never starts a tool.
+        /// The Paint button, greyed while the stand's area is gone. Binding and painting stay
+        /// separate steps: picking an area in the menu never starts a tool.
         /// </summary>
         internal void DrawPaint(Rect rect)
         {
@@ -773,17 +582,14 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The Serves menu, in three sections (<see cref="ServesMenuOption"/>):
-        /// this room and a radius; every area a colonist could be restricted to
-        /// except Home, each with its colour; then New allowed area and Manage
-        /// areas. Hovering an area draws it. One that leaves out the stand's own
-        /// cell is faded and says why in red, since a stand outside its area
-        /// serves nothing. Vanilla's own area menu
-        /// (<c>AreaUtility.MakeAllowedAreaListFloatMenu</c>) is not used: it
-        /// lists Home, opens the menu itself with plain rows, so no swatches,
-        /// fading or sections, and its Manage areas leaves this window open.
-        /// Built apart from the click so the harness can read and pick the
-        /// options (docs/DESIGN.md, "Catchments").
+        /// The Serves menu, in three sections (<see cref="ServesMenuOption"/>): this room and a
+        /// radius; every allowed area except Home, each with its colour; then New allowed area and
+        /// Manage areas. An area that leaves out the stand's own cell is faded and says why in red,
+        /// since a stand outside its area serves nothing. Built apart from the click so the harness
+        /// can read and pick the options. It is not vanilla's
+        /// <c>AreaUtility.MakeAllowedAreaListFloatMenu</c>, which lists Home, opens the menu
+        /// itself, has no swatches, fading or sections, and leaves this window open behind Manage
+        /// areas.
         /// </summary>
         internal List<FloatMenuOption> ServesMenuOptions()
         {
@@ -817,9 +623,8 @@ namespace ShiftChange
                                                  area.ColorTexture, holdsStand ? Color.white : FadedSwatch,
                                                  _ => area.MarkForDraw()));
             }
-            // Greyed at the cap rather than hidden, with vanilla's own reason.
-            // A disabled option sorts last, below Manage areas..., which is
-            // where the player goes next to make room.
+            // Greyed at the cap rather than hidden, with vanilla's reason. A disabled float-menu
+            // option sorts last, below Manage areas, which is where the player goes to make room.
             ServesMenuOption make = new ServesMenuOption(ServesMenuOption.SectionManage,
                                                          "ShiftChange.ServesOptionNewArea".Translate(),
                                                          () => comp.MakeServeArea());
@@ -838,14 +643,13 @@ namespace ShiftChange
         internal static readonly Color FadedSwatch = new Color(1f, 1f, 1f, 0.35f);
 
         /// <summary>
-        /// How the menu lists an area that leaves out the stand's own cell: its
-        /// name faded and the rest in red, the Serves row's own words for a
-        /// stand outside its area, so it reads apart from the areas the stand
-        /// can serve. Rich-text colour tags, as vanilla's labels use.
+        /// How the menu lists an area that leaves out the stand's own cell: its name faded and the
+        /// rest in red, the Serves row's own words for a stand outside its area. Rich-text colour
+        /// tags, as vanilla's labels use.
         ///
-        /// <para><c>Resolve</c>, never a cast: <c>TaggedString</c>'s implicit
-        /// conversion to string strips every tag (<c>StripTags</c>), which would
-        /// take the faded name back to the row's red.</para>
+        /// <para><c>Resolve</c>, never a cast: <c>TaggedString</c>'s implicit conversion to string
+        /// strips every tag (<c>StripTags</c>), which would turn the faded name red with the
+        /// rest.</para>
         /// </summary>
         internal static string AreaLeavingStandOut(string name)
         {
@@ -855,11 +659,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Starts vanilla's Expand allowed area tool on <paramref name="area"/>
-        /// the way Manage areas does (<c>Dialog_ManageAreas.SelectDesignator</c>):
-        /// the tool paints whichever area its public static names. This window
-        /// closes first. It absorbs clicks around itself, so left open it would
-        /// swallow every stroke of the brush.
+        /// Starts vanilla's Expand allowed area tool on <paramref name="area"/> the way Manage
+        /// areas does (<c>Dialog_ManageAreas.SelectDesignator</c>): the tool paints whichever area
+        /// its public static names. This window closes first: it absorbs clicks around itself, so
+        /// left open it would swallow every stroke of the brush.
         /// </summary>
         internal void Paint(Area area)
         {
@@ -873,9 +676,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Opens vanilla's Manage areas, closing this window first: the paint
-        /// buttons there close only their own dialog, and this one, still open
-        /// behind it, would then swallow the strokes (see <see cref="Paint"/>).
+        /// Opens vanilla's Manage areas, closing this window first: the paint buttons there close
+        /// only their own dialog, and this one, still open behind it, would swallow the strokes
+        /// (see <see cref="Paint"/>).
         /// </summary>
         internal void OpenManageAreas(Map map)
         {
