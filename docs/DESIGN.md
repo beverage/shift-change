@@ -700,11 +700,13 @@ is tradeable whatever the flag says — and the dialog's `ModeOnly` return alrea
 hides the row for exactly those stands. One condition, not two that can drift
 apart.
 
-The failure mode is vanilla. A postfix on a public static, whose signature has
-held across versions, that does nothing unless it finds our comp: if Ludeon
-moves the method, the patch fails to apply,
-Harmony logs it, and stands go back to being tradeable, which is where they
-started.
+A postfix on a public static, whose signature has held across versions, that
+does nothing unless it finds our comp. If Ludeon moves the method, the patch
+does not fail alone: `PatchAll` throws on a target it cannot resolve, the game
+logs one "Error in static constructor" line, and every attribute patch after it
+in the assembly, and the Outfit Stands Plus patch applied after `PatchAll`, are
+lost with it. A guard against that belongs on all the patches at once, not on
+this one.
 
 ## Change back
 
