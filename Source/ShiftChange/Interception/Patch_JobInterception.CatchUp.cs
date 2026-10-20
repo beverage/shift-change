@@ -11,17 +11,16 @@ namespace ShiftChange
 {
     public static partial class Patch_JobInterception
     {
-        /// <summary>Toggle for the mid-job catch-up below.</summary>
+        /// <summary>Switch for the mid-job catch-up.</summary>
         [TweakValue("ShiftChange")]
         public static bool DressMidJob = true;
 
         /// <summary>
-        /// A stand just returned to availability. If a colonist is ALREADY
-        /// working bare in its room, because they took the job while every
-        /// stand was checked out, interrupt them to change now and resume the
-        /// job afterwards. Only a job whose def is both suspendable and
-        /// casually interruptible, which leaves a doctor mid-treatment alone.
-        /// docs/DESIGN.md, "The mid-job catch-up".
+        /// A stand just returned to availability. If a colonist is already working bare in its
+        /// room, because they took the job while every stand was checked out, interrupt them to
+        /// change now and resume the job afterwards. Only a job whose def is both suspendable and
+        /// casually interruptible, which leaves a doctor mid-treatment alone: vanilla's
+        /// <c>TendPatient</c> is neither. docs/DESIGN.md, "The mid-job catch-up".
         /// </summary>
         public static void Notify_StandFreed(CompShiftStand stand, Pawn except)
         {
@@ -35,8 +34,7 @@ namespace ShiftChange
             }
             catch (Exception e)
             {
-                // Called from inside another pawn's job cleanup — breaking
-                // THAT would turn a convenience into a job-system fault.
+                // Runs inside another pawn's job cleanup, which a throw here must not break.
                 Log.Error("[ShiftChange] stand-freed catch-up threw at "
                           + (stand?.parent?.LabelShort ?? "an unknown stand")
                           + ", freed by "
@@ -51,9 +49,8 @@ namespace ShiftChange
             {
                 return;
             }
-            // Room stands only. A freed radius or area stand would pull a bare
-            // colonist off work anywhere in its catchment, and the next job
-            // boundary catches them anyway (docs/DESIGN.md, "Catchments").
+            // Room stands only: a freed radius or area stand would pull a bare colonist off work
+            // anywhere in its catchment, and the next job boundary catches them anyway.
             if (stand.serves != CatchmentKind.Room)
             {
                 return;
@@ -81,12 +78,9 @@ namespace ShiftChange
                 {
                     continue;
                 }
-                // The duty guard applies here too, and this path needs it
-                // said out loud: the job filter below rejects a job that is
-                // not casually interruptible, but a duty job is not required
-                // to say so, and a freed stand reaching across the room to
-                // pull a ritual participant off their duty is the same
-                // stranding by another route.
+                // A lord or duty holds the pawn, as in StartJob. A duty job need not declare itself
+                // not casually interruptible, so the job filter below would not stop a freed
+                // stand pulling a ritual participant off their duty.
                 if (pawn.GetLord() != null || pawn.mindState?.duty != null)
                 {
                     continue;
@@ -103,53 +97,33 @@ namespace ShiftChange
                     continue;
                 }
                 WorkGiverDef giver = job.workGiverDef;
-                // Classified with no tag. Only a giver-less job's work type
-                // depends on one, and neither test below reads it: the work
-                // test needs a stamped giver, and the recreation class does
-                // not look at the tag.
+                // No tag: only a giver-less job's work type depends on one, and neither test below
+                // reads it (the work test needs a stamped giver, the recreation class ignores it).
                 JobClass c = Classify(pawn, job, null);
-                // FEWER KINDS THAN StartJob, on purpose: work from a stamped
-                // giver that is not an emergency, and recreation. A giver-less
-                // job the work arm takes, medical bed rest or unstamped
-                // fishing, is never caught up, and neither is any emergency,
-                // which the medical-emergency setting does not change.
-                // Deliveries and ignored givers are not Work, so they stay out:
-                // StartJob only stops a pawn being dressed as they TAKE such a
-                // job, and a freed stand would otherwise reach across and pull
-                // them off one mid-haul, the same wardrobe detour by another
-                // route. docs/DESIGN.md, "The mid-job catch-up".
+                // Fewer kinds than StartJob dresses for, on purpose: work from a stamped giver
+                // that is not an emergency, and recreation. Giver-less work (medical bed rest,
+                // unstamped fishing) and every emergency, whatever the medical-emergency setting
+                // says, are never caught up. Deliveries and ignored givers' jobs carry a work type
+                // but are never Work (Classify), which is what keeps them out here, or a freed
+                // stand would pull a colonist off a mid-haul. docs/DESIGN.md, "The mid-job
+                // catch-up".
                 bool forWork = giver?.workType != null && !giver.emergency
                     && c.Kind == JobKind.Work && stand.HandlesWork(c.Work);
-                // The joy twin: a colonist already at recreation bare when
-                // this stand freed — the pool-party case — is caught up the
-                // same way. Joy jobs carry no workGiverDef (RecreationArm says
-                // who stamps one), so the two arms are disjoint by
-                // construction.
+                // Joy jobs carry no workGiverDef (RecreationArm says who stamps one), so the
+                // work and recreation arms are disjoint.
                 bool forRecreation = !forWork && giver == null
                     && stand.HandlesRecreation() && c.RecreationJob
-                    // The dress arm's bed guard applies here too: never pull a
-                    // pawn out of bed. Its outdoor guard returned above.
+                    // Never pull a pawn out of bed, as in RecreationArm.
                     && !OnABed(pawn);
-                // NO SLEEP ARM HERE, and it is not an omission. Catch-up
-                // interrupts a pawn already doing the thing the freed stand
-                // dresses for, and the sleep equivalent is a colonist asleep
-                // in bed — who is excluded twice over before the arms are even
-                // consulted: LayDown sets casualInterruptible false
-                // (Core/Defs/JobDefs/Jobs_Misc.xml), which the job filter above
-                // rejects, and the OnABed guard would reject them again.
-                // Waking someone to put pyjamas on is the one catch-up nobody
-                // wants.
+                // No sleep arm: vanilla's LayDown is not casually interruptible, so the job
+                // filter above already turns a sleeper away.
                 if (!forWork && !forRecreation)
                 {
                     continue;
                 }
-                // The shared resolver, not one picked by which arm matched:
-                // VisitSickPawn is the one vanilla job that is BOTH (Doctor
-                // work with joyKind Social), and resolving it A-first here
-                // while StartJob resolved it B-first re-opened a bounded
-                // dress/undress churn per stand-freed event (fix-verify,
-                // 2026-08-15). Every site answers "where does this job
-                // happen" identically or the two answers fight.
+                // The shared resolver, not one picked by the matching arm. VisitSickPawn is both
+                // Doctor work and Social joy, so two resolvers ordering it differently disagree
+                // about where it happens and the pawn churns between the stand and the patient.
                 if (!stand.Covers(SharedTargetPlace(job, c, map), map))
                 {
                     continue;
@@ -158,19 +132,17 @@ namespace ShiftChange
                 {
                     continue;
                 }
-                // Read off the plan WouldDress has just built, before anything
-                // builds another; the walk it may lead to is asked last.
+                // Read straight after WouldDress, before anything builds another plan; the walk
+                // it may lead to is asked last.
                 bool lessProtected = PlanLowersVacuumProtection(pawn, map);
-                // The second dress path, and it needs the same latch: without
-                // it, a stand returning to the pool re-dresses the very pawn
-                // the player just pulled out of this room.
+                // The latch holds on this dress path too, or a stand returning to the pool would
+                // re-dress the pawn the player just pulled out of this room.
                 if (LatchBlocks(pawn, stand, forWork ? StandTrigger.Work : StandTrigger.Recreation))
                 {
                     continue;
                 }
-                // Outside this pawn's allowed area, so the swap would die on
-                // its first toil (see StandForbiddenTo). Interrupting them for
-                // it is a detour that ends where it started.
+                // Outside this pawn's allowed area, so the swap would die on its first toil (see
+                // StandForbiddenTo).
                 if (StandForbiddenTo(parent, pawn))
                 {
                     continue;
@@ -184,9 +156,8 @@ namespace ShiftChange
                 {
                     continue;
                 }
-                // What is left of the job may still go through vacuum. A region
-                // walk, so asked only of a colonist who would otherwise be the
-                // one caught up.
+                // What is left of the job may still go through vacuum. A region walk, so asked
+                // only of a colonist who would otherwise be the one caught up.
                 if (lessProtected && DressingTripGoesThroughVacuum(job, pawn, stand, map))
                 {
                     continue;
@@ -204,8 +175,8 @@ namespace ShiftChange
             Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, parent);
             best.jobs.StartJob(swap, JobCondition.InterruptForced, null,
                 resumeCurJobAfterwards: true, cancelBusyStances: true, null, JobTag.ChangingApparel);
-            // The suspended job goes back on the queue as the same object, and
-            // is the job they were dressed for, as Insert records it.
+            // StartJob puts the suspended job back on the queue as the same object; it is the job
+            // they were dressed for, as Insert records it.
             JobQueue queue = best.jobs.jobQueue;
             if (resumed != null && queue.Count > 0 && queue.Peek()?.job == resumed)
             {
@@ -220,14 +191,12 @@ namespace ShiftChange
         internal static List<ThingDef> standDefs;
 
         /// <summary>
-        /// Every def the XML patched into the shift system: the
-        /// <see cref="Building_OutfitStand"/> class family, filtered to defs
-        /// actually carrying our comp. Class alone is not enough — a stand
-        /// mod we did not patch has no comp, no ledger, and no business in
-        /// the pool — and a hardcoded defName stopped being true when
-        /// Outfit Stands Plus' powered stands joined. The XML decides
-        /// coverage; this list only reads it. Resolved once: the def set is
-        /// fixed for the process lifetime.
+        /// Every def in the <see cref="Building_OutfitStand"/> class family that carries our
+        /// comp. The class alone is not enough: a stand mod the XML does not patch has no comp or
+        /// ledger and stays out of the pool, and other mods' stands, Outfit Stands Plus' powered
+        /// ones among them, are further defs of the family, so no defName is listed. The XML
+        /// decides coverage; this only reads it. Resolved once: the def set is fixed for the
+        /// process lifetime.
         /// </summary>
         internal static List<ThingDef> StandDefs
         {

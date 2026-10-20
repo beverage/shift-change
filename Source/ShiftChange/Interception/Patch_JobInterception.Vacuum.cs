@@ -7,30 +7,22 @@ namespace ShiftChange
 {
     public static partial class Patch_JobInterception
     {
-        /// <summary>
-        /// The most regions an air walk visits before it stops and reports
-        /// <see cref="AirRoute.Unread"/>: past it the walk decides nothing,
-        /// which dresses nobody and sends nobody to change.
-        /// </summary>
+        /// <summary>The most regions an air walk visits before it gives up.</summary>
         internal const int AirWalkRegionCap = 4000;
 
         /// <summary>
-        /// The fewest ticks between two vacuum messages about one colonist, an
-        /// in-game hour. A drafted colonist starts a forced job on every click
-        /// and every attack, and vanilla answers a repeated message by flashing
-        /// it and playing its sound again.
+        /// The fewest ticks between two vacuum messages about one colonist, an in-game hour. A
+        /// drafted colonist starts a forced job on every click and every attack, and the game
+        /// answers a repeated message by flashing it and playing its sound again.
         /// </summary>
         internal const int VacuumWarningTicks = 2500;
 
-        /// <summary>
-        /// The regions an air walk still has to reach. Cleared after every walk,
-        /// so it never holds a region past the call that filled it.
-        /// </summary>
+        /// <summary>The regions an air walk still has to reach, cleared after every walk.</summary>
         internal static readonly HashSet<Region> AirWalkTargets = new HashSet<Region>();
 
         /// <summary>
-        /// When each colonist was last told about vacuum, by thingIDNumber.
-        /// Cleared with the session (<see cref="ResetSessionState"/>).
+        /// When each colonist was last told about vacuum, by thingIDNumber, in TicksGame. Both
+        /// restart per save, so <see cref="ResetSessionState"/> clears it.
         /// </summary>
         internal static readonly Dictionary<int, int> LastVacuumWarningTick = new Dictionary<int, int>();
 
@@ -41,15 +33,16 @@ namespace ShiftChange
             Air,
 
             /// <summary>
-            /// Some place was not: it is in vacuum, only vacuum leads to it, or
-            /// it is on another map. Also the answer when the walk starts in
-            /// vacuum.
+            /// Some place was not: in vacuum, reachable only through vacuum, or on another map.
+            /// Also the answer when the walk starts in vacuum.
             /// </summary>
             Vacuum,
 
             /// <summary>
-            /// The walk could not be made: no region to start from, the map's
-            /// region updater switched off, or the region cap reached.
+            /// The walk could not be made (no region to start from, region updater off, region cap
+            /// reached), so it shows nothing either way: a stand whose plan lowers protection does
+            /// not dress for the trip, and neither the vacuum change-back nor the return trip's
+            /// vacuum refusal acts on it.
             /// </summary>
             Unread,
         }
@@ -58,12 +51,15 @@ namespace ShiftChange
         internal enum UniformInVacuum
         {
             /// <summary>
-            /// Nothing to do: not a vacuum map, the uniform protects as well as
-            /// their own clothes, or the trip stays in air or could not be read.
+            /// Nothing to do: not a vacuum map, the uniform protects as well as their own clothes,
+            /// the trip stays in air, or a walk could not be made.
             /// </summary>
             Fine,
 
-            /// <summary>The trip goes through vacuum and the stand can be reached through air: change back first.</summary>
+            /// <summary>
+            /// The trip goes through vacuum and the stand can be reached through air: change back
+            /// first.
+            /// </summary>
             ChangeBack,
 
             /// <summary>The trip goes through vacuum, and so would the walk to the stand.</summary>
@@ -79,12 +75,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The dress plan <see cref="SwapPlan.WouldDress"/> has just built, in
-        /// its scratch lists, would leave the pawn less protected against
-        /// vacuum (<see cref="SwapPlan.LeavesThemLessProtected"/>). Read straight
-        /// after <c>WouldDress</c>, before anything builds another plan. Two
-        /// apparel sums and a stat read; the region walk is
-        /// <see cref="DressingTripGoesThroughVacuum"/>.
+        /// The dress plan <see cref="SwapPlan.WouldDress"/> has just built would leave the pawn
+        /// less protected against vacuum. Call it straight after <c>WouldDress</c>, before
+        /// anything builds another plan: it reads that plan's scratch lists. Two apparel sums and
+        /// a stat read; the region walk is <see cref="DressingTripGoesThroughVacuum"/>, asked last.
         /// </summary>
         internal static bool PlanLowersVacuumProtection(Pawn pawn, Map map)
         {
@@ -93,12 +87,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The trip from <paramref name="stand"/> to the places
-        /// <paramref name="job"/> names cannot be shown to stay in air
-        /// (<see cref="AirRouteFor"/>), so a stand whose plan lowers vacuum
-        /// protection must not dress them for it. A walk that could not be made
-        /// counts: it dresses nobody. Asked by the stand search of a stand that
-        /// would win, and by the mid-job catch-up. docs/DESIGN.md, "Vacuum".
+        /// The trip from <paramref name="stand"/> to the places <paramref name="job"/> names is not
+        /// shown to stay in air (<see cref="AirRouteFor"/>), so a stand whose plan lowers vacuum
+        /// protection must not dress them for it. A walk that could not be made counts as not
+        /// shown.
         /// </summary>
         internal static bool DressingTripGoesThroughVacuum(Job job, Pawn pawn, CompShiftStand stand, Map map)
         {
@@ -115,15 +107,13 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The pawn on shift at <paramref name="onShift"/> is about to take
-        /// <paramref name="job"/> through vacuum, from where they stand, in a
-        /// uniform that protects them less than the clothes they parked
-        /// (<see cref="SwapPlan.UniformLeavesThemLessProtected"/>). The same
-        /// trip question the dressing asks, so the two directions agree. Then
-        /// whether changing back first is worth anything: only when the walk
-        /// to the stand stays in air, since otherwise the walk to change is
-        /// itself the crossing the gate exists to prevent. docs/DESIGN.md,
-        /// "Vacuum".
+        /// What the gate makes of the pawn on shift at <paramref name="onShift"/> taking
+        /// <paramref name="job"/> through vacuum from where they stand, in a uniform that protects
+        /// them less than the clothes they parked
+        /// (<see cref="SwapPlan.UniformLeavesThemLessProtected"/>). It asks the same trip question
+        /// as dressing, so the two directions agree. Changing back first is worth it only when the
+        /// walk to the stand stays in air: otherwise that walk is itself the crossing the gate
+        /// exists to prevent. docs/DESIGN.md, "Vacuum".
         /// </summary>
         internal static UniformInVacuum UniformIntoVacuum(Job job, Pawn pawn, CompShiftStand onShift, Map map)
         {
@@ -154,13 +144,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The return trip would walk a colonist in uniform through vacuum to
-        /// change: a vacuum map, a uniform that protects less than their own
-        /// clothes, and no way to the stand through air. Asked before every
-        /// return the return trip starts, whatever it starts it for, so a
-        /// colonist cut off from their stand by vacuum is not sent across it
-        /// in the clothes that make the crossing dangerous. They change back
-        /// at the next job boundary they reach from the stand's side.
+        /// Changing back would walk a colonist in uniform through vacuum: a vacuum map, a uniform
+        /// that protects less than their own clothes, and no way to the stand through air. Asked
+        /// before every return trip, whatever it is for.
         /// </summary>
         internal static bool ReturnCrossesVacuum(Pawn pawn, CompShiftStand onShift, Map map)
         {
@@ -184,13 +170,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The order a colonist was just given takes them through vacuum in a
-        /// uniform that protects less than their own clothes. Orders run as
-        /// given in both directions (docs/DESIGN.md, "The gates"), so this only
-        /// says so. Drafted moves are orders too, which is why it is also asked
-        /// for a drafted colonist the interception otherwise leaves alone, and
-        /// why it carries the guards <see cref="MapToDecideOn"/> would have
-        /// applied. True if a message was posted.
+        /// Warns when the order a colonist was just given takes them through vacuum in a uniform
+        /// that protects less than their own clothes; orders run as given, so it only says so.
+        /// Drafted moves are orders too, so it is also asked for a drafted colonist the
+        /// interception otherwise leaves alone, with the guards <see cref="MapToDecideOn"/> would
+        /// have applied. True if a message was posted.
         /// </summary>
         internal static bool WarnIfOrderedIntoVacuum(Job job, Pawn pawn)
         {
@@ -207,13 +191,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Tell the player a colonist is heading through vacuum in a uniform
-        /// that protects less, when nothing the mod does will change it: an
-        /// order, which runs as given, or a stand the colonist cannot reach
-        /// through air or at all. A change back the mod is about to start says
-        /// nothing. At most once a <see cref="VacuumWarningTicks"/> per
-        /// colonist; the caller checks <see cref="WarnedLately"/> first, before
-        /// the walk. True if a message was posted.
+        /// Tells the player a colonist is heading through vacuum in a uniform that protects less,
+        /// when nothing the mod does will change it: an order, or a stand they cannot reach
+        /// through air or at all. A change back the mod is starting says nothing. Callers check
+        /// <see cref="WarnedLately"/> first, before the walk. True if a message was posted.
         /// </summary>
         internal static bool WarnOfVacuum(Pawn pawn, UniformInVacuum outcome, bool ordered)
         {
@@ -241,7 +222,7 @@ namespace ShiftChange
             return true;
         }
 
-        /// <summary>The colonist was told about vacuum less than <see cref="VacuumWarningTicks"/> ago.</summary>
+        /// <summary>Told about vacuum less than <see cref="VacuumWarningTicks"/> ago.</summary>
         internal static bool WarnedLately(Pawn pawn)
         {
             int last;
@@ -251,17 +232,15 @@ namespace ShiftChange
 
         /// <summary>
         /// Whether every place <paramref name="job"/> names can be reached from
-        /// <paramref name="from"/> through air (<see cref="AirWalk"/>). Those
-        /// are the places <see cref="EveryPlaceCovered"/> reads, read the same
-        /// way (<see cref="ReadPlace"/>), so a bill's ingredients count. A safe
-        /// place cut off by vacuum fails as surely as a place in vacuum.
+        /// <paramref name="from"/> through air (<see cref="AirWalk"/>). The places are those
+        /// <see cref="EveryPlaceCovered"/> reads, read the same way (<see cref="ReadPlace"/>), so
+        /// a bill's ingredients count. A safe place cut off by vacuum fails as surely as one in
+        /// vacuum.
         ///
-        /// <para>It reads the map, not the path. The pathfinder ignores vacuum,
-        /// so where air and vacuum both connect two places and crossing the
-        /// vacuum is shorter, the pawn may cross it anyway: the known gap,
-        /// left out of v1.5.2 on purpose. Not part of the shared room resolver,
-        /// which must not read the map; both directions ask this same
-        /// question. docs/DESIGN.md, "Vacuum".</para>
+        /// <para>It reads the map, not the path. The pathfinder ignores vacuum, so where air and
+        /// vacuum both connect two places and crossing is shorter, the pawn may cross anyway: a
+        /// known gap, left out on purpose (docs/DESIGN.md, "Vacuum"). This is a gate of its own,
+        /// not part of the shared room resolver, which must not read the map.</para>
         /// </summary>
         internal static AirRoute AirRouteFor(Job job, Pawn pawn, Map map, IntVec3 from)
         {
@@ -285,7 +264,7 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>Whether one cell can be reached from <paramref name="from"/> through air.</summary>
+        /// <summary>Whether a cell is reachable from <paramref name="from"/> through air.</summary>
         internal static AirRoute AirRouteTo(Pawn pawn, Map map, IntVec3 from, IntVec3 to)
         {
             HashSet<Region> targets = AirWalkTargets;
@@ -302,13 +281,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The air walk: region by region from <paramref name="from"/>,
-        /// stepping only into regions whose room holds less vacuum than harms a
-        /// pawn (<see cref="HoldsAir"/>) and that the pawn may pass
-        /// (<c>Region.Allows</c>, as reachability asks it: a door they cannot
-        /// open, or one forbidden to them, is not a way through, however much
-        /// air is behind it). Empties <paramref name="targets"/> as it reaches
-        /// them, and stops when they are all reached.
+        /// Walks regions outward from <paramref name="from"/>, stepping only into regions that
+        /// hold air (<see cref="HoldsAir"/>) and that the pawn may pass: <c>Region.Allows</c>, as
+        /// reachability asks it, so a door they cannot open, or one forbidden to them, is no way
+        /// through however much air is behind it. Removes each of <paramref name="targets"/> as it
+        /// reaches it, and stops when none are left.
         /// </summary>
         internal static AirRoute AirWalk(Pawn pawn, Map map, IntVec3 from, HashSet<Region> targets)
         {
@@ -357,9 +334,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A region holding air: its room reads below the vacuum that harms a
-        /// pawn. A doorway reads the mean of the rooms on either side, so the
-        /// door between air and open space stops the walk too.
+        /// A region whose room reads below the vacuum that harms a pawn. A doorway reads the mean
+        /// of the raw vacuum on either side (<c>Room.UnsanitizedVacuum</c>), so a door between
+        /// air at zero and open space reads exactly <c>VacuumUtility.MinVacuumForDamage</c> and
+        /// stops the walk only because the comparison is strict. Air pumped below zero lets that
+        /// doorway through, though not the space beyond it.
         /// </summary>
         internal static bool HoldsAir(Region region)
         {
@@ -368,11 +347,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Adds the region a place stands in to <paramref name="targets"/>, the
-        /// place read by <see cref="ReadPlace"/>: its own cell, or for a solid
-        /// place the cell beside it with a room. A place that cannot be read is
-        /// skipped. False for a thing on another map, which no walk on this
-        /// one reaches.
+        /// Adds the region a place stands in to <paramref name="targets"/>, reading the place with
+        /// <see cref="ReadPlace"/>. A place that cannot be read is skipped. False for a thing on
+        /// another map, which no walk on this one reaches.
         /// </summary>
         internal static bool AddAirTarget(LocalTargetInfo place, Map map, HashSet<Region> targets)
         {

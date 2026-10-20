@@ -7,56 +7,46 @@ using Verse.AI;
 namespace ShiftChange
 {
     /// <summary>
-    /// The abort button: a gizmo on any colonist currently in a stand's
-    /// uniform that cancels their orders and sends them to change back NOW,
-    /// on the player's timing rather than at their next job boundary. A press
-    /// latches them out of dressing at that stand, and at stands with its
-    /// trigger that cover it, until they leave its catchment or wake
-    /// (<see cref="Patch_JobInterception.ChangedBackAt"/>), and drafting drops
-    /// the latch. Deliberately not automatic: no auto-change on a raid, and a
-    /// pawn drafted in uniform stays in it. Why each: docs/DESIGN.md, "Change
-    /// back".
+    /// The Change back button: a gizmo on any colonist in a stand's uniform that cancels their
+    /// orders and sends them to change back now, on the player's timing rather than at their
+    /// next job boundary. A press latches them out of dressing at that stand, and at stands with
+    /// its trigger that cover it, until they leave its catchment or wake
+    /// (<see cref="Patch_JobInterception.ChangedBackAt"/>), and drafting drops the latch. It is
+    /// deliberately not automatic: no auto-change on a raid, and a pawn drafted in uniform stays
+    /// in it. Why each: docs/DESIGN.md, "Change back".
     /// </summary>
     [HarmonyPatch(typeof(Pawn), nameof(Pawn.GetGizmos))]
     public static class Patch_ChangeBackGizmo
     {
         /// <summary>
-        /// Shared by every instance of this gizmo so multi-select merges
-        /// them into one button (<c>Command.GroupsWith</c> compares label,
-        /// icon and groupKey). Each pawn's own command still fires — grouped
-        /// gizmos inherit the click by default
-        /// (<c>Gizmo.alsoClickIfOtherInGroupClicked</c>) — so the action
-        /// below only ever handles its own pawn.
+        /// Shared by every instance of this gizmo so multi-select merges them into one button
+        /// (<c>Command.GroupsWith</c> compares label, icon and groupKey). Each pawn's own command
+        /// still fires, since grouped gizmos inherit the click by default
+        /// (<c>Gizmo.alsoClickIfOtherInGroupClicked</c>), so the action below only ever handles
+        /// its own pawn.
         /// </summary>
         internal const int GroupKey = 83619427;
 
         /// <summary>
-        /// The gate is deliberately NOT an iterator. `GizmoGridDrawer`
-        /// rebuilds the bar once per rendered frame for every selected object
-        /// (`GizmoGridDrawer.cs:54-100` caches on `Time.frameCount` plus the
-        /// selection), and passthrough postfixes nest in run order — ours runs
-        /// last on `Pawn.GetGizmos`, so an iterator here wraps every gizmo of
-        /// every other mod in the chain, for every selected pawn, every frame,
-        /// to decide something that is almost always "no". Returning `values`
-        /// untouched keeps our frame off that path entirely; only a pawn who
-        /// actually gets the button pays for the wrapper.
+        /// The gate is deliberately not an iterator: <c>GizmoGridDrawer</c> rebuilds the bar once
+        /// per rendered frame for every selected object, and passthrough postfixes nest in run
+        /// order, so an iterator here wraps every gizmo the postfixes before it pass through, for
+        /// every selected pawn, every frame, to decide something that is almost always no.
+        /// Returning <c>values</c> untouched keeps this off that path; only a pawn who gets the
+        /// button pays for the wrapper.
         /// </summary>
         // ReSharper disable once InconsistentNaming — Harmony injection.
         public static IEnumerable<Gizmo> Postfix(IEnumerable<Gizmo> values, Pawn __instance)
         {
-            // Deliberately NOT gated on Patch_JobInterception.Enabled or
-            // faulted. Interception switched off, or latched off by its own
-            // faults, is precisely the moment this button matters most:
-            // automatic return trips have stopped, so without it every pawn
-            // currently in uniform is stranded there with no route back at
-            // all. Both exist to stop the mod ACTING on its own; neither may
-            // also remove the player's manual remedy.
+            // Reads neither Patch_JobInterception.Enabled nor faulted. With interception switched
+            // off or latched off by its faults, automatic return trips have stopped and a pawn in
+            // uniform has no other way back; both switches stop the mod acting on its own, and
+            // neither may also remove the player's manual remedy.
             if (__instance == null || !__instance.IsColonistPlayerControlled)
             {
                 return values;
             }
-            // No SessionGuard.Ensure() call of our own: OnShiftStandFor opens
-            // with one, so a second here only repeats a reference compare.
+            // No SessionGuard.Ensure() here: OnShiftStandFor opens with one.
             CompShiftStand stand = CompShiftStand.OnShiftStandFor(__instance);
             if (stand?.parent == null || !stand.parent.Spawned)
             {
@@ -82,12 +72,11 @@ namespace ShiftChange
                 defaultLabel = "ShiftChange.ChangeBackLabel".Translate(),
                 defaultDesc = stand.ByCatchment("ShiftChange.ChangeBackDesc").Translate(
                     stand.parent.Label.Named("STAND")),
-                // The stand's own build icon — this mod ships no art, and
-                // the picture of the stand is also the clearest statement of
-                // where the pawn is about to walk.
+                // The stand's own build icon: the mod ships no art, and it shows where the pawn
+                // is about to walk.
                 icon = stand.parent.def.uiIcon,
                 groupKey = GroupKey,
-                // No hotkey, by the same rule the stand's gizmos follow.
+                // No hotkey, as on the stand's gizmos.
                 action = () => ChangeBack(pawn, stand)
             };
 
@@ -105,16 +94,13 @@ namespace ShiftChange
 
         internal static void ChangeBack(Pawn pawn, CompShiftStand stand)
         {
-            // "Cancel orders" is the literal half of the button: anything
-            // the player or the think tree had lined up behind the current
-            // job is dropped, so the pawn goes to the stand and stops.
+            // Drop anything queued behind the current job, so the pawn goes to the stand and stops.
             pawn.jobs?.ClearQueuedJobs();
 
             Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, stand.parent);
-            // Vanilla's own ordered-job path: it sets playerForced, respects
-            // an uninterruptible current job (a tend finishes first) and
-            // honours the queue-order key, so the button behaves like every
-            // other right-click order in the game.
+            // Vanilla's ordered-job path: it sets playerForced, lets an uninterruptible current
+            // job finish (a tend), and honours the queue-order key, so the button behaves like
+            // any other right-click order.
             if (pawn.jobs != null && pawn.jobs.TryTakeOrderedJob(swap, JobTag.ChangingApparel))
             {
                 Patch_JobInterception.ChangedBackAt[pawn] =
@@ -124,17 +110,11 @@ namespace ShiftChange
     }
 
     /// <summary>
-    /// Drafting drops the change-back latch, so an undrafted pawn resumes
-    /// ordinary shift changes immediately — a fight is a decisive enough
-    /// break that "have they left the catchment" stops being the useful
-    /// question.
-    /// Patching the setter (rather than polling) means the clear happens on
-    /// the same frame as the draft, and it fires on UNdrafting too —
-    /// harmless, since the latch is only ever set by the button and a second
-    /// clear is a no-op.
-    ///
-    /// Note this patch does NOT change what drafting does to a uniform: a
-    /// pawn drafted in whites stays in whites, deliberately.
+    /// Drafting drops the change-back latch: after a fight, whether the pawn has left the
+    /// catchment is no longer the useful question, so an undrafted pawn resumes ordinary shift
+    /// changes. The setter also fires on undrafting, which is harmless: the latch is only ever
+    /// set by the button, and a second clear is a no-op. It does not change what drafting does
+    /// to a uniform; a pawn drafted in whites stays in whites.
     /// </summary>
     [HarmonyPatch(typeof(Pawn_DraftController), nameof(Pawn_DraftController.Drafted), MethodType.Setter)]
     public static class Patch_DraftClearsDressBlock
