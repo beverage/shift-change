@@ -1,6 +1,6 @@
-// SCENES only — see the config table in ShiftChange.csproj. Pure inspection:
-// this file reads the map and writes a text file, and changes nothing in the
-// game. It is dev-only because its output is source code for a fixture.
+// SCENES only (see the config table in ShiftChange.csproj). Pure inspection: this file reads the
+// map and writes a text file, and changes nothing in the game. It is dev-only because its output
+// is source code for a fixture.
 #if SCENES
 using System.Collections.Generic;
 using System.IO;
@@ -13,29 +13,26 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// Turn a room you built by hand into the C# that rebuilds it.
+    /// Turns a room built by hand in dev mode into the C# that rebuilds it. Click inside an
+    /// enclosed room and the terrain, things and pawn notes go to scene-export.cs in the save
+    /// data folder, overwriting any earlier export. It is a file because the log truncates and
+    /// a scene runs to hundreds of lines.
     ///
-    /// <para><b>Why in-game rather than from the save.</b> A <c>.rws</c> gives
-    /// up its THINGS readily — they are plain XML with def, pos, rot and stuff.
-    /// Its TERRAIN does not: <c>topGridDeflate</c> is a deflated array of
-    /// <c>ushort</c> shortHashes, and a shortHash is derived from the whole
-    /// loaded def set, so reading it outside the game means reconstructing the
-    /// player's entire def database first. In here <c>TerrainAt</c> simply
-    /// returns the def, and the problem disappears.</para>
+    /// <para>Coordinates are relative to the exported rectangle's south-west corner, so a stage
+    /// builder can place the scene from any <c>origin</c>. Thing lines follow the argument order
+    /// of <c>DebugTools_RecRoomStage.Spawn</c>, with a trailing Color when the thing has one;
+    /// terrain comes out as a cell list per def, not as calls.</para>
     ///
-    /// <para>Dressing a set by hand in dev mode is far faster than guessing
-    /// coordinates in source, but a hand-built set only exists in one save.
-    /// This closes that loop: build it, export it, paste it into a stage
-    /// builder, and it is reproducible for everyone.</para>
-    ///
-    /// <para>Output goes to a FILE rather than the log, because the log
-    /// truncates and a scene of any size runs to hundreds of lines.</para>
+    /// <para>It runs in the game rather than reading the save because a save stores terrain as
+    /// a deflated array of ushort short hashes (<c>topGridDeflate</c>), and a short hash is
+    /// derived from the whole loaded def set, so only the running game can turn it back into a
+    /// def. Things are plain XML in the save.</para>
     /// </summary>
     internal static class DebugTools_ExportScene
     {
         /// <summary>
-        /// Things that are scenery rather than set: they regrow, they blow in,
-        /// and reproducing them would bury the real furniture.
+        /// Things that are scenery rather than set, and would bury the real furniture. Pawns
+        /// are exported as notes instead (<see cref="Pawns"/>).
         /// </summary>
         internal static bool Ignore(Thing thing)
         {
@@ -64,8 +61,7 @@ namespace ShiftChange
                 return;
             }
 
-            // The room's own cells stop at the walls, and the walls are half the
-            // scene — so take the bounding box and grow it by one.
+            // Room cells stop at the walls, half the scene: grow the bounding box by one.
             List<IntVec3> cells = room.Cells.ToList();
             if (cells.Count == 0)
             {
@@ -109,9 +105,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Terrain, grouped by def and emitted as explicit cell lists. Runs
-        /// would be terser, but a list survives someone reordering it and is
-        /// obvious to hand-edit — which is the point of exporting at all.
+        /// Terrain, grouped by def and emitted as explicit cell lists rather than runs: a list
+        /// survives reordering and is obvious to hand-edit, which is the point of exporting.
         /// </summary>
         internal static void Terrain(Map map, CellRect rect, StringBuilder code)
         {
@@ -145,10 +140,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Every building and item, with the three things that actually matter
-        /// for reproducing a look: rotation, stuff, and colour. Colour is
-        /// emitted only when a <c>CompColorable</c> is carrying one, because a
-        /// stuff-coloured thing re-derives its own.
+        /// Every building and item, with what reproducing a look needs: rotation, stuff and
+        /// colour. Colour is written for any thing with a <c>CompColorable</c> and no stuff (the
+        /// def's own colour when none was set) and never for a stuff-made thing, so a dye on a
+        /// stuff-made thing, which draws over its stuff's colour, is lost. A multi-cell thing is
+        /// listed under every cell it covers, so each is emitted once.
         /// </summary>
         internal static void Things(Map map, CellRect rect, StringBuilder code)
         {
@@ -183,10 +179,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Pawns are listed as a COMMENT, not as code. Reproducing a colonist
-        /// means their kit, their needs, their work priorities and their stand
-        /// assignment, which the stage builders already do properly — copying a
-        /// generated pawn verbatim would produce a different one anyway.
+        /// Pawns are listed as a comment, not as code: reproducing a colonist means their kit,
+        /// needs, work priorities and stand assignment, which the stage builders already do
+        /// properly, and a copied generated pawn would differ anyway.
         /// </summary>
         internal static void Pawns(Map map, CellRect rect, StringBuilder code)
         {

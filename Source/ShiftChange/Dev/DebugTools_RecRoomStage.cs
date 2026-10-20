@@ -1,10 +1,8 @@
-// SCENES only — see the config table in ShiftChange.csproj. This file BUILDS A
-// SCENE and must never reach a player: it clears its footprint (destroying any
-// pawn standing in it), rewrites terrain and roof, unlocks the whole research
-// tree, and leaves permanent player-faction colonists and buildings behind. The
-// fixture primitives live in DebugTools_Fixtures, under SCENES || HARNESS;
-// SpawnTorch/TopUpNeeds come from DebugTools_DemoStage, which is SCENES-gated
-// too.
+// Compiled only with SCENES (Debug and Media builds; see ShiftChange.csproj). This file builds
+// a scene and must never reach a player: it clears its footprint, destroying any pawn standing
+// in it, rewrites terrain and roof, unlocks the whole research tree, and leaves player-faction
+// colonists and buildings behind. Fixture primitives come from DebugTools_Fixtures; TopUpNeeds
+// from DebugTools_DemoStage, which is SCENES-only too.
 #if SCENES
 using System.Collections.Generic;
 using RimWorld;
@@ -15,50 +13,21 @@ using static ShiftChange.DebugTools_Fixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// A black-tie games room: billiards, poker, a harp and a television, eight
-    /// guests, and eight stands that dress them for it.
+    /// A black-tie games room for the recreation trigger: billiards, poker, a harp and a
+    /// television, eight guests, and eight stands that dress them for it. Dev tools menu:
+    /// Shift Change, Dev tools, Build rec room stage, then click a cell.
     ///
-    /// <para><b>Why a second recreation fixture.</b> The pool stage exercises
-    /// exactly one giver — Odyssey's <c>GoSwimming</c>, at <c>baseChance</c> 1
-    /// and <c>joyKind Meditative</c>, the most crowded kind in the game. That
-    /// makes it slow to trigger and, once Meditative tolerance passes 0.5, unable
-    /// to trigger at all. This room offers <b>four kinds at higher weights</b> —
-    /// Gaming_Dexterity (billiards, 4), Gaming_Cerebral (poker, 4), Television
-    /// (3.5) and HighCulture (harp, 2) — so boredom on one cannot stall the
-    /// fixture.</para>
+    /// <para>The pool stage exercises one joy giver, Odyssey's <c>GoSwimming</c>
+    /// (<c>baseChance</c> 1, joyKind Meditative), and a kind whose tolerance passes 0.5 is
+    /// skipped outright, so that fixture can stall. Here four kinds are on offer, so boredom
+    /// on one cannot stall the room: billiards (Gaming_Dexterity, <c>baseChance</c> 4), poker
+    /// (Gaming_Cerebral, 4), television (3.5) and the harp (HighCulture, 2).</para>
     ///
-    /// <para><b>The dress code is the point.</b> These stands hold formal wear,
-    /// not a uniform: a guest changes to go and enjoy themselves. That is the
-    /// venue case rather than the workplace one, and it is the shape a bar or a
-    /// lounge would use.</para>
-    ///
-    /// <para><b>Eight guests, eleven places.</b> Every joy job caps its own
-    /// table through <c>joyMaxParticipants</c>: <c>Play_Billiards</c> reserves
-    /// the table for 2, <c>Play_Poker</c> for 4,
-    /// <c>Play_MusicalInstrument</c> for 1, and <c>WatchTelevision</c> for 8 —
-    /// though a watcher also needs a sittable inside the set's watch rect,
-    /// which the two couches supply four of. Eleven places for eight guests
-    /// means three sit empty in any one frame, and the harp is the likeliest
-    /// of them: at <c>baseChance</c> 2 it is the lowest-weighted giver in the
-    /// room. That is the deliberate trade — the set is dressed for the camera
-    /// first, an empty corner reads worse than an empty chair, and the harp
-    /// buys a fourth joyKind the three tables cannot.</para>
-    ///
-    /// <para><b>One stand per guest.</b> The men's piece is gendered —
-    /// <c>Apparel_VestRoyal</c> is <c>Male</c> in its own def and
-    /// <c>PawnCanWear</c> enforces it — so a stand shared across the room would
-    /// silently dress only half of it. The women's <c>Apparel_RobeRoyal</c> has
-    /// no gender restriction, but they still get a stand each because the two
-    /// frocks are different colours, and a stand holds one outfit.</para>
-    ///
-    /// <para><b>On the women's frocks.</b> RimWorld has no dress apparel at all
-    /// — not in Core, not in any DLC, and not in any mod on this machine.
-    /// <c>Apparel_RobeRoyal</c> ("prestige robe", Royalty) is the closest thing:
-    /// long, flowing, embroidered, and unisex. Dyed scarlet and gold it reads as
-    /// evening wear. If ATH's style Female Dresses
-    /// (<c>Anthitei.ATHsStyleFemaleDresses.Style</c>) is ever enabled, it maps
-    /// several garments to dress-shaped styles and setting <c>StyleDef</c> on
-    /// the piece would render an actual gown with no other change here.</para>
+    /// <para>Each joy job caps its own table through <c>joyMaxParticipants</c>:
+    /// <c>Play_Billiards</c> 2, <c>Play_Poker</c> 4, <c>Play_MusicalInstrument</c> 1,
+    /// <c>WatchTelevision</c> 8. A watcher also needs a sittable inside the set's watch rect,
+    /// and the two couches supply four, so eight guests have eleven places and the harp's is
+    /// the likeliest to stay empty.</para>
     /// </summary>
     internal static class DebugTools_RecRoomStage
     {
@@ -78,16 +47,14 @@ namespace ShiftChange
 
         internal const float HeatPush = 3000f;
 
-        // Black tie, and four frocks. Dyed rather than styled, because the style
-        // pack is not a dependency of anything here.
+        // Evening wear is dyed, not styled: the game has no dress apparel in Core or any DLC,
+        // so the women wear Apparel_RobeRoyal (Royalty), the nearest thing to a gown. ATH's
+        // Female Dresses style (Anthitei.ATHsStyleFemaleDresses.Style) would render real gowns
+        // if set as the piece's StyleDef, but it is not a dependency of anything here.
         //
-        // BlackTie sits at 22% lightness rather than the 13% it started on.
-        // Apparel tint MULTIPLIES the texture, so the surviving tonal range is
-        // proportional to the tint's own luminance: measured off a capture, the
-        // vest at 13% kept a 43-level spread against the scarlet robe's 167,
-        // and its shadow tones had merged with the pawn outline. 22% roughly
-        // doubles that and still reads as black against marble, which sits
-        // around 65-70%.
+        // BlackTie is 22% lightness: apparel tint multiplies the texture, so darker flattens
+        // the tonal range until the vest's shadows merge with the pawn outline, and lighter
+        // stops reading as black against marble.
         internal static readonly Color BlackTie = new Color(0.22f, 0.22f, 0.27f);
         internal static readonly Color DressWhite = new Color(0.95f, 0.94f, 0.92f);
         internal static readonly Color Scarlet = new Color(0.72f, 0.09f, 0.15f);
@@ -96,16 +63,16 @@ namespace ShiftChange
         internal static readonly Color Sapphire = new Color(0.15f, 0.29f, 0.63f);
 
         /// <summary>
-        /// Registered from <see cref="DebugTools_Menu"/>, not by its own
-        /// attribute — one collapsing entry, never a category of loose ones.
+        /// Builds the stage at the clicked cell. Registered from <see cref="DebugTools_Menu"/>,
+        /// not by its own attribute, so the dev tools stay one collapsing entry.
         /// </summary>
         internal static void BuildRecRoomStage()
         {
             Map map = Find.CurrentMap;
             IntVec3 origin = UI.MouseCell();
 
-            // The footprint is wider than the room: the power cell sits OUTSIDE
-            // it, west of the wall, so it never appears in a shot of the room.
+            // Three cells wider than the room, to the west: the power cell sits outside the
+            // west wall, so it never appears in a shot of the room.
             CellRect footprint = new CellRect(origin.x - 3, origin.z, Width + 3, Height);
             if (!footprint.InBounds(map))
             {
@@ -125,9 +92,6 @@ namespace ShiftChange
             GenDebug.ClearArea(footprint, map);
             Current.Game.playSettings.useWorkPriorities = true;
 
-            // Dev mode needs the whole tree available to redress this scene by
-            // hand — a build menu missing half its furniture is not a scene you
-            // can iterate on.
             UnlockEverything();
 
             BuildShell(map, origin);
@@ -136,16 +100,9 @@ namespace ShiftChange
             Power(map, origin, interior);
             Amusements(map, origin);
 
-            // Stands run contiguously down the west wall, one per guest,
-            // alternating so the row reads as a party rather than four black
-            // suits followed by four frocks. The pairing is not cosmetic: the
-            // men's piece is gendered, so a guest sent to the wrong stand
-            // would find nothing wearable.
-            //
-            // Eight stands fit between the corner lamps at z 1 and 11, and the
-            // four wall lamps share cells with four of them — a wall lamp is
-            // an attachment, not an edifice, so it occupies the same interior
-            // cell it hangs off and neither wipes the other.
+            // One stand per guest down the west wall, alternating by sex so the row reads as
+            // a party; guest i is assigned stand i (see Patron). Eight stands fit between the
+            // corner lamps at z 1 and 11.
             (string Nick, Gender Sex, string Outer, string Hat, Color Frock)[] guests =
             {
                 ("Ash",   Gender.Male,   "Apparel_VestRoyal", "Apparel_HatTop",    BlackTie),
@@ -178,8 +135,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Every research project finished, so the architect menu offers the
-        /// whole catalogue while dressing the set by hand.
+        /// Finishes every research project, so the architect menu offers the whole catalogue
+        /// while the set is dressed by hand. Permanent for the colony; DebugTools_SleepStage
+        /// calls it too.
         /// </summary>
         internal static void UnlockEverything()
         {
@@ -188,13 +146,10 @@ namespace ShiftChange
             {
                 return;
             }
-            // FinishProject recurses into prerequisites itself (:405), so the
-            // only guard needed is "already done" — and asking the manager for
-            // the CURRENT project of a category would return null on any
-            // category with nothing selected, which is most of them.
-            //
-            // Letters and dialogs off: unlocking ~150 projects would otherwise
-            // bury the screen in completion popups.
+            // FinishProject finishes prerequisites itself, so the only guard needed is
+            // IsFinished (asking the manager for a category's current project would return
+            // null for most categories). Letters and dialogs are off: ~150 completions would
+            // otherwise bury the screen in popups.
             foreach (ResearchProjectDef project in DefDatabase<ResearchProjectDef>.AllDefsListForReading)
             {
                 if (!project.IsFinished)
@@ -206,10 +161,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The shell, floored as exported: <c>TileMarble</c> under the walls,
-        /// <c>FineTileMarble</c> across the interior — fine tile is what draws
-        /// the chequerboard, it is not two alternating defs — and two
-        /// <c>CarpetFineAuburn</c> insets under the games.
+        /// Walls, door, roof and floor: <c>TileMarble</c> under the walls, <c>FineTileMarble</c>
+        /// across the interior (fine tile is what draws the chequerboard, not two alternating
+        /// defs) and two <c>CarpetFineAuburn</c> insets under the games.
         /// </summary>
         internal static void BuildShell(Map map, IntVec3 origin)
         {
@@ -238,36 +192,24 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A doormat ON the door tile, facing out. Guests arrive across open
-        /// ground in evening dress and track soil onto the marble all the way
-        /// to the billiards table; the mat takes the carried filth at the
-        /// threshold.
+        /// A doormat on the door tile, facing out: guests arrive across open ground in evening
+        /// dress, and the mat takes the filth they carry at the threshold instead of the marble.
         ///
-        /// <para><b>It shares the door's cell, which is what the def is built
-        /// for.</b> <c>isEdifice false</c> and <c>clearBuildingArea false</c>
-        /// are exactly the flags that let a building sit in an occupied cell,
-        /// and nothing in <c>GenSpawn.SpawningWipes</c> fires for a Standable
-        /// non-edifice against a door. The threshold is also the best cell
-        /// available for the job: the mat acts only on
-        /// <c>IsHashIntervalTick(10)</c>, and a pawn waiting for a door to open
-        /// dwells there longer than it would crossing open ground.</para>
+        /// <para>The mat shares the door's cell because the def is built for it
+        /// (<c>isEdifice false</c>, <c>clearBuildingArea false</c>), so nothing in
+        /// <c>GenSpawn.SpawningWipes</c> fires for it against the door. It acts only on
+        /// <c>IsHashIntervalTick(10)</c>, and a pawn waiting for the door dwells at the
+        /// threshold longer than it would crossing open ground.</para>
         ///
-        /// <para><b>Rotation is cosmetic to the cleaning and load-bearing to
-        /// the look.</b> <c>LT.Building_DoorMat.Tick</c> iterates
-        /// <c>this.OccupiedRect()</c> and calls <c>HavePawnsDropFilth</c> on
-        /// any pawn standing on its OWN cells, so the cell cleans however the
-        /// mat is turned. But the art occupies only the upper ~60% of its 64x64
-        /// texture, and <c>Graphic_Single</c> with <c>rotatable true</c> and no
-        /// <c>drawRotated false</c> spins with the building — so rotation
-        /// decides which EDGE of the cell the mat hugs. <c>South</c> puts it on
-        /// the outward half of the threshold, where a guest wipes their feet
-        /// before stepping in; <c>North</c> would tuck it inside the room and
-        /// leave the approach bare.</para>
+        /// <para>Rotation does not change the cleaning (<c>LT.Building_DoorMat.Tick</c> acts on
+        /// any pawn standing on its own cells) but decides which edge of the cell the mat
+        /// hugs: the art fills only the upper ~60% of its texture and the <c>Graphic_Single</c>
+        /// spins with the building. South puts it on the outward half; North would tuck it
+        /// inside the room.</para>
         ///
-        /// <para>Mod content (<c>dracoix.doormat.r12a</c>), so silently absent
-        /// on a lighter modlist — the same rule the rest of this set follows.
-        /// The plain mat is the stuffable one, so it takes a material; the
-        /// coloured variants are fixed-cost cloth and would take null.</para>
+        /// <para>Mod content (<c>dracoix.doormat.r12a</c>), skipped silently on a lighter
+        /// modlist. The plain mat is stuffable, so it takes a material; the coloured variants
+        /// would take null.</para>
         /// </summary>
         internal static void Doormats(Map map, IntVec3 origin)
         {
@@ -275,24 +217,17 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Lighting and power. The vanometric cell sits OUTSIDE the west wall
-        /// and feeds HIDDEN conduits, so nothing in a shot of the room is a
-        /// power fixture and there is no fuel, sun or flat battery to be
-        /// mistaken for the mod failing.
+        /// Lighting and power. The vanometric cell sits outside the west wall and feeds hidden
+        /// conduits, so no power fixture appears in a shot and no fuel, sun or flat battery can
+        /// be mistaken for the mod failing.
         ///
-        /// <para><b>The conduit runs under EVERY wall, not just the feed row.</b>
-        /// A consumer searches a SIX-cell box around itself for a transmitter
-        /// (<c>PowerConnectionMaker.BestTransmitterForConnector:103</c>) and
-        /// this room is thirteen cells deep, so a single run along the south
-        /// side powered the near half and left the north wall's television —
-        /// ten cells away — dark. An unlit fixture in a fixture room reads as
-        /// this mod failing rather than as a missing watt, which is the whole
-        /// confusion the stage exists to avoid.
-        ///
-        /// A ring puts a transmitter within one cell of every edge. Conduits
-        /// are not edifices, so they share the wall cells rather than wiping
-        /// the walls, and a wall attachment measures from the WALL it hangs on
-        /// (<c>:43</c>) — which is exactly where the ring is.</para>
+        /// <para>The conduit runs under every wall, not only the feed row: a consumer connects
+        /// to the nearest transmitter within six cells of it on each axis
+        /// (<c>PowerConnectionMaker.BestTransmitterForConnector</c>) and the room is thirteen
+        /// cells deep, so one run along the south side left the north wall's television dark.
+        /// The ring puts a transmitter within one cell of every edge. Conduits are not
+        /// edifices, so they share the wall cells instead of wiping the walls, and a wall
+        /// attachment measures from the wall it hangs on, which is where the ring is.</para>
         /// </summary>
         internal static void Power(Map map, IntVec3 origin, CellRect interior)
         {
@@ -314,7 +249,6 @@ namespace ShiftChange
                     DebugTools_Fixtures.Spawn(map, conduit, null,
                                               new IntVec3(x, 0, supply.z), Rot4.North);
                 }
-                // Then the ring, under all four walls.
                 for (int rx = 0; rx < Width; rx++)
                 {
                     Spawn(map, origin, conduit.defName, null, rx, 0, Rot4.North);
@@ -327,11 +261,9 @@ namespace ShiftChange
                 }
             }
 
-            // Four corners, plus a wall lamp on every other cell of the
-            // changing wall so the row of stands is lit for the camera. They
-            // sit in the same cells as four of the eight stands, which is what
-            // a wall attachment does — it occupies the interior cell and draws
-            // onto the wall it hangs off.
+            // Corner lamps, plus a wall lamp on every other cell of the stands' wall. A wall
+            // lamp is an attachment, not an edifice, so it shares an interior cell with a
+            // stand and draws onto the wall it hangs off.
             Spawn(map, origin, "StandingLamp", null, 1, 1, Rot4.North);
             Spawn(map, origin, "StandingLamp", null, 15, 1, Rot4.North);
             Spawn(map, origin, "StandingLamp", null, 1, 11, Rot4.North);
@@ -343,36 +275,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The set, as dressed by hand and exported: poker in the east corner
-        /// with four armchairs, billiards on the second carpet, a harp and
-        /// stool on the open floor, and two couches facing a flatscreen along
-        /// the north wall.
-        ///
-        /// <para>Four joyKinds on purpose — Gaming_Dexterity (billiards),
-        /// Gaming_Cerebral (poker), Television and HighCulture (harp) — so a
-        /// bored tolerance on any one cannot stall the fixture. The television
-        /// works here only because the conduit ring reaches the north wall.</para>
-        ///
-        /// <para><b>The harp faces EAST, and that is not cosmetic.</b> Its
-        /// <c>interactionCellOffset</c> is <c>(0,0,-1)</c> and
-        /// <c>ThingUtility.InteractionCell</c> rotates that offset with the
-        /// building (<c>IntVec3Utility.RotatedBy</c>, <c>AsInt 1</c> maps
-        /// <c>(x,z)</c> to <c>(z,-x)</c>), so North puts the musician one cell
-        /// SOUTH of the harp and East puts them one cell WEST — on the stool.
-        /// The build menu starts a harp at South, since <c>defaultPlacingRot</c>
-        /// defaults there, so a hand-placed harp has been rotated and the
-        /// rotation is the whole reason the stool is furniture rather than
-        /// scenery. A scene export of this room reported <c>Rot4.North</c>;
-        /// transcribing that verbatim sends the guest to the bare cell south of
-        /// the harp and the stool is never sat on.</para>
-        ///
-        /// <para>The couches sit at z 9, two cells south of the screen, and the
-        /// pair spans x 11-14 against the screen's x 12-13 — centred under it.
-        /// Both facts are load-bearing: a flatscreen's watch rect starts two
-        /// cells out (<c>watchBuildingStandDistanceRange 2~6</c>) and is six
-        /// wide, and <c>WatchBuildingUtility.TryFindBestWatchCell</c> only
-        /// takes a seat whose rotation faces the screen. A couch parked
-        /// anywhere else is furniture nobody ever sits on.</para>
+        /// The set, as dressed by hand and exported: poker, billiards, a harp and stool, and two
+        /// couches facing a flatscreen on the north wall, which works only because the conduit
+        /// ring reaches that wall.
         /// </summary>
         internal static void Amusements(Map map, IntVec3 origin)
         {
@@ -384,19 +289,26 @@ namespace ShiftChange
 
             Spawn(map, origin, "BilliardsTable", "WoodLog", 6, 8, Rot4.North);
 
-            // East, not the exported North — the stool at (6,3) is the harp's
-            // interaction cell only under East. See the note above.
+            // The harp faces East so that its interaction cell, one cell west, is the stool at
+            // (6,3): InteractionCell rotates the harp's interactionCellOffset (0,0,-1) with the
+            // building, so North would send the musician to the bare cell south of it. A harp
+            // placed from the build menu faces North unless rotated, and the scene export copies
+            // each thing's rotation, so keep East even if an export of a hand-dressed room says
+            // North.
             Spawn(map, origin, "Stool", "WoodLog", 6, 3, Rot4.North);
             Spawn(map, origin, "Harp", null, 7, 3, Rot4.East);
 
+            // The couches sit at z 9, two cells south of the screen, and the pair spans x 11-14
+            // against the screen's x 12-13, centred under it. A flatscreen's watch rect starts
+            // two cells out (watchBuildingStandDistanceRange 2~6) and is six wide, and
+            // WatchBuildingUtility.TryFindBestWatchCell only takes a seat whose rotation faces
+            // the screen, so a couch anywhere else is furniture nobody sits on.
             Spawn(map, origin, "Couch", "Leather_Thrumbo", 11, 9, Rot4.North);
             Spawn(map, origin, "Couch", "Leather_Thrumbo", 13, 9, Rot4.North);
             Spawn(map, origin, "FlatscreenTelevision", null, 13, 11, Rot4.South);
         }
 
-        /// <summary>
-        /// Paint a rectangle of terrain, in the export's own coordinates.
-        /// </summary>
+        /// <summary>Paints a terrain rectangle offset from the room's south-west corner.</summary>
         internal static void Floor(Map map, IntVec3 origin, string defName,
                                    int x, int z, int width, int height)
         {
@@ -415,11 +327,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Spawn one thing in the export's own coordinates and signature, so a
-        /// fresh `Export scene` pastes in here verbatim. A missing def is
-        /// skipped rather than thrown: half this set is DLC or mod content, and
-        /// a stage that refuses to build on a lighter modlist is worth less
-        /// than one that builds slightly emptier.
+        /// Spawns one thing with the arguments the scene export writes for it, so exported
+        /// lines paste in (a colour argument the export may add is not taken). A missing def is
+        /// skipped, not thrown: half this set is DLC or mod content, and a stage that builds
+        /// slightly emptier on a lighter modlist beats one that refuses to build.
         /// </summary>
         internal static void Spawn(Map map, IntVec3 origin, string defName, string stuff,
                                    int x, int z, Rot4 rot)
@@ -438,23 +349,21 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// One stand, declared for recreation, holding a formal shirt plus the
-        /// gendered piece and hat it is given, dyed to the set's colour. Full
-        /// change stays OFF: a dress code replaces the outer layers, it does not
-        /// strip the guest.
+        /// One stand, declared for recreation, holding a formal shirt plus the outer piece (the
+        /// Male-only vest or the unrestricted prestige robe) and hat it is given, dyed to the
+        /// set's colour. Full change stays off: a dress code replaces the outer layers and does
+        /// not strip the guest.
         /// </summary>
         /// <param name="shirt">
-        /// The formal base layer, under the outer piece. Everyone gets one:
-        /// without it a guest wears evening dress over the shirt they arrived
-        /// in, which is visible at the collar and cuffs and is exactly the
-        /// half-changed look the dress code exists to avoid.
+        /// Tint of the formal shirt under the outer piece, or null for none. Every guest gets
+        /// one, or the shirt they arrived in shows at the collar and cuffs.
         /// </param>
         internal static Building_OutfitStand Dress(Map map, ThingDef standDef, IntVec3 cell,
                                                    string gendered, string hat,
                                                    Color colour, Color? shirt)
         {
-            // Qualified: the local Spawn overload below takes the export's
-            // signature and would otherwise shadow the fixture primitive.
+            // Qualified: this class's own Spawn takes the export's signature and would hide
+            // the fixture one.
             Building_OutfitStand stand = (Building_OutfitStand)DebugTools_Fixtures.Spawn(
                 map, standDef, ThingDefOf.WoodLog, cell, Rot4.East);
 
@@ -490,18 +399,16 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A guest: own clothes on, every work priority off so nothing competes
-        /// with joy, needs topped up except joy, and their own stand assigned.
+        /// A guest: own clothes on, every work priority off so nothing competes with joy, needs
+        /// topped up except joy, and their own stand assigned.
         ///
-        /// <para>The assignment is what keeps the set coherent, and the failure
-        /// it prevents is not "finds nothing to wear" — it is worse than that.
-        /// A stand serves anyone who can wear SOMETHING on it
-        /// (<c>SwapPlan.WouldDress</c>), and each garment is then filtered on
-        /// its own. Only three of the five pieces are gender-locked — the vest
-        /// and top hat to Male, the ladies hat to Female — so a man claiming a
-        /// shared women's stand would wear the formal shirt AND the prestige
-        /// robe, and skip only the hat. Assigned stands are exclusive
-        /// (<c>CompShiftStand.CanBeClaimedBy</c>), which is the fix.</para>
+        /// <para>One stand per guest, assigned: a stand holds one outfit, and the frocks differ
+        /// in colour. A stand also serves anyone who can wear something from it
+        /// (<c>SwapPlan.WouldDress</c>), and each garment is then filtered on its own
+        /// (<c>PawnCanWear</c>). Only the vest and top hat (Male) and the ladies hat (Female)
+        /// are gender-locked, so a man at a women's stand would wear the formal shirt and the
+        /// prestige robe and skip only the hat. Assigned stands are exclusive
+        /// (<c>CompShiftStand.CanBeClaimedBy</c>), which prevents that.</para>
         /// </summary>
         internal static void Patron(Map map, IntVec3 cell, Gender gender, string nick,
                                     Building_OutfitStand stand)

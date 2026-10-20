@@ -1,11 +1,8 @@
-// SCENES only — see the config table in ShiftChange.csproj. This file BUILDS
-// SCENES and must never reach a player: they clear their footprint (destroying
-// any pawn standing in it), rewrite terrain and roof, unlock the whole research
-// tree, and leave permanent player-faction colonists and buildings behind. The
-// fixture primitives live in DebugTools_Fixtures, under SCENES || HARNESS;
-// UnlockEverything comes from
-// DebugTools_RecRoomStage, SpawnTorch/TopUpNeeds from DebugTools_DemoStage, and
-// the card stage's shell from DebugTools_PreviewStage — all SCENES-gated too.
+// Compiled only with SCENES (see the configuration table in ShiftChange.csproj); it must never
+// reach a player. The stage builders clear their footprint, destroying any pawn standing in it,
+// rewrite terrain and roof, unlock the whole research tree, and leave player-faction colonists
+// and buildings behind. They call DebugTools_DemoStage, DebugTools_PreviewStage and
+// DebugTools_RecRoomStage, which must stay under SCENES with this file.
 #if SCENES
 using RimWorld;
 using UnityEngine;
@@ -15,60 +12,23 @@ using static ShiftChange.DebugTools_Fixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// Bedtime in prestige cataphract, in the two shapes the gallery needs.
+    /// Bedtime in prestige cataphract, in the two shapes the gallery needs: a comparison of two
+    /// bedrooms off one corridor, and a single-room card.
     ///
-    /// <para><b>Build sleep stage</b> is the comparison: two 5×5 bedrooms side
-    /// by side off one shared corridor, a soldier in each, both about to turn
-    /// in. West DEPOSITS the armour into an empty rack and sleeps in what was
-    /// underneath; east SWAPS it for a light kit on the stand. The subject is
-    /// the MODE, not the bedtime — they are two answers to one situation, and a
-    /// viewer can only weigh them side by side. One build, one capture, one
-    /// gif.</para>
-    ///
-    /// <para><b>Build sleep card stage</b> is the same room alone, at the
-    /// preview stage's exact block geometry, for a 320×360 gallery panel. It
-    /// borrows <see cref="DebugTools_PreviewStage.BuildShell"/> and
-    /// <see cref="DebugTools_PreviewStage.InteriorOf"/> wholesale rather than
-    /// reproducing the numbers, so a sleep card and a work card can never drift
-    /// apart on framing — the same reason the preview stage borrows its room
-    /// dressing from the demo stage.</para>
-    ///
-    /// <para><b>The deposit half is visually quieter, and that is known.</b> The
-    /// west soldier walks up and the armour disappears into the rack; the east
-    /// one plays two visible changes. Do not fix that by speeding one side up —
-    /// the rooms have to read at the same rate for the comparison to survive,
-    /// which is the lesson the rec room gif's ramp already paid for. It is also
-    /// why the CARD stage stages the swap rather than the deposit: a card is one
-    /// still, and an empty rack in a still reads as nothing happening.</para>
-    ///
-    /// <para><b>THE TRAP THIS FILE EXISTS TO ENCODE: every soldier wears a shirt
-    /// and trousers UNDER the armour.</b> A deposit-only stand refuses outright
-    /// when what it would take leaves the colonist psychologically nude
-    /// (<see cref="SwapPlan.WouldBeNude"/>) — and prestige cataphract covers
-    /// torso and legs, so a soldier wearing nothing underneath is one the west
-    /// stand declines forever. Hand-build this scene without the base layer and
-    /// the feature looks broken. It is not.</para>
-    ///
-    /// <para><b>The deposit filter is NARROWED, deliberately.</b> An outfit
-    /// stand ships <c>defaultStorageSettings</c> allowing the whole Apparel
-    /// category minus ApparelUtility and Weapons, so out of the box it would
-    /// try to take the base layer too — and then decline under the rule above,
-    /// which reads as "nothing happens". Disallow-all, then allow exactly the
-    /// two armour pieces. That is the configuration a player performs, so the
-    /// stage performs it.</para>
-    ///
-    /// <para><b>Both triggers are AUTOMATIC.</b> No stand is told to serve
-    /// sleep; each room holds one owned bed, which scores it Bedroom, and the
-    /// Bedroom row in the role table does the rest. Worth demonstrating rather
-    /// than bypassing — it is the path a player gets by building a stand in a
-    /// bedroom and touching nothing.</para>
+    /// <para>In the comparison a soldier in each room is about to turn in. West deposits the
+    /// armour into an empty rack and sleeps in what was underneath; east swaps it for a light
+    /// kit on the stand. The deposit side is visually quieter, since the armour just disappears
+    /// into the rack. Do not speed one side up to compensate: the rooms must read at the same
+    /// rate for the comparison to hold.</para>
     /// </summary>
     internal static class DebugTools_SleepStage
     {
-        /// <summary>Square rooms, matching the demo stage's.</summary>
         internal const int RoomInterior = 5;
 
-        /// <summary>Shared with both neighbours, so the two rooms open onto ONE corridor.</summary>
+        /// <summary>
+        /// Rows of corridor. Must equal <see cref="DebugTools_PreviewStage.CorridorHeight"/>,
+        /// because the card stage places its soldier with it inside the preview stage's shell.
+        /// </summary>
         internal const int CorridorHeight = 2;
 
         /// <summary>Outer wall, interior, party wall, interior, outer wall.</summary>
@@ -81,14 +41,13 @@ namespace ShiftChange
         internal const int PartyX = RoomInterior + 1;
         internal const int InteriorZ = CorridorHeight + 2;
 
-        /// <summary>Door columns: the centre of each room's five.</summary>
+        /// <summary>Door columns, at the centre of each room's five.</summary>
         internal const int WestDoorX = 3;
         internal const int EastDoorX = PartyX + 3;
 
         /// <summary>
-        /// Low enough that JobGiver_GetRest wins the next roll under an Anything
-        /// timetable assignment (it needs CurLevel &lt; 0.3), high enough that
-        /// the soldier is not staggering.
+        /// Low enough that JobGiver_GetRest wins the next roll under an Anything timetable
+        /// assignment (it needs the rest level below 0.3), high enough to avoid staggering.
         /// </summary>
         internal const float DrainedRest = 0.15f;
 
@@ -98,8 +57,7 @@ namespace ShiftChange
         internal static readonly Color Sand = new Color(0.78f, 0.72f, 0.56f);
         internal static readonly Color Underlayer = new Color(0.55f, 0.58f, 0.62f);
 
-        // ------------------------------------------------- the comparison
-
+        /// <summary>The comparison at the clicked cell; clears its footprint first.</summary>
         internal static void BuildSleepStage()
         {
             Map map = Find.CurrentMap;
@@ -145,13 +103,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Two rooms, one corridor. Rows from the south edge: wall / corridor ×2
-        /// / wall with both doors / interiors ×5 / wall.
-        ///
-        /// <para>The party wall stops at the divider row on purpose — it splits
-        /// the two bedrooms and NOT the corridor, so both soldiers start in one
-        /// continuous space and walk to their own doors. Two corridors would
-        /// read as two separate stages that happen to be adjacent.</para>
+        /// Rows from the south edge: wall, two corridor rows, the divider wall with both doors,
+        /// five interior rows, north wall. The party wall runs only from the divider row up, so
+        /// both soldiers start in one continuous corridor; two would read as separate stages.
         /// </summary>
         internal static void BuildShell(Map map, IntVec3 origin)
         {
@@ -185,12 +139,13 @@ namespace ShiftChange
             }
         }
 
-        // ------------------------------------------------------- the card
-
         /// <summary>
-        /// One room at the preview stage's block geometry, for a gallery panel.
-        /// The swap configuration, because a card is a single still and an empty
-        /// rack does not read as a feature.
+        /// The swap room alone, for a 320×360 gallery panel, built at the clicked cell. It clears
+        /// the footprint first, and stages the swap rather than the deposit because a card is one
+        /// still and an empty rack in a still reads as nothing happening. The preview stage's
+        /// shell and interior are used so the capture rect and door column match a work card's;
+        /// devtools/bridge/shoot-sleep-card.py selects this entry by its menu label and crops
+        /// the preview stage's 8×9 rect from the block.
         /// </summary>
         internal static void BuildSleepCardStage()
         {
@@ -216,8 +171,6 @@ namespace ShiftChange
             Current.Game.playSettings.useWorkPriorities = true;
             DebugTools_RecRoomStage.UnlockEverything();
 
-            // Borrowed, not reproduced: a sleep card and a work card have to
-            // crop identically or the gallery stops looking like a set.
             DebugTools_PreviewStage.BuildShell(map, origin);
             CellRect interior = DebugTools_PreviewStage.InteriorOf(origin);
 
@@ -233,8 +186,6 @@ namespace ShiftChange
                 MessageTypeDefOf.TaskCompletion, historical: false);
         }
 
-        // ----------------------------------------------------- the shared
-
         internal static ThingDef StandDef()
         {
             ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
@@ -247,48 +198,26 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// One bedroom's contents: a bed in the middle of the floor, a stand on
-        /// the west wall, and the soldier who owns both, standing in the
-        /// corridor outside their own door.
-        ///
-        /// <para><b>The bed is centred rather than tucked into a corner</b>
-        /// because these rooms are photographed square-on: a corner bed pulls
-        /// the eye off-axis and leaves the opposite corner empty, which a 5×5
-        /// cannot afford. Two tiles cannot centre exactly in five rows, so it
-        /// sits one row north of true centre, leaving the walking space on the
-        /// door side where the action is.</para>
-        ///
-        /// <para><b>Order matters.</b> The bed is spawned and ASSIGNED before
-        /// the stand's trigger is read, because the trigger is automatic — the
-        /// room only scores Bedroom once it holds a bed, and reading
-        /// <c>HandlesRest</c> earlier would see a roleless room and report
-        /// false.</para>
+        /// Fills one bedroom: carpet, a bed, a stand on the west wall, and the soldier who owns
+        /// both, spawned at <paramref name="start"/> in the corridor outside the room's door.
+        /// The bed is centred, not in a corner, because the rooms are photographed square-on;
+        /// two tiles cannot centre exactly in five rows, so it covers rows <c>minZ + 1</c> and
+        /// <c>minZ + 2</c>, half a row toward the door.
         /// </summary>
         internal static void Occupant(Map map, ThingDef standDef, CellRect interior,
                                       string nick, Gender gender, bool deposit, IntVec3 start)
         {
-            // CARPET THE ROOM, because every card in the gallery has one. The
-            // demo stage lays red, green and blue in its three work rooms and
-            // the preview stage inherits them, so a bare plank floor here would
-            // put the sleep card visibly outside the set. Dark rather than a
-            // fourth primary: it is a bedroom, and the pawns — armour in one
-            // beat, pale kit in the next — read far better against it than
-            // against brown planks. Measured bonus from the reshoot: a flat
-            // field costs a THIRD of the gif file size a plank floor does,
-            // because the ditherer has almost nothing to chew on.
-            //
-            // Silent-fail through the list: these defs are generated by a
-            // TerrainTemplateDef crossed with the structural ColorDefs, so one
-            // can move between versions while the others survive.
+            // The demo and preview stages carpet their rooms, so a plank floor would put the card
+            // outside the set. The names are tried in order because these terrain defs are
+            // generated by crossing a TerrainTemplateDef with the structural colours, so one can
+            // be missing in a game version while the others survive.
             Carpet(map, interior, "CarpetGreyDark", "CarpetSlate", "CarpetBlack");
 
-            // Rot4.SOUTH, matching the demo stage's hospital, and it is not a
-            // free choice. GenAdj.OccupiedRect places a 1x2 building at Position
-            // and Position + z whichever way it faces — rotation only swaps the
-            // axes for East/West — so North and South occupy the same two cells
-            // and differ ONLY in the sprite. North draws the pillow at the foot
-            // end, which reads as an upside-down bed and was exactly that on the
-            // first take.
+            // Facing south, as the demo stage's hospital does. A bed's head, where the pillow is
+            // drawn, is always its Position, and the bed runs from there toward its facing
+            // (BedUtility.GetSleepingSlotPos, GenAdj.OccupiedRect). South covers Position and
+            // the cell south of it, pillow at the top of the shot; North covers Position and the
+            // cell north of it, pillow at the bottom, which reads as an upside-down bed.
             Building_Bed bed = (Building_Bed)DebugTools_Fixtures.Spawn(
                 map, ThingDefOf.Bed, ThingDefOf.WoodLog,
                 new IntVec3(interior.minX + interior.Width / 2, 0, interior.minZ + 2),
@@ -310,8 +239,10 @@ namespace ShiftChange
                 GenSpawn.Spawn(pawn, interior.CenterCell, map);
             }
 
-            // THE BASE LAYER IS LOAD-BEARING, not dressing — see the class
-            // comment. Without it the deposit stand declines every night.
+            // The shirt and trousers under the armour are required. A deposit-only stand declines
+            // a plan that would leave the soldier psychologically nude (SwapPlan.WouldBeNude),
+            // and the armour covers torso and legs, so without a base layer the west stand
+            // declines every night and the feature looks broken.
             pawn.apparel?.DestroyAll();
             Wear(pawn, "Apparel_BasicShirt", Underlayer);
             Wear(pawn, "Apparel_Pants", Underlayer);
@@ -327,24 +258,27 @@ namespace ShiftChange
             }
             else
             {
-                // "Flak helmet" is Apparel_AdvancedHelmet — the def name and the
-                // label disagree, and reaching for Apparel_SimpleHelmet gets the
-                // plain one instead.
+                // The flak helmet's def is Apparel_AdvancedHelmet; Apparel_SimpleHelmet is the
+                // plain one.
                 Put(stand, "Apparel_Duster", Sand);
                 Put(stand, "Apparel_AdvancedHelmet", Sand);
             }
 
-            // Read AFTER the bed is down and owned, so the room has a role.
+            // No stand is told to serve sleep: the room scores Bedroom once the bed is down (one
+            // bed scores it, owned or not), and the Bedroom row in the role table supplies the
+            // trigger, as it does for a player who builds a stand in a bedroom and touches
+            // nothing. So this is read only after the bed spawns, or the room, still a generic
+            // Room, would report false.
             CompShiftStand comp = stand.TryGetComp<CompShiftStand>();
             if (comp != null && !comp.HandlesRest())
             {
-                // Should not fire: one owned bed scores Bedroom, and Bedroom is
-                // in the rest table. Kept because a modded room-role worker can
-                // outscore it, and a stage that silently does nothing is worse
-                // than one that quietly declares the trigger.
+                // Not expected: one bed scores Bedroom, which the rest table covers. Kept
+                // because another mod's room-role worker can outscore Bedroom, and a stage that
+                // silently does nothing is worse than one that declares the trigger by hand.
                 comp.ToggleRest();
                 if (deposit)
                 {
+                    // ToggleRest keeps the stored bit, so this repeat is only a precaution.
                     DepositOnly(stand);
                 }
                 Messages.Message("Room did not score Bedroom for " + nick
@@ -352,6 +286,7 @@ namespace ShiftChange
                     MessageTypeDefOf.CautionInput, historical: false);
             }
 
+            // Every work type off, so nothing competes with resting.
             pawn.workSettings.EnableAndInitialize();
             foreach (WorkTypeDef work in DefDatabase<WorkTypeDef>.AllDefsListForReading)
             {
@@ -369,17 +304,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Deposit-only, with the filter narrowed to exactly the armour.
-        ///
-        /// <para><c>SetDisallowAll</c> first is the whole point: the stand's
-        /// shipped default accepts nearly all apparel, which would sweep the
-        /// base layer into the plan and trip the never-naked refusal, and the
-        /// stage would then demonstrate nothing at all.</para>
-        ///
-        /// <para>Called again after a fallback <c>ToggleRest</c> because
-        /// <see cref="CompShiftStand.DepositOnly"/> is gated on
-        /// <c>HandlesRest()</c> — setting it while the trigger is off stores the
-        /// bit but reads back false, and the filter work would be invisible.</para>
+        /// Makes the stand deposit-only, with its filter narrowed to exactly the two armour
+        /// pieces. A stand's shipped filter accepts nearly all apparel, which would put the base
+        /// layer in the plan and trip the never-nude refusal, so the stage would demonstrate
+        /// nothing. Disallow all, then allow the armour, as a player would.
         /// </summary>
         internal static void DepositOnly(Building_OutfitStand stand)
         {

@@ -1,11 +1,7 @@
-// SCENES only — see the config table in ShiftChange.csproj. This file BUILDS
-// A SCENE and must never reach a player: it clears a 10x8 footprint (which
-// destroys any pawn standing in it), lays 24 cells of shallow water, and
-// leaves a permanent player-faction colonist and buildings behind. The
-// fixture primitives it is built from live in DebugTools_Fixtures, under
-// SCENES || HARNESS; the three it still takes from DebugTools_DemoStage
-// (SpawnTorch, SpawnStand, TopUpNeeds) resolve because that file is
-// SCENES-gated too.
+// SCENES only, see the config table in ShiftChange.csproj. This file builds a scene and must
+// never reach a player: it clears a 10x8 footprint (destroying any pawn in it), rewrites its
+// terrain and roof, and leaves a permanent player-faction colonist and buildings behind. It
+// calls DebugTools_DemoStage (SpawnTorch, SpawnStand, TopUpNeeds), which must stay under SCENES.
 #if SCENES
 using System.Collections.Generic;
 using LudeonTK;
@@ -19,34 +15,22 @@ using static ShiftChange.DebugTools_Fixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// The recreation test fixture: dev mode → Shift Change → Build pool room
-    /// stage, then click a map cell. One roofed natatorium — a shallow-water
-    /// pool ringed by a plank deck, torch-lit and heat-pushed warm — with an
-    /// outfit stand by the door holding one white robe, and a swimmer with no
-    /// work at all and a drained joy need.
+    /// Fixture for the recreation arm: a roofed shallow-water pool ringed by a plank deck,
+    /// torch-lit and heated, with a stand by the door holding one white robe and set to
+    /// recreation, and a swimmer with no work and a drained joy need. The swimmer should dress
+    /// first, swim, and change back on their first job outside. The recreation footage is shot
+    /// here, so keep the layout stable.
     ///
-    /// It staged the baseline before the recreation branch, when the swimmer
-    /// took GoSwimming breaks in their own clothes, and is now that branch's
-    /// acceptance fixture: the same take, with the stand set to recreation
-    /// and the swimmer dressing at it first. Keep the stage stable; the
-    /// comparison across that change is the point.
+    /// <para>The pool is sized for <c>SwimPathFinder</c>, which makes exactly twelve hops out
+    /// from the start cell and then returns to it (a fourteen-cell path), each hop to a water
+    /// cell from just over one to just over three cells away, and fails outright if any hop
+    /// finds none. A 6×4 pool keeps a candidate in reach of every node; a 3×3 one resolves,
+    /// but the hops fold back on the spot and read as wading rather than swimming.</para>
     ///
-    /// The pool is sized for <c>SwimPathFinder</c>, which is all-or-nothing:
-    /// it builds exactly 12 hops of 1–3 cells each and FAILS OUTRIGHT if any
-    /// hop has no candidate (SwimPathFinder.cs:27-76) — there are no shorter
-    /// paths. A 6×4 pool keeps in-pool candidates at radius ≤3 from every
-    /// node, so a path always resolves; ~3×3 still paths but the hops fold on
-    /// the spot and read as wading rather than swimming.
-    ///
-    /// GoSwimming's other gates (JoyGiver_GoSwimming.cs:58-81): indoors the
-    /// ROOM temperature must exceed 10 °C — hence the heat push and torches —
-    /// and every pool cell must be Standable, IsWater, non-toxic and
-    /// unfogged. That means vanilla <c>WaterShallow</c> and never deep water:
-    /// deep water is Impassable, so SwimPathFinder rejects it as
-    /// non-Standable and vanilla swimmers never enter it.
-    ///
-    /// Never in a shipping build, like its siblings (docs/DESIGN.md,
-    /// "Development tooling").
+    /// <para>The GoSwimming giver also needs, indoors, a room temperature above 10 °C (hence
+    /// the heat push and torches) and pool cells that are standable, water, non-toxic and
+    /// unfogged. So the pool is vanilla <c>WaterShallow</c>: deep water is impassable, which
+    /// SwimPathFinder rejects as not standable, so vanilla swimmers never enter it.</para>
     /// </summary>
     internal static class DebugTools_PoolStage
     {
@@ -63,23 +47,19 @@ namespace ShiftChange
         internal const int DoorX = 4;
 
         /// <summary>
-        /// Below the 0.35 threshold where the Anything-schedule think node
-        /// starts offering joy (ThinkNode_Priority_GetJoy), with headroom so
-        /// several consecutive swims fit in one observation session before
-        /// the need refills.
+        /// Below 0.35, where the Anything-schedule think node (<c>ThinkNode_Priority_GetJoy</c>)
+        /// starts offering joy, with headroom for several swims before the need refills.
         /// </summary>
         internal const float DrainedJoy = 0.15f;
 
         /// <summary>
-        /// One shot of warmth so the room passes GoSwimming's indoor gate
-        /// (&gt; 10 °C) on the first joy roll instead of waiting for the
-        /// torches to catch up. Torches sustain it afterwards.
+        /// One shot of warmth so the room passes GoSwimming's indoor gate (above 10 °C) on the
+        /// first joy roll instead of waiting for the torches, which sustain it afterwards.
         /// </summary>
         internal const float HeatPush = 3000f;
 
         /// <summary>
-        /// Registered from <see cref="DebugTools_Menu"/>, not by its own
-        /// attribute — one collapsing entry, never a category of loose ones.
+        /// Registered from <see cref="DebugTools_Menu"/>, not by its own attribute.
         /// </summary>
         internal static void BuildPoolStage()
         {
@@ -114,8 +94,8 @@ namespace ShiftChange
                 map.terrainGrid.SetTerrain(cell, water);
             }
 
-            // Deck corners away from the stand's SW spot. Light matters for
-            // the eventual footage, heat for the giver's indoor gate.
+            // Torches at the deck's east corners, away from the stand's south-west spot: light
+            // for the footage, warmth for the giver's indoor gate.
             DebugTools_DemoStage.SpawnTorch(map, new IntVec3(interior.maxX, 0, interior.minZ));
             DebugTools_DemoStage.SpawnTorch(map, new IntVec3(interior.maxX, 0, interior.maxZ));
 
@@ -124,17 +104,15 @@ namespace ShiftChange
             ThingDef robe = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_Robe");
             if (robe != null)
             {
-                // White-dyed, so the swap reads at a glance on camera. One robe only: the
-                // stand holds one outfit, and a second robe would just be
-                // evicted by the first swap.
+                // White, so the swap reads at a glance on camera. One robe only: the stand holds
+                // one outfit, and a second robe would be dropped when the first is put back.
                 stand.AddApparel(MakeGarment(robe, Color.white));
             }
 
-            // Arm the trigger. A pure pool room is ROLELESS — GoSwimming is
-            // terrain-driven, so RoomRoleWorker_RecRoom counts nothing here —
-            // and the automatic path can never light up. The manual toggle is
-            // the normal player flow for pool rooms; the stage does it for
-            // the take.
+            // A pure pool room scores only the generic Room role (swimming is terrain-driven, so
+            // RoomRoleWorker_RecRoom counts nothing in it), which suggests no trigger, so the
+            // stand never lights up on its own. The manual recreation toggle is the player's flow
+            // for pool rooms.
             CompShiftStand comp = stand.TryGetComp<CompShiftStand>();
             if (comp != null && !comp.HandlesRecreation())
             {
@@ -143,8 +121,8 @@ namespace ShiftChange
 
             SpawnSwimmer(map, origin, interior);
 
-            // After the shell exists, so the push lands in the enclosed room
-            // rather than dissipating outdoors.
+            // After the shell exists, so the heat lands in the enclosed room instead of
+            // dissipating outdoors.
             GenTemperature.PushHeat(new IntVec3(origin.x + DoorX, 0, interior.minZ + 1), map, HeatPush);
 
             Messages.Message("Pool room stage built; the stand dresses for recreation. Use "
@@ -155,29 +133,16 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Re-arm the recreation trigger on one pawn: drop the joy need to a
-        /// level that makes them seek recreation, and clear the joy TOLERANCES
-        /// that would otherwise decide which kind they pick.
+        /// Re-arms the recreation trigger on one pawn: drains joy to <see cref="DrainedJoy"/> and
+        /// clears every joy tolerance, so any giver can win the next roll. It starts no job, so
+        /// the real roll runs and any joy source from any mod is exercised.
         ///
-        /// <para>The tolerance half is the part that matters, and it replaced a
-        /// "force a swim" button that could not do this job. Joy selection is a
-        /// weighted roll over every giver, and a kind whose tolerance passed 0.5
-        /// is not down-weighted but SKIPPED outright
-        /// (<c>JobGiver_GetJoy</c> tests <c>BoredOf</c> and continues), with
-        /// boredom only lifting once tolerance decays below 0.3. A psycaster
-        /// meditating for psyfocus banks Meditative tolerance through the same
-        /// joy path (<c>JobDriver_Meditate</c> ticks
-        /// <c>JoyUtility.JoyTickCheckEnd</c>), which silently excludes every
-        /// Meditative giver — hot springs, swimming, skygazing, art. Draining
-        /// the need alone does nothing about that, which is why a hundred
-        /// draft/undraft cycles could not produce a pool take.</para>
-        ///
-        /// <para>Deliberately does NOT start a job. Forcing one specific joy
-        /// def only ever tested that def — it was Odyssey <c>GoSwimming</c>
-        /// against water TERRAIN, so it could not reach a modded hot spring,
-        /// which is a building with its own giver. Re-arming and letting the
-        /// real roll happen tests the path a player actually walks, and works
-        /// for any joy source from any mod.</para>
+        /// <para>The tolerance reset is the part that matters. A joy kind whose tolerance has
+        /// passed 0.5 is skipped outright, not down-weighted (<c>JobGiver_GetJoy</c> tests
+        /// <c>BoredOf</c> and continues), until tolerance decays below 0.3. Meditating for
+        /// psyfocus banks Meditative tolerance (<c>JobDriver_Meditate</c> ticks
+        /// <c>JoyUtility.JoyTickCheckEnd</c>), which excludes every Meditative giver, swimming
+        /// included; draining the need alone cannot undo that.</para>
         /// </summary>
         internal static void DrainRecreation(Pawn pawn)
         {
@@ -190,10 +155,8 @@ namespace ShiftChange
 
             pawn.needs.joy.CurLevel = DrainedJoy;
 
-            // JoyToleranceSet keeps both maps private and exposes only "add"
-            // and "decay one interval" — there is no reset. Reflection is the
-            // honest way to get one, and this file is SCENES-only, so it never
-            // reaches a player.
+            // JoyToleranceSet keeps both maps (tolerances and bored) private and exposes only
+            // add and decay-one-interval, with no reset, so they are reset by reflection.
             int cleared = 0;
             JoyToleranceSet tolerances = pawn.needs.joy.tolerances;
             foreach (string field in new[] { "tolerances", "bored" })
@@ -205,8 +168,7 @@ namespace ShiftChange
                 {
                     continue;
                 }
-                // DefMap<T,V> exposes an indexer and Count; reset through them
-                // rather than reaching further into its own internals.
+                // A DefMap<T,V> exposes an indexer and Count; reset through those.
                 PropertyInfo count = map.GetType().GetProperty("Count");
                 PropertyInfo item = map.GetType().GetProperty("Item", new[] { typeof(int) });
                 if (count == null || item == null)
@@ -229,10 +191,7 @@ namespace ShiftChange
                 historical: false);
         }
 
-        /// <summary>
-        /// Walls, one south door, plank floor, roof. Rows from the south
-        /// edge: wall with door / deck / pool rows / deck / wall.
-        /// </summary>
+        /// <summary>Walls with one south door, plank floor and roof over the footprint.</summary>
         internal static void BuildShell(Map map, IntVec3 origin)
         {
             IntVec3 door = origin + new IntVec3(DoorX, 0, 0);
@@ -261,11 +220,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// One colonist with EVERY work type at priority zero, so joy and
-        /// idling are all the think tree can offer — the stage measures the
-        /// joy pipeline, and a stray hauling job would muddy the take. Needs
-        /// are full except joy, drained below the Anything-schedule threshold
-        /// so the first break comes quickly.
+        /// One colonist inside the door with every work type at priority zero, so only joy and
+        /// idling are on offer and a stray job cannot muddy the take. Needs are full except joy,
+        /// drained so the first break comes quickly.
         /// </summary>
         internal static void SpawnSwimmer(Map map, IntVec3 origin, CellRect interior)
         {

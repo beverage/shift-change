@@ -10,25 +10,22 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// Drives ECR's reload pipeline from a polling thread, because Mono's
-    /// FileSystemWatcher on macOS registers happily and then never delivers
-    /// (convicted 2026-08-08: "Registered file watcher" in Player.log, the
-    /// .dll_orig rewritten by a Debug build, no event, no reload).
+    /// Starts EditCompileReload's reload from a polling thread, because ECR's own file watcher
+    /// never fires here: under Unity's Mono on macOS a FileSystemWatcher registers and then
+    /// delivers no events.
     ///
-    /// The poller watches the .dll_orig's mtime — the same file ECR's own
-    /// watcher targets, since that file is both the trigger and the payload —
-    /// and fires only after the mtime holds still for one full poll: the
-    /// compiler plugin streams the file over ~150ms, and firing mid-write
-    /// would feed AsmResolver a torn image. The reload itself is ECR's own
-    /// private ProcessAssembly, invoked by reflection: pure CLR work with its
-    /// own rollback-on-exception, which ECR already runs on a background
-    /// thread by design, so a single poller thread preserves its threading
-    /// assumptions trivially.
-    ///
-    /// Debug builds only, like everything ECR.
+    /// <para>The poller watches the mtime of <c>Assemblies/ShiftChange.dll_orig</c>, the file a
+    /// Debug build writes and the one ECR's watcher targets, since it is both trigger and
+    /// payload. The reload is ECR's private <c>ProcessAssembly</c>, called by reflection. It is
+    /// pure CLR work that rolls itself back on an exception, and ECR already runs it on a
+    /// background thread, so a single poller thread keeps its threading assumptions.</para>
     /// </summary>
     internal static class EcrWatchdog
     {
+        /// <summary>
+        /// Milliseconds between checks, and so the settle time a change must survive before it
+        /// fires. Keep it well above the ~150 ms the build takes to stream the file.
+        /// </summary>
         internal const int PollMs = 500;
 
         public static void Start()
@@ -59,6 +56,7 @@ namespace ShiftChange
             EcrLog.Message("watchdog armed on " + path);
         }
 
+        /// <summary>Runs on the watchdog thread for the life of the game.</summary>
         internal static void Poll(string path, MethodInfo process)
         {
             DateTime known = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : default;
@@ -70,8 +68,9 @@ namespace ShiftChange
                 {
                     if (!File.Exists(path))
                     {
-                        // A Release build swept it mid-session. Keep polling —
-                        // the next Debug build recreates it.
+                        // Any non-Debug build (Release, Media, the harness runs) deletes the
+                        // file. Keep polling: when a Debug build writes it again, it is handled
+                        // like any other change.
                         continue;
                     }
                     DateTime current = File.GetLastWriteTimeUtc(path);
@@ -82,8 +81,8 @@ namespace ShiftChange
                     }
                     if (current != pending)
                     {
-                        // First sighting of a new write — let it settle for a
-                        // full poll before trusting the bytes.
+                        // First sighting of a new write: wait one more poll, because firing
+                        // mid-write would hand ECR's AsmResolver a torn image.
                         pending = current;
                         continue;
                     }

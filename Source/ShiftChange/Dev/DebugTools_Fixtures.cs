@@ -1,6 +1,5 @@
-// Dev tooling, under either guard — see the configuration table in
-// ShiftChange.csproj. Both callers compile out of a shipping build, so this
-// does too.
+// Dev tooling, compiled under either dev guard (configuration table: ShiftChange.csproj).
+// A shipping build defines neither, so this compiles out along with both callers.
 #if SCENES || HARNESS
 using System.Collections.Generic;
 using RimWorld;
@@ -10,44 +9,29 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// Fixture primitives shared by the lifecycle harness and the SCENES-only
-    /// stage builders: make a thing, make a pawn, make a garment, dress them.
-    ///
-    /// <para><b>Why the guard is <c>SCENES || HARNESS</c> and not either one
-    /// alone.</b> Two dev-only callers gate independently — the stage builders
-    /// on SCENES, the harness on HARNESS — and each builds its fixtures out of
-    /// these members. Naming one guard would break the other's build. The
-    /// OR is the whole reason this file is not simply part of one of them;
-    /// everything that BUILDS A SCENE from these stays in
-    /// <c>DebugTools_DemoStage</c> / <c>DebugTools_PreviewStage</c>.</para>
-    ///
-    /// <para><b>This reaches no player.</b> Nothing here carries a
-    /// <c>[DebugAction]</c>, and a shipping build has neither constant, so the
-    /// type is not in the assembly at all. <see cref="Spawn"/> and
-    /// <see cref="AveragePawn"/> do make player-faction things and colonists —
-    /// that is what a fixture is — so keep it that way: if a shipped code path
-    /// ever wants one of these, that is a new resident, it needs its own
-    /// go/no-go, and it does not live in this file.</para>
+    /// Fixture primitives shared by the lifecycle harness and the SCENES-only stage builders:
+    /// make a thing, a pawn, a garment, and dress them. The guard names both constants because
+    /// each caller builds its fixtures from these; code that builds a whole scene stays in the
+    /// <c>DebugTools_*Stage</c> files. Spawn and AveragePawn make player-faction things and
+    /// colonists, so shipped code must never call into this file; a shipped need for one of
+    /// them is new code with its own go/no-go.
     /// </summary>
     internal static class DebugTools_Fixtures
     {
-        /// <summary>Steel helmet grey, and the researcher's duster.</summary>
+        /// <summary>The green tint of the researcher's duster.</summary>
         internal static readonly Color DusterGreen = new Color(0.62f, 0.9f, 0.7f);
 
+        /// <summary>Spawns a player-faction thing with no style and graphic variant 0.</summary>
         internal static Thing Spawn(Map map, ThingDef def, ThingDef stuff, IntVec3 cell, Rot4 rot)
         {
             Thing thing = ThingMaker.MakeThing(def, stuff);
             thing.SetFactionDirect(Faction.OfPlayer);
-            // A consistent set: no ideology styling, no random graphic
-            // variants — every torch, chair and table is the default sprite.
             thing.SetStyleDef(null);
             thing.overrideGraphicIndex = 0;
             Thing spawned = GenSpawn.Spawn(thing, cell, map, rot);
-            // …and clear AGAIN after spawning: vanilla's torch is a
-            // Graphic_Single with exactly one graphic, so the mixed torches
-            // in play could only come from a restyling mod on the modlist
-            // applying at SpawnSetup — after the pre-spawn clear. Post-spawn
-            // wins, and Notify_ColorChanged drops the cached graphic.
+            // Cleared again after spawning: a mod that restyles things can apply its style in
+            // SpawnSetup, after the clear above, and the post-spawn clear wins.
+            // Notify_ColorChanged drops the cached graphic.
             spawned.SetStyleDef(null);
             spawned.overrideGraphicIndex = 0;
             spawned.Notify_ColorChanged();
@@ -55,23 +39,20 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// John and Jane Q. Pawn: a 30-year-old baseliner with a standard
-        /// body, natural hair, no beard, no tattoos, NO TRAITS (a randomly
-        /// rolled Nudist or Pyromaniac hijacks a take), and a role nickname
-        /// so the on-screen label reads Doc / Lab / Chef / Patient.
+        /// A generated colonist with a plain, repeatable look: 30 years old, baseliner, standard
+        /// body, natural hair, no beard, tattoos or traits (a rolled Nudist or Pyromaniac
+        /// hijacks a take), and the nickname <paramref name="nick"/> so the on-screen label
+        /// reads as the role. Backstories stay, and one can disable a work type outright; a
+        /// staff pawn whose specialty is disabled gets priority 0 in everything
+        /// (<c>SpawnStaff</c> zeroes all non-specialty work) and wanders. So the pawn is
+        /// rerolled, at most 30 times and keeping the last roll, until
+        /// <paramref name="mustBeCapableOf"/>, when given, is enabled. Relations are off so the
+        /// discarded rolls leave nothing behind.
         ///
-        /// Traits are cleared, but BACKSTORIES are rolled and kept — and a
-        /// backstory can disable a work type outright. A chef whose roll
-        /// disabled Cooking gets priority 0 in everything (SpawnStaff zeroes
-        /// all non-specialty work) and wanders the set for the whole take
-        /// (found in play, 2026-08-08). So reroll until the specialty is
-        /// enabled; relations are off so the discards leave nothing behind.
-        ///
-        /// <para>Two more rolls are taken out, for the lifecycle harness: a pawn
-        /// whose needs would move while the harness pumps it
-        /// (<see cref="NeedsTickWhilePumped"/>) is rerolled too, and whatever
-        /// the pawn arrived needing tended is removed
-        /// (<see cref="RemoveTendableConditions"/>).</para>
+        /// The lifecycle harness also relies on two more rolls being removed: a pawn whose
+        /// needs tick under a stopped clock (<see cref="NeedsTickWhilePumped"/>) is rerolled,
+        /// and conditions it arrived needing tended are removed
+        /// (<see cref="RemoveTendableConditions"/>).
         /// </summary>
         internal static Pawn AveragePawn(Gender gender, string nick, WorkTypeDef mustBeCapableOf = null)
         {
@@ -100,24 +81,12 @@ namespace ShiftChange
 
             pawn.Name = new NameTriple(gender == Gender.Female ? "Jane" : "John", nick, "Doe");
             pawn.story.traits.allTraits.Clear();
-            // THE IDEO HALF OF THE SAME PROBLEM, and it cost three red gate
-            // runs before anyone looked (2026-09-21). Traits are cleared one
-            // line above because a rolled Nudist hijacks a take; the decency
-            // cases then ask SwapPlan.PrefersNudity, whose SECOND arm is the
-            // ideoligion. IdeoUtility.IdeoPrefersNudityForGender walks the
-            // precepts for def.prefersNudity and matches when
-            // genderPrefersNudity is None or this pawn's gender — and a
-            // quicktest colony rolls its ideo at random. On the runs where
-            // that roll carried a nudity precept, the decency fixtures were
-            // staging a colonist the guard is supposed to exempt, so the
-            // assertions failed on a premise nobody had arranged. The tell was
-            // that the male and female halves of one pair disagreed, which
-            // only a gender-aware precept can do once traits are gone.
-            //
-            // The precept is removed rather than the ideo replaced: the pawn
-            // keeps a normal colony ideoligion, and only the axis these cases
-            // are blind to is pinned. NudistIsExemptFromDecency still arranges
-            // its own nudity, by trait, and is unaffected.
+            // Traits are cleared above, but the game also counts a pawn as preferring nudity
+            // when a precept of its ideoligion sets prefersNudity for the pawn's gender or for
+            // any gender (IdeoUtility.IdeoPrefersNudityForGender), and a quicktest colony rolls
+            // its ideoligion at random. Left in, such a precept would sometimes make the decency
+            // cases stage a colonist that SwapPlan.PrefersNudity exempts. Removing the precept
+            // keeps the ideoligion; NudistIsExemptFromDecency arranges its own nudity by trait.
             if (ModsConfig.IdeologyActive && pawn.Ideo != null)
             {
                 List<Precept> nudity = new List<Precept>();
@@ -146,34 +115,21 @@ namespace ShiftChange
             return pawn;
         }
 
-        /// <summary>
-        /// The largest delta <c>Thing.DoTick</c> hands to <c>TickInterval</c>:
-        /// <c>Thing.MaxTickIntervalRate</c> (<c>Thing.cs:606</c>, used at
-        /// <c>:727-732</c>), which is protected.
-        /// </summary>
+        /// <summary>Copy of the protected <c>Thing.MaxTickIntervalRate</c>.</summary>
         internal const int MaxTickIntervalDelta = 15;
 
         /// <summary>
-        /// This pawn's needs, and its random mental-break check, would fire
-        /// while the lifecycle harness pumps it. The harness runs every case
-        /// inside one frame, so the game clock stands still while
-        /// <c>RunSwap</c> and the other pumps call <c>Pawn.DoTick</c> by hand.
-        /// Both are gated on <c>IsHashIntervalTick(150, delta)</c>
-        /// (<c>Pawn_NeedsTracker.cs:112</c>, <c>MentalBreaker.cs:253</c>), which
-        /// reads that clock and the pawn's id, with a delta of at most
-        /// <see cref="MaxTickIntervalDelta"/>. With the clock stopped the
-        /// answer never changes. Most pawns' needs never move, about one pawn
-        /// in ten gets 150 ticks of need every 15 pumped ticks, and about one
-        /// in 150 gets them on every pumped tick.
-        ///
-        /// <para>Measured on 1.7.4979, 2026-10-15, pumping each kind 6,000
-        /// ticks: a colonist of the last kind ran out of food within 500
-        /// ticks, was downed by malnutrition, and died at tick 1,114 in one run
-        /// and 1,334 in another. One of the middle kind ran out of food by
-        /// tick 5,000. A case that pumps such a colonist through a few swaps
-        /// sees one cut short with nothing taking over, and then a dead pawn.
-        /// With the clock running, as the stage builders have it, this costs a
-        /// reroll now and then and nothing else.</para>
+        /// Whether this pawn's needs, or its random mental-break check, would fire while the
+        /// lifecycle harness pumps it. The harness runs every case inside one frame, so the
+        /// game clock stands still while <c>RunSwap</c> and the other pumps call
+        /// <c>Pawn.DoTick</c> by hand. The needs tracker and the mental breaker run on
+        /// <c>IsHashIntervalTick(150, delta)</c>, which reads that clock and the pawn's id with
+        /// a delta of at most <see cref="MaxTickIntervalDelta"/>, so for a given pawn the
+        /// answer never changes. Most pawns' needs never move, about one in ten gets 150 ticks
+        /// of need every 15 pumped ticks, and about one in 150 gets them every pumped tick; a
+        /// colonist of the last kind is out of food within 500 pumped ticks and dies, which
+        /// cuts a case short. With the clock running, as in the stage builders, this costs a
+        /// reroll now and then and nothing else.
         /// </summary>
         internal static bool NeedsTickWhilePumped(Pawn pawn)
         {
@@ -181,14 +137,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Removes every condition the pawn needs tended now. Vanilla tends a
-        /// new pawn's conditions only when it is not joining the player
-        /// (<c>PawnGenerator.cs:1297</c>), so a colonist who rolled asthma
-        /// starts untended, and is an urgent patient
-        /// (<c>HealthAIUtility.ShouldSeekMedicalRestUrgent</c>) from the start.
-        /// Nobody dresses an urgent patient for bed, and nobody changes one
-        /// back before it, so a case that sends its colonist to bed failed at
-        /// random. Asthma comes to roughly one colonist in seventy by thirty.
+        /// Removes every condition the pawn needs tended now. The generator tends a new pawn's
+        /// conditions only when the pawn is not joining the player, so a colonist who rolled one
+        /// (asthma, roughly one in seventy by thirty) starts untended and is an urgent patient
+        /// (<c>HealthAIUtility.ShouldSeekMedicalRestUrgent</c>). By default the mod neither
+        /// dresses an urgent patient for bed nor changes one back before it, so a case that
+        /// sends its colonist to bed would fail at random.
         /// </summary>
         internal static void RemoveTendableConditions(Pawn pawn)
         {
@@ -208,19 +162,14 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Cloth for anything stuffable, default sprite always — staged
-        /// garments should read identically take after take. The explicit
-        /// SetColor matters: CompColorable.Initialize rolls the def's
-        /// colorGenerator (random clothing colours — the pink chef's
-        /// uniform), so "default" has to be imposed.
+        /// A garment in the default sprite and a fixed colour: <c>CompColorable</c> rolls the
+        /// def's colorGenerator on initialisation, which would give random clothing colours.
         /// </summary>
         internal static Apparel MakeGarment(ThingDef def, Color? tint)
         {
-            // Cloth for anything that takes it, but NOT unconditionally: the
-            // simple helmet is Metallic-only, and handing ThingMaker a stuff
-            // outside the def's own categories is not a thing the game has to
-            // tolerate. Fabric-capable pieces keep Cloth so every garment
-            // staged before this change still looks identical.
+            // Cloth where the def accepts fabric, otherwise its default stuff: the simple
+            // helmet is metallic only, and ThingMaker is not required to tolerate a stuff
+            // outside the def's own stuffCategories.
             ThingDef stuff = null;
             if (def.MadeFromStuff)
             {
@@ -238,9 +187,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The room's work gear from Vanilla Apparel Expanded when its defs
-        /// are loaded; a colour-tinted vanilla outfit otherwise, so the swap
-        /// still reads on camera without the apparel mod.
+        /// Stocks the stand with the named defs that are loaded (the room's work gear from
+        /// Vanilla Apparel Expanded). When none is, a vanilla shirt and trousers in
+        /// <paramref name="fallbackTint"/>, so the swap still reads without the apparel mod.
         /// </summary>
         internal static void Stock(Building_OutfitStand stand, string[] preferredDefNames, Color fallbackTint)
         {
@@ -271,30 +220,18 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Strips generated apparel and dresses the pawn in the starting kit
-        /// the shift change is filmed AGAINST. PawnGenerator rolls random
-        /// colonist clothing, which both muddies the take (a chef can spawn
-        /// already wearing a toque in whatever fabric rolled) and pads the
-        /// change-in with one removal delay per displaced garment.
-        ///
-        /// Every piece here is chosen for what it does ON CAMERA when the
-        /// swap fires, and the choices are conflict rules, not costume:
-        ///
-        /// - **Tunic** — one OnSkin torso piece. Scrubs and chef's whites
-        ///   displace exactly this, so the change-in stays short.
-        /// - **Simple helmet** on all three (`Overhead`/`UpperHead`). The
-        ///   doctor's surgical mask and the chef's toque occupy that same
-        ///   slot, so both of them visibly LOSE the helmet at the stand —
-        ///   a metallic head going bare is the clearest frame-to-frame
-        ///   signal the mod produces. The researcher's stand holds no
-        ///   headgear, so theirs stays on, which is the point: it shows the
-        ///   swap moves what the stand names and nothing else.
-        /// - **Duster, tinted green, researcher only** — the lab coat is
-        ///   `Shell` and so is a duster, so the coat displaces it. Without
-        ///   this the researcher's change was a tunic vanishing under a coat,
-        ///   which read as nothing happening at all. Green because it is the
-        ///   civvies that should sink into the green carpet; the stand's coat
-        ///   is default white and steps forward out of it.
+        /// Strips the pawn's generated apparel and dresses it in the starting kit the shift
+        /// change is filmed against: random generated clothing muddies a take (a chef can spawn
+        /// already wearing a toque) and adds a removal delay per displaced garment. Each piece
+        /// is chosen for what it conflicts with at the stand.
+        /// - Tunic: one on-skin torso piece, which scrubs and chef's whites displace exactly,
+        ///   so the change-in stays short.
+        /// - Simple helmet, on everyone (Overhead layer, UpperHead group): the doctor's mask and
+        ///   the chef's toque take its slot, so both visibly lose it at the stand. The
+        ///   researcher's stand holds no headgear, so theirs stays on.
+        /// - Duster, tinted green, researcher only: the lab coat and a duster are both Shell, so
+        ///   the coat displaces it. A swap that displaces nothing stores nothing, and
+        ///   <c>HarnessFixtures.Build</c> returns null for one.
         /// </summary>
         internal static void DressInStartingKit(Pawn pawn, bool researcher)
         {
@@ -320,7 +257,8 @@ namespace ShiftChange
                 }
             }
 
-            // Last, so a conflicting roll can never displace it silently.
+            // Worn last, so the helmet displaces any earlier piece sharing its slot instead of
+            // being displaced itself.
             ThingDef helmet = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_SimpleHelmet");
             if (helmet != null)
             {

@@ -1,18 +1,15 @@
 #if DEBUG
-// Hot-reload visibility grants — Debug builds only.
+// Visibility grants for hot reload.
 //
-// ECR loads each reloaded image as a NEW assembly named ShiftChange1,
-// ShiftChange2, … (AsmWriter: $"{assembly.Name}{version}") and redirects our
-// methods into it, so every member a swapped body touches is a CROSS-ASSEMBLY
-// access. ECR stamps IgnoresAccessChecksTo onto the swapped image for exactly
-// this, but Unity's Mono does not implement that attribute (convicted
-// 2026-08-08: attribute present, FieldAccessException anyway). The mechanism
-// Mono has always honoured is InternalsVisibleTo — which is why this mod's
-// default member visibility is `internal`, not `private`, and why these
-// grants enumerate the numbered twins.
+// EditCompileReload loads each reloaded image as a new assembly named ShiftChange1,
+// ShiftChange2 and so on, and redirects the mod's methods into it, so every member a swapped
+// body touches is a cross-assembly access. ECR stamps IgnoresAccessChecksTo onto the swapped
+// image for this, but Unity's Mono does not implement that attribute and throws
+// FieldAccessException anyway. Mono does honour InternalsVisibleTo, hence these grants to the
+// numbered twins, and hence the mod's default of `internal` members rather than `private`.
 //
-// The list length is the session's reload budget: reload number 65 starts
-// throwing FieldAccessException again, and the fix is a game restart.
+// The grants run to ShiftChange64, so a session has 64 reloads: reload 65 would load as
+// ShiftChange65, which has no grant, throws FieldAccessException again, and needs a restart.
 
 using System.Runtime.CompilerServices;
 

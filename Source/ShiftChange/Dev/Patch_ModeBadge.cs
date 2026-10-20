@@ -6,24 +6,20 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// The on-screen answer to "which testing mode am I in?" (decided
-    /// 2026-08-08). Debug builds draw a small badge top-right, under
-    /// vanilla's dev-mode indicator:
+    /// A small badge at the top right, under vanilla's dev-mode indicator, saying which testing
+    /// mode this build is in.
     ///
-    ///   cyan:   "lab build — reload armed" — gameplay interception is LIVE
-    ///           (identical logic to Release), but the first reload will
-    ///           fork the session;
-    ///   orange: "LAB MODE — gameplay off · don't save" — the quarantine has
-    ///           fired and the session is disposable.
+    /// <para>Cyan, "lab build — reload armed": gameplay interception is live, identical to
+    /// Release, but the first reload will fork the session. Orange, "LAB MODE — gameplay off ·
+    /// don't save": a reload has fired, interception is disabled, and the session is
+    /// disposable.</para>
     ///
-    /// Release builds compile none of this. No badge IS the live-mode
-    /// signal: if you cannot see a badge, you are on the shipping build and
-    /// your colony is safe to play and save.
+    /// <para>A build with no badge (Release or Media) is safe to play and save.</para>
     /// </summary>
     [HarmonyPatch(typeof(UIRoot), nameof(UIRoot.UIRootOnGUI))]
     internal static class Patch_ModeBadge
     {
-        /// <summary>Set by OnEditCompileReload when the quarantine fires.</summary>
+        /// <summary>Set by <c>HarmonyInit.OnEditCompileReload</c> after a reload fires.</summary>
         internal static bool GameplayDark;
 
         internal static void Postfix()

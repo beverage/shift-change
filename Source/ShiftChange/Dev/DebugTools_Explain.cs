@@ -1,7 +1,6 @@
-// SCENES only — see the config table in ShiftChange.csproj. Pure diagnostics:
-// this file reads state and prints it, and changes nothing. It is dev-only
-// because it reports engine internals a player has no use for, not because it
-// is dangerous.
+// SCENES only (configuration table: ShiftChange.csproj). Read-only diagnostics: this file prints
+// state and changes none. It is dev-only because it reports engine internals, not because it is
+// dangerous.
 #if SCENES
 using System;
 using System.Collections.Generic;
@@ -13,24 +12,19 @@ using Verse.AI;
 namespace ShiftChange
 {
     /// <summary>
-    /// Why is this pawn not taking recreation?
+    /// Why is this pawn not taking recreation? Walks the game's joy gates and then this mod's stand
+    /// search, and names whichever is shut.
     ///
-    /// <para><b>Why this exists.</b> Every gate below returns null silently.
-    /// <c>JobGiver_GetJoy</c> skips a giver whose kind is bored without a word,
-    /// and <c>JoyGiver_GoSwimming.TryGiveJob</c> has five separate early
-    /// returns and logs none of them. A stand that never fires therefore looks
-    /// identical to a stand that is misconfigured, and the mod's own Verbose
-    /// flag cannot tell them apart: Verbose only speaks once interception is
-    /// handling a job, so SILENCE means no recreation job was ever started and
-    /// no stand setting could have changed it.</para>
-    ///
-    /// <para>This walks both halves — vanilla's selection gates first, then
-    /// ours — and names whichever one is shut. It reports and changes nothing,
-    /// so it composes with <see cref="DebugTools_PoolStage.DrainRecreation"/>
-    /// rather than replacing it: explain, then drain, then explain again.</para>
+    /// The game's gates return null without a log line: <c>JobGiver_GetJoy</c> skips a giver whose
+    /// kind is bored, and <c>JoyGiver_GoSwimming.TryGiveJob</c> has several early returns. The
+    /// mod's Verbose flag only speaks once interception is handling a job, so a pawn that never
+    /// starts a recreation job leaves no log, whatever the stand settings are. This reports and
+    /// changes nothing, so it composes with <see cref="DebugTools_PoolStage.DrainRecreation"/>:
+    /// explain, drain, explain again.
     /// </summary>
     internal static class DebugTools_Explain
     {
+        /// <summary>Writes a recreation report for the pawn to the dev log.</summary>
         internal static void ExplainRecreation(Pawn pawn)
         {
             if (pawn?.Map == null || !pawn.RaceProps.Humanlike)
@@ -44,7 +38,6 @@ namespace ShiftChange
             StringBuilder report = new StringBuilder();
             report.Append("[ShiftChange] recreation report for ").AppendLine(pawn.LabelShort);
 
-            // ---------------------------------------------------- the pawn
             Need_Joy joy = pawn.needs?.joy;
             if (joy == null)
             {
@@ -54,28 +47,21 @@ namespace ShiftChange
             }
             report.Append("  joy need: ").AppendLine(joy.CurLevel.ToStringPercent());
 
-            // The most decisive gate of the lot, and it was printed as a bare
-            // value once — which read as neutral beside every other line. A
-            // drafted pawn never reaches the joy think tree at all: no giver
-            // runs, no job is made, and interception has nothing to intercept,
-            // so Verbose stays silent and looks like OUR fault.
+            // A drafted pawn never reaches the joy think tree: no giver runs and no job is made, so
+            // interception has nothing to intercept and Verbose stays silent.
             report.Append("  drafted: ").Append(pawn.Drafted)
                   .AppendLine(pawn.Drafted
                       ? "  <-- BLOCKS everything; a drafted pawn takes no joy at all"
                       : "");
 
-            // A hard early return in the swimming giver, and easy to miss: a
-            // pawn about to get hungry or sleepy never even looks for water.
+            // The swimming giver returns early for a pawn about to get hungry or sleepy.
             bool basicNeed = PawnUtility.WillSoonHaveBasicNeed(pawn);
             report.Append("  will soon have a basic need: ").Append(basicNeed)
                   .AppendLine(basicNeed ? "  <-- BLOCKS swimming outright" : "");
 
-            // ------------------------------------------- IS JOY RUNNING AT ALL
-            // The gate above every giver, and the one that makes all of the
-            // detail below moot when it is shut. ThinkNode_Priority_GetJoy
-            // returns a bare 0 for a handful of unrelated reasons and the pawn
-            // then idle-wanders, which looks exactly like "recreation is
-            // broken". Ask it for the number rather than reasoning about it.
+            // The gate above every giver. ThinkNode_Priority_GetJoy returns 0 for several unrelated
+            // reasons (the lines down to the priority), after which the pawn wanders as if
+            // recreation were broken; the priority line asks the node itself.
             report.Append("  current job: ")
                   .AppendLine(pawn.CurJobDef?.defName ?? "none (idle)");
 
@@ -100,10 +86,8 @@ namespace ShiftChange
                       ? "  <-- ZERO: the joy think node never runs, so nothing below matters"
                       : "  (non-zero: joy is being sought)");
 
-            // ---------------------------------------------- joy tolerances
-            // The usual culprit. Past 0.5 a kind is BORED and every giver of
-            // that kind is skipped, not merely down-weighted; boredom only
-            // lifts once tolerance decays back under 0.3.
+            // The usual culprit: a joy kind whose tolerance passes 0.5 is bored and all its givers
+            // are skipped, not down-weighted. The boredom lifts only below 0.3.
             report.AppendLine("  joy tolerances:");
             string tolerances = joy.tolerances.TolerancesString();
             report.AppendLine(string.IsNullOrEmpty(tolerances)
@@ -122,13 +106,10 @@ namespace ShiftChange
             report.Append("    bored kinds: ").Append(bored).Append(" of ")
                   .AppendLine(kinds.Count.ToString());
 
-            // ---------------------------------------------------- the room
             Room room = pawn.Position.GetRoom(map);
 
-            // A DOORWAY is its own one-cell room (Room.IsDoorway, :457). Stand
-            // a pawn on a threshold and every room-scoped line below describes
-            // that single tile — no water, no stands — which reads exactly like
-            // a broken fixture. Say so instead.
+            // A doorway is a one-cell room of its own, so every room-scoped line below would
+            // describe that single tile and read like a broken fixture. Say so instead.
             if (room != null && room.IsDoorway)
             {
                 report.AppendLine("  room: THIS PAWN IS STANDING IN A DOORWAY, which is its own "
@@ -141,9 +122,9 @@ namespace ShiftChange
                   .Append(room == null ? "" : room.PsychologicallyOutdoors ? ", outdoors" : ", indoors")
                   .AppendLine(room != null && room.TouchesMapEdge ? ", TOUCHES MAP EDGE" : "");
 
-            // ------------------------------------------- the swimming gates
-            // Named specifically because the pool fixture is the case this was
-            // written for; every one of these is a silent null return upstream.
+            // Approximations of GoSwimming's silent early returns, checked in this room only:
+            // warm enough, a usable water cell, and a swim path from it. The giver searches the
+            // nearest regions, not only this room, so the live check below is authoritative.
             if (room != null)
             {
                 bool warmEnough = room.PsychologicallyOutdoors
@@ -177,14 +158,10 @@ namespace ShiftChange
                 }
             }
 
-            // ------------------------------------------- what she can DO now
-            // GROUND TRUTH, not a replica. Everything above re-implements the
-            // giver's gates and can therefore be wrong in the giver's favour —
-            // the swim block once reported a usable cell and a 14-hop path for
-            // a pawn whose GoSwimming still returned null. So ASK each giver.
-            //
-            // TryGiveJob only builds a Job; it reserves nothing and starts
-            // nothing, so calling every giver is a read.
+            // Ground truth, not a replica: the checks above re-implement the givers' gates and can
+            // pass for a pawn whose giver still returns null, so ask each giver. A vanilla
+            // giver's TryGiveJob only builds a Job and reserves and starts nothing, so this is a
+            // read; a modded giver is assumed to behave the same.
             report.AppendLine("  joy givers (live TryGiveJob):");
             List<JoyGiverDef> givers = DefDatabase<JoyGiverDef>.AllDefsListForReading;
             int yielding = 0;
@@ -233,10 +210,8 @@ namespace ShiftChange
             report.Append("    ").Append(yielding)
                   .AppendLine(" giver(s) can produce a job right now — the roll picks among these by weight.");
 
-            // ----------------------------------------------------- our half
-            // Only reachable if something above let a joy job start; reported
-            // anyway, because "our stand is fine" is the answer that sends the
-            // next hour upstream instead of into this mod.
+            // Interception only matters once a joy job starts, but report it regardless: a healthy
+            // stand is then a stated result and the search moves upstream.
             report.Append("  interception enabled: ").AppendLine(Patch_JobInterception.Enabled.ToString());
             if (room == null)
             {

@@ -1,6 +1,6 @@
-// SCENES only — see the config table in ShiftChange.csproj. Like the demo
-// stage this BUILDS A SCENE and must never reach a player: it clears a 32x10
-// footprint (destroying any pawn in it) and leaves three permanent
+// SCENES only, see the config table in ShiftChange.csproj. Like the demo stage, this file builds
+// a scene and must never reach a player: it clears a 32x10 footprint (destroying any pawn in
+// it), rewrites the terrain and roof under the three blocks, and leaves three permanent
 // player-faction colonists and three roomfuls of owned buildings behind.
 #if SCENES
 using LudeonTK;
@@ -11,52 +11,28 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// The title-card stage: dev mode → Shift Change → Build preview stage,
-    /// then click a map cell. Three standalone rooms — hospital, laboratory,
-    /// kitchen — each with its own corridor and its own worker, sized so a
-    /// screenshot of any one of them crops to half a Workshop preview without
-    /// distortion.
+    /// The title-card stage: three standalone rooms (hospital, laboratory, kitchen), each with
+    /// its own corridor and worker, sized so a screenshot of any one crops to half a Workshop
+    /// preview. A preview is 640×360 and a card is a before/after pair, so a panel is 320×360
+    /// (8:9) and each block's capture rectangle is 8 tiles across (wall, 6 interior, wall) by 9
+    /// down (2 corridor, wall, 5 interior, wall).
     ///
-    /// <para>The geometry is the whole point. A Workshop preview is 640×360,
-    /// and a card is a before/after pair side by side, so each panel is
-    /// 320×360 — a ratio of 8:9. Each block's capture rectangle is therefore 8
-    /// tiles across by 9 down:</para>
+    /// <para>The far corridor wall sits one row below the capture rectangle, out of shot. It
+    /// still has to be enclosed and roofed, but leaving it out puts the panel's bottom edge on
+    /// the floor-to-wall line instead of cutting through anything. Blocks are
+    /// <see cref="Gap"/> tiles of open ground apart, so a crop of one cannot catch a
+    /// neighbour's wall. All three run at once, so one locked-off recording yields all six
+    /// stills with identical framing.</para>
     ///
-    /// <code>
-    ///   wall + 6 interior + wall              = 8 across
-    ///   wall + 5 interior + wall + 2 corridor = 9 down
-    /// </code>
+    /// <para>This is not the demo stage with different numbers: that layout is a test fixture
+    /// whose play observations have to stay comparable, so it is not resized for screenshots.
+    /// This stage reuses its room dressing and changes only the shell.</para>
     ///
-    /// <para>At 320 px that is exactly 40 px per tile, twice what the demo
-    /// stage gives on the same canvas, so a pawn standing in a corridor reads
-    /// on its own rather than leaning on its name label.</para>
-    ///
-    /// <para><b>Each block's far corridor wall sits one row BELOW its capture
-    /// rectangle</b>, deliberately out of shot. The corridor still has to be
-    /// enclosed and roofed, but excluding that row puts the panel's bottom
-    /// edge on the floor-to-wall line rather than cutting through anything.
-    /// </para>
-    ///
-    /// <para><b>The blocks are separated by <see cref="Gap"/> tiles of open
-    /// ground</b>, which is what makes them standalone. An 8-tile crop of one
-    /// block cannot catch a neighbour's wall, and a crop that is a few pixels
-    /// off catches grass rather than another room — the failure that made the
-    /// four-room demo stage uncroppable for this purpose.</para>
-    ///
-    /// <para>All three run at once, so one locked-off recording yields all six
-    /// stills. That matters more than it sounds: framing is then identical by
-    /// construction across every card, and the crop is measured once for the
-    /// whole take instead of once per screenshot.</para>
-    ///
-    /// <para><b>Why this is not the demo stage with different numbers.</b>
-    /// That one is a test fixture as much as a film set, and every play
-    /// observation to date was made in its layout. Resizing it to suit a
-    /// screenshot would make those observations incomparable. This stage
-    /// borrows all of its room dressing and changes only the shell.</para>
-    ///
-    /// <para>Never in a shipping build, like the demo stage: footage is filmed
-    /// on the Media configuration (docs/DESIGN.md, "Development
-    /// tooling").</para>
+    /// <para>The sleep card stage (<see cref="DebugTools_SleepStage"/>) reuses
+    /// <see cref="BuildShell"/>, <see cref="InteriorOf"/>, <see cref="BlockWidth"/>,
+    /// <see cref="BlockHeight"/> and <see cref="DoorX"/>, and
+    /// <c>devtools/bridge/shoot-sleep-card.py</c> hard-codes the block size, so a geometry
+    /// change has to reach that script by hand.</para>
     /// </summary>
     internal static class DebugTools_PreviewStage
     {
@@ -71,11 +47,7 @@ namespace ShiftChange
         /// <summary>One row taller than the shot: the corridor's far wall.</summary>
         internal const int BlockHeight = ShotHeight + 1;
 
-        /// <summary>
-        /// Open ground between blocks. Its only job is crop tolerance — miss
-        /// the edge by a few pixels and you catch grass instead of the next
-        /// room's wall.
-        /// </summary>
+        /// <summary>Open ground between blocks, so a crop slightly off catches grass.</summary>
         internal const int Gap = 4;
 
         internal const int Rooms = 3;
@@ -83,24 +55,15 @@ namespace ShiftChange
         internal const int Width = Rooms * BlockWidth + (Rooms - 1) * Gap;
 
         /// <summary>
-        /// Door column, relative to a block's origin, so interior column
-        /// <c>minX + 3</c>.
+        /// Door column, relative to a block's origin: interior column <c>minX + 3</c>. All three
+        /// rooms share it or the cards stop looking like a set, so the interior cell just inside
+        /// the door has to stay free in each (the stand is at <c>minX</c>, a torch at
+        /// <c>maxX</c>, and the kitchen's stove goes to the north end, see <see cref="Dress"/>).
         /// </summary>
-        /// <remarks>
-        /// Not centred, and not negotiable: the three rooms have to share a
-        /// door column or the cards stop looking like a set, and the kitchen
-        /// is the room that constrains it. <c>BuildKitchen</c> puts the stove
-        /// on the south wall at <c>interior.minX + 2</c> and the stand sits at
-        /// <c>minX</c>, with a torch at <c>maxX</c> — so a door at <c>minX +
-        /// 2</c> opens straight into the stove. <c>minX + 3</c> is clear in
-        /// all three rooms.
-        /// </remarks>
         internal const int DoorX = 4;
 
         /// <summary>
-        /// Reached from the "Dev tools..." submenu
-        /// (<see cref="DebugTools_Menu"/>), which carries the game-state and
-        /// Odyssey gating this method used to declare itself.
+        /// Registered from <see cref="DebugTools_Menu"/>, which gates it to Odyssey on a map.
         /// </summary>
         internal static void BuildPreviewStage()
         {
@@ -135,9 +98,8 @@ namespace ShiftChange
                 Building_OutfitStand stand =
                     DebugTools_DemoStage.SpawnStand(map, standDef, interior, doorNorth: false);
 
-                // The corridor gets its own light. Unlit, an arriving pawn is
-                // dark on dark and including the corridor buys nothing. East
-                // end, so it never stands where the worker does.
+                // Lights the corridor, where an arriving pawn is dark on dark otherwise. East
+                // end, clear of the worker.
                 DebugTools_DemoStage.SpawnTorch(map,
                     block + new IntVec3(BlockWidth - 2, 0, CorridorHeight));
 
@@ -159,8 +121,7 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Room dressing, borrowed wholesale from the demo stage so the two
-        /// stages can never drift on what a hospital or a kitchen contains.
+        /// Dresses a room with the demo stage's own builders, so the two cannot drift apart.
         /// </summary>
         internal static void Dress(Map map, int room, CellRect interior, Building_OutfitStand stand)
         {
@@ -175,19 +136,17 @@ namespace ShiftChange
             }
             else
             {
-                // stoveNorth: this kitchen's door is on the SOUTH wall, so the
-                // stove goes opposite it. Left at the demo stage's default the
-                // stove lands on the south wall across the doorway, and the
-                // chef changes and cooks in the same two tiles — no visible
-                // walk, and a before/after pair that looks like one photo.
+                // stoveNorth: this kitchen's door is on the south wall, so the stove goes
+                // opposite it. By default it lands across the doorway and the chef changes
+                // and cooks in the same two tiles: no visible walk, and a before/after pair
+                // that looks like one photo.
                 DebugTools_DemoStage.BuildKitchen(map, interior, stand, stoveNorth: true);
             }
         }
 
         /// <summary>
-        /// Walls, door, floor, roof for one block. Rows from the south edge:
-        /// wall / corridor ×2 / wall with the door / interiors ×5 / wall. The
-        /// southmost row is the one the capture crops away.
+        /// Walls, door, floor, roof for one block. Rows from the south edge: wall (cropped
+        /// away) / corridor ×2 / wall with the door / interior ×5 / wall.
         /// </summary>
         internal static void BuildShell(Map map, IntVec3 block)
         {
@@ -218,20 +177,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// One specialist per room, in their own clothes, standing in the
-        /// corridor at the door — the "before" half of that room's card.
+        /// One specialist per room, in their own clothes, in the corridor next to the door: the
+        /// "before" half of that room's card. Not on the far row, so their feet and name label
+        /// clear the panel's bottom edge. Food is full, unlike the demo stage's hungry doctor
+        /// and chef, so nobody leaves for a meal mid-shot.
         /// </summary>
-        /// <remarks>
-        /// <para>They stand in the corridor row ADJACENT to the door rather
-        /// than the far one. That is a framing decision: a title overlaid on
-        /// the bottom of a panel covers the far row, and a worker standing
-        /// there gets their feet clipped by the type.</para>
-        /// <para>Food is full, unlike the demo stage's deliberately hungry
-        /// doctor and chef. This take ends when the work does — nobody should
-        /// break for a meal mid-shot, and there is nothing to eat out here
-        /// anyway. Driving the change-back beat needs a reason to leave the
-        /// room, which is a different staging problem.</para>
-        /// </remarks>
         internal static void SpawnWorker(Map map, IntVec3 block, int room)
         {
             IntVec3 cell = block + new IntVec3(DoorX, 0, CorridorHeight);
@@ -264,9 +214,8 @@ namespace ShiftChange
             DebugTools_Fixtures.DressInStartingKit(pawn, workDefName == "Research");
             GenSpawn.Spawn(pawn, cell, map);
 
-            // Their specialty and nothing else, so each stays in their own
-            // building for the whole take instead of wandering to another
-            // room's job and dressing for the wrong room on camera.
+            // Their specialty and nothing else, so each stays in their own building instead
+            // of wandering to another room's job and dressing for the wrong room on camera.
             pawn.workSettings.EnableAndInitialize();
             foreach (WorkTypeDef work in DefDatabase<WorkTypeDef>.AllDefsListForReading)
             {
