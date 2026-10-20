@@ -171,8 +171,9 @@ specifically so they are tunable in play.
 | `RetryCooldownTicks` | `600` | Minimum ticks before reconsidering a pawn whose swap could not start |
 | `Patch_OutfitStandsPlusUseButton.Enabled` | `true` | Outfit Stands Plus' stand button reads our stand list; off hands it back its own walk over every building |
 
-Mod settings carry one player-facing toggle, `poolUnassignedStands` (default
-on). Settings live in vanilla's config file, so uninstalling leaves no trace in
+Mod settings carry three player-facing toggles: `poolUnassignedStands` (default
+on), `keepColonistsDecent` and `medicalEmergenciesChangeFirst` (both default
+off). Settings live in vanilla's config file, so uninstalling leaves no trace in
 a save.
 
 On a Debug or Media build: dev mode → **Shift Change** → **Dev tools…** →

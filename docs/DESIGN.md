@@ -638,15 +638,16 @@ Found in play: Ideology's apparel-recolor branch rides that giver
 (`JobGiver_OptimizeApparel.cs:84`) and fires whenever any *worn* item has a
 `DesiredColor`. On shift that is the uniform, so a pawn walked off and permanently
 dyed staged kit its favourite colour. The styling station's float-menu order
-bypasses the giver and stays available, because direct orders are never blocked.
-`nextApparelOptimizeTick` is untouched, so civvies optimize normally after
+bypasses the giver, but the second guard below refuses it while the pawn is on
+shift. `nextApparelOptimizeTick` is untouched, so civvies optimize normally after
 changing out.
 
-A second guard covers reloads: scribed or queued `RecolorApparel` jobs from
-pre-pause sessions resume after load and the driver dyes whatever its queue names,
+A second guard works when a `RecolorApparel` job starts: a queued one is saved
+with the pawn and survives a load, and the driver dyes whatever its queue names,
 wherever it sits. Its `TryMakePreToilReservations` is failed — the vanilla-routine
 way to cancel — when the pawn is on shift or any queued garment is parked in a
-stand.
+stand. A job already running when the game saved resumes without asking for
+reservations, so the guard does not reach it.
 
 ## Withholding from trade
 
