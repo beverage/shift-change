@@ -395,9 +395,10 @@ first and appended into second, because other mods add comps to this same def �
 Outfit Stands Plus does — and a def left with two `<comps>` nodes is resolved
 last-wins with a red "defines the same field twice" error, deleting whichever
 mod's node came first. For the same reason our assignable comp scribes
-mod-prefixed keys (comps scribe flat into the thing's save node, so two
-`CompAssignableToPawn` subclasses writing vanilla's generic `assignedPawns`
-cross-read on load), and every lookup of our assignable comp is exact-type first
+mod-prefixed keys (comps scribe flat into the thing's save node, so of two
+`CompAssignableToPawn` subclasses writing vanilla's generic `assignedPawns`, one
+would load the owners and the other would load none, with two errors on every
+load), and every lookup of our assignable comp is exact-type first
 (`TryGetComp<CompAssignableToPawn_ShiftStand>`) with a base-typed fallback — comp
 order, which follows patch order, decides nothing.
 
