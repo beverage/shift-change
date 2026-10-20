@@ -116,11 +116,14 @@ namespace ShiftChange
             Passed = 0;
             Failed = 0;
             KnownGaps = 0;
-            Report.AppendLine("[ShiftChange] lifecycle harness");
+            // The pad goes in the header, so a failure that depends on the map can be traced to it.
+            IntVec3 centre = map.Center - new IntVec3(PadSize / 2, 0, PadSize / 2);
+            Report.Append("[ShiftChange] lifecycle harness, pad at (").Append(origin.x).Append(", ")
+                  .Append(origin.z).AppendLine(origin == centre ? "), the map centre" : "), not the map centre");
 
             // First: every case below takes for granted what this checks.
-            Case(map, pad, "the fixture colonist is healthy and holds still under the stopped clock, and ground past the pad is ground",
-                 HarnessFixtureChecks.FixtureColonistHoldsStill);
+            Case(map, pad, "the fixture colonist is healthy and holds still under the stopped clock, and ground past the pad is ground open to the map edge",
+                 fix => HarnessFixtureChecks.FixtureColonistHoldsStill(fix, pad));
             Case(map, pad, "gravship flight keeps the ledger, and the shift ends normally after landing",
                  GravshipFlight);
             Case(map, pad, "gravship flight without the borrower releases it", GravshipFlightLeftBehind);

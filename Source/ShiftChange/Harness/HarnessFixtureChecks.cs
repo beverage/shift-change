@@ -34,12 +34,26 @@ namespace ShiftChange
         /// ticks keeps its food, while a colonist the check rejects loses food under the same
         /// pump (control). Untended asthma makes a colonist an urgent patient until the fixture
         /// removes it (control). A cell of natural rock past the pad becomes open ground with a
-        /// room under <see cref="HarnessFixtures.OpenGround"/>.
+        /// room under <see cref="HarnessFixtures.OpenGround"/>. The margin around the pad is in
+        /// rooms that touch the map edge, which the cases that need a stand in the open rely on.
         /// </summary>
-        internal static bool FixtureColonistHoldsStill(Fixture fix)
+        internal static bool FixtureColonistHoldsStill(Fixture fix, CellRect pad)
         {
             Map map = fix.Map;
             IntVec3 cell = fix.Stand.Position + new IntVec3(2, 0, 2);
+
+            int enclosed = 0;
+            foreach (IntVec3 margin in pad.ExpandedBy(1).EdgeCells)
+            {
+                Room room = margin.GetRoom(map);
+                if (room == null || !room.TouchesMapEdge)
+                {
+                    enclosed++;
+                }
+            }
+            bool open = Expect(enclosed == 0,
+                               "the margin around the pad reaches the map edge, so a stand outside the pad "
+                               + "is in the open (" + enclosed + " margin cells do not)");
 
             int moving = 0;
             int tending = 0;
@@ -56,7 +70,8 @@ namespace ShiftChange
                 }
                 p.Destroy();
             }
-            bool ok = Expect(moving == 0,
+            bool ok = open
+                    & Expect(moving == 0,
                              "forty fixture colonists in a row: none has needs that tick under the stopped clock")
                     & Expect(tending == 0, "and none needs tending");
 

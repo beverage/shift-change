@@ -468,7 +468,15 @@ under the stopped clock, and none needs tending. One of them keeps its food
 through 1,500 pumped ticks, while a colonist the fixture would reject loses
 food under the same pump. Asthma makes a colonist an urgent patient until the
 fixture removes it. A cell of natural rock past the pad becomes ground with a
-room under `OpenGround`. "Four engine traps" says why each is there.
+room under `OpenGround`. "Four engine traps" says why each is there. It also
+checks that the margin around the pad is in rooms that touch the map edge. Six
+cases put a stand in the open, on the pad left unwalled or on the margin outside
+its door, and the mod tests "in the open" with `Room.TouchesMapEdge`. A
+quicktest map can put its centre in open ground cut off from the edge by rock,
+deep water or walls, where all six fail at once, so the pad finder
+(`Patch_HarnessAutoRun.TryFindPad`) requires it, and this check names the cause
+when a pad picked by hand from the debug menu lands in such a place. The
+report's first line says where the pad is.
 
 ## What is not covered
 
@@ -643,8 +651,8 @@ whole outdoors.
 
 A case that puts something past the pad takes the cell with
 `OpenGround(fix, cell)`, which clears it to bare soil and has `Teardown` clear
-it again. The pad finder checks one cell of margin around the pad and no more,
-so further out a map can have natural rock, and anything left there stays on the
-map for every case after.
+it again. The pad finder checks one cell of margin around the pad, for ground in
+a room that touches the map edge, and no more, so further out a map can have
+natural rock, and anything left there stays on the map for every case after.
 
 Assert with `Expect(condition, what)`, and pair every negative with a control.

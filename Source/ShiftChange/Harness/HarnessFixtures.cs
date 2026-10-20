@@ -388,9 +388,9 @@ namespace ShiftChange
         /// pass for that reason.
         ///
         /// <para>The strip is the pad's one-cell margin, which
-        /// <see cref="Patch_HarnessAutoRun.TryFindPad"/> keeps in bounds and in a room; soil
-        /// because a quicktest map can put anything there, unfogged because a fogged item is never
-        /// hauled.</para>
+        /// <see cref="Patch_HarnessAutoRun.TryFindPad"/> keeps in bounds and in a room that touches
+        /// the map edge, so a stand put there is in the open; soil because a quicktest map can put
+        /// anything there, unfogged because a fogged item is never hauled.</para>
         /// </summary>
         internal static Fixture StageWithDoorway(Map map, CellRect pad)
         {

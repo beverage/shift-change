@@ -80,18 +80,21 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Somewhere the fixture can stand: the map centre if usable, so runs are comparable. The
-        /// pad is cleared before use, so the bar is a pad in bounds whose origin is standable and
-        /// not water, not an empty one.
+        /// Somewhere the fixture can stand: the map centre if usable, so runs are comparable, and a
+        /// random cell otherwise. The pad is cleared before use, so the bar is a pad in bounds
+        /// whose origin is standable and not water, not an empty one.
         ///
-        /// <para>The one-cell margin must have rooms too, because cases reach past their pad (the
-        /// exterior-wall case counts the ring around a wall on the pad's edge). Natural rock there
-        /// carries no room, <c>GetRoom</c> returns null, and the case silently stops running the
-        /// geometry it was written for. Open ground is one enormous room, so on an ordinary map
-        /// this rejects only origins near rock or walls. On a map whose load aborted before its
-        /// region grid was built it rejects every origin, which
-        /// <see cref="DebugTools_SaveRoundTrip.CannotStage"/> relies on. A pad picked by hand from
-        /// the debug menu bypasses this finder.</para>
+        /// <para>Every cell of the pad and its one-cell margin must be in a room that touches the
+        /// map edge. Cases reach past their pad: the exterior-wall case counts the ring around a
+        /// wall on the pad's edge, and some cases need a stand in the open, which the mod tests
+        /// with <c>Room.TouchesMapEdge</c>, on the margin outside a door or on the pad left
+        /// unwalled.
+        /// Natural rock has no room, and a valley ringed by mountains, an island in deep water or a
+        /// ruin's walls give the margin a room that does not reach the edge. The margin is a closed
+        /// ring around the pad, so it still reaches the edge once the cases build walls on the pad.
+        /// On a map whose load aborted before its region grid was built this rejects every origin,
+        /// which <see cref="DebugTools_SaveRoundTrip.CannotStage"/> relies on. A pad picked by hand
+        /// from the debug menu bypasses this finder.</para>
         /// </summary>
         internal static bool TryFindPad(Map map, out IntVec3 origin)
         {
@@ -107,7 +110,8 @@ namespace ShiftChange
                 }
                 foreach (IntVec3 cell in pad.ExpandedBy(1))
                 {
-                    if (cell.GetRoom(map) == null)
+                    Room room = cell.GetRoom(map);
+                    if (room == null || !room.TouchesMapEdge)
                     {
                         return false;
                     }
