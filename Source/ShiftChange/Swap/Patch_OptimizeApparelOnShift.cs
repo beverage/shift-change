@@ -22,8 +22,9 @@ namespace ShiftChange
     /// optimizes the pawn's own clothes as normal.</para>
     ///
     /// <para>The styling station's float-menu order calls <c>TryCreateRecolorJob</c> directly
-    /// and never passes through this giver, but <see cref="Patch_RecolorExecutionGuard"/> still
-    /// refuses that order while the pawn is on shift, at its reservations.</para>
+    /// and never passes through this giver. It is the player's order, so it proceeds on shift
+    /// and dyes what the pawn wears, the uniform included:
+    /// <see cref="Patch_RecolorExecutionGuard"/> lets it through.</para>
     /// </summary>
     [HarmonyPatch(typeof(JobGiver_OptimizeApparel), "TryGiveJob")]
     public static class Patch_OptimizeApparelOnShift
@@ -68,10 +69,11 @@ namespace ShiftChange
     /// the game saved resumes without asking for reservations, so this does not reach it.
     ///
     /// <para>Failing <c>TryMakePreToilReservations</c> is the clean kill: a queued job that fails
-    /// it is ended quietly as no longer valid, and the pawn picks another job. A player's order
-    /// fails it too, with a log warning. The job is blocked while the pawn is on shift (the worn
-    /// apparel is the uniform) and when any queued garment is parked in an outfit stand; off
-    /// shift, in their own clothes, recoloring runs as normal.</para>
+    /// it is ended quietly as no longer valid, and the pawn picks another job. The job is
+    /// blocked while the pawn is on shift (the worn apparel is the uniform) unless the player
+    /// ordered it, and whenever any queued garment is parked in an outfit stand, ordered or not,
+    /// since the pawn no longer wears it. Off shift, in their own clothes, recoloring runs as
+    /// normal.</para>
     /// </summary>
     [HarmonyPatch(typeof(JobDriver_RecolorApparel), nameof(JobDriver_RecolorApparel.TryMakePreToilReservations))]
     public static class Patch_RecolorExecutionGuard
@@ -85,12 +87,16 @@ namespace ShiftChange
             {
                 SessionGuard.Ensure();
                 Pawn pawn = __instance.pawn;
-                if (pawn != null && CompShiftStand.OnShiftStandFor(pawn) != null)
+                Job job = __instance.job;
+                // TryTakeOrderedJob sets playerForced before it asks for reservations, and the
+                // flag is saved with a queued job.
+                bool ordered = job != null && job.playerForced;
+                if (pawn != null && !ordered && CompShiftStand.OnShiftStandFor(pawn) != null)
                 {
                     __result = false;
                     return false;
                 }
-                List<LocalTargetInfo> queue = __instance.job?.GetTargetQueue(TargetIndex.B);
+                List<LocalTargetInfo> queue = job?.GetTargetQueue(TargetIndex.B);
                 if (queue != null)
                 {
                     for (int i = 0; i < queue.Count; i++)

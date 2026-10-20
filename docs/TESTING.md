@@ -415,6 +415,22 @@ means anything as one: a checked-out pawn refuses a spare duplicating the kit
 parked in their stand (`ParkedKitRefusesSpares`), and takes one once that kit
 is worn through (`WornOutParkedKitStillGoesShopping`).
 
+**Recolor** (`HarnessRecolor`). `RecolorOrderGoesThroughOnShift` drives
+Ideology's apparel recolor through the wardrobe optimizer, a job's own
+reservations, and `TryTakeOrderedJob` as the styling station calls it. On
+shift, the optimizer gives nothing and a recolor job the player did not order
+is refused, while the station's order is taken and the pawn starts it in
+uniform. An order naming a garment parked in the stand is refused. Off shift,
+the optimizer's recolor comes back and reserves, and one naming the parked
+garment is still refused. The job, the station and the order are Ideology's,
+so the case is a known gap on a mod list without it. The minimal list
+`run-harness.sh` writes names only Odyssey as a known expansion, and the game
+turns on every installed expansion it has not seen, so that list has Ideology
+whenever it is installed. `--full` has it when the copied list does, and a
+runner that names every expansion as known has only the ones it activates.
+The case does not check that the order finishes and dyes anything: the pawn
+never walks under the harness, so it stops the job once it has started.
+
 **Tables and rooms** (`HarnessTables`). Three cases need no map and check that
 the static tables still match the def database, where every lookup is
 silent-fail and a renamed def empties its row with no error: the room-role
@@ -492,9 +508,10 @@ room under `OpenGround`. "Four engine traps" says why each is there.
   find on startup — but nothing pins the two collectors that reach stand
   contents in the first place, so a route quietly rerouted around the deal would
   take the protection with it and say nothing.
-- **Pooling on and off, the optimizer pause, the recolor guard, `SwapPlan`'s
-  rollback.** No cases yet. The retry cooldown is asserted on the allowed-area
-  path only.
+- **Pooling on and off, `SwapPlan`'s rollback.** No cases yet. The retry
+  cooldown is asserted on the allowed-area path only. The recolor case does not
+  reach a recolor job that was already running when the game saved, which
+  resumes without asking for reservations.
 - **A revert of `StaysInBed` to `pawn.InBed()`** — the specific defect the
   wake-up case was written for. The fixture reaches "on a bed" by assigning
   `Position`, never by running a lay-down driver, so posture stays `NotLaying`
