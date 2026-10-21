@@ -237,7 +237,8 @@ decompiled game, and none of the history.
 - No history: no dates, no "used to" or "was once", no story of the bug or the
   review that produced the code, no capitals or bold for emphasis. History
   belongs in git and the release notes. A harness case may say in one sentence
-  that it guards a past bug.
+  that it guards a past bug. `check-invariants.py` rejects a date or a
+  `File.cs:123` citation in any comment under `Source/`.
 - The reason lives at the site. Point at `docs/DESIGN.md` only for an argument
   that spans several files and is already written there, and never restate it.
 - Aim for about one comment line per five or six lines of code, and keep lines

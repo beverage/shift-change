@@ -626,6 +626,7 @@ network.
 | `<Patch>` root, recursively | A plural root discards every operation in the file, and `xmllint` still passes. The engine walks `Patches/` with `AllDirectories`, so this must too. |
 | `About/Preview.png` size | Steam rejects a Workshop preview over 1 MiB and the game does not check, so an oversized one fails mid-publish as a bare result code. |
 | Workshop comment length | Steam takes at most 1,000 characters in a Workshop comment, so a longer `media/comment-v*.txt` cannot be posted as written and the file then disagrees with what went out. Three drafts here did. |
+| Comment history | A date or a `File.cs:123` citation in a comment under `Source/`. AGENTS.md keeps history out of comments, and a line number into the game moves with every update. |
 
 CI also runs the BBCode validator over the store description, because an
 unclosed tag makes Steam render the remainder of the page as literal text.

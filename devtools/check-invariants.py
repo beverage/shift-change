@@ -305,8 +305,7 @@ HOME_PATH = re.compile(r"/(?:Users|home)/[A-Za-z0-9._-]+/")
 # Vocabulary from the private working notes that means nothing to a reader of
 # this repository. "principal" was the worst of it — 26 comments cited decisions
 # as "(principal, DATE)", which names an internal role rather than saying the
-# useful part, that the choice was deliberate and when. "(decided DATE)" carries
-# the same weight to someone who has never seen the tracker.
+# useful part, that the choice was deliberate and why.
 INTERNAL_VOCAB = re.compile(r"\bprincipals?\b", re.IGNORECASE)
 
 
@@ -326,8 +325,8 @@ def check_home_paths():
                 if match:
                     fail("internal-vocab",
                          "%s:%d says %s — that is private working vocabulary. Say "
-                         "what a stranger needs instead: '(decided YYYY-MM-DD)' "
-                         "for a deliberate choice."
+                         "what a stranger needs instead: that the choice was "
+                         "deliberate, and why."
                          % (rel(path), number, match.group(0)))
                 match = HOME_PATH.search(line)
                 if match:
@@ -337,6 +336,49 @@ def check_home_paths():
                          "os.path.expanduser, with an env override where the "
                          "location can differ."
                          % (rel(path), number, match.group(0)))
+
+
+# ------------------------------------------------------------ comment history
+
+# AGENTS.md, "Comments": a comment states the fact the code depends on and
+# carries no history. A date says when something was learned, not what is true,
+# and a `File.cs:123` citation into the game goes stale with every update and
+# points a contributor at a decompile they do not have. Both are mechanical to
+# spot, so neither is left to review. History belongs in git and CHANGELOG.md.
+#
+# Only the comment part of a line is read: string literals are blanked first, so
+# a date or a path inside a string, which is code, passes.
+COMMENT_DATE = re.compile(r"\b(?:19|20)\d{2}-(?:0[1-9]|1[0-2])(?:-\d{2})?\b")
+COMMENT_CITATION = re.compile(r"\b[\w.]+\.(?:cs|xml):\d+")
+STRING_LITERAL = re.compile(r'@"(?:""|[^"])*"|"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^\'\\\n])\'')
+
+
+def comment_part(line):
+    """The text after a line's `//`, or None, with string literals blanked."""
+    code = STRING_LITERAL.sub('""', line)
+    start = code.find("//")
+    return None if start < 0 else code[start:]
+
+
+def check_comment_history():
+    for path in cs_files():
+        lines = open(path, encoding="utf-8").read().split("\n")
+        for number, line in enumerate(lines, 1):
+            comment = comment_part(line)
+            if comment is None:
+                continue
+            match = COMMENT_DATE.search(comment)
+            if match:
+                fail("comment-history",
+                     "%s:%d dates a comment (%s) — say what is true, and leave when "
+                     "it was learned to git and CHANGELOG.md"
+                     % (rel(path), number, match.group(0)))
+            match = COMMENT_CITATION.search(comment)
+            if match:
+                fail("comment-history",
+                     "%s:%d cites %s — line numbers move with every game update; "
+                     "name the type and method in words instead"
+                     % (rel(path), number, match.group(0)))
 
 
 # ----------------------------------------------------------------- patch roots
@@ -476,6 +518,7 @@ def main():
     check_patch_roots()
     check_private_tracking_refs()
     check_home_paths()
+    check_comment_history()
     check_harness_gating()
     check_dev_folder()
 
