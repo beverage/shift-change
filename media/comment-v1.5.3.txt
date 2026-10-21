@@ -1,0 +1,7 @@
+v1.5.3 update:
+
+Fixed: with Ideology, a colonist in uniform ordered to Recolor apparel at a styling station now does it. Colours picked for the stand's outfit stay on it when it goes back to the stand.
+
+Fixed: a stand whose owner died while it was boxed for a move no longer goes back to them when it is set down.
+
+Colonists in uniform still never recolor anything on their own.
