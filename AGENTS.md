@@ -95,7 +95,7 @@ the written file as well as the loaded state. They run last, since they replace
 `Current.Game`. A real gravship launch is the one thing still out of reach.
 
 **Four engine traps live in the driver cases**, all invisible from the API and
-all already paid for once. Pathfinding in 1.6 is asynchronous, so ticking a
+all already paid for once. Pathfinding is asynchronous, so ticking a
 single pawn never completes a walk — fixtures stage the pawn on the stand's
 interaction cell. Jobs are pooled, so a `Job` reference held across its own
 completion silently becomes the pawn's *next* job — watch `jobs.curDriver`,

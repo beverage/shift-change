@@ -28,10 +28,13 @@ devtools/run-harness.sh --with=khamenman.outfitstandsplus   # the four, plus one
 devtools/run-harness.sh --with-after=khamenman.outfitstandsplus   # loaded after us
 ```
 
-Builds Release, launches with `-quicktest -shiftchange-harness`, waits for the
-game to run every case and quit itself, prints the report, exits non-zero on any
-failure. By hand: dev mode → **Shift Change** → **Run lifecycle harness**, then
-click a clear 7×7 area.
+Builds Release with `-p:Harness=true`, launches with `-quicktest
+-shiftchange-harness`, waits for the game to run every case and quit itself,
+prints the report, exits non-zero on any failure. By hand, in a Debug or Media
+build: dev mode → **Shift Change** → **Dev tools…** → **Run lifecycle harness**,
+then click ground you can lose. Cases clear a 7×7 pad, a cell of margin round
+it, a strip west of it and single cells further out, and reset some of that to
+soil.
 
 `--with=<packageId>` adds a mod to the minimal list, ahead of this one, for a
 case that tests against that mod and is a known gap without it. It can be given
@@ -457,8 +460,9 @@ room under `OpenGround`. "Four engine traps" says why each is there.
   scribing itself — what gets written, and what survives coming back — but not
   the paths that fix up a ledger found inconsistent on spawn. Those are still
   exercised only in play.
-- **A real gravship launch.** The flight case drives `DeSpawn(WillReplace)` →
-  `Spawn` → `PostSwapMap`, which is what the engine does, but no gravship is
+- **A real gravship launch.** The flight cases drive `DeSpawn(WillReplace)` →
+  `Spawn` → `PostSwapMap`, the engine's order (`Fly` runs the engine's
+  `PreSwapMap` first, `GravshipFlight` does not), but no gravship is
   built or flown, so the area rebind is tested against an area re-created by
   hand on the same map, not one the landing copied. The cases that need a
   second map use a pocket map (`HarnessFixtures.SecondMap`), and remove it with
@@ -512,9 +516,10 @@ blockers that play had not.
 **Drive the engine's own entry points.** Cases call `Thing.DeSpawn`,
 `GenSpawn.Spawn`, `Pawn.Kill`, `PawnBanishUtility.Banish`, the real
 `Patch_JobInterception.Prefix` and the real `JobDriver_SwapAtStand` — never our
-own handlers directly. A harness that hand-rolls the call sequence tests the
-author's model of the engine, and both traps below are cases where that model
-would have been wrong.
+own comp handlers directly. Decision functions such as `TryInsertSwap`, the one
+the prefix calls, are driven directly where the decision is the claim. A harness
+that hand-rolls the call sequence tests the author's model of the engine, and
+the first two traps below are cases where that model would have been wrong.
 
 **Pair every negative with a positive control.** "Did not divert" is worthless
 alone, because a stand that was never eligible satisfies it too. The drafted
@@ -524,8 +529,8 @@ against broken code in draft, including one that checked a job was "not a swap"
 when any job at all satisfied it.
 
 **Make a timeout say where it stopped.** The pump prints the toil index, tick
-budget, driver type and pawn position when it gives up. Both traps below were
-diagnosed in one run each because of it; a bare "timed out" would have cost
+budget, driver type and pawn position when it gives up. The first two traps
+below were diagnosed in one run each because of it; a bare "timed out" would have cost
 several ten-minute cycles apiece.
 
 **Count known gaps apart from failures.** A case can be marked `GAP` with its
@@ -607,13 +612,15 @@ actually writes — the greps found none of seven.
 
 ## Adding a case
 
-Register it in `RunHarness`. `Case(map, pad, name, body)` gives a fixture with a
+Register it in `DebugTools_LifecycleHarness.Run`; its list is the order the
+cases run in. `Case(map, pad, name, body)` gives a fixture with a
 checked-out ledger; `Case(map, pad, name, stage, body)` stages its own;
 `Case(name, body)` needs no map.
 
-`Build()` hand-assembles a checked-out state for lifecycle cases. `Stage(kit,
-enclose, capableOf)` produces an undressed pawn for cases that watch the driver
-work, and can wall the pad into a proper room — which functional cases need,
+`Build()` hand-assembles a checked-out state for lifecycle cases. `Stage(map,
+pad, kit, enclose, capableOf, gender)` produces an undressed pawn for cases that
+watch the driver work (the decency pair turns on its gender), and can wall the
+pad into a proper room — which functional cases need,
 because `FindAvailableStand` walks `room.ContainedThings` and an open pad is the
 whole outdoors.
 
