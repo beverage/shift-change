@@ -10,6 +10,7 @@ apparel, no new buildings.
 | [README.md](README.md) | what the mod does, for players |
 | [docs/DESIGN.md](docs/DESIGN.md) | engine interfaces and why each took its shape |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | build, debug, test loop, file map |
+| [CHANGELOG.md](CHANGELOG.md) | what changed in each release; the Workshop change notes are made from it |
 
 ## Verify your work
 
@@ -236,7 +237,7 @@ decompiled game, and none of the history.
   inline comment explains a line that is not obvious, and nothing that is.
 - No history: no dates, no "used to" or "was once", no story of the bug or the
   review that produced the code, no capitals or bold for emphasis. History
-  belongs in git and the release notes. A harness case may say in one sentence
+  belongs in git and CHANGELOG.md. A harness case may say in one sentence
   that it guards a past bug. `check-invariants.py` rejects a date or a
   `File.cs:123` citation in any comment under `Source/`.
 - The reason lives at the site. Point at `docs/DESIGN.md` only for an argument
