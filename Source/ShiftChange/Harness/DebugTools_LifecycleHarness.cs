@@ -20,6 +20,7 @@ using static ShiftChange.HarnessInterop;
 using static ShiftChange.HarnessLifecycle;
 using static ShiftChange.HarnessGizmos;
 using static ShiftChange.HarnessOwnership;
+using static ShiftChange.HarnessRecolor;
 using static ShiftChange.HarnessRideAlong;
 using static ShiftChange.HarnessScoring;
 using static ShiftChange.HarnessSwap;
@@ -422,6 +423,9 @@ namespace ShiftChange
                  ParkedKitRefusesSpares);
             Case(map, pad, "but takes one once the parked kit is worn through",
                  WornOutParkedKitStillGoesShopping);
+            // A known gap unless Ideology is active.
+            Case(map, pad, "a recolor order goes through on shift, the optimizer's recolor does not, and none reaches a parked garment",
+                 RecolorOrderGoesThroughOnShift);
             // These two need a live map and no fixture, so they sit after the fixture cases and
             // before the game-replacing ones below.
             Case("a work target with no room of its own still resolves one",

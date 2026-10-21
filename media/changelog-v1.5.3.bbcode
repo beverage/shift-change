@@ -1,0 +1,5 @@
+[list]
+[*]Fixed: with Ideology, ordering a colonist in uniform to Recolor apparel at a styling station did nothing, and left a warning in the log. The order now goes through, and the colonist dyes the clothes you picked new colours for in Change style. When those include the stand's outfit, it goes back to the stand in its new colours, and the next colonist to borrow it wears them.
+[*]Fixed: if a stand's owner died while the stand was boxed up for a move, setting it down made them its owner again, so nobody else could use it. A dead owner is now dropped when the stand is placed. A stand already held for a dead colonist this way needs them removed once with Set owner.
+[*]Unchanged: a colonist in uniform still never recolors anything on their own; only your order does. Off shift, in their own clothes, recoloring works as before. A living owner still gets their stand back after a move.
+[/list]
