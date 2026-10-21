@@ -951,34 +951,79 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The first mod frame inside the FinalizeLoading abort, or null when no abort was
-        /// logged. It names whose cache broke the load, so the reader need not open Player.log.
+        /// The first mod frame inside a FinalizeLoading abort, or null when no abort was logged.
+        /// It names whose cache broke the load, so the reader need not open Player.log.
         /// </summary>
         internal static string FinalizeAbortCulprit()
         {
+            bool aborted = false;
             foreach (LogMessage message in Log.Messages)
             {
                 if (message.text == null || !message.text.Contains(FinalizeAbort))
                 {
                     continue;
                 }
-                foreach (string line in message.text.Split('\n'))
+                aborted = true;
+                string frame = FirstModFrame(message.text);
+                if (frame != null)
                 {
-                    int at = line.IndexOf("at ", StringComparison.Ordinal);
-                    // Taken for a mod's frame when the line holds "Mods": an engine frame carries
-                    // no source path, and a mod's carries one only when it ships its symbols, from
-                    // wherever it was built. A bare substring, so an engine method named for mods
-                    // (LoadedModManager.LoadAllActiveMods) matches too; the fallback below covers
-                    // a trace with no such frame.
-                    if (at < 0 || line.IndexOf("Mods", StringComparison.Ordinal) < 0)
-                    {
-                        continue;
-                    }
-                    string frame = line.Substring(at + 3);
-                    int cut = frame.IndexOf(" [0x", StringComparison.Ordinal);
-                    return cut > 0 ? frame.Substring(0, cut).Trim() : frame.Trim();
+                    return frame;
                 }
-                return "a frame the harness could not name";
+            }
+            return aborted ? "a frame the harness could not name" : null;
+        }
+
+        /// <summary>
+        /// How a frame of the game, the runtime or Harmony begins; one opening with a parenthesis
+        /// is a runtime wrapper. A mod that declares its types in Verse or RimWorld is skipped too.
+        /// </summary>
+        internal static readonly string[] EngineFrames =
+        {
+            "Verse.", "RimWorld.", "LudeonTK.", "System.", "Microsoft.", "UnityEngine.", "Unity.",
+            "Mono.", "MonoMod.", "HarmonyLib.", "HarmonyMod.", "Waylith.", "RimWorldWaylith.",
+            "Brutal.", "InvokeMessageMethod_", "(",
+        };
+
+        /// <summary>
+        /// What some Harmony versions write before the original method's full name when they name
+        /// the replacement for a patched method.
+        /// </summary>
+        internal static readonly string[] PatchedFrames =
+        {
+            "HarmonyGenerated.", "MonoMod.Utils.DynamicMethodDefinition.",
+        };
+
+        /// <summary>
+        /// The first stack frame in an exception's text that no <see cref="EngineFrames"/> entry
+        /// begins, cut after its argument list, or null when every frame is the engine's.
+        /// </summary>
+        internal static string FirstModFrame(string text)
+        {
+            foreach (string line in text.Split('\n'))
+            {
+                string trimmed = line.Trim();
+                if (!trimmed.StartsWith("at ", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                // Only the type name marks a mod's frame: a source path follows only when the mod
+                // ships its symbols, and names wherever it was built.
+                string frame = trimmed.Substring(3);
+                foreach (string patched in PatchedFrames)
+                {
+                    if (frame.StartsWith(patched, StringComparison.Ordinal))
+                    {
+                        frame = frame.Substring(patched.Length);
+                    }
+                }
+                // A line with no argument list is message text, not a frame.
+                int close = frame.IndexOf(')');
+                if (close < 0
+                    || EngineFrames.Any(e => frame.StartsWith(e, StringComparison.Ordinal)))
+                {
+                    continue;
+                }
+                return frame.Substring(0, close + 1);
             }
             return null;
         }
