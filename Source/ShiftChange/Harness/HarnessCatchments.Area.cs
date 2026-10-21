@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System.Collections.Generic;
 using System.Linq;
@@ -17,13 +15,11 @@ namespace ShiftChange
     internal static partial class HarnessCatchments
     {
         /// <summary>
-        /// A BEDROOM STAND MOVED TO AN AREA KEEPS ITS WORK LIST. Leaving room
-        /// mode ticks the room's Sleeping for real; since the bedroom suggests
-        /// it anyway, the settings window's work list stays in reach, and
-        /// ticking a work type swaps the trigger out with the stand still on
-        /// its area. The automatic bedroom stand is the first control, and
-        /// Sleeping ticked once the room is no bedroom, which hides the list,
-        /// is the second.
+        /// A bedroom stand moved to an area keeps its work list. Leaving room mode ticks the room's
+        /// Sleeping for real; since the bedroom suggests it anyway, the settings window keeps the
+        /// work list in reach, and ticking a work type swaps Sleeping out with the stand still on
+        /// its area. Controls: the automatic bedroom stand, and Sleeping ticked once the room is no
+        /// bedroom, which hides the list.
         /// </summary>
         internal static bool BedroomStandMovedToAnAreaKeepsItsWorkList(Fixture fix)
         {
@@ -69,13 +65,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// AN AREA COVERS ITS PAINTED CELLS while the stand stands in one. It
-        /// reaches a painted cell past the walls and leaves out an unpainted
-        /// cell of the stand's own room, since the area replaces the room, and
-        /// it covers nothing once the stand's own cell is cleared. Room mode's
-        /// answers on the same cells are the control. Binding needs something
-        /// ticked and an area a colonist could be restricted to, and the radius
-        /// served before comes back on switching to a radius.
+        /// An area covers its painted cells while the stand stands in one: a painted cell past the
+        /// walls, not an unpainted cell of the stand's own room, since the area replaces the room,
+        /// and nothing once the stand's own cell is cleared. Room mode's answers on the same cells
+        /// are the control. Binding needs something ticked and an area a colonist could be
+        /// restricted to, and the radius served before comes back on switching to a radius.
         /// </summary>
         internal static bool AreaCoversItsCells(Fixture fix)
         {
@@ -143,11 +137,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// AN AREA REPLACES THE ROOM, through the real dressing decision. Work
-        /// on a painted cell outside the stand's room dresses; work on an
-        /// unpainted cell does not, the stand's own room included. Room mode's
-        /// answers on the same cells are the control, and painting the far
-        /// corner in brings it back.
+        /// An area replaces the room, through the real dressing decision. Work on a painted cell
+        /// outside the stand's room dresses; work on an unpainted cell does not, the stand's own
+        /// room included. Room mode's answers on the same cells are the control, and painting the
+        /// far corner in brings it back.
         /// </summary>
         internal static bool AreaStandDressesWithinItsArea(Fixture fix)
         {
@@ -195,11 +188,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A DELETED AREA LEAVES ITS STAND SERVING NOTHING. The stand stays in
-        /// area mode under the area's last name, a rename included, and covers
-        /// no cell and dresses nobody, rather than falling back to its room. A
-        /// new area under the same name is not adopted, since default names
-        /// repeat; picking it binds it, which is the paired positive.
+        /// A deleted area leaves its stand serving nothing. The stand stays in area mode under the
+        /// area's last name, a rename included, and covers no cell and dresses nobody, rather than
+        /// falling back to its room. A new area under the same name is not adopted, since default
+        /// area names repeat; picking it binds it, which is the paired positive.
         /// </summary>
         internal static bool DeletedAreaServesNobody(Fixture fix)
         {
@@ -251,16 +243,14 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A GRAVSHIP LANDING REBINDS THE AREA IT CARRIED. A landing copies
-        /// the ship's areas under their labels, so the stand's own area object
-        /// stays behind on the old map. Here the old area is deleted and a new
-        /// one made under its label, which is what the stand finds on landing.
-        /// Without a flight the stand does not adopt it (control: the namesake
-        /// rule); after a flight on the same map, despawned for replacement and
-        /// set down again as <c>GravshipFlight</c> does, it does, with nobody
-        /// on shift, which is the early return in <c>PostSwapMap</c> it has to
-        /// run ahead of. A namesake that leaves out the stand's own cell, which
-        /// a carried area never does, is not adopted on landing either.
+        /// A gravship landing rebinds the area it carried. A landing copies the ship's areas under
+        /// their labels, so the stand's own area object stays behind on the old map. The case
+        /// deletes the old area and makes a new one under its label, which is what the stand finds
+        /// on landing. Without a flight the stand does not adopt it (control: the namesake rule).
+        /// After a flight on the same map (<see cref="Land"/>) it does, with nobody on shift, so
+        /// the rebind has to run ahead of the early return in <c>PostSwapMap</c>. A namesake that
+        /// leaves out the stand's own cell, which a carried area never does, is not adopted on
+        /// landing either.
         /// </summary>
         internal static bool GravshipLandingRebindsTheArea(Fixture fix)
         {
@@ -309,9 +299,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A gravship landing on the fixture's own map, as <c>GravshipFlight</c>
-        /// flies one: despawned for replacement, set down on the same cell,
-        /// then <c>PostSwapMap</c>.
+        /// A gravship landing staged on the fixture's own map, in the order
+        /// <see cref="HarnessLifecycle.GravshipFlight"/> uses: the stand alone is despawned for
+        /// replacement, set down on the same cell, then <c>PostSwapMap</c> runs. A real flight
+        /// also runs <c>PreSwapMap</c> first and copies the areas between the spawn and
+        /// <c>PostSwapMap</c>; the caller stages the copied area beforehand.
         /// </summary>
         internal static void Land(Fixture fix)
         {

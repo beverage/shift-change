@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using RimWorld;
 using Verse;
@@ -11,16 +9,14 @@ using static ShiftChange.HarnessFixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// Checks on the fixtures themselves: what a case can take for granted
-    /// about the colonist it is handed and the ground past the pad. Each was a
-    /// failure that moved from case to case at random before it was arranged.
+    /// Checks on the fixtures themselves: what a case can take for granted about the colonist
+    /// it is handed and the ground past the pad.
     /// </summary>
     internal static class HarnessFixtureChecks
     {
         /// <summary>
-        /// Calls <c>Pawn.DoTick</c> the way <see cref="RunSwap"/> does, with
-        /// the game clock standing still, until the pawn dies or
-        /// <paramref name="ticks"/> run out.
+        /// Calls <c>Pawn.DoTick</c> the way <see cref="RunSwap"/> does, with the game clock
+        /// standing still, until the pawn dies or <paramref name="ticks"/> run out.
         /// </summary>
         internal static void Pump(Pawn pawn, int ticks)
         {
@@ -31,15 +27,14 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// THE FIXTURE COLONIST HOLDS STILL, and the ground past the pad is
-        /// ground. Forty colonists in a row from
-        /// <see cref="DebugTools_Fixtures.AveragePawn"/>: none has needs that
-        /// tick while the harness pumps it, and none needs tending. One of
-        /// them, pumped 1,500 ticks, keeps its food, while a colonist the check
-        /// rejects loses its food under the same pump (control). Asthma makes a
-        /// colonist an urgent patient until the fixture removes it (control).
-        /// Natural rock past the pad becomes open ground with a room under
-        /// <see cref="HarnessFixtures.OpenGround"/>.
+        /// What every case takes for granted about its fixture. Forty colonists in a row from
+        /// <see cref="DebugTools_Fixtures.AveragePawn"/> have no needs that tick under the stopped
+        /// clock (<see cref="DebugTools_Fixtures.NeedsTickWhilePumped"/>) and none needs tending
+        /// (<see cref="DebugTools_Fixtures.RemoveTendableConditions"/>). One pumped for 1,500
+        /// ticks keeps its food, while a colonist the check rejects loses food under the same
+        /// pump (control). Untended asthma makes a colonist an urgent patient until the fixture
+        /// removes it (control). A cell of natural rock past the pad becomes open ground with a
+        /// room under <see cref="HarnessFixtures.OpenGround"/>.
         /// </summary>
         internal static bool FixtureColonistHoldsStill(Fixture fix)
         {
@@ -106,7 +101,7 @@ namespace ShiftChange
             ok &= Expect(rejected.Dead || rejected.needs.food.CurLevel < rejectedBefore,
                          "while a colonist the check rejects loses food under the same pump (control)");
 
-            // Asthma, which is what the bed cases met at random.
+            // Asthma stands for any condition a generated colonist arrives needing tended.
             HediffDef asthma = DefDatabase<HediffDef>.GetNamedSilentFail("Asthma");
             BodyPartDef lungDef = DefDatabase<BodyPartDef>.GetNamedSilentFail("Lung");
             Pawn patient = DebugTools_Fixtures.AveragePawn(Gender.Female, "Asthma");

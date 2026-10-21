@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System;
 using System.Collections.Generic;
@@ -18,27 +16,22 @@ using static ShiftChange.HarnessFixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// Harness cases for the engine lifecycle events a ledger has to
-    /// survive: gravship flight, teardown, reinstall, death, banishment,
-    /// and the fault latch that disables interception after repeated throws.
-    ///
-    /// <para>Case ORDER is decided in one place,
-    /// <see cref="DebugTools_LifecycleHarness.Run"/>.</para>
+    /// Harness cases for the engine lifecycle events a ledger has to survive: gravship
+    /// flight, map removal, teardown, reinstall, death and banishment, and the fault latch
+    /// that disables interception after repeated throws. Also holds the flight and meal-break
+    /// helpers <see cref="HarnessVacuum"/> reuses. Cases are registered, and ordered, in
+    /// <see cref="DebugTools_LifecycleHarness.Run"/>.
     /// </summary>
     internal static class HarnessLifecycle
     {
         /// <summary>
-        /// The gravship case, and the reason the harness exists. The stand,
-        /// the parked civvies and the borrower all survive a launch's
-        /// <c>WillReplace</c> despawn; the ledger must survive with them, or
-        /// the pawn lands in a uniform with no way out. Why the stand keeps
-        /// its contents in that mode: <see cref="CompShiftStand.PostDeSpawn"/>.
-        ///
-        /// <para>Nothing can touch a pawn's gear during the flight itself: the
-        /// gravship in flight is a world object with no gear tab. So the shift
-        /// picks up on landing exactly where it stood: the next meal break
-        /// sends the borrower to the stand on its own, and the return leg ends
-        /// the shift as it would have without the flight.</para>
+        /// A flight carrying the stand and its borrower together. The stand, the parked civvies
+        /// and the borrower all survive a takeoff's <c>WillReplace</c> despawn, so the ledger must
+        /// survive too, or the pawn lands in a uniform with no way out (<c>Building_OutfitStand</c>
+        /// keeps its contents in that mode, see <see cref="CompShiftStand.PostDeSpawn"/>). A
+        /// gravship in flight is a world object with no gear tab, so nothing happens to the pawn's
+        /// clothes meanwhile: after landing the next meal break sends them to the stand, and the
+        /// return leg ends the shift normally.
         /// </summary>
         internal static bool GravshipFlight(Fixture fix)
         {
@@ -70,18 +63,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A flight from a map with a grav anchor, which the takeoff keeps
-        /// rather than abandons (<c>WorldComponent_GravshipController.TakeoffEnded</c>):
-        /// the stand flies, and the borrower stays behind, spawned, on a map
-        /// that is still there.
-        ///
-        /// <para>Decided 2026-10-16: the shift stays suspended while they are
-        /// apart, the uniform forced and the wardrobe optimizer paused, since a
-        /// player's mistake or an emergency split them and putting things
-        /// right is the player's to do. Once they share a map again it resumes
-        /// on its own, and the return leg ends it normally. The pause keys on
-        /// the registry entry, which is what is asserted here; the optimizer
-        /// itself is not run.</para>
+        /// The stand flies and the borrower stays, spawned, on a map the takeoff keeps because it
+        /// has a grav anchor (<c>WorldComponent_GravshipController.TakeoffEnded</c>). The shift
+        /// stays suspended while they are apart, uniform forced and wardrobe optimizer paused,
+        /// and resumes once they share a map (docs/DESIGN.md, "Ownership and the ledger"). The
+        /// pause keys on the registry entry, which is what is asserted; the optimizer is not run.
         /// </summary>
         internal static bool StandFliesWithoutItsBorrower(Fixture fix)
         {
@@ -127,11 +113,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The mirror of <see cref="StandFliesWithoutItsBorrower"/>: the
-        /// borrower flies and the stand stays on the anchored map. The stand
-        /// is never told, since it never moved and nothing of ours hears a
-        /// pawn's <c>PostSwapMap</c>. Suspended while they are apart and
-        /// resumed once the borrower flies back, as decided there.
+        /// The mirror of <see cref="StandFliesWithoutItsBorrower"/>: the borrower flies and the
+        /// stand stays on the anchored map. The shift is kept while they are apart, the uniform
+        /// still forced and no meal break sending them after a stand on another map, and it
+        /// resumes once the borrower flies back. The stand is never told, since it does not move
+        /// and nothing of ours hears a pawn's <c>PostSwapMap</c>.
         /// </summary>
         internal static bool BorrowerFliesWithoutTheirStand(Fixture fix)
         {
@@ -173,19 +159,16 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The borrower flies, and the stand stays on a map with no grav
-        /// anchor, which the takeoff abandons (<c>GravshipUtility.AbandonMap</c>).
-        /// Map removal never despawns a building: <c>Thing.Notify_MyMapRemoved</c>
-        /// marks it discarded, so <see cref="CompShiftStand.PostDeSpawn"/>
-        /// never runs and nothing releases the ledger. The parked clothes are
-        /// gone with the map and the shift cannot end. What must not outlive
-        /// it is the forced flag on the uniform, which then pins the borrower
-        /// into it with no route out (see <see cref="CompShiftStand.ReleaseBorrower"/>).
-        ///
-        /// <para>Built on the second map (<see cref="BuildOnSecondMap"/>); the
-        /// borrower flies to the harness's own, and the second map is removed
-        /// by the same <c>Game.DeinitAndRemoveMap</c> an abandoned map
-        /// reaches.</para>
+        /// The borrower flies and the stand stays on a map with no grav anchor, which the takeoff
+        /// abandons (<c>GravshipUtility.AbandonMap</c>). Map removal never despawns a building:
+        /// <c>Thing.Notify_MyMapRemoved</c> marks it discarded, so
+        /// <see cref="CompShiftStand.PostDeSpawn"/> never runs and
+        /// <see cref="CompShiftStand.Notify_MapRemoved"/> is the stand's only notice. The parked
+        /// clothes go with the map; the case asserts the stand discarded, its ledger and registry
+        /// entry released, and the uniform still worn but no longer forced, since a forced flag
+        /// would pin the borrower into it (<see cref="CompShiftStand.ReleaseBorrower"/>).
+        /// Built on the second map (<see cref="BuildOnSecondMap"/>) and removed through the same
+        /// <c>Game.DeinitAndRemoveMap</c> an abandoned map reaches.
         /// </summary>
         internal static bool StandLostWithItsMap(Fixture fix, Map home, CellRect pad)
         {
@@ -219,12 +202,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// <see cref="StandLostWithItsMap"/>, with the stand in a box: minified
-        /// mid-shift, and the box left on the map that is removed. Removal
-        /// reaches things inside containers (<c>Map.GetChildHolders</c>), so the
-        /// boxed stand hears it too. The minify already took the forced flag off
-        /// (<see cref="CompShiftStand.PostDeSpawn"/>); what this asserts is the
-        /// ledger released with the box rather than left naming the borrower.
+        /// <see cref="StandLostWithItsMap"/> with the stand minified mid-shift and the box left on
+        /// the map that is removed. Map removal reaches things inside containers
+        /// (<c>Map.GetChildHolders</c>), so the boxed stand hears it too. The minify already took
+        /// the forced flag off; this asserts the ledger is released with the box.
         /// </summary>
         internal static bool BoxedStandLostWithItsMap(Fixture fix, Map home, CellRect pad)
         {
@@ -263,13 +244,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Every stand def carrying our comp asks to hear when its map is
-        /// removed (<see cref="CompProperties_ShiftStand.ResolveReferences"/>).
-        /// A def fact rather than a lifecycle one: without the flag the engine
-        /// never calls <see cref="CompShiftStand.Notify_MapRemoved"/>, and
-        /// <see cref="StandLostWithItsMap"/> covers only the vanilla stand. Under
-        /// <c>--with=khamenman.outfitstandsplus</c> this reaches that mod's
-        /// stands as well.
+        /// Every stand def carrying our comp asks to hear when its map is removed
+        /// (<see cref="CompProperties_ShiftStand.ResolveReferences"/>). Without
+        /// <c>notifyMapRemoved</c> the engine never calls
+        /// <see cref="CompShiftStand.Notify_MapRemoved"/>, and the two map-loss cases cover only
+        /// the vanilla stand; under <c>--with=khamenman.outfitstandsplus</c> this reaches that
+        /// mod's stands too.
         /// </summary>
         internal static bool StandDefsHearMapRemoval()
         {
@@ -284,13 +264,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// One thing's gravship flight, in the engine's order:
-        /// <c>PreSwapMap</c> and a <c>WillReplace</c> despawn at takeoff
-        /// (<c>GravshipUtility.GenerateGravship</c>), <c>GenSpawn.Spawn</c> on
-        /// the landing map, then <c>PostSwapMap</c>
-        /// (<c>GravshipPlacementUtility.PostSwapMap</c>). For a flight that
-        /// carries one of the pair; <see cref="GravshipFlight"/> interleaves
-        /// the two, as the engine does when both are aboard.
+        /// One thing's gravship flight, in the engine's order: <c>PreSwapMap</c> and a
+        /// <c>WillReplace</c> despawn at takeoff (<c>GravshipUtility.GenerateGravship</c>), a
+        /// spawn on the landing map, then <c>PostSwapMap</c>
+        /// (<c>GravshipPlacementUtility.PostSwapMap</c>). For a flight carrying one of the pair;
+        /// <see cref="GravshipFlight"/> interleaves the two as the engine does with both aboard,
+        /// without the <c>PreSwapMap</c> step, which nothing of ours overrides.
         /// </summary>
         internal static void Fly(Thing thing, Map to, IntVec3 cell)
         {
@@ -302,13 +281,13 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The return leg, run for real at the stand, and what it has to
-        /// leave: the uniform back on the stand and every parked garment back
-        /// on the borrower. A shift that ends as it would have without the
-        /// flight is the behaviour; the ledger checks before it are state.
+        /// The return leg, run for real at the stand: the uniform must end up back on the stand
+        /// and every parked garment back on the borrower.
         /// </summary>
         internal static bool ShiftEndsNormally(Fixture fix, Apparel uniform, List<Apparel> parked)
         {
+            // On the interaction cell: pathing is asynchronous, so a ticked pawn never finishes a
+            // walk (docs/TESTING.md, "Four engine traps").
             fix.Pawn.Position = fix.Stand.InteractionCell;
             if (!RunSwap(fix))
             {
@@ -325,14 +304,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Whether a meal break would send the borrower to the stand right now:
-        /// the automatic return trip, asked of the real interception and left
-        /// with no trace (<see cref="Probe"/>). A meal on the ground is a
-        /// sit-down break, which changes them out first wherever they eat
-        /// (<c>MealBreakChangesOut</c>), so the one thing this asks of a flight
-        /// is whether the stand is within reach. The probe clears the retry
-        /// cooldown a refusal stamps; in play that cooldown delays the first
-        /// change back after a reunion by up to
+        /// Whether a meal break would send the borrower to the stand right now: the automatic
+        /// return trip, asked of the real interception and left with no trace
+        /// (<see cref="Probe"/>). A meal on the ground is a sit-down break, which changes the pawn
+        /// out first wherever they eat (<c>MealBreakChangesOut</c>), so this asks of a flight only
+        /// whether the stand is within reach. The probe clears the retry cooldown a refusal
+        /// stamps, which in play can delay the first change back after a reunion by up to
         /// <see cref="Patch_JobInterception.RetryCooldownTicks"/>.
         /// </summary>
         internal static bool MealBreakSendsThemBack(Fixture fix)
@@ -366,11 +343,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The other half of the flight: the stand came, the borrower did not,
-        /// left on a map the takeoff abandoned. Nobody can walk back for their
-        /// clothes, so the ledger has to go — and critically the FORCED flags
-        /// have to come off with it, or the pawn is pinned into the uniform
-        /// with every route out closed.
+        /// The stand flies and the borrower is left on a map the takeoff abandoned, so nobody can
+        /// walk back for their clothes. The ledger must go, and the forced flags with it, or the
+        /// pawn is pinned into the uniform with every route out closed.
         /// </summary>
         internal static bool GravshipFlightLeftBehind(Fixture fix)
         {
@@ -379,9 +354,8 @@ namespace ShiftChange
                 ? fix.Comp.IssuedUniformForReading[0]
                 : null;
 
-            // The stand flies; the borrower stays on the old map. Despawning
-            // the pawn without respawning them is what "left behind" looks
-            // like from the stand's side.
+            // A despawn with no respawn stands in for a borrower left on an abandoned map: on no
+            // map, which is what the stand's PostSwapMap checks for.
             fix.Stand.DeSpawn(DestroyMode.WillReplace);
             fix.Pawn.DeSpawn(DestroyMode.Vanish);
             GenSpawn.Spawn(fix.Stand, standCell, fix.Map, Rot4.North);
@@ -399,17 +373,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Deconstruct or burn down. Unlike the flight the stand really is
-        /// gone, and unlike a minify it DROPS its container on the way out
-        /// (<c>Building_OutfitStand.cs:392</c>), so the civvies are already on
-        /// the floor, the ledger cannot be honoured, and the forced flags must
-        /// come off.
-        ///
-        /// <para>Uses <c>Deconstruct</c> rather than <c>Vanish</c>, and the
-        /// distinction is the whole point: <c>Vanish</c> is the minify, which
-        /// keeps its contents and now keeps its ledger with them. Testing the
-        /// release path through <c>Vanish</c> asserted the opposite of what
-        /// ships.</para>
+        /// Deconstruct or burn down. The stand is really gone, and unlike a flight
+        /// (<c>WillReplace</c>) or a minify (<c>Vanish</c>) a <c>Deconstruct</c> despawn makes
+        /// <c>Building_OutfitStand</c> drop its container, so the civvies are already on the
+        /// floor, the ledger cannot be honoured, and the forced flags must come off. The case uses
+        /// <c>Deconstruct</c> because <c>Vanish</c>, the minify, keeps the ledger: testing the
+        /// release through it would assert the opposite of what ships.
         /// </summary>
         internal static bool TeardownReleases(Fixture fix)
         {
@@ -432,22 +401,16 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The case this whole branch exists for, reported from play
-        /// 2026-08-23: move a stand while somebody has its uniform out, and
-        /// they must still be able to hand it back afterwards.
+        /// Moving a stand while somebody has its uniform out: they must still be able to hand it
+        /// back afterwards. Guards a past bug where a move released the ledger and left the pawn
+        /// stuck in the uniform.
         ///
-        /// <para>A minify is a <c>Vanish</c>, which KEEPS the container
-        /// (<c>Building_OutfitStand.cs:390-397</c>), so the borrower's civvies
-        /// travel inside the box. The ledger has to travel with them or the
-        /// stand lands reading those civvies as its own kit — the pawn is
-        /// stuck in the uniform and their own clothes become stand stock.
-        /// Releasing here shipped once and did exactly that; ejecting the
-        /// civvies to the floor instead shipped once too and was the same
-        /// permanent swap with the clothes underfoot.</para>
-        ///
-        /// <para>The forced flag is the one thing that must NOT survive the
-        /// boxed window, so it is asserted OFF while boxed and ON again on
-        /// landing.</para>
+        /// <para>A minify is a <c>Vanish</c> despawn and <c>Building_OutfitStand</c> keeps its
+        /// container through one, so the borrower's civvies travel inside the box. The ledger has
+        /// to travel with them, or the stand lands reading those civvies as its own kit; dropped
+        /// on the floor instead, they leave the pawn just as stuck in the uniform. The forced
+        /// flag is the exception: it must not survive the boxed window, so the case asserts it
+        /// off while boxed and on again on landing.</para>
         /// </summary>
         internal static bool ReinstallKeepsTheLedger(Fixture fix)
         {
@@ -499,9 +462,9 @@ namespace ShiftChange
                              "and the uniform is force-worn again on landing");
             }
 
-            // The proof that matters: the return trip actually runs and the
-            // pawn gets their own clothes back. Everything above is state; this
-            // is the behaviour the report was about.
+            // The return trip actually runs and the pawn gets their own clothes back: the
+            // behaviour, where everything above is state. The pawn stands on the interaction cell
+            // because pathing is asynchronous (docs/TESTING.md, "Four engine traps").
             fix.Pawn.Position = fix.Stand.InteractionCell;
             if (!RunSwap(fix))
             {
@@ -518,25 +481,21 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Relocating a stand — the Reinstall designator — is a minify and a
-        /// respawn of the SAME thing, so everything the player configured has
-        /// to be on the other side of it.
+        /// Relocating a stand with the Reinstall designator is a minify and a respawn of the same
+        /// thing, so everything the player configured must come out the other side: owner, work
+        /// types and full-change flag. The removal flag, staged on, must be held off again on
+        /// landing, as it is for any stand in service.
         ///
-        /// <para>Owners are the half that was actually broken: the base comp
-        /// parks them on despawn and offers them back on spawn, but only past
-        /// <c>CanSetUninstallAssignedPawn</c>, whose base answer is
-        /// <c>false</c> (<c>CompAssignableToPawn.cs:214,233-236</c>) — and it
-        /// clears the parked list either way, so a move silently unowned the
-        /// stand. The mode and flag halves ride on comp scribing and
-        /// <c>PostSpawnSetup</c> and are asserted here as regression cover,
-        /// not because they were failing.</para>
+        /// <para>Owners are the half that was broken: the base comp parks them on despawn and
+        /// offers them back on spawn, but only past <c>CanSetUninstallAssignedPawn</c>, whose base
+        /// answer is false, and it clears the parked list either way, so a move silently unowned
+        /// the stand. The other fields stay on the comp, which rides in the box unsaved, so this
+        /// case proves no scribing; <c>PostSpawnSetup</c> holds the removal flag off again.</para>
         ///
-        /// <para>Minifies through <c>MakeMinified</c> rather than a bare
-        /// <c>DeSpawn</c>, because the wrap is what the real path does and it
-        /// is the step that would notice a stand left holding a live
-        /// reference. The re-spawn is <c>Blueprint_Install.MakeSolidThing</c>'s
-        /// shape: drop the inner thing out of the box, spawn it, bin the
-        /// box.</para>
+        /// <para>The minify goes through <c>MakeMinified</c>, not a bare <c>DeSpawn</c>, because
+        /// the wrap is what the real path does and would notice a stand left holding a live
+        /// reference. The respawn has the shape of <c>Blueprint_Install.MakeSolidThing</c>: take
+        /// the inner thing out of the box, destroy the box, then spawn the thing.</para>
         /// </summary>
         internal static bool ReinstallKeepsConfiguration(Fixture fix)
         {
@@ -558,8 +517,8 @@ namespace ShiftChange
             assignable.TryAssignPawn(fix.Pawn);
             fix.Comp.ToggleWork(work);
             fix.Comp.SetFullChange(true);
-            // Staged LAST: ToggleWork is an entry into service and clears it.
-            // Setting it before would assert nothing about the landing.
+            // Set last: ToggleWork enters service, which clears the flag, so setting it earlier
+            // would leave nothing to assert about the landing.
             flag(fix.Stand) = true;
 
             Map map = fix.Map;
@@ -590,11 +549,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// An owner who dies while their stand is boxed must not own it again when it is set down.
-        /// Death reaches the reaper, but the reaper scans spawned stands only, so the boxed
-        /// stand's parked owner list keeps the pawn; the base comp then offers each parked owner
-        /// back through <c>CanSetUninstallAssignedPawn</c>, and a dead colonist still passes
-        /// <c>IsColonist</c>. Guards a past bug. Minified and set down as
+        /// An owner who dies while their stand is boxed must not own it again when it is set
+        /// down. Guards a past bug. Death reaches the reaper, but the reaper scans spawned stands
+        /// only, so the boxed stand's parked owner list keeps the pawn; the base comp then offers
+        /// each parked owner back through <c>CanSetUninstallAssignedPawn</c>, and a dead colonist
+        /// still passes <c>IsColonist</c>. Minified and set down as
         /// <see cref="ReinstallKeepsConfiguration"/> does it.
         /// </summary>
         internal static bool DeadOwnerNotRestoredOnReinstall(Fixture fix)
@@ -640,11 +599,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Death runs <c>Pawn.Kill</c> → <c>Pawn.Destroy(KillFinalize)</c> →
-        /// <c>Pawn_Ownership.UnclaimAll</c> (<c>Pawn.cs:2350-2352</c>), which
-        /// <see cref="Patch_UnclaimStands"/> hooks. Cheap to arrange in play,
-        /// but it is the case the whole reaper story rests on, so it is worth
-        /// having a regression marker for it.
+        /// Death runs <c>Pawn.Kill</c>, then <c>Pawn.Destroy(KillFinalize)</c>, then
+        /// <c>Pawn_Ownership.UnclaimAll</c>, which <see cref="Patch_UnclaimStands"/> hooks. The
+        /// case asserts the ledger is reaped and the registry entry cleared on that path.
         /// </summary>
         internal static bool DeathReaps(Fixture fix)
         {
@@ -655,14 +612,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The exit vanilla does not route through <c>UnclaimAll</c>, caught
-        /// by <see cref="Patch_BanishStands"/> instead.
-        ///
-        /// Asserted to the same depth as <see cref="DeathReaps"/>, plus the
-        /// forced flag — which matters here and not there, because banishment
-        /// leaves the pawn ALIVE and standing on the map. A ledger cleared
-        /// without clearing forced pins them into the uniform with every route
-        /// out already closed.
+        /// The exit vanilla does not route through <c>UnclaimAll</c>: on a spawned colonist
+        /// <c>PawnBanishUtility.Banish</c> clears guest status and sets the faction to null, and
+        /// reaches no unclaim, so <see cref="Patch_BanishStands"/> calls the reaper itself.
+        /// Asserted as deeply as <see cref="DeathReaps"/>, plus the forced flag, which matters here
+        /// because a banished pawn stays alive on the map: a ledger cleared without it pins them
+        /// into the uniform with every route out closed.
         /// </summary>
         internal static bool BanishmentReaps(Fixture fix)
         {
@@ -680,28 +635,23 @@ namespace ShiftChange
                 ok &= Expect(!fix.Pawn.outfits.forcedHandler.IsForced(uniform),
                              "uniform no longer force-worn");
             }
-            // The reap must survive the pawn coming back. A liveness-only fix
-            // passes everything above and then fails this, because the ledger
-            // was never emptied — it was only being disbelieved.
+            // The reap must survive the pawn being recruited back. A fix that only disbelieved a
+            // departed borrower's ledger would pass everything above and fail here, since the
+            // ledger was never emptied.
             fix.Pawn.SetFaction(Faction.OfPlayer);
             ok &= Expect(!fix.Comp.OnShift, "still reaped after re-recruitment");
             return ok;
         }
 
         /// <summary>
-        /// The fault latch, driven by real throws through the real
-        /// <see cref="Patch_JobInterception.Prefix"/> catch block rather than
-        /// by calling the counter directly (why:
-        /// <see cref="Patch_JobInterception.injectFaults"/>).
-        ///
-        /// Three claims: throws below the limit are counted and the mod keeps
-        /// serving, the limit latches it off, and a game change re-arms it. The
-        /// third is the bug this was written for
-        /// (<see cref="Patch_JobInterception.faulted"/>).
-        ///
-        /// The one thing this cannot do is load an actual save; it changes the
-        /// game reference under <see cref="SessionGuard"/> instead, which is
-        /// the same trigger a load pulls.
+        /// The fault latch, driven by real throws through the catch block of the real
+        /// <see cref="Patch_JobInterception.Prefix"/> rather than by calling the counter (the seam
+        /// is <see cref="Patch_JobInterception.injectFaults"/>). Three claims: throws below the
+        /// limit are counted and the mod keeps serving, the limit latches interception off, and a
+        /// game change re-arms it (<see cref="Patch_JobInterception.faulted"/>). The third guards
+        /// a past bug in which only quitting the game re-armed it. A save load cannot be run
+        /// here, so the case resets the game reference under <see cref="SessionGuard"/>, the
+        /// trigger a load pulls.
         /// </summary>
         internal static bool FaultLatchRecovers(Fixture fix)
         {
@@ -712,9 +662,8 @@ namespace ShiftChange
 
             bool ok = Expect(!Patch_JobInterception.faulted, "starts armed");
 
-            // Below the limit: counted, still serving. These catch blocks also
-            // fire for a NEIGHBOUR's exception thrown through our frame, so
-            // one throw must not take the mod out for the rest of the colony.
+            // Below the limit: counted, still serving. The catch also sees other mods' exceptions
+            // thrown through our frame, so one throw must not disable the mod for the colony.
             Fault(fix.Pawn, 2);
             ok &= Expect(Patch_JobInterception.faultCount == 2, "throws are counted")
                 & Expect(!Patch_JobInterception.faulted, "still armed below the limit");
@@ -722,17 +671,15 @@ namespace ShiftChange
             Fault(fix.Pawn, 1);
             ok &= Expect(Patch_JobInterception.faulted, "latched at the limit");
 
-            // What a save load does. This is the whole fix: before it, the
-            // only way back was quitting the game.
+            // A game change, as a save load makes one.
             SessionGuard.current = null;
             SessionGuard.Ensure();
             ok &= Expect(!Patch_JobInterception.faulted, "a game change re-arms it")
                 & Expect(Patch_JobInterception.faultCount == 0, "the count resets with it");
 
-            // Enabled is a STANDING decision — the player's, or the hot-reload
-            // quarantine's — and the quarantine has to survive a load because
-            // the wedging twin JobDriver is still loaded. Re-arming it here
-            // would resurrect the 2026-08-08 tracker wedge.
+            // Enabled is a standing decision, the player's or the hot-reload quarantine's, and the
+            // quarantine must survive a load because the twin JobDriver that wedges a tracker is
+            // still loaded. Re-arming it along with the latch would bring the wedge back.
             ok &= Expect(Patch_JobInterception.Enabled == enabledBefore,
                          "Enabled is left alone");
 

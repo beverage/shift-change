@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System.Collections.Generic;
 using System.Linq;
@@ -17,14 +15,12 @@ namespace ShiftChange
     internal static partial class HarnessCatchments
     {
         /// <summary>
-        /// STAYING DRESSED AT A RADIUS WORK STAND: inside its ring, the
-        /// uniform stays on for the stand's own work, for pass-through work,
-        /// and for idling and wandering, and for nothing else. Past the ring
-        /// nothing keeps it, in the stand's own room included. Room mode
-        /// keeping it for anything in the room is the control, and each job
-        /// kept is paired with one of the same shape that changes them back,
-        /// so a probe failing for its own reasons cannot pass as staying
-        /// dressed.
+        /// Staying dressed at a radius work stand: inside its ring, the uniform stays on for the
+        /// stand's own work, for pass-through work, and for idling and wandering, and for nothing
+        /// else. Past the ring nothing keeps it, in the stand's own room included. Room mode
+        /// keeping it for anything in the room is the control, and each job kept is paired with
+        /// one of the same shape that changes them back, so a probe failing for its own reasons
+        /// cannot pass as staying dressed.
         /// </summary>
         internal static bool RadiusWorkStandKeepsTheUniformInItsRing(Fixture fix)
         {
@@ -41,7 +37,8 @@ namespace ShiftChange
             {
                 return Expect(false, "the work, joy and bed defs resolve");
             }
-            // Ticked before the bed lands: a bed makes the pad a bedroom.
+            // Ticked before the bed lands: a bed makes the pad a bedroom, which an automatic stand
+            // would read as sleep.
             fix.Comp.ToggleWork(doctor);
             MakeCalm(fix.Map);
 
@@ -108,14 +105,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// PASS-THROUGH WORK IS JUDGED AT BOTH ENDS. A haul with its item and its
-        /// destination inside the ring keeps the uniform on; with either end
-        /// past it, the colonist changes back before the haul, while the stand
-        /// is near. A cleaning run's queue is judged the same way. An errand
-        /// with no giver, queued ahead of the stand's own work inside the ring,
-        /// rides along whatever its ends (docs/DESIGN.md, "Errands queued ahead
-        /// of work"). Room mode keeping the
-        /// outbound haul, which never leaves the room, is the control.
+        /// Pass-through work is judged at both ends. A haul with its item and its destination
+        /// inside the ring keeps the uniform on; with either end past it, the colonist changes
+        /// back before the haul, while the stand is near. A cleaning run's queue is judged the
+        /// same way. An errand with no giver, queued ahead of the stand's own work inside the
+        /// ring, rides along whatever its ends (docs/DESIGN.md, "Errands queued ahead of work").
+        /// Room mode keeping the outbound haul, which never leaves the room, is the control.
         /// </summary>
         internal static bool PassThroughWorkIsJudgedAtBothEnds(Fixture fix)
         {
@@ -202,12 +197,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// STAYING DRESSED AT A RADIUS SLEEP STAND: the first job out of bed
-        /// changes the colonist back, wherever it is, a haul inside the ring
-        /// included. Going to a bed inside the ring keeps the pyjamas on, since
-        /// the stand would dress them for it; a bed past the ring does not, and
-        /// nor does bed rest for medical reasons, which is the work arm's. The
-        /// same haul at a work stand keeping the uniform on is the control.
+        /// Staying dressed at a radius sleep stand: the first job out of bed changes the colonist
+        /// back, wherever it is, a haul inside the ring included. Going to a bed inside the ring
+        /// keeps the pyjamas on, since the stand would dress them for it; a bed past the ring
+        /// does not, and nor does bed rest for medical reasons, which is the work arm's. The same
+        /// haul at a work stand keeping the uniform on is the control.
         /// </summary>
         internal static bool RadiusSleepStandKeepsItOnlyForBed(Fixture fix)
         {
@@ -218,8 +212,8 @@ namespace ShiftChange
             {
                 return Expect(false, "the work and bed defs resolve");
             }
-            // Ticked before the beds land. A bed makes the pad a bedroom, and on
-            // an automatic stand ToggleRest would then turn sleep OFF.
+            // Ticked before the beds land: a bed makes the pad a bedroom, and on an automatic
+            // stand ToggleRest would then turn sleep off.
             fix.Comp.ToggleRest();
             fix.Comp.SetServes(CatchmentKind.Radius);
             fix.Comp.SetServeRadius(3);
@@ -276,12 +270,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// STAYING DRESSED AT A RADIUS RECREATION STAND (decided 2026-10-09):
-        /// inside its ring, recreation, idling and wandering keep the outfit
-        /// on, and pass-through work does not, since that is a work stand's. A
-        /// swimmer wanders between pools in swimwear, but changes before
-        /// hauling. The same haul at a work stand keeping the uniform on is
-        /// the control.
+        /// Staying dressed at a radius recreation stand: inside its ring, recreation, idling and
+        /// wandering keep the outfit on, and pass-through work does not, since that is a work
+        /// stand's. A swimmer wanders between pools in swimwear, but changes before hauling. The
+        /// same haul at a work stand keeping the uniform on is the control.
         /// </summary>
         internal static bool RadiusRecreationStandKeepsItForPlay(Fixture fix)
         {
@@ -330,12 +322,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// THE TABLES A RADIUS STAND STAYS DRESSED BY. Pass-through work is
-        /// read from work tags, so a modded work type carrying the Hauling tag
-        /// under a name of its own passes through, and one named Hauling
-        /// without the tag does not. The incidental list's six rows all
-        /// resolve, so none is a typo that can never match, and each counts
-        /// only without a giver.
+        /// The tables a radius stand stays dressed by. Pass-through work is read from work tags,
+        /// so a modded work type carrying the Hauling tag under a name of its own passes through,
+        /// and one named Hauling without the tag does not. The incidental list's six rows all
+        /// resolve, so none is a typo that can never match, and each counts only without a giver.
         /// </summary>
         internal static bool PassThroughAndIncidentalTablesHold()
         {
@@ -390,17 +380,15 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// THE JOB A COLONIST WAS JUST DRESSED FOR NEVER CHANGES THEM BACK,
-        /// though its target leaves the catchment while they change: a
-        /// patient here, standing in for an animal walking out of an unwalled
-        /// ring or a cow out of the barn. Dressed through the work arm's own
-        /// <c>Insert</c>, and the deferred job started by the engine's own
-        /// queue, so the job tracker's pause between the two is on the path
-        /// and must not spend the grace. Vanilla can start a haul first and
-        /// put the job back in the queue: that haul keeps the uniform on, and
-        /// so does the job starting again. The next job out there changes them
-        /// back, which is the control: the grace lasts one job. Once for a
-        /// radius stand, then for a room stand whose patient leaves the room.
+        /// The job a colonist was just dressed for never changes them back, though its target
+        /// leaves the catchment while they change: a patient here, standing in for an animal
+        /// walking out of an unwalled ring or a cow out of the barn. Dressed through the work
+        /// arm's own <c>Insert</c>, and the deferred job started by the engine's own queue, so
+        /// the job tracker's pause between the two is on the path and must not spend the grace.
+        /// Vanilla can start a haul first and put the job back in the queue: that haul keeps the
+        /// uniform on, and so does the job starting again. The next job out there changes them
+        /// back, which is the control: the grace lasts one job. Once for a radius stand, then for
+        /// a room stand whose patient leaves the room.
         /// </summary>
         internal static bool JustDressedForNeverSendsThemBack(Fixture fix)
         {
@@ -425,8 +413,8 @@ namespace ShiftChange
                     & DressedForThenMoved(fix, tend, patient, fix.Stand.Position + new IntVec3(4, 0, 4),
                                           "radius: the patient walks past the ring");
 
-            // Changed back while the stand still serves its radius, so the
-            // freed stand catches nobody up on the way to room mode.
+            // Changed back while the stand still serves its radius, so the freed stand catches
+            // nobody up on the way to room mode.
             ok &= Expect(RunSwap(fix), "changed back between the passes")
                 & Expect(!fix.Comp.OnShift, "and off shift (control)");
             Settle(fix.Pawn);
@@ -442,9 +430,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// One pass of <see cref="JustDressedForNeverSendsThemBack"/>: dress for
-        /// tending the patient, move the patient to <paramref name="away"/>
-        /// while the colonist changes, then let the engine start the tending.
+        /// One pass of <see cref="JustDressedForNeverSendsThemBack"/>: dress for tending the
+        /// patient, move the patient to <paramref name="away"/> while the colonist changes, then
+        /// let the engine start the tending.
         /// </summary>
         internal static bool DressedForThenMoved(Fixture fix, WorkGiverDef tend, Pawn patient,
                                                  IntVec3 away, string pass)
@@ -457,8 +445,8 @@ namespace ShiftChange
             bool ok = Expect(inserted && pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand
                              && queue.Count > 0 && queue[0].job == tending,
                              pass + ": the work arm sends them to dress, the tending deferred behind the swap");
-            // RunSwap's own swap takes over from the inserted one, and the
-            // queue keeps the tending: the swap driver never touches it.
+            // RunSwap's own swap takes over from the inserted one, and the queue keeps the
+            // tending: the swap driver never touches it.
             ok &= Expect(RunSwap(fix), "they dressed")
                 & Expect(fix.Comp.OnShift && queue.Count > 0 && queue[0].job == tending,
                          "on shift, with the tending still queued (control)");
@@ -469,16 +457,15 @@ namespace ShiftChange
                 & Expect(pawn.CurJobDef == JobDefOf.Wait_MaintainPosture,
                          "the job tracker paused between the swap and the queue (control: the pause is on the path)");
 
-            // The pause ends as the tracker ends it at expiry, and the queue
-            // starts the tending through StartJob, this mod's prefix included.
+            // The pause ends as the tracker ends it at expiry, and the queue starts the tending
+            // through StartJob, this mod's prefix included.
             pawn.jobs.EndCurrentJob(JobCondition.Succeeded);
             ok &= Expect(pawn.CurJob == tending,
                          "the tending they dressed for starts (" + (pawn.CurJobDef?.defName ?? "no job") + ")")
                 & Expect(fix.Comp.OnShift, "in uniform: the job they were dressed for does not send them back");
 
-            // Vanilla's StartJob can then put the tending back at the head of
-            // the queue, untagged, and start a haul first
-            // (Pawn_JobTracker.TryOpportunisticJob).
+            // Vanilla's StartJob can then put the tending back at the head of the queue,
+            // untagged, and start a haul first (Pawn_JobTracker.TryOpportunisticJob).
             queue.EnqueueFirst(tending);
             ok &= Expect(!Diverts(fix, JobMaker.MakeJob(JobDefOf.HaulToCell, away, away)),
                          "a haul vanilla starts first, the tending queued behind it, keeps the uniform on")

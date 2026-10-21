@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System;
 using System.Collections.Generic;
@@ -17,30 +15,15 @@ using static ShiftChange.DebugTools_LifecycleHarness;
 
 namespace ShiftChange
 {
-    /// <summary>
-    /// Staging and teardown for every harness case: builds a throwaway stand
-    /// and borrower on a cleared pad, runs the real swap driver against it,
-    /// and sweeps the pad afterwards so no case inherits another's mess.
-    ///
-    /// <para>Case ORDER is decided in one place,
-    /// <see cref="DebugTools_LifecycleHarness.Run"/>.</para>
-    /// </summary>
+    /// <summary>Staging, pumping and teardown shared by every harness case.</summary>
     internal static class HarnessFixtures
     {
         /// <summary>
-        /// A spare colonist on the pad, registered for teardown. Bare of work
-        /// types on purpose: the assignable comp offers every colonist when the
-        /// stand has resolved none, which is what these cases want to test.
-        ///
-        /// <para>Retried like a fixture build (<see cref="BuildAttempts"/>), and
-        /// for the same reason: on a large mod list, spawning a fresh pawn
-        /// sometimes throws <c>Collection was modified</c> in
-        /// <c>Pawn_HealthTracker.Notify_Spawned</c>, under third-party postfixes on
-        /// <c>Pawn.SpawnSetup</c>. This runs inside case bodies, where the fixture
-        /// retry never reached, so one such throw failed a whole case on the full
-        /// list. Every retry is printed, so an intermittent fault of our own would
-        /// still show, and the last attempt's exception is left to fail the
-        /// case.</para>
+        /// A spare colonist on the pad, registered for teardown. Spawning is retried like a fixture
+        /// build (<see cref="BuildAttempts"/>): on a large mod list it can throw
+        /// <c>Collection was modified</c> in <c>Pawn_HealthTracker.Notify_Spawned</c>, under
+        /// third-party postfixes on <c>Pawn.SpawnSetup</c>. Every retry is printed, and the last
+        /// attempt's exception fails the case.
         /// </summary>
         internal static Pawn SpawnExtra(Fixture fix, Gender gender, string nick)
         {
@@ -67,8 +50,7 @@ namespace ShiftChange
                           .AppendLine(e.Message);
                     try
                     {
-                        // Half spawned, most likely: out of the way before the
-                        // next one lands on the same cell.
+                        // Likely half spawned: clear it before the retry lands on the same cell.
                         if (!pawn.Destroyed)
                         {
                             pawn.Destroy();
@@ -82,10 +64,7 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>
-        /// A stand-in gizmo chain. Identity is all that matters — these are
-        /// never drawn, only counted and compared by reference.
-        /// </summary>
+        /// <summary>Stand-in gizmos: never drawn, only counted and compared by reference.</summary>
         internal static List<Gizmo> Sentinels()
         {
             return new List<Gizmo>
@@ -127,8 +106,7 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A recreation job whose B target is the pawn's own cell — the shape
-        /// the joy arm resolves. <see cref="WorkJob"/> is its work-arm twin.
+        /// A recreation job whose B target is the pawn's own cell, the shape the joy arm resolves.
         /// </summary>
         internal static Job JoyJob(Fixture fix, JobDef def)
         {
@@ -143,11 +121,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Remove a staged threat and drop the cache stamp with it, so the map
-        /// reads calm again NOW rather than 101 ticks from now that never
-        /// arrive. Hands the next case a calm map — the freed-stand case
-        /// asserts on that by name, so a stale non-None left behind here fails
-        /// a case that has nothing wrong with it.
+        /// Removes a staged threat and drops the danger cache's stamp, so the map reads calm at
+        /// once; a plain <c>Destroy</c> leaves the rating stale until something drops it.
         /// </summary>
         internal static void ClearThreat(Fixture fix, Pawn threat)
         {
@@ -159,30 +134,20 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A live hostile on the map, which is all <c>StoryDanger</c> is:
-        /// <c>DangerWatcher</c> sums <c>kindDef.combatPower</c> over the
-        /// attack-target cache.
+        /// A live hostile on the map, which is all <c>StoryDanger</c> is: <c>DangerWatcher</c> sums
+        /// <c>kindDef.combatPower</c> over the attack-target cache. It is never ticked (the harness
+        /// ticks fixture pawns one at a time, never the map), so it stands inert, but a colonist
+        /// ticked while it is there reacts to it: clear it (<see cref="ClearThreat"/>) before
+        /// anything pumps the colonist.
         ///
-        /// It is never ticked. The harness ticks fixture pawns one at a time
-        /// and never the map, so this one stands inert beside the pad and
-        /// cannot fight, flee or path — which is what makes a raider safe to
-        /// park next to the colonist whose job we are about to drive.
-        ///
-        /// Unfogged deliberately: <c>IsActiveThreatToPlayer</c> refuses a
-        /// fogged target (<c>canBeFogged</c> defaults false), and a quicktest
-        /// map is fogged everywhere the starting pawns have not walked.
-        ///
-        /// <para><b>Insects, not pirates.</b> The first version of this asked
-        /// for <c>Faction.OfPirates</c> and failed on staging rather than on
-        /// behaviour (harness run, 2026-08-31): pirates are generated into a
-        /// world by worldgen and the quicktest world has none, so the faction
-        /// came back null. <c>OfInsects</c> is a permanent faction present in
-        /// every world, permanently hostile, and a Megascarab carries no
-        /// <c>CompCanBeDormant</c> — so it reads awake and counts toward the
-        /// rating. (<c>IsActiveThreatToPlayer</c>'s <c>ignoreHives</c> flag
-        /// excludes hives, not the insects themselves.) The fallbacks exist so
-        /// a world missing one permanent faction still stages a threat rather
-        /// than reporting a behavioural failure that never ran.</para>
+        /// <para>Unfogged, because <c>IsActiveThreatToPlayer</c> refuses a fogged target
+        /// (<c>canBeFogged</c> defaults false), and map generation fogs every cell not connected
+        /// to the start spot, which clearing rock does not lift. An insect, not a pirate: the
+        /// quicktest world has no pirate faction, so <c>Faction.OfPirates</c> can be null, while
+        /// <c>OfInsects</c> is permanent and always hostile. A Megascarab's
+        /// <c>CompCanBeDormant</c> does not start dormant, so it reads awake and counts, and
+        /// <c>ignoreHives</c> drops only insects whose lord defends a hive; this one has no lord.
+        /// The fallbacks cover a world missing a faction; null means none could be staged.</para>
         /// </summary>
         internal static Pawn Threat(Fixture fix)
         {
@@ -210,22 +175,17 @@ namespace ShiftChange
             Pawn threat = PawnGenerator.GeneratePawn(kind, hostile);
             GenSpawn.Spawn(threat, cell, fix.Map, Rot4.North);
             fix.Map.fogGrid.Unfog(threat.Position);
-            // Swept by Teardown as a backstop if an assertion below throws;
-            // the case destroys it itself on the ordinary path, and Teardown
-            // skips anything already destroyed.
+            // Registered so Teardown removes it if the case throws before ClearThreat.
             fix.Extras.Add(threat);
             ForceDangerRecheck(fix.Map);
             return threat;
         }
 
         /// <summary>
-        /// Drop <c>DangerWatcher</c>'s cache stamp so the next read recomputes.
-        ///
-        /// The rating is cached for 101 ticks, and the harness runs from a
-        /// <c>Game.FinalizeInit</c> postfix — before the game loop — so
-        /// <c>TicksGame</c> never advances while a case runs. Without this a
-        /// spawned hostile sits behind a stale <c>None</c> forever, and the
-        /// case would pass by asserting nothing.
+        /// Drops <c>DangerWatcher</c>'s cache stamp so the next read recomputes. The rating is
+        /// cached for 101 ticks and <c>TicksGame</c> never advances during a case, which runs
+        /// inside one frame, so a spawned hostile would sit behind a stale <c>None</c> and the
+        /// case would assert nothing.
         /// </summary>
         internal static void ForceDangerRecheck(Map map)
         {
@@ -234,35 +194,18 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// MAKE the map calm, rather than assert that it is. Returns how many
-        /// targets were swept, so a caller can say whether it had to do
-        /// anything.
+        /// Makes the map calm rather than asserting that it is, and returns how many hostile
+        /// targets it swept. A quicktest map is generated, not arranged, and can come up with
+        /// something already hostile on it, which fails every control that opens with
+        /// <c>DangerRating == None</c> and each assertion behind it, since the danger gate is
+        /// one-directional and nothing dresses on a map under threat.
         ///
-        /// <para><b>Why this exists (2026-09-18).</b> A quicktest map is
-        /// generated, not arranged, and what it contains is a roll. One came up
-        /// with something already hostile on it, and every case opening with
-        /// <c>DangerRating == None</c> as a control failed — along with each
-        /// assertion sitting behind that control, because the danger gate is
-        /// one-directional and nothing dresses on a map under threat. Eleven
-        /// assertions across six cases, and not one of them was about the mod:
-        /// the run before and the run after were both green. A control that
-        /// fails on a dice roll is worse than no control at all, because what
-        /// it spends is the release gate's credibility.</para>
-        ///
-        /// <para><b>What has to go is exactly what the rating sums.</b>
-        /// <c>DangerWatcher.CalculateDangerRating</c> walks
-        /// <c>attackTargetsCache.TargetsHostileToColony</c> through
-        /// <c>AffectsStoryDanger</c>, and only a Pawn (its
-        /// <c>kindDef.combatPower</c>) or an unmanned mortar contributes
-        /// anything at all; every other hostile sums to zero. Sweeping the
-        /// whole hostile set is that same answer with no arithmetic in it, and
-        /// on a throwaway map nothing in that set is worth keeping.</para>
-        ///
-        /// <para>The set is snapshotted first, because destroying a target
-        /// mutates the very cache this enumerates. The fixture's own colonists
-        /// are not in it; a threat staged by <see cref="Threat"/> is, which is
-        /// harmless — the case that stages one destroys it itself, and this
-        /// runs before any of that.</para>
+        /// <para><c>DangerWatcher.CalculateDangerRating</c> sums, over
+        /// <c>attackTargetsCache.TargetsHostileToColony</c> through <c>AffectsStoryDanger</c>, only
+        /// a Pawn (its <c>kindDef.combatPower</c>) or an unmanned mortar, so sweeping that whole
+        /// set clears the rating with no arithmetic. The set is snapshotted first, because
+        /// destroying a target mutates the cache being enumerated. It sweeps a threat staged by
+        /// <see cref="Threat"/> too, so call it before staging one.</para>
         /// </summary>
         internal static int MakeCalm(Map map)
         {
@@ -281,10 +224,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Ask the real decision function what it would do, and leave no trace:
-        /// cancel any swap it started, and clear the retry cooldown it stamps
-        /// on a refusal — that cooldown would otherwise silently make every
-        /// later probe in this case return false for the wrong reason.
+        /// Asks the real decision function (<c>TryInsertSwap</c>) what it would do and leaves no
+        /// trace: cancels a swap it started and clears the retry cooldown a refusal stamps, which
+        /// would otherwise make later probes in the case return false for the wrong reason.
         /// </summary>
         internal static bool Diverts(Fixture fix, Job job, JobTag? tag = null)
         {
@@ -298,11 +240,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// <see cref="Diverts"/>, then drop whatever it queued. A divert
-        /// enqueues the deferred job WITH its reservations held, so a meal or a
-        /// patient reserved by one probe would fail the next probe's dry run,
-        /// and a case would then report as a refusal what was really a
-        /// reservation clash.
+        /// <see cref="Diverts"/>, then drops whatever it queued. A divert enqueues the deferred job
+        /// with its reservations held, so a meal or patient reserved by one probe would fail the
+        /// next probe's dry run, and the case would read a reservation clash as a refusal.
         /// </summary>
         internal static bool Probe(Fixture fix, Job job, JobTag? tag = null)
         {
@@ -312,10 +252,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Put a pawn back where a probe found them: off any swap it started,
-        /// nothing queued, no retry cooldown. For cases that call
-        /// <c>TryInsertSwap</c> directly, because they need to look at what it
-        /// left behind before it is cleared.
+        /// Puts a pawn back where a probe found them (no swap, nothing queued, no retry cooldown),
+        /// for cases that call <c>TryInsertSwap</c> directly to inspect what it left behind first.
         /// </summary>
         internal static void Settle(Pawn pawn)
         {
@@ -328,8 +266,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A job of the given work type, targeted where the pawn stands — so
-        /// it reads as work done in the stand's own room.
+        /// A <c>Wait</c> job carrying <paramref name="giver"/>, aimed at the pawn's own cell so it
+        /// reads as work done in the stand's room.
         /// </summary>
         internal static Job WorkJob(Fixture fix, WorkGiverDef giver)
         {
@@ -339,8 +277,7 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Make interception throw <paramref name="times"/> times, through the
-        /// real patch entry point.
+        /// Makes interception throw <paramref name="times"/> times, via the real patch entry.
         /// </summary>
         internal static void Fault(Pawn pawn, int times)
         {
@@ -350,30 +287,15 @@ namespace ShiftChange
                 Patch_JobInterception.Prefix(
                     JobMaker.MakeJob(JobDefOf.Wait), null, pawn, pawn.jobs);
             }
-            // Belt and braces: if a call did not reach the injection point the
-            // counter would otherwise stay armed into the next case.
+            // Disarm in case a call never reached the injection point.
             Patch_JobInterception.injectFaults = 0;
         }
 
-        // -------------------------------------------------------- fixturing
-
         /// <summary>
-        /// A stand and a pawn, dressed per <paramref name="kit"/>, with NO
-        /// ledger — nothing has swapped yet. Cases that want to watch the
-        /// driver build the ledger start here and call <see cref="RunSwap"/>;
-        /// <see cref="Build"/> starts here too and then hand-assembles a
-        /// checked-out state for the lifecycle cases.
-        /// </summary>
-        /// <summary>
-        /// Wall, roof and floor the pad's perimeter, so its interior is a
-        /// PROPER ROOM.
-        ///
-        /// The lifecycle cases do not need this — they act on a ledger
-        /// directly. The functional cases do: <c>FindAvailableStand</c> walks
-        /// <c>room.ContainedThings</c>, and on the open pad that room is the
-        /// whole outdoors. Testing the decision table out there would assert
-        /// against a huge-room path that the review has already flagged as
-        /// questionable, and would then break the day it is tightened.
+        /// Walls the pad's edge and roofs and floors all of it, so the interior is a proper room.
+        /// The functional cases need one: <c>FindAvailableStand</c> walks
+        /// <c>room.ContainedThings</c>, and on the open pad that room is the whole outdoors. The
+        /// lifecycle cases act on a ledger directly and do not.
         /// </summary>
         internal static void EnclosePad(Map map, CellRect pad)
         {
@@ -395,6 +317,12 @@ namespace ShiftChange
             }
         }
 
+        /// <summary>
+        /// A stand stocked with a duster and a pawn dressed per <paramref name="kit"/> on its
+        /// interaction cell, with no ledger yet: cases that watch the driver build one start here
+        /// and call <see cref="RunSwap"/>. The stand sits one cell in from the pad's south-west
+        /// corner. Null when the stand def, the duster or the comp cannot be had.
+        /// </summary>
         internal static Fixture Stage(Map map, CellRect pad, StageKit kit,
                                       bool enclose = false, WorkTypeDef capableOf = null,
                                       Gender gender = Gender.Male)
@@ -418,32 +346,22 @@ namespace ShiftChange
                 return null;
             }
 
-            // Gender is a parameter because vanilla's decency rule is ASYMMETRIC
-            // (Pawn_ApparelTracker.PsychologicallyNude:214-222): a man is nude on
-            // missing trousers alone, a woman on missing trousers OR a bare torso.
-            // A male-only fixture therefore certifies as safe a whole class of
-            // stand configurations that strip a woman. Default stays Male so every
-            // case written before 2026-09-06 is untouched.
+            // Gender is a parameter because vanilla's decency rule is asymmetric
+            // (Pawn_ApparelTracker.PsychologicallyNude): a man is nude on missing trousers alone, a
+            // woman on missing trousers or a bare torso. A male-only fixture would certify as safe
+            // a whole class of stand configurations that strip a woman.
             Pawn pawn = DebugTools_Fixtures.AveragePawn(gender, "Test", capableOf);
             pawn.apparel?.DestroyAll();
             if (capableOf != null)
             {
                 pawn.workSettings?.EnableAndInitialize();
             }
-            // ON the interaction cell, so the driver's Goto toil arrives
-            // immediately and no path is ever requested.
-            //
-            // This is not tidiness, it is the only way the pump works.
-            // Pathfinding in 1.6 is ASYNCHRONOUS — Pawn_PathFollower.PatherTick
-            // waits on `curPathRequest.TryGetPath(...)` (:261), and that
-            // request is served by a job system the game's own update loop
-            // drives, not by Pawn.DoTick(). Ticking one pawn therefore leaves
-            // it "moving" forever, one cell from the stand, which is exactly
-            // what the first version of these cases did for 5000 ticks.
-            //
-            // What it costs: these cases do not exercise the walk. The walk is
-            // vanilla's Toils_Goto, not ours, and what they are here to prove
-            // is the transfer.
+            // On the interaction cell, so the driver's Goto toil arrives at once and no path is
+            // ever requested. Pathfinding is asynchronous: Pawn_PathFollower.PatherTick waits on a
+            // path request served by a job system that the game's own update loop drives, not
+            // Pawn.DoTick, so ticking one pawn leaves it moving forever, a cell short of the stand.
+            // The cost is that these cases do not exercise the walk, which is vanilla's Toils_Goto;
+            // they exist to prove the transfer.
             GenSpawn.Spawn(pawn, stand.InteractionCell, map, Rot4.North);
             WearOne(pawn, "Apparel_BasicShirt");
             WearOne(pawn, "Apparel_Pants");
@@ -461,22 +379,18 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// <see cref="Stage"/> in an enclosed room with a door in its west wall,
-        /// beside the stand, and the strip of ground outside that wall cleared,
-        /// floored with soil and unfogged.
-        ///
-        /// <para>For the cases that need a colonist inside the room to REACH
-        /// something outside it. A sealed room is a fine stand-in while nothing
-        /// is walked to, but hauling asks <c>CanReach</c> before it hands out a
-        /// job (<c>HaulAIUtility.PawnCanAutomaticallyHaulFast</c>), and the
-        /// return trip asks it of the stand before it starts a swap. Sealed in,
-        /// neither a haul nor a change-back can happen, and a case would pass
-        /// for that reason instead of ours.</para>
+        /// <see cref="Stage"/> in an enclosed room with a door in its west wall beside the stand,
+        /// and the strip of ground outside that wall cleared, floored with soil and unfogged. For
+        /// cases that need a colonist inside to reach something outside: hauling asks
+        /// <c>CanReach</c> before it hands out a job
+        /// (<c>HaulAIUtility.PawnCanAutomaticallyHaulFast</c>), and the return trip asks it of the
+        /// stand before it starts a swap, so in a sealed room neither can happen and a case would
+        /// pass for that reason.
         ///
         /// <para>The strip is the pad's one-cell margin, which
-        /// <see cref="Patch_HarnessAutoRun.TryFindPad"/> keeps in bounds and in
-        /// a room. Soil because a quicktest map can put anything there, and
-        /// unfogged because a fogged item is never hauled.</para>
+        /// <see cref="Patch_HarnessAutoRun.TryFindPad"/> keeps in bounds and in a room; soil
+        /// because a quicktest map can put anything there, unfogged because a fogged item is never
+        /// hauled.</para>
         /// </summary>
         internal static Fixture StageWithDoorway(Map map, CellRect pad)
         {
@@ -484,10 +398,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// <see cref="StageWithDoorway(Map, CellRect)"/> with a colonist who can
-        /// do <paramref name="capableOf"/>. Vanilla's opportunistic haul refuses
-        /// anyone whose hauling is disabled, and a generated colonist's
-        /// backstory can disable it.
+        /// <see cref="StageWithDoorway(Map, CellRect)"/> with a colonist who can do
+        /// <paramref name="capableOf"/>: vanilla's opportunistic haul refuses anyone whose hauling
+        /// is disabled, and a generated colonist's backstory can disable it.
         /// </summary>
         internal static Fixture StageWithDoorway(Map map, CellRect pad, WorkTypeDef capableOf)
         {
@@ -520,21 +433,16 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// <see cref="Stage"/>, with a second, foreign assignable comp on the
-        /// stand: the shape Outfit Stands Plus gives the stands it touches.
+        /// <see cref="Stage"/> with a second, foreign assignable comp on the stand, the shape
+        /// Outfit Stands Plus gives the stands it touches. It reuses one the mod list already
+        /// supplies, for the reason <see cref="DebugTools_SaveRoundTrip.ForeignAssignable"/> gives;
+        /// otherwise a plain <c>CompAssignableToPawn</c> serves, since the code under test names no
+        /// foreign type.
         ///
-        /// <para>Reuses one when the mod list already supplies it, for the reason
-        /// <see cref="DebugTools_SaveRoundTrip.ForeignAssignable"/> spells out: a
-        /// second plain comp beside theirs is two foreign comps, and the case
-        /// stops testing ours against theirs. A plain
-        /// <c>CompAssignableToPawn</c> serves otherwise, since the code under
-        /// test names no foreign type.</para>
-        ///
-        /// <para>The comp goes on the DEF, because comps are built from
-        /// <c>def.comps</c> when the thing is made, and the edit is reverted as
-        /// soon as the stand exists. The spawned stand keeps the comp it was
-        /// built with, and nothing made after it, in this case or any later one,
-        /// sees the edit.</para>
+        /// <para>The comp goes on the def, because comps are built from <c>def.comps</c> when the
+        /// thing is made, and the edit is reverted as soon as the stand exists, so nothing made
+        /// afterwards sees it. The stand keeps its comp while spawned, but a load rebuilds comps
+        /// from the def and drops it.</para>
         /// </summary>
         internal static Fixture StageWithForeignAssignable(Map map, CellRect pad)
         {
@@ -584,9 +492,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Strip a fixture stand back to empty, so a case can state exactly what
-        /// it holds instead of working around the duster <see cref="Stage"/>
-        /// stocks.
+        /// Strips a fixture stand to empty, so a case can state what it holds instead of working
+        /// around the duster <see cref="Stage"/> stocks.
         /// </summary>
         internal static void ClearStand(Building_OutfitStand stand)
         {
@@ -620,23 +527,16 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Run one swap to completion through the REAL driver: start the job on
-        /// the pawn's own tracker, then tick that pawn until the job ends.
+        /// Runs one swap through the real driver: starts the job on the pawn's own tracker, then
+        /// ticks that pawn until the job ends. Returns false, after printing why, when the swap
+        /// gets no driver, ends with anything but <c>Succeeded</c>, or outlasts
+        /// <paramref name="maxTicks"/>. Every caller asserts on it, so a pump that gave up fails
+        /// loudly instead of falling through to assertions that pass for the wrong reason.
         ///
-        /// <para>One pawn is a complete pump. <c>Pawn.Tick</c> drives
-        /// <c>pather.PatherTick()</c> and <c>jobs.JobTrackerTick()</c>
-        /// (<c>Verse/Pawn.cs:1555,:1573</c>), the toil delay counts down in
-        /// <c>JobDriver.DriverTick</c>, and nothing in this driver reads
-        /// <c>TicksGame</c> — so no <c>TickManager</c>, no world tick, and no
-        /// other pawn's AI is involved. That is what makes this runnable from
-        /// a debug action at all. The pawn's own interval gates do read the
-        /// clock, which stands still, so the loop holds the pawn's rest
-        /// full.</para>
-        ///
-        /// <para>Returns false on timeout rather than throwing, and every
-        /// caller asserts on it: a pump that gave up must FAIL loudly, not
-        /// fall through into assertions that then pass for the wrong
-        /// reason.</para>
+        /// <para>One pawn is a complete pump: ticking it drives its pather and job tracker, the
+        /// toil delay counts down in <c>JobDriver.DriverTick</c>, and nothing in this driver reads
+        /// <c>TicksGame</c>, so no <c>TickManager</c>, world tick or other pawn's AI is
+        /// involved.</para>
         /// </summary>
         internal static bool RunSwap(Fixture fix, int maxTicks = 5000)
         {
@@ -645,13 +545,10 @@ namespace ShiftChange
                 resumeCurJobAfterwards: false, cancelBusyStances: true, null,
                 JobTag.ChangingApparel);
 
-            // Watch the DRIVER, never the Job. Jobs are POOLED: when ours ends
-            // it goes back to JobMaker's pool and is handed straight out again
-            // for the pawn's next job — so `CurJob != swap` compares a
-            // reference that vanilla has already recycled under us and stays
-            // equal forever. The first version of this waited 5000 ticks on a
-            // JobDriver_WaitMaintainPosture that was wearing our job object.
-            // Drivers are built per job and never pooled.
+            // Watch the driver, never the Job. Jobs are pooled: when ours ends it goes back to
+            // JobMaker's pool and is handed out again as the pawn's next job, so `CurJob != swap`
+            // compares a reference vanilla has already recycled and stays equal. Drivers are built
+            // per job and never pooled.
             JobDriver started = fix.Pawn.jobs.curDriver;
             if (started == null)
             {
@@ -659,11 +556,8 @@ namespace ShiftChange
                 return false;
             }
 
-            // Capture how it ENDED, not merely that it ended. "The driver
-            // changed" is satisfied by a job that failed its reservations and
-            // died before its transfer toil — which is exactly what a flaky
-            // run looked like, reported as a pass, while every assertion after
-            // it failed with no explanation.
+            // Capture how it ended, not only that it did: "the driver changed" is also true of a
+            // job that failed its reservations and died before its transfer toil.
             JobCondition ended = JobCondition.None;
             started.AddFinishAction(c => ended = c);
 
@@ -680,12 +574,8 @@ namespace ShiftChange
                           .Append(", pawn at ").Append(fix.Pawn.Position)
                           .Append(" vs cell ").Append(fix.Stand.InteractionCell)
                           .AppendLine();
-                    // WHAT took the pawn, not merely that something did. An end
-                    // condition names the verb and leaves the actor unnamed, so
-                    // a red run bought a second red run to diagnose — and these
-                    // have been intermittent, which makes the second one a wait
-                    // of unknown length. Everything here is read from the pawn
-                    // at the moment the driver changed.
+                    // Report what took the pawn: an end condition names the verb and leaves the
+                    // actor unnamed.
                     Job replacement = fix.Pawn.CurJob;
                     Report.Append("        taken by ")
                           .Append(replacement == null ? "nothing" : replacement.def.defName)
@@ -717,20 +607,17 @@ namespace ShiftChange
                           .AppendLine();
                     return false;
                 }
-                // The game clock stands still while the harness runs, inside one
-                // frame, and the pawn's needs are gated on it. The fixture only
-                // hands out colonists whose needs do not tick under a stopped
-                // clock (DebugTools_Fixtures.NeedsTickWhilePumped), so rest,
-                // food and mood hold still here without being topped up.
+                // The game clock stands still while the harness runs, inside one frame, and the
+                // pawn's needs are gated on it. The fixture only hands out colonists whose needs do
+                // not tick under a stopped clock (DebugTools_Fixtures.NeedsTickWhilePumped), so
+                // rest, food and mood hold still here without being topped up.
                 //
-                // The whole pawn, so a third-party Pawn.Tick postfix can throw
-                // in here. The case-level catch reports that as FAIL threw:
-                // rather than swallowing it.
+                // This ticks the whole pawn, so a third-party Pawn.Tick postfix can throw here; the
+                // case-level catch reports that as `FAIL threw:` rather than swallowing it.
                 fix.Pawn.DoTick();
             }
 
-            // A timeout that says only "timed out" costs an entire debugging
-            // cycle. Say where it got stuck.
+            // A bare timeout costs a debugging cycle: say where it got stuck.
             JobDriver driver = fix.Pawn.jobs?.curDriver;
             JobDriver_SwapAtStand ours = driver as JobDriver_SwapAtStand;
             Report.Append("      stuck after ").Append(maxTicks).Append(" ticks — driver ")
@@ -752,15 +639,14 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A stand stocked with a lab coat and a pawn in a tunic and duster,
-        /// put on shift the way <see cref="JobDriver_SwapAtStand.DoTransfer"/>
-        /// does it — plan from <see cref="SwapPlan"/>, move the apparel, then
-        /// <c>NotifyDressed</c>.
-        ///
-        /// The duster matters: without it the lab coat (Shell) displaces
-        /// nothing on a tunic (OnSkin) and the ledger stores nothing, which is
-        /// a real case but a useless FIXTURE — every assertion below is about
-        /// a ledger with contents in it.
+        /// A checked-out fixture, put on shift the way
+        /// <see cref="JobDriver_SwapAtStand.DoTransfer"/> does it: plan from
+        /// <see cref="SwapPlan"/>, move the apparel, then <c>NotifyDressed</c> with an empty
+        /// stored-forced list. The pawn wears the researcher's starting kit (tunic, duster,
+        /// helmet). The stand holds Vanilla Apparel Expanded's lab coat, which displaces the
+        /// duster, or without that mod (the four-mod list) a vanilla shirt and trousers, which
+        /// displace the tunic. A ledger with nothing stored is no use to the assertions that
+        /// follow, so Build returns null without one.
         /// </summary>
         internal static Fixture Build(Map map, CellRect pad)
         {
@@ -784,9 +670,8 @@ namespace ShiftChange
                 return null;
             }
 
-            // The transfer, exactly as the driver sequences it: plan from the
-            // one shared predicate, own clothes off and into the stand,
-            // uniform out and on, forced set, ledger recorded.
+            // The driver's own sequence: plan from SwapPlan, own clothes into the stand, uniform
+            // out and on.
             List<Apparel> toWear = new List<Apparel>();
             List<Apparel> toStore = new List<Apparel>();
             if (!SwapPlan.BuildDress(pawn, stand, toWear, toStore) || toStore.Count == 0)
@@ -833,9 +718,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Leave nothing behind. Destroying the stand fires our own release
-        /// path, which is fine — the assertions have already run, and a case
-        /// that leaked a registry entry would otherwise poison the next one.
+        /// Removes what a case left: pawns and their registry entries, the stand, areas, zones,
+        /// claimed cells and the second map, then clears the pad's things and roofs. Terrain stays
+        /// as the case left it. Destroying the stand fires our own release path, which is fine
+        /// since the assertions have run.
         /// </summary>
         internal static void Teardown(Fixture fix, Map map, CellRect pad)
         {
@@ -874,10 +760,9 @@ namespace ShiftChange
                         area.Delete();
                     }
                 }
-                // The doorway fixture's strip lies outside the pad, so the pad
-                // clear below never reaches it. A zone a case left there goes
-                // too: an extra stockpile on the map is a haul destination for
-                // every case after this one.
+                // The doorway fixture's strip lies outside the pad, so the pad clear below never
+                // reaches it. A stockpile a case left there would be a haul destination for every
+                // later case.
                 if (fix.Outside.Area > 0)
                 {
                     foreach (IntVec3 cell in fix.Outside)
@@ -892,9 +777,8 @@ namespace ShiftChange
                     map.zoneManager.ZoneAt(cell)?.Delete();
                     GenDebug.ClearArea(CellRect.SingleCell(cell), map);
                 }
-                // After the pawn and the stand, which may be standing on it.
-                // Caught, because this runs in the case's finally: a throw here
-                // would end the whole run, every case after this one included.
+                // After the pawn and the stand, which may be standing on it. Caught: this runs in
+                // the case's finally, and a throw would end the run for every case after this one.
                 if (fix.Pocket != null && Find.Maps.Contains(fix.Pocket))
                 {
                     try
@@ -914,31 +798,25 @@ namespace ShiftChange
         internal const int SecondMapSize = 50;
 
         /// <summary>
-        /// A second map, for a gravship flight that leaves the borrower and
-        /// their stand on different maps. A pocket map, the one kind the engine
-        /// makes without a world tile, made as vanilla's own "Generate pocket
-        /// map" debug action makes one (<c>PocketMapUtility.GeneratePocketMap</c>).
-        /// Odyssey's <c>SpacePocket</c>, because the harness needs Odyssey
-        /// anyway and that generator only lays terrain. Removing it
-        /// (<see cref="RemoveSecondMap"/>) reaches <c>Game.DeinitAndRemoveMap</c>,
-        /// where an origin map abandoned after a takeoff also ends up.
+        /// A second map, for a gravship flight that leaves the borrower and their stand on
+        /// different maps; null when Odyssey's generator is missing. The caller puts it on
+        /// <see cref="Fixture.Pocket"/> so <see cref="Teardown"/> removes it.
         ///
-        /// <para>Its generator turns the region and room updater off, and a
-        /// gravship landing turns it back on before it spawns anything
-        /// (<c>GravshipPlacementUtility.PlaceGravshipInMap</c>). So does this,
-        /// so a stand set down here gets a room as a landed one would.</para>
+        /// <para>A pocket map, the one kind the engine makes without a world tile
+        /// (<c>PocketMapUtility.GeneratePocketMap</c>), from Odyssey's <c>SpacePocket</c>
+        /// generator, which only lays terrain. Removing it (<see cref="RemoveSecondMap"/>) reaches
+        /// <c>Game.DeinitAndRemoveMap</c>, as an origin map abandoned after a takeoff does.</para>
         ///
-        /// <para>And it builds the map's drawing sections, as looking at the
-        /// map would. A map is drawn into sections only the first time it is
-        /// drawn (<c>MapDrawer.RegenerateEverythingNow</c>), and
-        /// <c>MapDrawer.Dispose</c> walks them with no null check, so removing a
-        /// map nobody ever looked at throws (1.6.4871 and 1.7.4980 alike).
-        /// Vanilla's own debug action makes its new pocket map the current
-        /// map, and an origin map in play has always been drawn.</para>
+        /// <para>The generator turns the region and room updater off, and a gravship landing turns
+        /// it back on before it spawns anything
+        /// (<c>GravshipPlacementUtility.PlaceGravshipInMap</c>). So does this, so a stand set down
+        /// here gets a room as a landed one would.</para>
         ///
-        /// <para>Null when Odyssey's generator is missing. The caller puts the
-        /// map on <see cref="Fixture.Pocket"/>, so <see cref="Teardown"/>
-        /// removes it.</para>
+        /// <para>It also builds the map's drawing sections. A map is drawn into sections only the
+        /// first time it is drawn (<c>MapDrawer.RegenerateEverythingNow</c>), and
+        /// <c>MapDrawer.Dispose</c> walks them with no null check, so removing a map nobody ever
+        /// looked at throws. Vanilla's debug action makes its new pocket map the current map, and
+        /// an origin map in play has always been drawn.</para>
         /// </summary>
         internal static Map SecondMap(Map source)
         {
@@ -955,22 +833,18 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Remove a <see cref="SecondMap"/>, destroying any pawn still on it
-        /// first: map removal passes the pawns it finds to the world
-        /// (<c>MapDeiniter.PassPawnsToWorld</c>), which would keep a fixture
-        /// colonist in the game after the case.
+        /// Removes a <see cref="SecondMap"/>, destroying any pawn still on it first: map removal
+        /// passes the pawns it finds to the world (<c>MapDeiniter.PassPawnsToWorld</c>), which
+        /// would keep a fixture colonist in the game after the case.
         ///
-        /// <para>Also drops the redraw the map queued for itself. A new map
-        /// asks for its first full redraw once the long event it was made in
-        /// is over (<c>Map.FinalizeInit</c>, through
-        /// <c>LongEventHandler.ExecuteWhenFinished</c>). The headless run is
-        /// itself one of those queued actions, so the redraw would run after
-        /// the harness, on a map already gone, and log a failure for every
-        /// layer of every section. <see cref="SecondMap"/> drew the map
-        /// already. The queue is walked by index and this map's entries sit
-        /// after the running harness's, so taking them out is safe; a run
-        /// from the debug menu queues nothing, since there the redraw runs at
-        /// once.</para>
+        /// <para>It also drops the redraw the map queued for itself. A new map asks for its first
+        /// full redraw once the long event it was made in is over (<c>Map.FinalizeInit</c>, through
+        /// <c>LongEventHandler.ExecuteWhenFinished</c>). The headless run is itself one of those
+        /// queued actions, so the redraw would run after the harness, on a map already gone, and
+        /// log a failure for every layer of every section; <see cref="SecondMap"/> drew the map
+        /// already. The queue is walked by index and this map's entries sit after the running
+        /// harness's, so removing them is safe. A run from the debug menu queues nothing, since
+        /// there the redraw runs at once.</para>
         /// </summary>
         internal static void RemoveSecondMap(Map away)
         {
@@ -991,11 +865,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// <see cref="Build"/> on a <see cref="SecondMap"/>: the stand and its
-        /// borrower, on shift, both on the second map, for a case that flies
-        /// the borrower to the harness's own map and leaves the stand behind.
-        /// The fixture's <c>Map</c> is the second map, so the case is handed
-        /// the harness's map and pad itself.
+        /// <see cref="Build"/> on a <see cref="SecondMap"/>: the stand and its borrower, on shift,
+        /// both on the second map, for a case that flies the borrower to the harness's own map and
+        /// leaves the stand behind. The fixture's <c>Map</c> is the second map, so the case is
+        /// handed the harness's map and pad itself.
         /// </summary>
         internal static Fixture BuildOnSecondMap(Map map, CellRect pad)
         {
@@ -1026,18 +899,15 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Makes <paramref name="cell"/>, past the pad, bare soil with nothing
-        /// on it and no roof, for a case to put things on, and has
-        /// <see cref="Teardown"/> clear it again. Returns the cell, and leaves
-        /// one outside the map alone for the caller's bounds check.
+        /// Makes <paramref name="cell"/>, past the pad, bare soil with nothing on it and no roof,
+        /// for a case to put things on, and has <see cref="Teardown"/> clear it again. A cell
+        /// outside the map is returned untouched, for the caller's bounds check.
         ///
         /// <para>The pad finder checks one cell of margin around the pad
-        /// (<c>Patch_HarnessAutoRun.TryFindPad</c>), and these cells lie
-        /// further out, so on some maps they hold natural rock. A meal spawned
-        /// onto rock read as being in the cell beside it, and failed the
-        /// feeding case (2026-10-15). And with nothing clearing them after,
-        /// what a case left there stayed on the map for every case after it,
-        /// where vanilla's opportunistic haul can pick it up.</para>
+        /// (<c>Patch_HarnessAutoRun.TryFindPad</c>) and these cells lie further out, so on some
+        /// maps they hold natural rock. A meal spawned onto rock reads as being in the cell beside
+        /// it. And whatever a case left there would stay on the map for every later case, where
+        /// vanilla's opportunistic haul can pick it up.</para>
         /// </summary>
         internal static IntVec3 OpenGround(Fixture fix, IntVec3 cell)
         {
@@ -1052,7 +922,6 @@ namespace ShiftChange
             return cell;
         }
 
-        // ------------------------------------------------------- assertions
     }
 }
 #endif

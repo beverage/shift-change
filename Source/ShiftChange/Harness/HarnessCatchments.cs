@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System.Collections.Generic;
 using System.Linq;
@@ -15,26 +13,20 @@ using static ShiftChange.HarnessFixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// Harness cases for catchments: a stand serving a radius around itself,
-    /// or an allowed area, instead of its room. docs/DESIGN.md, "Catchments".
-    ///
-    /// <para>Case ORDER is decided in one place,
-    /// <see cref="DebugTools_LifecycleHarness.Run"/>.</para>
+    /// Cases for catchments: a stand serving a radius around itself, or an allowed area, instead of
+    /// its room (docs/DESIGN.md, "Catchments"). <see cref="DebugTools_LifecycleHarness.Run"/>
+    /// registers every case and so decides their order.
     /// </summary>
     internal static partial class HarnessCatchments
     {
 
         /// <summary>
-        /// LEAVING ROOM MODE NEEDS SOMETHING TICKED, and leaving shift use
-        /// brings the stand back to its room with its radius kept. Automatic is
-        /// a room's reading, so an automatic stand's set becomes ticks on the
-        /// way out, and one with nothing to tick stays put. The window greys
-        /// its Serves row on <see cref="CompShiftStand.ServesSomething"/>, a
-        /// test apart from the setter's, so the two are checked against each
-        /// other in every state that draws the row: greyed where a radius is
-        /// refused, live where one is taken, and live in radius mode, where
-        /// going back to the room always is. A stand out of shift use draws no
-        /// row at all.
+        /// A stand leaves room mode only with something ticked, and on leaving shift use returns to
+        /// its room with its radius kept. Automatic is a room's own reading, so an automatic
+        /// stand's set becomes ticks on the way out, and a stand with nothing to tick stays in its
+        /// room. The window greys its Serves row on <see cref="CompShiftStand.ServesSomething"/>, a
+        /// test separate from the setter's refusal, so the two are compared in every state that
+        /// draws the row; a stand out of shift use draws none, so there only the setter is asked.
         /// </summary>
         internal static bool CatchmentNeedsSomethingTicked(Fixture fix)
         {
@@ -82,8 +74,6 @@ namespace ShiftChange
                 & Expect(fix.Comp.ServesSomething,
                          "and its Serves row stays live, so it can switch back");
 
-            // Back on This room with the tick untouched, it is the room's own
-            // reading again, so Automatic, and follows the room from here on.
             fix.Comp.SetServes(CatchmentKind.Room);
             ok &= Expect(fix.Comp.serves == CatchmentKind.Room && fix.Comp.IsAutomatic
                          && fix.Comp.HandlesWork(doctor),
@@ -130,13 +120,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A ROOM STAND IN THE OPEN SERVES NOTHING. On open ground the stand's
-        /// room is all the open ground on the map, so serving it covers no cell
-        /// and dresses nobody, for work as for recreation and sleep, and the
-        /// alert lists the stand. Given a radius, the same work dresses and the
-        /// alert drops it (control). A colonist already in its uniform, as an
-        /// older save can hold, changes back at their next job once the stand
-        /// serves its room again.
+        /// A room stand in the open serves nothing. On open ground its room is all the open ground
+        /// on the map, so serving it covers no cell, not even the stand's own: Doctor work beside
+        /// it dresses nobody, and the alert lists the stand. Given a radius, the same work dresses
+        /// and the alert drops it (control). A colonist already in its uniform, as an older save
+        /// can hold, changes back at their next job once the stand serves its room again.
         /// </summary>
         internal static bool RoomStandInTheOpenServesNothing(Fixture fix)
         {
@@ -167,10 +155,10 @@ namespace ShiftChange
             ok &= Expect(Probe(fix, WorkAt(tend, near)), "given a radius, the same work dresses (control)")
                 & Expect(!Lists(alert, fix.Stand), "and the alert drops it (control)");
 
-            // As an older save can hold: a colonist in the uniform of a room
-            // stand in the open. The dressing probe recorded its job as the one
-            // just dressed for, which on shift would keep the uniform on
-            // whatever the stand covers.
+            // Stage a colonist in the uniform of a room stand in the open, as an older save can
+            // hold: dress them while the stand serves a radius, then put it back on its room. The
+            // probes above recorded their job as the one just dressed for, which on shift would
+            // keep the uniform on whatever the stand covers, so that record goes first.
             Patch_JobInterception.DressedFor.Remove(fix.Pawn);
             ok &= Expect(RunSwap(fix), "dressed at the stand while it serves a radius")
                 & Expect(fix.Comp.OnShift, "and on shift (control)");
@@ -186,13 +174,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// As a swap succeeds, the job tracker starts a one-tick pause
-        /// (<c>Wait_MaintainPosture</c>) before the queue gets a turn, so it
-        /// falls between every swap and the job deferred behind it. Judged as
-        /// a job, it sent a radius sleep stand's colonist straight back to
-        /// change. It rides along now, and this asserts so after every
-        /// dressing here, then settles the colonist, since a swap left running
-        /// would answer every probe below with <c>MidSwap</c>.
+        /// Asserts that the job after a swap does not send the colonist straight back to change,
+        /// then settles them. As a swap succeeds the job tracker starts a one-tick pause
+        /// (<c>Wait_MaintainPosture</c>) before the queue gets a turn, so the pause falls between
+        /// every swap and the job deferred behind it. Judged as a job of its own it would send a
+        /// radius sleep stand's colonist straight back to change, so it has to ride along. Settling
+        /// ends a swap that did start, which would answer every later probe with <c>MidSwap</c>.
         /// </summary>
         internal static bool NotSentStraightBack(Fixture fix)
         {
@@ -230,11 +217,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// THE WORDS FOLLOW THE CATCHMENT. The Serves row, the inspect pane and
-        /// the switch's tooltip all read the stand's mode: its room, the open
-        /// ground (nothing, whatever the stand is for), or its radius.
-        /// Asserted on the strings the window draws, since no case draws one;
-        /// the room's wording is the control for each radius one.
+        /// The Serves row, the inspect pane and the switch's tooltip all read the stand's mode: its
+        /// room, the open ground (nothing, whatever the stand is for), or its radius. Asserted on
+        /// the strings those three build, since no case draws a window or a gizmo; the room's
+        /// wording is the control for each radius one.
         /// </summary>
         internal static bool CatchmentWordsFollowTheMode(Fixture fix)
         {
@@ -294,7 +280,7 @@ namespace ShiftChange
                                "until it serves a radius (control)");
         }
 
-        /// <summary>Another outfit stand on the fixture's map, stocked with a duster, or null.</summary>
+        /// <summary>Another stand on the fixture's map, stocked with a duster, or null.</summary>
         internal static CompShiftStand StageStand(Fixture fix, IntVec3 at)
         {
             Building_OutfitStand stand = DebugTools_Fixtures.Spawn(
@@ -305,10 +291,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A new allowed area on the fixture's map, named and painted on
-        /// <paramref name="cells"/>, or null when the map already holds ten.
-        /// Recorded on the fixture, whose teardown deletes it, since an area
-        /// outlives the pad.
+        /// A new allowed area on the fixture's map, named and painted on <paramref name="cells"/>,
+        /// or null when the map already holds ten, vanilla's cap. Recorded on the fixture, whose
+        /// teardown deletes it, since an area outlives the pad.
         /// </summary>
         internal static Area_Allowed NewArea(Fixture fix, string label, params IntVec3[] cells)
         {
@@ -327,14 +312,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A SOLID TARGET IS JUDGED AT ITS OWN CELL, THEN THE FLOOR BESIDE IT.
-        /// A rock has no room on its own cell, so a mining job's room cell is
-        /// the floor beside it, and room mode dresses by that (control). An area
-        /// dresses a miner with the rock painted, or only the floor around it,
-        /// and not with neither; a miner in uniform keeps it for the rock
-        /// painted alone. A wall's repair, judged as pass-through work at the
-        /// places it names, keeps the uniform on with only the floor around the
-        /// wall painted, and not with nothing painted.
+        /// A solid target is judged at its own cell, then the floor beside it. A rock has no room
+        /// on its own cell, so a mining job's room cell is the floor beside it, which room mode
+        /// dresses by (control). An area dresses a miner for the rock painted, or for only the
+        /// floor around it, and not for neither; a miner in uniform keeps it for the rock alone. A
+        /// wall's repair, judged as pass-through work at every place it names, keeps the uniform on
+        /// with only the floor around the wall painted, and changes them back with none (control).
         /// </summary>
         internal static bool SolidTargetIsJudgedAtItsOwnCellFirst(Fixture fix)
         {
@@ -384,10 +367,9 @@ namespace ShiftChange
 
             SetCells(area, aroundRock, false);
             area[rock.Position] = true;
-            // Each dressing probe recorded its job as the one just dressed for,
-            // and on shift that grace would keep the uniform on for the same
-            // job whatever the catchment said: the probe below would pass for
-            // the wrong reason.
+            // A dressing probe records its job as the one just dressed for, and on shift that
+            // record keeps the uniform on for the same job whatever the catchment says, so the
+            // probe below would pass for the wrong reason. Clear it.
             Patch_JobInterception.DressedFor.Remove(fix.Pawn);
             ok &= Expect(RunSwap(fix), "dressed for mining") & Expect(fix.Comp.OnShift, "and on shift (control)");
             if (!fix.Comp.OnShift)
@@ -416,10 +398,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A fresh job of <paramref name="def"/> on <paramref name="target"/>,
-        /// as <paramref name="giver"/> hands it out. One per probe: jobs are
-        /// pooled, and one a probe queued can be handed out again once the
-        /// queue is cleared.
+        /// A fresh job of <paramref name="def"/> on <paramref name="target"/>, as
+        /// <paramref name="giver"/> hands it out. One per probe: jobs are pooled, and one a probe
+        /// queued can be handed out again once the queue is cleared.
         /// </summary>
         internal static Job JobOn(JobDef def, WorkGiverDef giver, Thing target)
         {
@@ -428,7 +409,7 @@ namespace ShiftChange
             return job;
         }
 
-        /// <summary>Paints or clears every cell of <paramref name="cells"/> that is on the map.</summary>
+        /// <summary>Paints or clears the on-map cells of <paramref name="cells"/>.</summary>
         internal static void SetCells(Area area, List<IntVec3> cells, bool painted)
         {
             for (int i = 0; i < cells.Count; i++)
@@ -440,7 +421,7 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>A fresh report from <paramref name="alert"/> lists <paramref name="stand"/>.</summary>
+        /// <summary>Whether a fresh report from the alert lists <paramref name="stand"/>.</summary>
         internal static bool Lists(Alert alert, Thing stand)
         {
             AlertReport report = alert.GetReport();
@@ -448,9 +429,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The instance of <paramref name="type"/> that vanilla's alert readout
-        /// made for this game, or null. Read off the readout's private list,
-        /// since what is under test is that vanilla made it from the subclass.
+        /// The instance of <paramref name="type"/> that vanilla's alert readout made for this game,
+        /// or null. Read off the readout's private list, since what is under test is that vanilla
+        /// made it from the subclass alone.
         /// </summary>
         internal static Alert VanillaAlert(System.Type type)
         {
@@ -462,13 +443,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A ROOM STAND BESIDE A DOOR SERVES ITS OWN ROOM ONLY. The region
-        /// lister files a thing under every region it can be touched from, so
-        /// the doorway's room lists the stand just inside the door and a room
-        /// stand just outside it (control). Neither covers work in the
-        /// doorway, and the dress search agrees: that work dresses nobody,
-        /// where the same work inside the room does (control). The stand
-        /// outside stands in the open, where the alert says it serves nothing.
+        /// A room stand beside a door serves its own room only. The region lister files a thing
+        /// under every region it can be touched from, so the doorway's room lists the stand just
+        /// inside the door and a room stand just outside it (control). Neither covers work in the
+        /// doorway, and the dress search agrees: that work dresses nobody, where the same work
+        /// inside the room does (control). The stand outside stands in the open and serves nothing.
         /// </summary>
         internal static bool RoomStandBesideADoorServesItsOwnRoom(Fixture fix)
         {
@@ -514,16 +493,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// AN URGENT PATIENT ON SHIFT GOES STRAIGHT TO BED, with the medical
-        /// emergency setting off. In room mode, a colonist in uniform who takes
-        /// a wound needing a doctor now lies down in a bed out past the door
-        /// without changing back first; so they do when vanilla puts the
-        /// lay-down back in the queue untagged, and a haul it starts ahead of
-        /// the lay-down keeps the uniform on too. That untagged lay-down never
-        /// reads as ordinary sleep. At a radius stand they go straight to the
-        /// bed inside the ring. Recuperating with no such wound changes them
-        /// back first, the urgent case does with the setting on, and the haul
-        /// does with nothing queued: all controls.
+        /// An urgent patient on shift goes straight to bed, with the medical emergency setting off:
+        /// in room mode to a bed out past the door, tagged or as vanilla puts the lay-down back in
+        /// the queue untagged, with a haul it starts ahead of the lay-down, and at a radius stand
+        /// to a bed inside the ring. Recuperating with no such wound, or with the setting on,
+        /// changes them back first (controls).
         /// </summary>
         internal static bool UrgentPatientGoesStraightToBed(Fixture fix)
         {
@@ -554,9 +528,9 @@ namespace ShiftChange
             IntVec3 haulFrom = new IntVec3(fix.Outside.minX, 0, fix.Outside.maxZ);
             IntVec3 haulTo = new IntVec3(fix.Outside.minX, 0, fix.Outside.maxZ - 1);
 
-            // The wound below is the only thing that makes them urgent: the
-            // fixture removes what a generated colonist arrives needing
-            // tended (DebugTools_Fixtures.RemoveTendableConditions).
+            // The wound below must be the only thing that makes them urgent. Vanilla leaves a
+            // generated colonist's conditions untended, so the fixture removes them
+            // (DebugTools_Fixtures.RemoveTendableConditions).
             bool ok = Expect(!HealthAIUtility.ShouldSeekMedicalRestUrgent(fix.Pawn),
                              "the colonist needs no doctor to begin with (precondition)")
                     & Expect(!fix.Comp.Covers(bedOut.Position, map) && fix.Comp.Covers(bedIn.Position, map),
@@ -627,11 +601,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// THE REGISTRY FORGETS A STAND THAT IS NO LONGER SPAWNED. Removing a
-        /// map despawns none of its buildings, so a catchment stand left on an
-        /// abandoned map would stay listed, holding the map through its area.
-        /// An unspawned stand stands in for one here: a stand search drops it,
-        /// and keeps the fixture's spawned stand (control).
+        /// The registry forgets a stand that is no longer spawned. Removing a map despawns none of
+        /// its buildings, so a catchment stand left on an abandoned map would stay listed. An
+        /// unspawned stand stands in for one here: a stand search drops it, and keeps the fixture's
+        /// spawned stand (control).
         /// </summary>
         internal static bool RegistryForgetsAStandNoLongerSpawned(Fixture fix)
         {

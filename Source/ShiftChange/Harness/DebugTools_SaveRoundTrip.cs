@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System;
 using System.Collections.Generic;
@@ -14,50 +12,34 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// Save/load round-trip coverage for the state an outfit stand scribes:
-    /// the assignable comp's owner lists, and <see cref="CompShiftStand"/>'s
-    /// ledger.
+    /// Save/load round trips for the state an outfit stand scribes: the assignable comp's owner
+    /// lists and <see cref="CompShiftStand"/>'s ledger and catchment.
     ///
-    /// <para>The load runs synchronously. <c>GameDataSaveLoader.LoadGame</c>
-    /// queues an asynchronous long event and disposes the current game
-    /// (<c>GameDataSaveLoader.cs:153-166</c>), so control never returns to an
-    /// assertion. <c>SavedGameLoaderNow.LoadGameFromSaveFileNow</c> is the
-    /// synchronous primitive beneath it, and the one <c>Root_Play</c> uses for
-    /// an autostart save (<c>Root_Play.cs:32</c>). It runs <c>Game.LoadGame()</c>
-    /// inline — world, maps, <c>Scribe.loader.FinalizeLoading()</c> and
-    /// <c>FinalizeInit</c> (<c>Game.cs:560-636</c>) — so both scribe passes
-    /// complete before the next statement.</para>
+    /// <para>The load is synchronous. <c>GameDataSaveLoader.LoadGame</c> queues an asynchronous
+    /// long event and disposes the current game, so control never returns to an assertion.
+    /// <c>SavedGameLoaderNow.LoadGameFromSaveFileNow</c>, the primitive beneath it, runs the
+    /// whole load inline, both scribe passes included, so everything has finished before the
+    /// next statement.</para>
     ///
-    /// <para>These cases replace <c>Current.Game</c>. Once one has run, the map
-    /// the harness was handed and every reference held across the call belong
-    /// to a disposed game. Two constraints follow, both applied where the cases
-    /// are registered in <see cref="DebugTools_LifecycleHarness.Run"/>: they run
-    /// last among the map cases, and they register through the fixture-less
-    /// <c>Case</c> overload, since <c>Teardown</c> would clear a pad on the
-    /// disposed map.</para>
+    /// <para>A load replaces <c>Current.Game</c>, so the map the harness was handed and every
+    /// reference held across the call belong to a disposed game. Hence these cases run last
+    /// among the map cases, as registered in <see cref="DebugTools_LifecycleHarness.Run"/>, and
+    /// through the fixture-less <c>Case</c> overload, since <c>Teardown</c> would clear a pad on
+    /// the disposed map. The cases are numbered legs in run order: <c>RoundTrip</c> (1),
+    /// <c>LegacyMigration</c> (2), <c>ForeignAssignable</c> (3), <c>AreaRoundTrip</c> (4). Each
+    /// runs on the game the one before left: leg 2 rewrites leg 1's file, and legs 3 and 4
+    /// stage on whatever map is current.</para>
     ///
-    /// <para><c>Game.LoadGame</c> calls <c>FinalizeInit</c>, which
-    /// <see cref="Patch_HarnessAutoRun"/> postfixes. A one-shot latch there
-    /// prevents a nested harness run.</para>
-    ///
-    /// <para>Assertions read the written file as well as the loaded comp state.
-    /// Comp state alone cannot distinguish a value that scribed correctly from
-    /// one that never left the object. Mechanisms:
-    /// <c>rimworld-docs/gamedata/scribe-system.md</c>.</para>
+    /// <para>Assertions read the written file as well as the loaded state: comp state alone
+    /// cannot tell a value that scribed from one that never left the object.</para>
     /// </summary>
     internal static class DebugTools_SaveRoundTrip
     {
         /// <summary>
-        /// Five save files, not cleaned up.
-        ///
-        /// <para><c>run-harness.sh</c> gives the game an isolated
-        /// <c>-savedatafolder</c> and wipes it at the start of every run, so the
-        /// normal path leaves nothing behind. Driving the harness from the debug
-        /// menu writes them into that profile's <c>Saves</c> folder instead;
-        /// that entry point is SCENES-only.</para>
-        ///
-        /// <para>They are kept because the assertions are about file contents.
-        /// When one fails, the file is the artifact to inspect.</para>
+        /// The five save files, left in place so that a failed assertion about file contents
+        /// leaves the file to inspect. <c>run-harness.sh</c> wipes its isolated save folder at
+        /// the start of each run; a run from the debug menu writes them to that profile's own
+        /// Saves folder.
         /// </summary>
         internal const string SaveName = "shiftchange-harness-roundtrip";
         internal const string LegacySaveName = "shiftchange-harness-legacy";
@@ -70,8 +52,8 @@ namespace ShiftChange
         internal const string AreaLabelKey = "shiftChangeServeAreaLabel";
 
         /// <summary>
-        /// Our mod-prefixed keys, and the generic keys <c>CompAssignableToPawn</c>
-        /// writes — which older saves and any foreign assignable also carry.
+        /// Our prefixed keys, and the generic keys <c>CompAssignableToPawn</c> writes, which
+        /// older saves and any foreign assignable also carry.
         /// </summary>
         internal const string OurKey = "shiftChangeAssignedPawns";
         internal const string OurUninstalledKey = "shiftChangeUninstalledAssignedPawns";
@@ -79,78 +61,63 @@ namespace ShiftChange
         internal const string LegacyUninstalledKey = "uninstalledAssignedPawns";
 
         /// <summary>
-        /// The reconciled marker (<see cref="CompAssignableToPawn_ShiftStand.ownersUnified"/>),
-        /// and its whole node whatever it holds. It arrived in v1.4.7 and the
-        /// generic keys were retired in v1.0.2, so no save carries both;
-        /// <see cref="LegacyMigration"/> strips it for that reason.
+        /// The reconciled marker (<see cref="CompAssignableToPawn_ShiftStand.ownersUnified"/>)
+        /// and its whole node, whatever it holds. It arrived after the generic keys were
+        /// retired, so no save carries both, and <see cref="LegacyMigration"/> strips it.
         /// </summary>
         internal const string OurMarkerKey = "shiftChangeOwnersUnified";
         internal const string OurMarkerNode = "<" + OurMarkerKey + ">[^<]*</" + OurMarkerKey + ">";
 
         /// <summary>
-        /// The catchment keys' prefix (<see cref="CompShiftStand.PostExposeData"/>),
-        /// and every node under it, written out or null. They arrived in
-        /// v1.5.0, so <see cref="LegacyMigration"/> strips them too.
+        /// The catchment keys' prefix (<see cref="CompShiftStand.PostExposeData"/>), and every
+        /// node under it, written out or null. They too arrived after the generic keys were
+        /// retired, so <see cref="LegacyMigration"/> strips them.
         /// </summary>
         internal const string CatchmentKeyPrefix = "shiftChangeServe";
         internal const string CatchmentNodes =
             "<(" + CatchmentKeyPrefix + @"\w*)>[^<]*</\1>|<" + CatchmentKeyPrefix + @"\w*\b[^>]*/>";
 
         /// <summary>
-        /// Logged when a reference list registers load-ids during LoadingVars
-        /// and does not collect them during ResolvingCrossRefs
-        /// (<c>LoadIDsWantedBank.ConfirmClear</c>, <c>:53</c>). A half-consumed
-        /// bank drops the reference without erroring, so absence of this line
-        /// is what makes the migration leg meaningful.
+        /// Logged by <c>LoadIDsWantedBank.ConfirmClear</c> when a reference list registers load
+        /// ids during LoadingVars and never collects them during ResolvingCrossRefs. The
+        /// reference is dropped with no other error, so the absence of this line is what makes
+        /// the migration leg meaningful.
         /// </summary>
         internal const string UnconsumedWarning = "Not all loadIDs which were read were consumed";
 
         /// <summary>
-        /// Logged when two comps read the same node on one thing: the second
-        /// registration is refused (<c>LoadIDsWantedBank.cs:108</c>) and the
-        /// matching take finds nothing (<c>:149</c>).
-        /// <see cref="ForeignAssignable"/> asserts both are absent.
+        /// Logged when two comps read the same node of one thing: <c>LoadIDsWantedBank</c>
+        /// refuses the second registration, and the matching take then finds nothing
+        /// (<see cref="FailedTake"/>). <see cref="DeclinedAndReconciled"/> and
+        /// <see cref="ForeignAssignable"/> assert both are absent.
         /// </summary>
         internal const string DuplicateRegistration = "Tried to register the same list of load IDs twice";
         internal const string FailedTake = "Could not get load IDs list";
 
         /// <summary>
-        /// Logged by <c>Verse.Map</c> when <c>FinalizeLoading</c> throws. That
-        /// pass is what SPAWNS a loaded map's contents, so an abort leaves a
-        /// map with nothing in it and every stand lookup below returns null.
-        ///
-        /// <para>The three round-trip cases used to call that "no stand after
-        /// loading", which names a symptom three layers downstream of the
-        /// cause and reads as a bug in our own scribing. It cost about an hour
-        /// on the v1.2.3 release gate and cost it again on the v1.3.0 one.
-        /// Vehicle Framework is the case in hand: it keys a static
-        /// map-component cache by map index and never clears it between
-        /// in-process loads, so the harness's second and third loads collide
-        /// on key 0. Nothing of ours is anywhere on that stack.</para>
+        /// Logged by <c>Game.LoadGame</c> when a map's <c>FinalizeLoading</c> throws; the load
+        /// carries on. That pass spawns a loaded map's contents, so after an abort the map is
+        /// empty and every stand lookup returns null. A mod can cause it: Vehicle Framework keys
+        /// a static map-component cache by map index and never clears it between in-process
+        /// loads, so the second and later loads collide on key 0. Nothing of ours is on that
+        /// stack.
         /// </summary>
         internal const string FinalizeAbort = "Error in Map.FinalizeLoading()";
 
         /// <summary>
-        /// Several assertions in this file test for absence — no unconsumed
-        /// load-ids, no duplicate registration, no failed take. A scanner that
-        /// never matches anything satisfies all of them, so one leg logs this
-        /// string and asserts <see cref="Logged"/> finds it.
+        /// Several assertions in this file test for absence: no unconsumed load ids, no duplicate
+        /// registration, no failed take. A scanner that never matches satisfies all of them, so
+        /// leg 1 logs this string and asserts <see cref="Logged"/> finds it.
         /// </summary>
         internal const string Probe = "[ShiftChange] harness log-scanner probe";
 
         // ------------------------------------------------------------ leg 1
 
         /// <summary>
-        /// Saves a stand carrying an owner and a populated ledger, loads it
-        /// back, and asserts every scribed field survived, the forced flag
-        /// included.
-        ///
-        /// <para>The stand is also saved with vanilla's removal flag ON, and
-        /// the load must sweep it back off, beside the control that the loaded
-        /// stand is in service; why this case carries that leg is in the
-        /// comment where the flag is staged. This leg also logs
-        /// <see cref="Probe"/>, the control for the file's absence
-        /// assertions.</para>
+        /// Saves a stand carrying an owner, a populated ledger and a radius catchment, loads it
+        /// back, and asserts every scribed field survived, the forced flag included. The stand is
+        /// saved with vanilla's removal flag on, and the load must sweep it off. Logs
+        /// <see cref="Probe"/>, the control for the file's absence assertions.
         /// </summary>
         internal static bool RoundTrip(Map map, CellRect pad)
         {
@@ -169,13 +136,12 @@ namespace ShiftChange
                     "      the stand has no CompAssignableToPawn_ShiftStand");
                 return false;
             }
-            // Through the comp's own API rather than the backing list: the
-            // harness simulates orchestration only, never engine calls.
+            // Through the comp's own API, not its backing list: the copy into a foreign
+            // assignable happens there.
             owned.TryAssignPawn(fix.Pawn);
 
-            // Build leaves storedForcedApparel empty; the forced flag is one
-            // of the fields under test. Re-record through NotifyDressed with
-            // one stored garment flagged.
+            // Build leaves storedForcedApparel empty, and the forced flag is under test: record
+            // again through NotifyDressed with one stored garment flagged.
             List<Apparel> stored = new List<Apparel>(fix.Comp.storedOwnerApparel);
             List<Apparel> issued = new List<Apparel>(fix.Comp.issuedUniform);
             if (stored.Count == 0 || issued.Count == 0)
@@ -187,10 +153,9 @@ namespace ShiftChange
             fix.Comp.NotifyDressed(fix.Pawn, stored, issued,
                                    new List<Apparel> { stored[0] });
 
-            // The catchment rides in the same save: a radius stand at a radius
-            // that is not the default, so a value that never left the object
-            // cannot pass for one that scribed. A radius needs something
-            // ticked first.
+            // The catchment rides in the same save, at a radius other than the default so a
+            // value that never left the object cannot pass for one that scribed. A radius needs
+            // a work type ticked first.
             WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
             if (doctor == null)
             {
@@ -201,8 +166,7 @@ namespace ShiftChange
             fix.Comp.SetServes(CatchmentKind.Radius);
             fix.Comp.SetServeRadius(9);
 
-            // Captured before the load: afterwards these objects belong to a
-            // disposed game.
+            // Captured before the load: afterwards these objects belong to a disposed game.
             IntVec3 standCell = fix.Stand.Position;
             string ownerLoadID = fix.Pawn.GetUniqueLoadID();
             int ownerID = fix.Pawn.thingIDNumber;
@@ -210,13 +174,10 @@ namespace ShiftChange
             int issuedCount = issued.Count;
             string forcedLoadID = stored[0].GetUniqueLoadID();
 
-            // The invariant's migration half: a stand saved EXPOSED must come
-            // back clean. Refusing the toggle's OFF->ON transition never
-            // emptied the stands already sitting in ON, and this is the leg
-            // that proves they get swept. Staged here rather than in its own
-            // case because this is the only case that already pays for a
-            // save/load cycle, and the sweep runs in PostSpawnSetup, which
-            // only a real load exercises.
+            // A stand saved with the removal flag on must load with it off. The toggle's disable
+            // only stops the off-to-on change, so the flag can already be on in a save, and
+            // CompShiftStand.PostSpawnSetup clears it on every spawn, a load included. Staged in
+            // this leg because it already pays for a save/load cycle.
             if (Patch_AllowRemovingToggle.AllowRemovingItemsRef != null)
             {
                 Patch_AllowRemovingToggle.AllowRemovingItemsRef(fix.Stand) = true;
@@ -228,17 +189,10 @@ namespace ShiftChange
             }
             string saved = File.ReadAllText(savePath);
 
-            // Asserted on the file before anything is read back: comp state
-            // cannot distinguish a value that scribed correctly from one that
-            // never left the object.
-            //
-            // The generic key is not ours to write, but it is not empty either
-            // once another mod's assignable shares the stand (Outfit Stands
-            // Plus puts one on the vanilla stand): that comp saves under it,
-            // and it holds a copy of a single owner. So the owner appears
-            // there once per foreign comp and never more. One more is OUR comp
-            // writing the generic key, which is the regression this guards; on
-            // a list with no foreign assignable the expected count is zero.
+            // The generic key is not ours to write, but another mod's assignable on the same stand
+            // (Outfit Stands Plus gives the vanilla stand one) saves under it with a copy of the
+            // owner. So the owner appears there once per foreign comp, and one more means our comp
+            // wrote it; with no foreign assignable the expected count is zero.
             int foreignCopies = fix.Stand.AllComps.OfType<CompAssignableToPawn>()
                 .Count(c => !(c is CompAssignableToPawn_ShiftStand));
             int genericHits = NodeBodies(saved, LegacyKey).Count(body => body.Contains(ownerLoadID));
@@ -259,8 +213,8 @@ namespace ShiftChange
 
             SavedGameLoaderNow.LoadGameFromSaveFileNow(SaveName);
 
-            // Positive control for the absence assertions. Logged after the
-            // load, so it also covers the queue being cleared by it.
+            // Positive control for the absence assertions, logged after the load so that a load
+            // which cleared the queue could not hide it.
             Log.Message(Probe);
             ok &= DebugTools_LifecycleHarness.Expect(
                     Logged(Probe),
@@ -321,38 +275,24 @@ namespace ShiftChange
         // ------------------------------------------------------------ leg 2
 
         /// <summary>
-        /// Rewrites the file leg 1 wrote into the shape a save from before
-        /// v1.0.2 carries, loads it, and asserts the owner comes back and
-        /// re-saves under the prefixed key.
+        /// Rewrites the file leg 1 wrote into the shape of a save from before v1.0.2, loads it,
+        /// and asserts the owner comes back and re-saves under the prefixed key. The rewrite
+        /// runs in-process, so the assertion and the artifact it reads cannot drift apart.
         ///
-        /// <para>The rewrite runs in-process rather than in the shell runner so
-        /// the assertion and the artifact it reads cannot drift apart.</para>
+        /// <para>Two routes bring the owner back, and whether the loaded stand carries a foreign
+        /// assignable picks the one under test. Without one, the key migration in
+        /// <see cref="CompAssignableToPawn_ShiftStand.PostExposeData"/> reads the generic keys
+        /// (<see cref="KeyMigration"/>). With one, those keys are that comp's: the migration
+        /// declines them, and the one-time reconcile adopts the owner from the foreign list on
+        /// first spawn (<see cref="DeclinedAndReconciled"/>). Outfit Stands Plus puts a foreign
+        /// assignable on every vanilla stand, so the four-mod list only takes the first route
+        /// and a list carrying that mod only the second.</para>
         ///
-        /// <para><b>Two routes bring the owner back, and the loaded stand picks
-        /// the one under test.</b> With no foreign assignable on it, the key
-        /// migration in <see cref="CompAssignableToPawn_ShiftStand.PostExposeData"/>
-        /// reads the generic keys (<see cref="KeyMigration"/>). With one, those
-        /// keys are that comp's: the migration declines them, and the one-time
-        /// reconcile adopts the owner from the foreign list on first spawn
-        /// (<see cref="DeclinedAndReconciled"/>). Outfit Stands Plus puts a
-        /// foreign assignable on every vanilla stand, so the four-mod list only
-        /// ever takes the first route and a list carrying that mod only the
-        /// second. Nothing else in the harness reaches the decline: leg 3's
-        /// save carries our prefixed keys, and a present key switches the
-        /// migration off before the contest is consulted.</para>
-        ///
-        /// <para><b>The rewrite also strips the reconciled marker.</b> No save
-        /// old enough to carry the generic keys has one (see
-        /// <see cref="OurMarkerKey"/>), and leaving it in made a file no version
-        /// ever wrote. Beside a foreign assignable that file lost the owner
-        /// outright: the stand loaded as already reconciled with an empty list,
-        /// skipped the reconcile, and the copy then emptied the foreign list as
-        /// well. That failed this case with Outfit Stands Plus loaded, found
-        /// 2026-09-29.</para>
-        ///
-        /// <para>The catchment keys go for the same reason: the round-trip
-        /// save serves a radius, and no save from before v1.5.0 serves
-        /// anything but its room.</para>
+        /// <para>The rewrite also strips the reconciled marker (<see cref="OurMarkerKey"/>) and
+        /// the catchment keys, since no save old enough to carry the generic keys has either.
+        /// With the marker left in, a stand beside a foreign assignable loads as already
+        /// reconciled with an empty list, skips the reconcile, and the copy then empties the
+        /// foreign list too, losing the owner.</para>
         /// </summary>
         internal static bool LegacyMigration()
         {
@@ -365,9 +305,8 @@ namespace ShiftChange
             }
             string source = File.ReadAllText(sourcePath);
 
-            // The owner is read off OUR key, before the rewrite. Afterwards the
-            // stand can carry the generic key twice, and beside a foreign
-            // assignable the first of the two is that comp's copy.
+            // Read the owner off our key before the rewrite: afterwards the stand can carry the
+            // generic key twice, and beside a foreign assignable the first is that comp's copy.
             string ownerLoadID = FirstListEntry(source, OurKey);
             if (ownerLoadID == null)
             {
@@ -376,8 +315,6 @@ namespace ShiftChange
                 return false;
             }
 
-            // Longest key first: rewriting the short one first would corrupt
-            // the long one into "shiftChangeUninstalledassignedPawns".
             string legacy = Regex.Replace(Regex.Replace(source
                     .Replace(OurUninstalledKey, LegacyUninstalledKey)
                     .Replace(OurKey, LegacyKey),
@@ -427,14 +364,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Leg 2 with no foreign assignable on the stand: the key migration.
-        ///
-        /// <para>Three assertions, counting the caller's load-id check: the
-        /// owner arrives, the loader reports no unconsumed load-ids, and a
-        /// re-save writes the owner back under the prefixed key. The third is
-        /// what shows the migration collected the reference rather than only
-        /// registering it — an in-memory owner that does not scribe satisfies
-        /// the first two.</para>
+        /// Leg 2 with no foreign assignable: the key migration. The owner must arrive, and a
+        /// re-save must write it under the prefixed key.
         /// </summary>
         internal static bool KeyMigration(CompAssignableToPawn_ShiftStand assign, string ownerLoadID)
         {
@@ -443,8 +374,8 @@ namespace ShiftChange
                     && p.GetUniqueLoadID() == ownerLoadID),
                 "the legacy owner migrated onto the comp");
 
-            // Re-save: the owner must come back out under the prefixed key,
-            // which only a migration that collected the reference produces.
+            // Only a migration that collected the reference writes the owner back out under the
+            // prefixed key; an in-memory owner that does not scribe passes the checks above.
             if (!TrySave(ReSaveName, out string resavePath))
             {
                 return false;
@@ -462,23 +393,19 @@ namespace ShiftChange
 
         /// <summary>
         /// Leg 2 beside a foreign assignable: the route
-        /// <see cref="CompAssignableToPawn_ShiftStand.PostExposeData"/> promises
-        /// a save from before v1.0.2 that carries both mods.
+        /// <see cref="CompAssignableToPawn_ShiftStand.PostExposeData"/> promises a legacy save
+        /// that carries both mods.
         ///
-        /// <para>First, the decline leaves no trace. The stand's node carries
-        /// the generic key twice, the foreign comp's and our rewritten one, and
-        /// the loader answers every read of it with the first
-        /// (<c>ScribeLoader.EnterNode</c> looks the child up by name). Had ours
-        /// read it too, the second registration would be refused and the
-        /// matching take would find nothing: the two log lines asserted absent
-        /// here.</para>
+        /// <para>The decline leaves no trace. The stand's node carries the generic key twice, the
+        /// foreign comp's and our rewritten one, and the loader answers every read of it with the
+        /// first (<c>ScribeLoader.EnterNode</c> looks the child up by name). Had ours read it
+        /// too, the second registration would be refused and its take would find nothing: the
+        /// two log lines asserted absent here.</para>
         ///
-        /// <para>Then the owner comes back by the other road. Ours loads empty,
-        /// the foreign list holds the owner (leg 1's copy put it there, the
-        /// shape the <c>PostExposeData</c> comment expects of such a save), and
-        /// the reconcile adopts it. The copy writes it back, so a re-save
-        /// carries it under our key and under the generic key once per foreign
-        /// comp, the count leg 1 makes.</para>
+        /// <para>The owner comes back by the other road. Ours loads empty, the foreign list holds
+        /// the owner (leg 1's copy put it there), and the reconcile adopts it. The copy writes it
+        /// back, so a re-save carries it under our key and under the generic key once per
+        /// foreign comp, the count leg 1 makes.</para>
         /// </summary>
         internal static bool DeclinedAndReconciled(CompAssignableToPawn_ShiftStand assign,
                                                    List<CompAssignableToPawn> foreigners,
@@ -528,41 +455,25 @@ namespace ShiftChange
         // ------------------------------------------------------------ leg 3
 
         /// <summary>
-        /// Asserts a stand from an older save, carrying another mod's assignable
-        /// comp with an owner of its own, round-trips that owner without a
-        /// contest and adopts it into ours.
+        /// Asserts that a stand from an older save, carrying another mod's assignable comp with
+        /// an owner of its own, round-trips that owner without a contest and adopts it into ours.
         ///
-        /// <para>Comps scribe flat into the thing's node, so every
-        /// <c>CompAssignableToPawn</c> on one building that uses the generic key
-        /// reads and writes the same node. This case asserts the load leaves no
-        /// trace of a contest over it — no duplicate registration, no failed
-        /// take, no unconsumed load-ids.</para>
+        /// <para>Comps scribe flat into the thing's node, so every <c>CompAssignableToPawn</c>
+        /// using the generic key reads and writes the same node. The load must leave no trace of
+        /// a contest over it: no duplicate registration, no failed take, no unconsumed load
+        /// ids.</para>
         ///
         /// <para>It does not reach the decline in
-        /// <see cref="CompAssignableToPawn_ShiftStand.PostExposeData"/>. This
-        /// save carries our prefixed keys, empty, and a present key turns the
-        /// migration off before the contest is consulted: with the guard
-        /// removed, this case's own load logged no contest at all (measured
-        /// 2026-09-30, Outfit Stands Plus loaded). The decline is covered by
-        /// <see cref="LegacyMigration"/> beside a foreign assignable, and it is
-        /// that leg's lines, found by the whole-queue scan in
-        /// <see cref="Logged"/>, that would fail this case's absence assertions
-        /// too.</para>
+        /// <see cref="CompAssignableToPawn_ShiftStand.PostExposeData"/>: this save carries our
+        /// prefixed keys, empty, and a present key turns the migration off before the contest is
+        /// consulted. <see cref="LegacyMigration"/> beside a foreign assignable is the only case
+        /// that reaches it.</para>
         ///
-        /// <para>The save is staged in the shape one from before the copy
-        /// carries: the foreign comp holds an owner ours does not, and our
-        /// reconciled marker is off, so it is never written. On the way back in,
-        /// the first spawn's reconcile finds the foreign list the only one with
-        /// an owner and adopts it, and the copy then leaves the foreign list as
-        /// it was.</para>
-        ///
-        /// <para><c>ForeignAssignableBesideUs</c> excludes only our own
-        /// subclass, so a plain <c>CompAssignableToPawn</c> serves as the
-        /// foreign comp and no test-only type is needed. It is added to the DEF
-        /// rather than the instance: comps are rebuilt from <c>def.comps</c> by
-        /// <c>ThingWithComps.InitializeComps</c> (<c>:200-208</c>), so an
-        /// instance-level comp would be absent after the load and the case would
-        /// pass without testing anything. The def edit is reverted in a
+        /// <para>A plain <c>CompAssignableToPawn</c> serves as the foreign comp, since
+        /// <c>ForeignAssignableBesideUs</c> excludes only our subclass. It is added to the def,
+        /// not the instance: <c>ThingWithComps.InitializeComps</c> rebuilds comps from
+        /// <c>def.comps</c> on load, so an instance-level comp would be gone after the load and
+        /// the case would pass without testing anything. The def edit is reverted in a
         /// <c>finally</c>.</para>
         /// </summary>
         internal static bool ForeignAssignable()
@@ -572,8 +483,8 @@ namespace ShiftChange
             {
                 return CannotStage("no usable pad on the current map");
             }
-            // A fresh pad on the current map: the map and pad the harness was
-            // handed belong to a game the earlier legs replaced.
+            // A fresh pad on the current map: the map and pad the harness was handed belong to a
+            // game an earlier leg replaced.
             CellRect pad = new CellRect(origin.x, origin.z, DebugTools_LifecycleHarness.PadSize,
                                         DebugTools_LifecycleHarness.PadSize);
 
@@ -584,23 +495,13 @@ namespace ShiftChange
                 return false;
             }
 
-            // REUSE A FOREIGN ASSIGNABLE WHEN THE MOD LIST ALREADY SUPPLIES ONE.
-            //
-            // Adding one unconditionally makes TWO wherever a mod has already
-            // put one on this def, and Outfit Stands Plus does exactly that:
-            // its CompAssignableToPawn_OutfitStandsPlusBase derives from
-            // CompAssignableToPawn without overriding PostExposeData, so it
-            // scribes the generic assignedPawns / uninstalledAssignedPawns
-            // keys — and so does the plain one added here. The load then logs
-            // "Tried to register the same list of load IDs twice" and this
-            // case fails its own contest assertions.
-            //
-            // That failure is a FALSE POSITIVE: the duplication is between two
-            // FOREIGN comps, neither of them ours, because the finder below
-            // excludes only our subclass and cannot tell the comp it added
-            // from one a mod supplied. It is invisible on the four-mod minimal
-            // list, which carries no foreign assignable, and so it only ever
-            // appeared on the release gate.
+            // Reuse a foreign assignable when the mod list already supplies one. A second would
+            // make two wherever a mod put one on this def, and the case would test theirs against
+            // theirs: Outfit Stands Plus' base comp derives from CompAssignableToPawn without
+            // overriding PostExposeData, so it scribes the generic keys exactly as the plain one
+            // added here does, and the load logs a duplicate registration. The finders exclude
+            // only our subclass and cannot tell the added comp from a supplied one, and the
+            // four-mod list has no foreign assignable, so only a larger list shows it.
             CompProperties present = standDef.comps.FirstOrDefault(
                 cp => cp != null && cp.compClass != null
                       && typeof(CompAssignableToPawn).IsAssignableFrom(cp.compClass)
@@ -637,20 +538,17 @@ namespace ShiftChange
                     return false;
                 }
 
-                // An owner set through the foreign comp's own call, which no
-                // override of ours sees, and the reconciled marker switched
-                // off: together, the shape a stand from before the copy loads
+                // An owner set through the foreign comp's own call, which none of our overrides
+                // see, and the reconciled marker off: the shape a stand from before the copy loads
                 // with.
                 foreign.TryAssignPawn(fix.Pawn);
                 ours.ownersUnified = false;
                 string ownerLoadID = fix.Pawn.GetUniqueLoadID();
                 IntVec3 standCell = fix.Stand.Position;
 
-                // Loud rather than silent: the case is "ours against theirs",
-                // and a second foreign comp turns it into "theirs against
-                // theirs" while still going through the motions. Asserted so a
-                // mod list that grows another one says so, instead of quietly
-                // reshaping what is under test.
+                // Asserted, so a list that grows a second foreign comp says so: the case is ours
+                // against theirs, and a second turns it into theirs against theirs while it still
+                // goes through the motions.
                 bool ok = DebugTools_LifecycleHarness.Expect(
                         foreigners.Count == 1,
                         "exactly one foreign assignable, so the contest under test "
@@ -715,12 +613,9 @@ namespace ShiftChange
             }
             finally
             {
-                // Revert the def, and ONLY what this case actually added.
-                // Only leg 4 runs after this one, and the process exits shortly
-                // after, but a def edit outliving its case would silently change
-                // what any later case tests — and on a list that supplied its own
-                // foreign assignable nothing was added here at all, so this
-                // must not reach for somebody else's comp.
+                // Revert only what this case added. A def edit outliving its case would change
+                // what later cases test, and a list that supplied its own foreign assignable added
+                // nothing here, so this must not remove somebody else's comp.
                 if (foreignProps != null)
                 {
                     standDef.comps.Remove(foreignProps);
@@ -731,23 +626,21 @@ namespace ShiftChange
         // ------------------------------------------------------------ leg 4
 
         /// <summary>
-        /// Saves two stands serving allowed areas, one whose area was renamed
-        /// and one whose area was deleted, loads them back, and asserts the
-        /// first came back bound to its area under the new name, and the
-        /// second in area mode with no area, under the deleted one's name. A
-        /// third, boxed and carried by a world pawn so it is on no map, keeps
-        /// its binding to the live area through the save, as a stand carried by
-        /// a caravan must to serve that area again at home.
+        /// Saves two stands serving allowed areas, one whose area was renamed and one whose area
+        /// was deleted, loads them back, and asserts the first came back bound to its area under
+        /// the new name, and the second in area mode with no area, under the deleted one's name.
+        /// A third, boxed and carried by a world pawn so it is on no map, keeps its binding to
+        /// the live area through the save, as a stand carried by a caravan must to serve that
+        /// area again at home.
         ///
-        /// <para>The file is asserted first. A rename changes an allowed
-        /// area's load ID, which embeds the name, so the reference has to carry
-        /// the name the area had when saved. The deleted area's reference must
-        /// be dropped rather than left for the loader to fail on, and a stand
-        /// with no binding writes no reference node at all.</para>
+        /// <para>The file is asserted first. A rename changes an allowed area's load ID, which
+        /// embeds the name, so the reference has to carry the name the area had when saved. The
+        /// deleted area's reference must be dropped rather than left for the loader to fail on,
+        /// and a stand with no binding writes no reference node at all.</para>
         ///
-        /// <para>A leg of its own, on a fresh pad: leg 2 loads leg 1's file
-        /// and takes the first stand it finds, so two more stands in that file
-        /// would make leg 2 test whichever came first.</para>
+        /// <para>A leg of its own on a fresh pad: leg 2 loads leg 1's file and takes the first
+        /// stand it finds, so more stands in that file would make leg 2 test whichever came
+        /// first.</para>
         /// </summary>
         internal static bool AreaRoundTrip()
         {
@@ -782,9 +675,9 @@ namespace ShiftChange
                     "      the second stand or the two areas could not be staged");
                 return false;
             }
-            // A third stand, boxed and carried by a colonist off every map, as a
-            // caravan carries one. Its area lives on, so the save keeps the
-            // binding for when the stand is set down at home again.
+            // A third stand, boxed and carried by a colonist off every map, as a caravan carries
+            // one. Its area lives on, so the save keeps the binding for when the stand is set
+            // down at home again.
             CompShiftStand boxed = HarnessCatchments.StageStand(fix, boundCell + new IntVec3(3, 0, 3));
             if (boxed == null)
             {
@@ -886,9 +779,8 @@ namespace ShiftChange
         // ---------------------------------------------------------- plumbing
 
         /// <summary>
-        /// <c>GameDataSaveLoader.SaveGame</c> catches and logs its own
-        /// exceptions (<c>:139-142</c>) and returns void, so success is
-        /// determined by the file existing.
+        /// Saves under <paramref name="name"/>. <c>GameDataSaveLoader.SaveGame</c> returns void
+        /// and catches and logs its own exceptions, so success is the file existing.
         /// </summary>
         internal static bool TrySave(string name, out string path)
         {
@@ -899,8 +791,7 @@ namespace ShiftChange
             }
             catch (Exception)
             {
-                // A delete that fails is not itself interesting — the
-                // existence check below is what decides.
+                // A failed delete is not itself a failure; the existence check below decides.
             }
             GameDataSaveLoader.SaveGame(name);
             if (File.Exists(path))
@@ -913,10 +804,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Whether <paramref name="needle"/> appears inside the named element
-        /// rather than anywhere in the document. A save repeats each pawn's load
-        /// id in many unrelated nodes, so a document-wide <c>Contains</c> would
-        /// match a file that lost the owner.
+        /// Whether <paramref name="needle"/> appears inside the named element rather than
+        /// anywhere in the document: a save repeats each pawn's load id in many unrelated nodes,
+        /// so a document-wide <c>Contains</c> would match a file that lost the owner.
         /// </summary>
         internal static bool NodeContains(string xml, string node, string needle)
         {
@@ -946,8 +836,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Every <c>&lt;node&gt;…&lt;/node&gt;</c> body in the document. A map
-        /// carries one per stand; the assertions match on any of them.
+        /// Every <c>&lt;node&gt;…&lt;/node&gt;</c> body in the document. A map carries one per
+        /// stand; the assertions match on any of them.
         /// </summary>
         internal static IEnumerable<string> NodeBodies(string xml, string node)
         {
@@ -972,8 +862,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The stand at a known cell on the current map, which after a load is
-        /// the loaded map rather than the one the fixture was built on.
+        /// The stand at a known cell on the current map, which after a load is the loaded map,
+        /// not the one the fixture was built on.
         /// </summary>
         internal static Building_OutfitStand FindStand(IntVec3 cell)
         {
@@ -986,9 +876,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Any stand on any loaded map. The migration leg cannot key on a
-        /// cell: it stages no fixture of its own, and the save it loads came
-        /// from a game two loads back.
+        /// Any stand on any loaded map. The migration leg stages no fixture and is not handed
+        /// leg 1's cell, and the foreign leg falls back to it when its stand is not at the cell
+        /// it saved.
         /// </summary>
         internal static Building_OutfitStand FindStandAnywhere()
         {
@@ -1006,20 +896,14 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The stand is gone after a load. Decide whether that is OUR failure
-        /// or the environment's, and say which.
+        /// The stand is gone after a load: decides whether that is our failure or the
+        /// environment's. A known gap when <see cref="FinalizeAbort"/> is in the log, since the
+        /// load never reached the pass that spawns things and the case exercised nothing;
+        /// calling that a failure would blame our scribing for a third party's static cache.
         ///
-        /// <para>A known gap rather than a failure when
-        /// <see cref="FinalizeAbort"/> is in the log: the load never reached
-        /// the pass that spawns things, so the case tested nothing and proved
-        /// nothing. Calling that FAIL blames our scribing for a third-party
-        /// static cache, and the tally then reads as three broken behaviours
-        /// when none of them were exercised at all.</para>
-        ///
-        /// <para>It excuses NOTHING ELSE. Every caller ands its own running
-        /// result in, so assertions that already failed earlier in the case
-        /// still fail it; and with no abort logged the stand is missing for a
-        /// reason nobody understands, which stays a failure and should.</para>
+        /// <para>It excuses nothing else. Every caller ands in its own running result, so
+        /// assertions that failed earlier in the case still fail it, and with no abort logged
+        /// the stand is missing for a reason nobody understands, which stays a failure.</para>
         /// </summary>
         internal static bool MissingStand(string where)
         {
@@ -1038,36 +922,16 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// There is nowhere to stage. Same fork as <see cref="MissingStand"/>,
-        /// one leg earlier: that one asks whether a load produced a stand, this
-        /// one asks whether the map a later leg inherited is fit to build on at
-        /// all.
+        /// There is nowhere to stage: the same fork as <see cref="MissingStand"/>, one step
+        /// earlier. When the load before aborted in <c>Map.FinalizeLoading</c>, the region and
+        /// room grids were never built, <c>TryFindPad</c> requires a room on every cell of the
+        /// pad and its margin, and legs 3 and 4 find no origin anywhere on the map.
         ///
-        /// <para><b>Why legs 3 and 4 need this.</b> The round-trip cases
-        /// replace <c>Current.Game</c>, so each runs on whatever the one before
-        /// it left behind. When an earlier load aborts in
-        /// <c>Map.FinalizeLoading</c> the region and room grids are never
-        /// built, <c>TryFindPad</c> requires a room on every cell of the pad
-        /// and its margin, and so no origin can be found anywhere on the map.
-        /// Legs 1 and 2 already report that as a gap through
-        /// <see cref="MissingStand"/>; legs 3 and 4 stage a pad of their own,
-        /// so they fail EARLIER than any assertion, at staging. Leg 3 once
-        /// never reached the treatment its siblings get, and the release gate
-        /// read red for a cause none of the three legs then shared with the
-        /// mod. Found on the v1.4.4 release gate, 2026-09-19.</para>
-        ///
-        /// <para><b>The discriminator is the abort, not the missing pad.</b>
-        /// "The previous leg killed the map" and "this run never had a usable
-        /// map" arrive at the same symptom and must not get the same verdict:
-        /// the first is the environment, the second is a broken harness
-        /// invocation and has to stay a failure. An abort in the log is
-        /// precisely the first — and only an abort, so a genuinely padless map
-        /// handed to the harness still fails here, as it does in
-        /// <c>Patch_HarnessAutoRun</c> before the run even starts.</para>
-        ///
-        /// <para>It excuses nothing past staging. Every other way this case
-        /// returns false — no stand def, no fixture, an assignable missing off
-        /// the staged stand — is untouched and still fails.</para>
+        /// <para>That is a known gap only when <see cref="FinalizeAbort"/> is in the log. A map
+        /// that was never usable is a broken harness invocation and stays a failure, as it does
+        /// in <see cref="Patch_HarnessAutoRun"/> before the run starts. Nothing past staging is
+        /// excused: no stand def, no fixture, an assignable missing off the staged stand all
+        /// still fail.</para>
         /// </summary>
         internal static bool CannotStage(string where)
         {
@@ -1087,10 +951,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The first mod frame inside the FinalizeLoading abort, or null when
-        /// no abort was logged. Named rather than merely counted so the reader
-        /// learns whose cache broke the load without opening Player.log, which
-        /// is the whole point of the probe.
+        /// The first mod frame inside the FinalizeLoading abort, or null when no abort was
+        /// logged. It names whose cache broke the load, so the reader need not open Player.log.
         /// </summary>
         internal static string FinalizeAbortCulprit()
         {
@@ -1103,9 +965,11 @@ namespace ShiftChange
                 foreach (string line in message.text.Split('\n'))
                 {
                     int at = line.IndexOf("at ", StringComparison.Ordinal);
-                    // A stack frame carrying a Mods path is a mod's own code.
-                    // Engine and mscorlib frames are compiled without one, so
-                    // this skips them without needing a namespace blocklist.
+                    // Taken for a mod's frame when the line holds "Mods": an engine frame carries
+                    // no source path, and a mod's carries one only when it ships its symbols, from
+                    // wherever it was built. A bare substring, so an engine method named for mods
+                    // (LoadedModManager.LoadAllActiveMods) matches too; the fallback below covers
+                    // a trace with no such frame.
                     if (at < 0 || line.IndexOf("Mods", StringComparison.Ordinal) < 0)
                     {
                         continue;
@@ -1120,19 +984,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Whether the log contains <paramref name="needle"/>.
-        ///
-        /// <para>Scans the whole queue rather than a range past a saved index.
-        /// Positional scanning is unsound in two ways, both producing false
-        /// passes: the queue caps at 1000 entries and dequeues past that
-        /// (<c>LogMessageQueue.cs:8</c>), so a noisy load pushes earlier entries
-        /// out from under the index; and an identical message does not enqueue
-        /// but increments <c>repeats</c> on the existing entry (<c>:24-34</c>),
-        /// placing a repeat of an earlier line behind the index.</para>
-        ///
-        /// <para>Scanning everything costs a duplicate failure instead — an
-        /// earlier leg's warning fails the later legs too. These strings appear
-        /// only when a load went wrong.</para>
+        /// Whether the log contains <paramref name="needle"/>. Scans the whole queue, not a range
+        /// past a saved index, which gives false passes two ways: the queue caps at 1000 entries,
+        /// so a noisy load pushes earlier entries out from under the index; and a message equal to
+        /// the last one does not enqueue but bumps that entry's <c>repeats</c>, behind the index.
+        /// The cost is a duplicate failure, an earlier leg's warning failing the later legs too;
+        /// these strings appear only when a load went wrong.
         /// </summary>
         internal static bool Logged(string needle)
         {

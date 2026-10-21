@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System;
 using System.Collections.Generic;
@@ -16,23 +14,21 @@ using static ShiftChange.HarnessFixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// Harness cases on a vacuum map. The second map
-    /// (<see cref="HarnessFixtures.SecondMap"/>) is Odyssey's <c>SpacePocket</c>,
-    /// whose biome is <c>Orbit</c>, so the game treats it as space: a room on it
-    /// holds a vacuum value, and open floor reads 1.
+    /// Harness cases on a vacuum map. The second map (<see cref="HarnessFixtures.SecondMap"/>) is
+    /// Odyssey's <c>SpacePocket</c>, whose biome is <c>Orbit</c>, so the game treats it as space: a
+    /// room on it holds a vacuum value, and open floor reads 1.
     ///
-    /// <para>The clock stands still while the harness runs, and the vacuum
-    /// simulation exchanges only on map ticks, so nothing moves a value a case
-    /// sets. Each case sets every room it reads, the open ones too: a doorway
-    /// averages its neighbours' stored values (<c>Room.UnsanitizedVacuum</c>),
-    /// and an open room's stored value is brought to 1 only when something reads
-    /// or exchanges it.</para>
+    /// <para>The clock stands still while the harness runs and the vacuum simulation exchanges only
+    /// on map ticks, so nothing moves a value a case sets. A case sets every room it reads, the
+    /// open ones too: a doorway averages its neighbours' stored values
+    /// (<c>Room.UnsanitizedVacuum</c>), and an open room's stored value is brought to 1 only when
+    /// something reads or exchanges it.</para>
     /// </summary>
     internal static class HarnessVacuum
     {
         /// <summary>
-        /// A walled, roofed room on the second map with a door onto a strip of
-        /// open floor, the room set to air and the strip to vacuum.
+        /// A walled, roofed room on the second map with a door onto a strip of open floor, the room
+        /// set to air and the strip to vacuum.
         /// </summary>
         internal struct VacuumScene
         {
@@ -44,9 +40,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Build a <see cref="VacuumScene"/> at the centre of <paramref name="away"/>.
-        /// The space map's own terrain is impassable, so the strip is laid as
-        /// floor: walkable, unroofed, and so open to space.
+        /// Build a <see cref="VacuumScene"/> at the centre of <paramref name="away"/>. The space
+        /// map's own terrain is impassable, so the strip is laid as floor: walkable, unroofed, and
+        /// so open to space.
         /// </summary>
         internal static VacuumScene StageVacuumScene(Map away)
         {
@@ -83,12 +79,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The ground every vacuum case stands on, checked before any of them
-        /// relies on it: the second map is a vacuum map; the staged room is a
-        /// room of its own and holds air; the strip and the doorway read at or
-        /// over the harm line; and a region walk that may only step into air
-        /// stays in the room, where an unrestricted walk from the same start
-        /// reaches the strip (the control, so the negative means something).
+        /// The ground every vacuum case stands on, checked before any of them relies on it: the
+        /// second map is a vacuum map; the staged room is a room of its own and holds air; the
+        /// strip and the doorway read at or over the harm line; and a region walk that may only
+        /// step into air stays in the room, where an unrestricted walk from the same start reaches
+        /// the strip (the control, so the negative means something).
         /// </summary>
         internal static bool VacuumMapStages(Map home)
         {
@@ -149,11 +144,10 @@ namespace ShiftChange
         // ------------------------------------------------- the gate's ship
 
         /// <summary>
-        /// The ship the gate's cases use, laid out from the second map's centre:
-        /// the fixture's room (stand, crafter, crafting spot), a door in its east
-        /// wall onto three cells of floor, and a second room past them with a
-        /// door of its own. The floor is open to space unless the ship is
-        /// <c>connected</c>, when it is roofed into a corridor holding air.
+        /// The ship the gate's cases use, laid out from the second map's centre: the fixture's room
+        /// (stand, crafter, crafting spot), a door in its east wall onto three cells of floor, and
+        /// a second room past them with a door of its own. The floor is open to space, or roofed
+        /// into a corridor holding air when <c>connected</c>.
         /// </summary>
         internal struct Ship
         {
@@ -194,11 +188,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Stage the ship on a second map: the crafter wears shirt, trousers, a
-        /// vacsuit and its helmet, which together reach a resistance of 1, and
-        /// the stand holds a duster, which displaces the vacsuit. Everything is
-        /// built before any room is read, so no room caches a layout that later
-        /// changed. Null, with the map removed, if any of it cannot be staged.
+        /// Stage the ship on a second map: the crafter wears shirt, trousers, a vacsuit and its
+        /// helmet, which together reach a resistance of 1, and the stand holds a duster, which
+        /// displaces the vacsuit. Everything is built before any room is read, so no room caches a
+        /// layout that later changed. Null, with the map removed, if any of it cannot be staged.
         /// </summary>
         internal static Fixture StageShip(Map home, bool connected)
         {
@@ -247,11 +240,9 @@ namespace ShiftChange
             EnclosePad(away, ship.FarRoom);
             Door(away, new IntVec3(ship.Room.maxX, 0, ship.OnFloor.z));
             Door(away, new IntVec3(ship.FarRoom.minX, 0, ship.OnFloor.z));
-            // A connected corridor needs walls down both sides as well as a
-            // roof. Space terrain cannot be walked, but it still carries
-            // air-exchange regions in the map's outdoor room, so a roofed strip
-            // with open sides is part of that room and reads as vacuum 1
-            // (found 2026-10-18: a 2,426-cell room touching the map edge).
+            // A connected corridor needs walls down both sides as well as a roof: space terrain
+            // cannot be walked but still carries air-exchange regions in the map's outdoor room, so
+            // a roofed strip with open sides joins that room and reads as vacuum 1.
             for (int x = ship.Room.maxX + 1; x < ship.FarRoom.minX; x++)
             {
                 IntVec3 cell = new IntVec3(x, 0, ship.OnFloor.z);
@@ -296,9 +287,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A bill at the ship's crafting spot whose one ingredient, ten steel,
-        /// lies at <paramref name="ingredientAt"/>: the job as
-        /// <c>WorkGiver_DoBill</c> builds it, the ingredients in targetQueueB.
+        /// A bill at the ship's crafting spot whose one ingredient, ten steel, lies at
+        /// <paramref name="ingredientAt"/>: the job as <c>WorkGiver_DoBill</c> builds it, the
+        /// ingredients in targetQueueB.
         /// </summary>
         internal static Job BillFetching(Fixture fix, IntVec3 ingredientAt)
         {
@@ -321,11 +312,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A crafter in a vacsuit, at a stand whose duster would take it off, is
-        /// not dressed for a bill whose ingredient lies on open floor outside:
-        /// the fetch goes through vacuum, so they do the bill in their own gear.
-        /// The same bill with its ingredient in the room dresses them (the
-        /// control).
+        /// A crafter in a vacsuit, at a stand whose duster would take it off, is not dressed for a
+        /// bill fetching from open floor outside: the fetch goes through vacuum, so they keep their
+        /// own gear. The same bill fetching from the room dresses them (the control).
         /// </summary>
         internal static bool IngredientInVacuumKeepsTheirGear(Fixture fix)
         {
@@ -341,11 +330,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The fetch fails just the same when the ingredient is somewhere safe
-        /// that only vacuum leads to: a second room past the open floor. The
-        /// connected ship, whose floor is a roofed corridor holding air, is the
-        /// promise made publicly: where everything connects through air,
-        /// nothing changes, and the same bill dresses them.
+        /// The fetch fails just the same when the ingredient is safe but only vacuum leads to it: a
+        /// second room past the open floor. The control is
+        /// <see cref="ConnectedShipChangesNothing"/>.
         /// </summary>
         internal static bool SafeRoomAcrossVacuumKeepsTheirGear(Fixture fix)
         {
@@ -358,7 +345,11 @@ namespace ShiftChange
                           "a bill fetching from a room only vacuum leads to does not dress the crafter");
         }
 
-        /// <summary>The control for <see cref="SafeRoomAcrossVacuumKeepsTheirGear"/>, on the connected ship.</summary>
+        /// <summary>
+        /// The control for <see cref="SafeRoomAcrossVacuumKeepsTheirGear"/>, on the connected ship:
+        /// its floor is a roofed corridor holding air, so the same bill dresses them. Where
+        /// everything connects through air nothing changes, as the README promises.
+        /// </summary>
         internal static bool ConnectedShipChangesNothing(Fixture fix)
         {
             Ship ship = ShipOn(fix.Map);
@@ -379,7 +370,11 @@ namespace ShiftChange
             return ok;
         }
 
-        /// <summary>What each cell of a row reads, for a case that failed on it.</summary>
+        /// <summary>
+        /// What each cell of a row reads, for a case that failed on it. For a cell in a room open
+        /// to space, its district is also told the roof changed, and the report says whether the
+        /// room still reads open after that.
+        /// </summary>
         internal static void ReportRow(Map map, int fromX, int toX, int z)
         {
             for (int x = fromX; x <= toX; x++)
@@ -406,10 +401,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A crafter already in the duster, their vacsuit parked, changes back
-        /// before a bill whose fetch goes through vacuum, and keeps the duster
-        /// on for one that stays inside (the control). This is the same question
-        /// the dressing asked, read off the ledger, so the two directions agree.
+        /// A crafter already in the duster, their vacsuit parked, changes back before a bill whose
+        /// fetch goes through vacuum and keeps the duster on for one that stays inside (the
+        /// control). Dressing asked the same question, so the two directions agree.
         /// </summary>
         internal static bool OnShiftChangesBackBeforeVacuum(Fixture fix)
         {
@@ -429,9 +423,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A crafter with no vacuum protection to lose is dressed as before,
-        /// even for a bill whose fetch goes through vacuum: the swap takes
-        /// nothing away, so the gate does not apply.
+        /// A crafter with no vacuum protection to lose is dressed as before, even for a bill whose
+        /// fetch goes through vacuum: the swap takes nothing away, so the gate does not apply.
         /// </summary>
         internal static bool UnprotectedCrafterIsUnaffected(Fixture fix)
         {
@@ -466,19 +459,18 @@ namespace ShiftChange
             return live == null ? new List<Message>() : new List<Message>(live);
         }
 
-        /// <summary>A message with this text went up since <paramref name="before"/> was read.</summary>
+        /// <summary>A message with this text appeared since <paramref name="before"/>.</summary>
         internal static bool PostedSince(List<Message> before, string text)
         {
             return LiveMessages().Any(m => m.text == text && !before.Contains(m));
         }
 
         /// <summary>
-        /// An order runs as given, in uniform, as every order does: only a
-        /// message says the uniform protects less, and it goes up on screen.
-        /// A second order within the hour says nothing more, where vanilla
-        /// would flash it and play its sound again, and with the stamp cleared
-        /// it speaks again (the control). A drafted move, which never reaches
-        /// the gates, is warned about the same way.
+        /// An order runs as given, in uniform; only a message says the uniform protects less, and
+        /// it goes up on screen. A second order within the hour says nothing more, since vanilla
+        /// answers a repeated message by flashing it and playing its sound again, and with the
+        /// stamp cleared it speaks again (the control). A drafted move, which never reaches the
+        /// gates, is warned about the same way.
         /// </summary>
         internal static bool OrderIntoVacuumRunsAsGiven(Fixture fix)
         {
@@ -527,11 +519,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The gate overrides the exemption emergencies have (decided
-        /// 2026-10-16): an emergency job through vacuum sends a colonist in
-        /// uniform back to change first, where the same job inside the room
-        /// still goes straight ahead (the control). Firefighting's giver,
-        /// because the medical-emergency setting never opens it.
+        /// The gate overrides the exemption emergencies have: an emergency job through vacuum sends
+        /// a colonist in uniform back to change first, where the same job inside the room still
+        /// goes straight ahead (the control). The emergency is firefighting's giver, because the
+        /// medical-emergency setting never opens it.
         /// </summary>
         internal static bool EmergencyIntoVacuumChangesBackFirst(Fixture fix)
         {
@@ -561,9 +552,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Off a vacuum map nothing changes, the other half of the public
-        /// promise: on the harness's own map, the crafter in the same vacsuit is
-        /// dressed for a bill whose ingredient lies outside the room.
+        /// Off a vacuum map nothing changes, since the README scopes the vacuum rule to a ship in
+        /// space: on the harness's own map, the crafter in the same vacsuit is dressed for a bill
+        /// whose ingredient lies outside the room.
         /// </summary>
         internal static bool PlanetMapChangesNothing(Fixture fix)
         {
@@ -582,8 +573,8 @@ namespace ShiftChange
                 return false;
             }
             fix.Comp.ToggleWork(crafting);
-            // Where the ship puts its bench: Stage puts the stand one cell in
-            // from the pad's south-west corner.
+            // Where the ship puts its bench: Stage puts the stand one cell in from the pad's
+            // south-west corner.
             IntVec3 benchAt = fix.Stand.Position + new IntVec3(3, 0, 2);
             Building_WorkTable spot = DebugTools_Fixtures.Spawn(fix.Map, spotDef, null, benchAt, Rot4.South)
                 as Building_WorkTable;
@@ -605,13 +596,12 @@ namespace ShiftChange
                    & Expect(Probe(fix, job), "and the bill dresses them, as it always has");
         }
 
-        // ------------------------------------------------- after the review
+        // ------------------------------------------------- the other arms of the gate
 
         /// <summary>
-        /// A stand whose outfit raises protection still dresses, for a bill
-        /// fetching through vacuum: the crafter has no suit of their own, and
-        /// the stand holds one. Once they wear it, the gate leaves them be,
-        /// since the uniform protects better than what they parked.
+        /// A stand whose outfit raises protection still dresses, for a bill fetching through
+        /// vacuum: the crafter has no suit of their own, and the stand holds one. Once they wear
+        /// it, the gate leaves them be, since the uniform protects better than what they parked.
         /// </summary>
         internal static bool VacsuitStandStillDresses(Fixture fix)
         {
@@ -645,10 +635,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The stand search passes over a stand whose outfit would take the
-        /// suit off, and goes on to the next: the nearer duster stand loses to a
-        /// vacsuit stand across the room, for a bill fetching through vacuum.
-        /// Without the job, the search picks the nearer one (the control).
+        /// The stand search passes over a stand whose outfit would take the suit off and goes on to
+        /// the next: for a bill fetching through vacuum, the nearer duster stand loses to a vacsuit
+        /// stand across the room. Without the job, the nearer one wins (the control).
         /// </summary>
         internal static bool ProtectiveStandWinsOverANearerOne(Fixture fix)
         {
@@ -689,10 +678,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The delivery arm asks too: an area stand whose area is painted
-        /// across the open floor does not dress a builder in a vacsuit for a
-        /// delivery whose steel lies out there, where steel inside the room
-        /// dresses them (the control).
+        /// The delivery arm asks too: an area stand whose area is painted across the open floor
+        /// does not dress a builder in a vacsuit for a delivery whose steel lies out there, where
+        /// steel inside the room dresses them (the control).
         /// </summary>
         internal static bool AreaDeliveryAcrossVacuumKeepsTheirGear(Fixture fix)
         {
@@ -729,11 +717,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The mid-job catch-up asks too: a stand freed while a crafter in a
-        /// vacsuit is already on a bill fetching through vacuum does not pull
-        /// them in to change, where the same job fetching from the room does
-        /// (the control). The stand serves nothing while the job starts, so the
-        /// job's own start does not dress them first.
+        /// The mid-job catch-up asks too: a stand freed while a crafter in a vacsuit is already on
+        /// a bill fetching through vacuum does not pull them in to change, where the same job
+        /// fetching from the room does (the control). The stand serves nothing while the job
+        /// starts, so the job's own start does not dress them first.
         /// </summary>
         internal static bool FreedStandSkipsAJobThroughVacuum(Fixture fix)
         {
@@ -750,9 +737,9 @@ namespace ShiftChange
             Thing steelIn = HarnessCatchments.Steel(map, ship.InRoom);
 
             fix.Comp.ToggleWork(crafting);
-            // Goto, which the catch-up may interrupt, aimed at another cell so
-            // it stays open (FreedStandCatchesUp says why), and carrying the
-            // bill's ingredient queue.
+            // A Goto, because the catch-up may interrupt it (Core's Wait is not suspendable), aimed
+            // at another cell so it stays open (a Goto to the cell the pawn stands on completes
+            // inside StartJob), and carrying the bill's ingredient queue.
             Job working = JobMaker.MakeJob(JobDefOf.Goto, ship.InRoom);
             working.workGiverDef = giver;
             working.targetQueueB = new List<LocalTargetInfo> { steelOut };
@@ -780,11 +767,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// An errand queued ahead of the stand's own work rides along in
-        /// uniform, but not into vacuum: on the connected ship, a haul from the
-        /// far room with a bill queued behind it keeps the duster on (the
-        /// control), and with the corridor open to vacuum the same errand sends
-        /// them back to change first.
+        /// An errand queued ahead of the stand's own work rides along in uniform, but not into
+        /// vacuum: on the connected ship, a haul from the far room with a bill queued behind it
+        /// keeps the duster on (the control), and with the corridor open to vacuum it sends them
+        /// back to change first.
         /// </summary>
         internal static bool ErrandAheadOfWorkChangesBackBeforeVacuum(Fixture fix)
         {
@@ -811,13 +797,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The air walk goes only where the colonist may pass: on the connected
-        /// ship, a bill fetching from the far room dresses them (the control),
-        /// and with the far room's door forbidden the walk finds no way there
-        /// through air and the bill keeps them in their vacsuit. The door here
-        /// is the only way in, so vanilla would hand out no such bill; what is
-        /// tested is that the walk obeys the door, which matters wherever the
-        /// other way in crosses vacuum.
+        /// The air walk goes only where the colonist may pass. On the connected ship a bill
+        /// fetching from the far room dresses them (the control); with the far room's door
+        /// forbidden the walk finds no way there through air and the bill keeps them in their
+        /// vacsuit. That door is the only way in, so vanilla would hand out no such bill; the case
+        /// tests that the walk obeys the door, which matters where another way in crosses vacuum.
         /// </summary>
         internal static bool ForbiddenDoorIsNoWayThrough(Fixture fix)
         {
@@ -840,11 +824,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A colonist in uniform cut off from their stand by vacuum is not sent
-        /// back across it to change: a job in the far room keeps the duster on,
-        /// and so does one out on the open floor, which a message reports
-        /// instead. From the stand's room, the same far-room job changes them
-        /// back first (the control).
+        /// A colonist in uniform cut off from their stand by vacuum is not sent back across it to
+        /// change: a job in the far room keeps the duster on, and so does one out on the open
+        /// floor, which a message reports instead. From the stand's room, the far-room job changes
+        /// them back first (the control).
         /// </summary>
         internal static bool StrandedColonistIsNotSentAcrossToChange(Fixture fix)
         {
@@ -880,9 +863,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The cooldown a failed swap leaves does not wave the next job into
-        /// vacuum: with it in force, a meal break that would change them back
-        /// does not (the control), and a bill through vacuum still does.
+        /// The cooldown a failed swap leaves does not wave the next job into vacuum: with it in
+        /// force, a meal break that would change them back does not (the control), and a bill
+        /// through vacuum still does.
         /// </summary>
         internal static bool CooldownDoesNotWaveThemIntoVacuum(Fixture fix)
         {
@@ -905,10 +888,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The return trip's refusal holds in vacuum too: an urgent patient
-        /// goes straight to a medical bed across vacuum in uniform, rather than
-        /// to the stand to change, where recuperating there with no such wound
-        /// changes them back first (the control).
+        /// The return trip's refusal holds in vacuum too: an urgent patient goes straight to a
+        /// medical bed across vacuum in uniform, rather than to the stand to change, where
+        /// recuperating there with no such wound changes them back first (the control).
         /// </summary>
         internal static bool UrgentPatientGoesStraightToBedAcrossVacuum(Fixture fix)
         {
@@ -960,11 +942,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A colonist whose stand is on another map gets no change back, which
-        /// cannot happen, but is not left silent either: flown to a vacuum map
-        /// in a duster, their vacsuit parked at a stand on the harness's map, a
-        /// job through vacuum puts up a message saying their own clothes are
-        /// not on this map, and so does an order.
+        /// A colonist whose stand is on another map cannot change back, and is not left silent
+        /// about it: flown to a vacuum map in a duster, their vacsuit parked at a stand on the
+        /// harness's map, a job through vacuum puts up a message that their own clothes are not on
+        /// this map, and so does an order.
         /// </summary>
         internal static bool StandOnAnotherMapStillWarns(Fixture fix)
         {
@@ -1013,7 +994,7 @@ namespace ShiftChange
             }
         }
 
-        /// <summary>A crafter in an enclosed room on the harness's own map, the duster's stand serving crafting.</summary>
+        /// <summary><see cref="StageEnclosedCrafter"/> with its stand serving crafting.</summary>
         internal static Fixture StageCrafterAtHome(Map map, CellRect pad)
         {
             WorkTypeDef crafting = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Crafting");

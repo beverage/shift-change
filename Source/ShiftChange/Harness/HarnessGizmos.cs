@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System.Linq;
 using RimWorld;
@@ -12,20 +10,17 @@ using static ShiftChange.HarnessFixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// Harness cases for the stand's own buttons: what the switch says, and
-    /// that each stand's buttons stay its own when several are selected. Built
-    /// the way the gizmo bar builds them, by asking the comps for their gizmos,
-    /// and never drawn.
+    /// Cases for the stand's buttons: what the switch says, and that selecting several stands keeps
+    /// each stand's buttons its own. Read from the comps' gizmos, never drawn.
     /// </summary>
     internal static class HarnessGizmos
     {
-        /// <summary>The stand's switch: the one command <see cref="CompShiftStand"/> yields.</summary>
+        /// <summary>The stand's switch: the first <c>Command_Action</c> its comp yields.</summary>
         internal static Command_Action Switch(CompShiftStand comp)
         {
             return comp.CompGetGizmosExtra().OfType<Command_Action>().FirstOrDefault();
         }
 
-        /// <summary>The stand's Set owner button.</summary>
         internal static Command_Action OwnerButton(Building_OutfitStand stand)
         {
             CompAssignableToPawn_ShiftStand comp = stand.TryGetComp<CompAssignableToPawn_ShiftStand>();
@@ -38,10 +33,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// THE SWITCH NAMES WHAT THE STAND SERVES, recreation and sleep
-        /// included. Its controls are an idle stand, a doctoring one and an
-        /// excluded one, each reading as it always has. Why it once did not:
-        /// docs/DESIGN.md, "Rooms to work types".
+        /// The switch names what the stand serves, recreation and sleep included; the idle,
+        /// doctoring and excluded stands are controls. Guards a past bug where the switch listed
+        /// work types alone, so a working recreation or sleep stand read as having no work yet
+        /// (docs/DESIGN.md, "Rooms to work types").
         /// </summary>
         internal static bool SwitchNamesWhatTheStandServes(Fixture fix)
         {
@@ -77,14 +72,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// SELECTING SEVERAL STANDS SHOWS EACH STAND'S OWN BUTTONS, the switch
-        /// and Set owner alike. Why a merged button set up one stand while
-        /// looking as if it set them all: docs/DESIGN.md, "Rooms to work
-        /// types".
-        ///
-        /// <para>The control is two plain commands built to the same face,
-        /// which do merge: the fixture's two stands are alike enough to have
-        /// merged, and it is our flag that keeps them apart.</para>
+        /// Selecting several stands shows each stand's own buttons, the switch and Set owner alike.
+        /// Why a merged button misled: docs/DESIGN.md, "Rooms to work types". The control is two
+        /// plain commands with the same face, which do merge (<c>Command.GroupsWith</c> compares
+        /// label, icon, hotkey and group key), so it is the <c>groupable</c> flag on our commands
+        /// that keeps the stands' buttons apart.
         /// </summary>
         internal static bool StandButtonsStaySeparate(Fixture fix)
         {

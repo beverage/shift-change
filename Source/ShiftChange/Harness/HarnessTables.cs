@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System;
 using System.Collections.Generic;
@@ -18,43 +16,27 @@ using static ShiftChange.HarnessFixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// Harness cases for the static tables and the room resolver — the ones
-    /// that assert a def name still resolves, or that a work target with no
-    /// room of its own still finds one.
+    /// Cases for the static tables, the room resolver and the work-type dialog's sizing: a def name
+    /// a table holds still resolves, and a work target with no room of its own still finds one.
     ///
-    /// <para>Case ORDER is decided in one place,
+    /// <para>Case order is decided in one place,
     /// <see cref="DebugTools_LifecycleHarness.Run"/>.</para>
     /// </summary>
     internal static class HarnessTables
     {
         /// <summary>
-        /// The work-type dialog's body must never be drawn into a rect shorter
-        /// than the body itself.
+        /// The work-type dialog never draws its body into a rect shorter than the body.
         ///
-        /// <para>WHY THIS IS A CASE AND NOT A COMMENT. A player on a high UI
-        /// scale photographed the dialog with its trigger rows and work grid
-        /// simply absent. Nothing had thrown and nothing was in the log: the
-        /// window is clamped to 85% of screen height, the rows above the grid
-        /// needed more than the clamp left, and <c>Listing.GetRect</c> runs
-        /// <c>NewColumnIfNeeded</c> on EVERY row — so at the first row that did
-        /// not fit it did <c>curX += ColumnWidth + 17</c> and carried on
-        /// drawing in a column outside the window. Captured at an effective
-        /// 640x360: a 479-wide group, header rows at x=0, and the Recreation
-        /// row at x=496.</para>
+        /// <para>Guards a past bug: at a high UI scale the window was clamped below the body and
+        /// the listing started a second column outside the window, blanking the trigger rows and
+        /// the work grid (<c>Listing.GetRect</c> runs <c>NewColumnIfNeeded</c> on every
+        /// row).</para>
         ///
-        /// <para>WHAT THIS COVERS, AND WHAT IT DOES NOT. The harness runs from
-        /// <c>Game.FinalizeInit</c>, with no GUI context, so it cannot draw a
-        /// listing and watch it wrap; <c>Listing.Begin</c> calls
-        /// <c>Widgets.BeginGroup</c>. It asserts the arithmetic that decides
-        /// the rect, which is the half a refactor is likely to get wrong. The
-        /// other half — <c>maxOneColumn</c>, and the measured feedback that
-        /// makes the number honest — is only exercised by drawing, and was
-        /// verified by opening the dialog at four effective UI sizes
-        /// (960x540, 853x480, 640x360, 480x270) on 2026-09-11.</para>
-        ///
-        /// <para>The heights are the ones really measured in that sweep rather
-        /// than invented: bodies of 533, 665 and 847 against window content of
-        /// 143, 220, 306 and 373.</para>
+        /// <para>Asserts only the arithmetic that sizes the rect: the headless run has no GUI
+        /// context to draw a listing in (<c>Listing.Begin</c> calls <c>Widgets.BeginGroup</c>), so
+        /// <c>maxOneColumn</c> and the measured-height feedback are covered only by drawing the
+        /// dialog. The bodies 533, 665 and 847 and the contents 143 to 373 were measured in play at
+        /// four UI scales; the other sizes are extremes.</para>
         /// </summary>
         internal static bool WorkTypeDialogBodyRectFitsTheBody()
         {
@@ -74,10 +56,8 @@ namespace ShiftChange
                         + contents[c].ToString("0") + " window gets "
                         + given.height.ToString("0"));
 
-                    // The converse matters too: a body that fits must NOT open
-                    // a scroll view. Every clipped region is one more thing
-                    // that has to clip the way we assume, and the grid's own
-                    // scroll view was removed for that reason.
+                    // A body that fits must not open a scroll view: every clipped region is one
+                    // more thing that has to clip the way we assume.
                     bool shouldScroll = bodies[b] > contents[c] + 1f;
                     ok &= Expect(scrolling == shouldScroll,
                         "body " + bodies[b].ToString("0") + " in "
@@ -90,20 +70,15 @@ namespace ShiftChange
         /// <summary>
         /// Every def the room-role table names still exists.
         ///
-        /// <c>RoomWorkTypes</c> resolves through <c>GetNamedSilentFail</c> and
-        /// drops whatever is missing, so a renamed def empties a role's work
-        /// list, <c>HandlesWork</c> returns false everywhere, and the mod does
-        /// nothing at all — with a green harness and no log line. Most likely
-        /// to fire on a game update rather than on an edit.
+        /// <para><c>RoomWorkTypes</c> resolves through <c>GetNamedSilentFail</c> and drops what is
+        /// missing, so a renamed def empties a role's work list and the mod does nothing, with no
+        /// log line. A game update is the likely cause.</para>
         ///
-        /// <para>That assertion is hard for <c>Defaults</c> and must NOT be
-        /// for <c>CompatDefaults</c>, whose names come from other mods and are
-        /// absent on any list that does not carry them — the four-mod minimal
-        /// list included. What is still checked there is the merge: whatever
-        /// DOES resolve has to reach <c>ForRole</c>, so a compat row that
-        /// silently fails to fold in is caught on a list that has the mod
-        /// while a row naming a def nobody ships stays invisible. That is the
-        /// intended asymmetry, not a weaker test.</para>
+        /// <para>The check is hard for <c>Defaults</c> and soft for <c>CompatDefaults</c>, whose
+        /// names come from other mods and are absent on any list without them, the four-mod list
+        /// included. For those it checks only the merge: whatever resolves must reach
+        /// <c>ForRole</c>. A compat row that fails to fold in is caught on a list that has the mod,
+        /// and a row naming a def nobody ships stays invisible, by design.</para>
         /// </summary>
         internal static bool RoomRoleTableResolves()
         {
@@ -149,44 +124,26 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A building that is impassable AND full-fillage has no region, so its
-        /// own cells belong to no room at all
-        /// (<c>RegionTypeUtility.GetExpectedRegionType</c> returns
-        /// <c>RegionType.None</c>). Every arm reads the job's room from the
-        /// target cell, so before <see cref="Patch_JobInterception.RoomBearing"/>
-        /// such a work target was invisible and pawns never changed at it.
+        /// A work target whose own cell has no room still resolves one.
         ///
-        /// <para>Uses a plain WALL as the stand-in, because it is Core, it is
-        /// exactly that combination, and one dropped inside a room does not
-        /// split it. The multi-cell part of the real case needs no separate
-        /// test: <c>GenAdj.CellsAdjacent8Way(thing)</c> sizes its ring from
-        /// <c>def.size</c>, which is engine code.</para>
+        /// <para>A building that is impassable and full-fillage has no region, so its cells belong
+        /// to no room (<c>RegionTypeUtility.GetExpectedRegionType</c> returns
+        /// <c>RegionType.None</c>), and every arm reads a job's room from its target cell.
+        /// <see cref="Patch_JobInterception.RoomBearing"/> finds one for such a target. A plain
+        /// wall stands in, since it is that combination and one dropped inside a room does not
+        /// split it. A multi-cell target needs no case of its own:
+        /// <c>GenAdj.CellsAdjacent8Way(thing)</c> sizes its ring from <c>def.size</c>.</para>
         ///
-        /// <para>The precondition is asserted rather than assumed. If a wall's
-        /// cell ever DID have a room, this case would otherwise pass without
-        /// exercising anything.</para>
+        /// <para>The precondition, that the wall's own cell has no room, is asserted: if it ever
+        /// did, the case would pass without exercising anything.</para>
         /// </summary>
         internal static bool SolidTargetResolvesARoom(Map map, CellRect pad)
         {
             IntVec3 cell = pad.CenterCell;
-            // A ROOM OBJECT DOES NOT SURVIVE THE SPAWN BELOW, so nothing may be
-            // compared across it by reference. Measured on a red run
-            // (2026-09-21): before room 64 with 16767 cells, after room 65 with
-            // 16766 — the same space minus the one cell the wall now fills,
-            // rebuilt into a new object, with regions NOT dirty on entry. The
-            // engine reuses the object often enough that comparing references
-            // passes most runs, which is what made this intermittent rather
-            // than simply wrong.
-            //
-            // A first attempt settled the map here, on the theory that an
-            // earlier case's teardown had left a stale room behind. The
-            // diagnostic disproved it — the rebuild is caused by this case's
-            // own spawn — so that call is gone rather than left in place as a
-            // second explanation for a symptom with one cause.
-            //
-            // The probe is the fix: a neighbouring cell that shares `before`,
-            // re-read AFTER the spawn, so both sides of the comparison come
-            // from the same generation.
+            // The wall's spawn rebuilds the room into a new Room object (the engine reuses the old
+            // one often enough that a reference comparison passes on most runs, which makes a
+            // failure intermittent), so nothing may be compared across the spawn by reference.
+            // `probe` is a neighbouring cell that shares `before`, read again after the spawn.
             bool dirtyOnEntry = map.regionAndRoomUpdater.AnythingToRebuild;
             Room before = cell.GetRoom(map);
             IntVec3 probe = IntVec3.Invalid;
@@ -220,21 +177,16 @@ namespace ShiftChange
                 Room after = bearing.GetRoom(map);
                 ok &= Expect(after != null, "RoomBearing returns a cell that has a room");
 
-                // Read the expected room NOW, from a cell that shared the
-                // target's room before the wall went in. Both sides of the
-                // comparison then belong to the generation the spawn produced.
+                // Read from the probe after the spawn, so both sides come from the same generation.
                 ok &= Expect(before == null || probe.IsValid,
                              "a neighbouring cell shares the target's room (control)");
                 Room expected = probe.IsValid ? probe.GetRoom(map) : null;
                 bool sameRoom = before == null || expected == null || after == expected;
                 if (!sameRoom)
                 {
-                    // Say WHICH two rooms disagreed. A bare "it is not the same
-                    // room" cannot tell a genuinely split room from a rebuilt
-                    // object carrying the same cells, and telling those apart
-                    // is the whole diagnosis. `before` is printed too, but it
-                    // is read after the spawn and so reports whatever its
-                    // abandoned object last cached.
+                    // Name both rooms: a bare mismatch cannot tell a genuinely split room from a
+                    // rebuilt object carrying the same cells. `before` is read after the spawn, so
+                    // it reports whatever its abandoned object last cached.
                     Report.Append("      expected room ")
                           .Append(expected == null ? -1 : expected.ID)
                           .Append(" (").Append(expected == null ? -1 : expected.CellCount)
@@ -267,44 +219,28 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// <summary>
-        /// A work target sunk into an EXTERIOR wall must resolve to the room it
-        /// encloses, whichever side of that room it sits in.
+        /// A work target sunk into an exterior wall resolves to the room it encloses, whichever
+        /// side of that room it sits in.
         ///
-        /// <para>The ring around such a target splits evenly: three cells in
-        /// the room, three outdoors, and the two flanking cells are wall and
-        /// carry no room at all. Nothing wins on count, so the answer is
-        /// whatever breaks the tie. <c>GenAdj.CellsAdjacent8Way</c> enumerates
-        /// the SOUTH row first (<c>GenAdj.cs:190</c>) and <c>RoomBearing</c>
-        /// promotes only on a strict <c>&gt;</c>, so a tie goes to whichever
-        /// room the walk reached first, which is always the southern one.</para>
+        /// <para>The ring around such a target splits evenly: three cells in the room, three
+        /// outdoors, and the two flanking cells are wall and carry no room. Nothing wins on count,
+        /// so the tie-break in <see cref="Patch_JobInterception.RoomBearing"/> decides, and it must
+        /// pick the enclosed room over the outdoor one. A tie broken by whichever room the ring
+        /// walk reaches first would answer differently in the north and south walls of one room,
+        /// because <c>GenAdj.CellsAdjacent8Way</c> enumerates the south row first; hence both
+        /// walls.</para>
         ///
-        /// <para>The same building in the north wall and in the south wall of
-        /// one room therefore resolves two different ways: the room in the
-        /// first case, the map-wide outdoor room in the second. That is the
-        /// shipped v1.4.0 defect. A plutonium processor is 4x4 rather than
-        /// 1x1, but the tie is identical and a vanilla wall reproduces it
-        /// without Rimatomics loaded, so this runs on the minimal list.</para>
-        ///
-        /// <para>The even split is ASSERTED, not assumed. If the ring ever
-        /// stopped tying, the case would pass while exercising nothing.</para>
-        ///
-        /// <para><b>And it is now ARRANGED as well as asserted (2026-09-18).</b>
-        /// The ring of the north wall reaches one cell OUTSIDE the pad, which
-        /// <c>ClearArea</c> was not touching. A generated map put natural rock
-        /// there, <c>GetRoom</c> came back null for it, the counter skipped it,
-        /// and the split read 3 in / 2 out — no tie, so the precondition failed
-        /// and the bearing assertion behind it failed honestly, having been
-        /// handed geometry it was never written for. Clearing a one-cell margin
-        /// costs 24 more cells on a throwaway map and makes the fixture say
-        /// what it means. The assertion stays: arranging a precondition is not
-        /// a reason to stop checking it.</para>
+        /// <para>A vanilla wall stands in, so this runs on the minimal list: a 1x1 target in a
+        /// one-cell wall is the shape whose ring ties. Rimatomics' 4x4 plutonium processor set into
+        /// such a wall never splits its ring evenly, so the count decides it, not the tie-break.
+        /// The even split is asserted, not assumed: if the ring ever stopped tying, the case would
+        /// pass while exercising nothing.</para>
         /// </summary>
         internal static bool ExteriorWallTargetResolvesTheRoom(Map map, CellRect pad)
         {
-            // The margin is part of the fixture: the wall's ring reaches into
-            // it. Clipped, because a pad against the map edge would otherwise
-            // expand out of bounds.
+            // Clear a one-cell margin too: the edge walls' rings reach outside the pad, and a
+            // generated map's natural rock there has no room, which turns the 3-3 split into 3-2.
+            // Clipped, so a pad against the map edge does not expand out of bounds.
             CellRect surround = pad.ExpandedBy(1).ClipInsideMap(map);
             try
             {
@@ -335,11 +271,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// One edge of <see cref="ExteriorWallTargetResolvesTheRoom"/>: counts
-        /// how the wall's ring divides between the enclosed room and everything
-        /// else, requires that division to be even (otherwise there is no tie
-        /// to break and the case proves nothing), then asserts the bearing
-        /// lands in the room rather than outdoors.
+        /// One edge of <see cref="ExteriorWallTargetResolvesTheRoom"/>: the wall's ring must split
+        /// evenly between the enclosed room and everything else (otherwise there is no tie to break
+        /// and the case proves nothing), and the bearing must land in the room, not outdoors.
         /// </summary>
         internal static bool EdgeWallBears(Map map, IntVec3 cell, Room inside, string edge)
         {
@@ -384,9 +318,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Whether the mod those compat tables are written against is loaded.
-        /// Asked by resolving a type we already depend on rather than by name,
-        /// so the answer is the same question the tables themselves ask.
+        /// Whether Rimatomics is loaded, asked the way the marker table asks: by resolving one of
+        /// its types by name.
         /// </summary>
         internal static bool RimatomicsLoaded
         {
@@ -394,22 +327,20 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The official givers <see cref="JobRoomTargets.IgnoredGivers"/>
-        /// carries ON PURPOSE, and the only ones it may: vanilla's seven
-        /// feeding givers, whose jobs put the meal in targetA
-        /// (<see cref="HarnessRideAlong.FeedingRidesAlong"/> has the reason).
-        /// Any other official giver on the list fails the guard below, and so
-        /// does an official giver of a feeding class missing from it.
+        /// The official givers <see cref="JobRoomTargets.IgnoredGivers"/> carries on purpose, and
+        /// the only ones it may: vanilla's seven feeding givers, whose jobs put the meal in targetA
+        /// (<see cref="HarnessRideAlong.FeedingRidesAlong"/> has the reason). Any other official
+        /// giver on the list fails the guard below, as does an official feeding giver missing from
+        /// it.
         /// </summary>
         internal static readonly HashSet<string> DeliberatelyIgnoredOfficialGivers =
             new HashSet<string>(HarnessRideAlong.FeedPatientGivers.Concat(HarnessRideAlong.DeliverFoodGivers));
 
         /// <summary>
-        /// The classes vanilla feeds a patient or a prisoner with. Every
-        /// official giver built on one is a meal run and must be on
-        /// <see cref="JobRoomTargets.IgnoredGivers"/>: a giver def can take its
-        /// class from a parent, as Core's Handling one does from the Doctor
-        /// one, and a list of names alone missed it.
+        /// The classes vanilla feeds a patient or a prisoner with. Every official giver built on
+        /// one is a meal run and must be on <see cref="JobRoomTargets.IgnoredGivers"/>. The guard
+        /// goes by class because a giver def can inherit its class from a parent def, as Core's
+        /// Handling giver does from the Doctor one, and a list of names alone would miss it.
         /// </summary>
         internal static readonly System.Type[] FeedingGiverClasses =
         {
@@ -418,11 +349,10 @@ namespace ShiftChange
         };
 
         /// <summary>
-        /// The official givers <see cref="JobRoomTargets.DeliveryGivers"/>
-        /// takes by class: Core's four construction deliveries and its
-        /// replanting giver, which derives from the same class. An official
-        /// giver joining the class later fails the guard below, since the
-        /// class takes it without a row anyone reviewed.
+        /// The official givers <see cref="JobRoomTargets.DeliveryGivers"/> takes by class: Core's
+        /// four construction deliveries and its replanting giver, which derives from the same
+        /// class. An official giver joining the class later fails the guard below, since the class
+        /// would take it without a row anyone reviewed.
         /// </summary>
         internal static readonly HashSet<string> OfficialDeliveryGivers =
             new HashSet<string>
@@ -435,9 +365,9 @@ namespace ShiftChange
             };
 
         /// <summary>
-        /// The job def a delivery giver builds its delivery with:
-        /// <c>Replant</c> for the replanting giver, <c>PlantSeed</c> for the
-        /// seed planter, <c>HaulToContainer</c> for the rest
+        /// The job def a delivery giver builds its delivery with: <c>Replant</c> for the replanting
+        /// giver (<c>WorkGiver_Replant.JobOnThing</c>), <c>PlantSeed</c> for the seed planter, and
+        /// <c>HaulToContainer</c> for the rest
         /// (<c>WorkGiver_ConstructDeliverResources.ResourceDeliverJobFor</c>).
         /// </summary>
         internal static JobDef DeliveryDefFor(WorkGiverDef giver)
@@ -452,11 +382,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The official jobs <see cref="JobRoomTargets.RideAlongJobs"/> carries
-        /// on purpose, and the only ones it may: vanilla's target-less unload,
-        /// the job tracker's pause between jobs, the carry Biotech's feeding
-        /// and playing end with, and its rescue of a baby left somewhere
-        /// unsafe.
+        /// The official jobs <see cref="JobRoomTargets.RideAlongJobs"/> carries on purpose, and the
+        /// only ones it may: vanilla's target-less unload, the job tracker's pause between jobs,
+        /// the carry Biotech's feeding and playing end with, and its rescue of a baby left
+        /// somewhere unsafe.
         /// </summary>
         internal static readonly HashSet<string> DeliberatelyRiddenOfficialJobs =
             new HashSet<string>
@@ -465,19 +394,17 @@ namespace ShiftChange
             };
 
         /// <summary>
-        /// <see cref="JobRoomTargets"/> holds three lists, mostly of another
-        /// mod's defNames. Those rows are ALLOWED to miss — that is what a
-        /// compat table is — so the standing assertions are structural, and the
-        /// resolution assertions only fire when the mod is actually loaded.
+        /// <see cref="JobRoomTargets"/>' job-target, ignored-giver and ride-along lists are mostly
+        /// another mod's defNames, and those rows are allowed to miss. So the standing assertions
+        /// are structural, and the resolution assertions fire only when the mod is loaded; without
+        /// Rimatomics the resolution half is reported as a known gap.
         ///
-        /// <para>The load-bearing one is the official-def guard. Retargeting a
-        /// vanilla job to its targetB, or making the mod ignore a vanilla work
-        /// giver, would change core behaviour for everyone and there is no
-        /// symptom that points at a table. Since the feeding fix some official
-        /// rows are deliberate, so the guard names them: an official def on a
-        /// list passes only if it is one of those, and each of those must still
-        /// resolve, since a renamed vanilla def would drop its row with no
-        /// error anywhere.</para>
+        /// <para>The load-bearing assertion is the official-def guard. Retargeting a vanilla job to
+        /// its targetB, or making the mod ignore a vanilla work giver, would change core behaviour
+        /// for everyone with no symptom that points at a table. Some official rows are deliberate,
+        /// so the guard names them: an official def on a list passes only if it is one of those,
+        /// and each of those must still resolve, since a renamed vanilla def would drop its row
+        /// with no error anywhere.</para>
         /// </summary>
         internal static bool JobTablesHold()
         {
@@ -492,7 +419,8 @@ namespace ShiftChange
                          && !JobRoomTargets.RidesAlong(null),
                          "a null def matches nothing");
 
-            // The giver test that separates a fresh haul from a continuation.
+            // The giver separates a fresh haul from a follow-up: a listed job rides along only
+            // without one.
             Job unload = JobMaker.MakeJob(JobDefOf.UnloadYourInventory);
             ok &= Expect(JobRoomTargets.RidesAlong(unload), "a listed job with no giver rides along");
             unload.workGiverDef = DefDatabase<WorkGiverDef>.GetNamedSilentFail("HaulGeneral");
@@ -500,9 +428,9 @@ namespace ShiftChange
                          "and the same job carrying a giver does not");
             ok &= Expect(JobRoomTargets.RidesAlong(JobMaker.MakeJob(JobDefOf.Wait_MaintainPosture, 1)),
                          "the job tracker's one-tick pause between jobs rides along, as it builds it");
-            // Both as the game builds them, with no giver: the carry a feeding
-            // or a play session ends with (ChildcareUtility), and the rescue
-            // the childcare giver's NonScanJob and the think tree hand out.
+            // Both built as the game builds them, with no giver: the carry a feeding or a play
+            // session ends with (ChildcareUtility), and the rescue the childcare giver's NonScanJob
+            // and the think tree hand out.
             if (JobDefOf.BringBabyToSafety != null)
             {
                 ok &= Expect(JobRoomTargets.RidesAlong(JobMaker.MakeJob(JobDefOf.BringBabyToSafety)),
@@ -561,10 +489,9 @@ namespace ShiftChange
             ok &= Expect(DefDatabase<JobDef>.GetNamedSilentFail("UnloadYourInventory") != null,
                          "vanilla's UnloadYourInventory resolves");
 
-            // The delivery givers go by class, so they are held to their named
-            // official givers the same way. A delivery is the giver's
-            // delivery job alone: the site jobs the same giver hands out are
-            // ordinary work.
+            // The delivery givers go by class, so they are held to their named official givers the
+            // same way. Only the giver's delivery job is a delivery; the site jobs it also hands
+            // out are ordinary work.
             foreach (WorkGiverDef giver in JobRoomTargets.DeliveryGivers)
             {
                 if (giver.modContentPack != null && giver.modContentPack.IsOfficialMod
@@ -627,14 +554,13 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// <see cref="RoomContentsWork"/>'s markers, same contract: structure
-        /// always, resolution only when the mod is there.
+        /// <see cref="RoomContentsWork"/>'s markers, as in <see cref="JobTablesHold"/>: structure
+        /// always, resolution only when the mod is there, and a known gap without Rimatomics.
         ///
-        /// <para>The assertion worth having is the HALF-RESOLVED one. A marker
-        /// whose type is present but whose work types are not is the exact
-        /// shape of a typo in a work-type name, and it fails silently — the
-        /// marker drops out of <c>Active</c> and every room it should have
-        /// armed simply does nothing, with no log line.</para>
+        /// <para>The assertion worth having is the half-resolved one. A marker whose type is
+        /// present but whose work types are not is the shape of a typo in a work-type name, and it
+        /// fails silently: the marker drops out of <c>Active</c> and every room it should have
+        /// armed does nothing, with no log line.</para>
         /// </summary>
         internal static bool ContentsMarkersHold()
         {
@@ -649,8 +575,8 @@ namespace ShiftChange
                              marker.typeName + " names a type and at least one work type");
             }
 
-            // HasComp, against the def database rather than a named def, so the
-            // check does not go stale when a def is renamed out from under it.
+            // HasComp, against the def database rather than a named def, so the check does not go
+            // stale when a def is renamed out from under it.
             ThingDef withComps = DefDatabase<ThingDef>.AllDefsListForReading
                 .FirstOrDefault(d => d.comps != null && d.comps.Any(c => c != null && c.compClass != null));
             ThingDef without = DefDatabase<ThingDef>.AllDefsListForReading

@@ -1,7 +1,6 @@
-// HARNESS only — see the configuration table in ShiftChange.csproj. This file
-// IS the -shiftchange-harness launch flag, and it does not ship: a Release
-// build compiles it out, so the flag does not exist in a player's install at
-// all. devtools/run-harness.sh builds with -p:Harness=true to get it back.
+// HARNESS only: this file is the -shiftchange-harness launch flag, and a plain Release build
+// compiles it out, so the flag does not exist in a player's install. The guard is whole-file,
+// always (docs/DESIGN.md, "Development tooling"); run-harness.sh builds with -p:Harness=true.
 #if HARNESS
 using System;
 using HarmonyLib;
@@ -11,34 +10,13 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// Runs the lifecycle harness without a human, when the game is launched
-    /// with <c>-shiftchange-harness</c>, then quits.
-    ///
-    /// <code>
-    /// devtools/rimworld-profile.sh minimal
-    /// open ".../RimWorldMac.app" --args -quicktest -shiftchange-harness
-    /// #   ... wait for the process to exit, then read Player.log ...
-    /// devtools/rimworld-profile.sh restore
-    /// </code>
-    ///
-    /// <para><b>Why the flag exists.</b> Driving the harness by hand costs a
-    /// menu hunt and a map click, and the menu's layout moves with the mod
-    /// list, so the coordinates that work on one profile are wrong on the
-    /// other. That is a small cost per run and a large one over a release, and
-    /// it is exactly the sort of friction that stops a test being run at all.
-    /// With this the whole loop is one command and a log read.</para>
-    ///
-    /// <para><b>What it costs a player: nothing, because it is not there.</b>
-    /// Release compiles this file out, so a shipped assembly carries no
-    /// postfix on <c>FinalizeInit</c> and no flag to pass. It is a Harmony
-    /// postfix rather than a <c>GameComponent</c> for a second reason that
-    /// still governs the harness build: components are scribed into every save
-    /// (<c>Game.ExposeData</c>, <c>LookMode.Deep</c>), and a dev-only feature
-    /// has no business appearing in a save file at all.</para>
-    ///
-    /// <para><b>It quits when it is done</b>, pass or fail. The point is a
-    /// loop that terminates on its own so a caller can wait on the process and
-    /// then read the log, rather than polling a screen.</para>
+    /// Runs the lifecycle harness without a human when the game is launched with
+    /// <c>-shiftchange-harness</c>, then quits, pass or fail, so a caller can wait on the process
+    /// and read the log. run-harness.sh adds <c>-quicktest</c> for a throwaway map; nothing here
+    /// checks for it, so the flag fires on any game that finishes initializing, a loaded save
+    /// included, clears a pad there and loads its round-trip saves over it. It is a Harmony
+    /// postfix rather than a <c>GameComponent</c>, because components are scribed into every
+    /// save and a dev-only feature has no business appearing in one.
     /// </summary>
     [HarmonyPatch(typeof(Game), nameof(Game.FinalizeInit))]
     public static class Patch_HarnessAutoRun
@@ -46,15 +24,11 @@ namespace ShiftChange
         internal const string Arg = "shiftchange-harness";
 
         /// <summary>
-        /// One run per process.
-        ///
-        /// <c>FinalizeInit</c> is not once-per-launch: the save/load round-trip
-        /// cases load a game in-process through
-        /// <c>SavedGameLoaderNow.LoadGameFromSaveFileNow</c>, and
-        /// <c>Game.LoadGame</c> calls <c>FinalizeInit</c> at the end of it
-        /// (<c>Game.cs:636</c>). Without this latch the harness starts a nested
-        /// run from inside its own round-trip case, and the process quits on
-        /// whichever finishes first.
+        /// One run per process. <c>FinalizeInit</c> is not once per launch: the save/load
+        /// round-trip cases load a game in-process through
+        /// <c>SavedGameLoaderNow.LoadGameFromSaveFileNow</c>, and <c>Game.LoadGame</c> calls
+        /// <c>FinalizeInit</c> at its end. Without this latch the harness starts a nested run
+        /// inside its own round-trip case, and the process quits on whichever finishes first.
         /// </summary>
         internal static bool started;
 
@@ -65,10 +39,8 @@ namespace ShiftChange
                 return;
             }
             started = true;
-            // FinalizeInit runs inside map generation's long event. Deferring
-            // means the harness spawns into a map that has finished setting
-            // itself up, which is the state a human clicking the debug action
-            // would find.
+            // FinalizeInit runs inside the long event that generates the map; deferring spawns the
+            // harness into a finished map, as a human clicking the debug action would find it.
             LongEventHandler.ExecuteWhenFinished(RunAndQuit);
         }
 
@@ -96,36 +68,30 @@ namespace ShiftChange
             }
             catch (Exception e)
             {
-                // Never let a throw here leave the process alive: an automated
-                // caller waiting on exit would hang forever on a game sitting
-                // at a map nobody is looking at.
+                // A throw must not leave the process alive: a caller waiting on exit would hang
+                // forever on a game sitting at a map nobody watches.
                 Log.Error("[ShiftChange] -" + Arg + " threw: " + e);
             }
 
-            // One line, one shape, greppable. The caller reads this rather
-            // than parsing the per-assertion report above it.
+            // One greppable verdict line; run-harness.sh matches it exactly rather than parsing the
+            // report above, so change the two together.
             Log.Message("[ShiftChange] harness auto-run: " + (passed ? "PASSED" : "FAILED"));
             Root.Shutdown();
         }
 
         /// <summary>
-        /// Somewhere the fixture can stand. Prefers the map centre so runs are
-        /// comparable, and only wanders if the centre is unusable — the pad is
-        /// cleared before use, so the bar is "in bounds and not water", not
-        /// "empty".
+        /// Somewhere the fixture can stand: the map centre if usable, so runs are comparable. The
+        /// pad is cleared before use, so the bar is a pad in bounds whose origin is standable and
+        /// not water, not an empty one.
         ///
-        /// <para><b>The one-cell MARGIN has to have rooms in it too</b>
-        /// (2026-09-18). Cases reach past the pad they were given: the
-        /// exterior-wall case counts the ring around a wall built on the pad's
-        /// edge, and that ring includes cells the clear never touched. Natural
-        /// rock there carries no room, <c>GetRoom</c> returns null, and the
-        /// case's geometry silently stops being the geometry it was written
-        /// for. Rejecting such an origin costs nothing on an ordinary map —
-        /// outdoor cells all belong to one enormous room — and it keeps runs
-        /// comparable, which is what the map-centre preference was already
-        /// reaching for. The case clears its own margin as well; this is the
-        /// half that also covers a pad chosen by hand from the debug menu
-        /// landing somewhere silly.</para>
+        /// <para>The one-cell margin must have rooms too, because cases reach past their pad (the
+        /// exterior-wall case counts the ring around a wall on the pad's edge). Natural rock there
+        /// carries no room, <c>GetRoom</c> returns null, and the case silently stops running the
+        /// geometry it was written for. Open ground is one enormous room, so on an ordinary map
+        /// this rejects only origins near rock or walls. On a map whose load aborted before its
+        /// region grid was built it rejects every origin, which
+        /// <see cref="DebugTools_SaveRoundTrip.CannotStage"/> relies on. A pad picked by hand from
+        /// the debug menu bypasses this finder.</para>
         /// </summary>
         internal static bool TryFindPad(Map map, out IntVec3 origin)
         {

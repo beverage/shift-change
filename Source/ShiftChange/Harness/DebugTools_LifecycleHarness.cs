@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System;
 using System.Collections.Generic;
@@ -13,12 +11,8 @@ using RimWorld;
 using UnityEngine;
 using Verse;
 using Verse.AI;
-// The case bodies live in sibling TYPES under Harness/ (split 2026-09-15).
-// Imported statically so the registration list in Run() below reads as plain
-// method names — that list is the ORDER authority and has to stay legible.
-// Types rather than partials because the harness still shipped then, and a
-// decompiler merges partials back into one class: the shipped dll would have
-// read exactly as it did before.
+// Case bodies live in sibling types under Harness/, imported statically so the registration list in
+// Run reads as plain method names. That list is the order authority.
 using static ShiftChange.HarnessCatchments;
 using static ShiftChange.HarnessFixtures;
 using static ShiftChange.HarnessGates;
@@ -35,78 +29,35 @@ using static ShiftChange.HarnessTriggers;
 namespace ShiftChange
 {
     /// <summary>
-    /// Dev mode → Shift Change → Run lifecycle harness, then click a clear map
-    /// cell. Builds a throwaway stand-and-borrower fixture, fires one real
-    /// engine lifecycle event at it, checks the ledger landed where it should,
-    /// tears the fixture down, and repeats for every event we make a claim
-    /// about. Results go to the dev log; a toast gives the tally.
+    /// The regression suite's runner. Most cases build a throwaway fixture, drive it, check the
+    /// outcome and tear it down; a lifecycle case fires one real engine event at a checked-out
+    /// stand and checks where the ledger lands. Results go to the dev log, and a toast gives the
+    /// tally. <see cref="Run"/> registers the cases, and its list is the order they run in.
     ///
-    /// <para><b>Why this exists.</b> Every lifecycle claim in this mod was
-    /// previously verified by arranging the situation in a live colony. Some of
-    /// those situations cannot reasonably be arranged: a gravship launch needs
-    /// substructure, fuel, thrusters and a pilot console before the game will
-    /// let one leave the ground, and the thing we need to observe takes one
-    /// tick in the middle of it. That cost meant the gravship path shipped
-    /// reasoned-about rather than tested, and it was wrong (the ledger was
-    /// destroyed on a flight the stand was designed to survive).</para>
+    /// <para>Each lifecycle case splits in two. The engine's half is read from the game's code and
+    /// taken as given: a gravship flight, say, despawns what is aboard with <c>WillReplace</c>. The
+    /// harness drives our half: given that call, where the ledger lands.</para>
     ///
-    /// <para><b>What it does and does not prove.</b> Each case splits in two.
-    /// The ENGINE half — "a gravship despawns aboard-things with
-    /// <c>WillReplace</c>" — is a static fact about the engine, settled by
-    /// reading <c>GravshipUtility.cs:389</c>, and no amount of play makes it
-    /// truer. The OUR half — "given that call, our ledger survives" — is what
-    /// this harness drives. It is the half that has actually been wrong.</para>
-    ///
-    /// <para><b>The one rule that keeps it honest: call the engine's own entry
-    /// points</b>, never our handlers directly, so the engine's comp dispatch,
-    /// its ordering and its own side effects run for real and only the
-    /// ORCHESTRATION around them is simulated. docs/TESTING.md, "Rules the
+    /// <para>Fire lifecycle events through the engine's own entry points, never our comp
+    /// handlers directly, so the engine's comp dispatch, its ordering and its side effects run
+    /// for real and only the orchestration around them is simulated. docs/TESTING.md, "Rules the
     /// suite follows".</para>
     ///
-    /// <para><b>Two kinds of fixture.</b> The lifecycle cases hand-assemble a
-    /// checked-out state (<see cref="Build"/> moves apparel and calls
-    /// <c>NotifyDressed</c>) because what they test is what happens to a
-    /// ledger AFTERWARDS. The driver cases stage an undressed pawn
-    /// (<see cref="Stage"/>) and run <see cref="JobDriver_SwapAtStand"/> for
-    /// real through the pawn's own tracker (<see cref="RunSwap"/>), because
-    /// what they test is whether the driver builds that ledger correctly in
-    /// the first place — which nothing covered until 2026-08-14, and which is
-    /// where B1 lived.</para>
+    /// <para>Two kinds of fixture. Lifecycle cases hand-assemble a checked-out state
+    /// (<see cref="Build"/>) to test what happens to a ledger afterwards. Driver cases stage an
+    /// undressed pawn (<see cref="Stage"/>) and run <see cref="JobDriver_SwapAtStand"/> for real
+    /// through the pawn's own tracker (<see cref="RunSwap"/>), to test whether the driver builds
+    /// that ledger.</para>
     ///
-    /// <para><b>Three engine traps the driver cases had to pay for</b>,
-    /// recorded at their call sites: pathfinding is asynchronous (hence
-    /// staging on the interaction cell), Jobs are pooled (hence watching the
-    /// driver, not the job), and the clock stands still (hence holding the
-    /// pumped pawn's rest full). docs/TESTING.md, "Three engine traps".</para>
-    ///
-    /// <para>Save/load round trips run in-process through the engine's
-    /// synchronous loader, as the last map cases, since they replace the whole
-    /// game — see <see cref="DebugTools_SaveRoundTrip"/>. Still out of reach: a
-    /// real gravship launch.</para>
-    ///
-    /// <para><b>What ships: none of this (2026-09-17).</b> The whole harness
-    /// is behind <c>#if HARNESS</c>, which a plain Release build does not
-    /// define, so neither this body nor <c>-shiftchange-harness</c> exists in
-    /// a player's install. <c>run-harness.sh</c> asks for them with
-    /// <c>-p:Harness=true</c> on top of Release codegen, and sweeps
-    /// <c>Assemblies/</c> back to the shipping dll when it is done. The
-    /// <c>[DebugAction]</c> wrapper remains SCENES only on top of that. The
-    /// two earlier rationales this replaced, and why: docs/DESIGN.md,
-    /// "Development tooling".</para>
-    ///
-    /// <para><b>First run, 2026-08-14</b>, clean Release restart on the ~100-mod
-    /// profile, quicktest map: 4 passed, 0 failed, 1 known gap. The gravship
-    /// case passed on all four assertions, which is what the
-    /// <c>WillReplace</c> guard in <see cref="CompShiftStand.PostDeSpawn"/> was
-    /// written for and had until then only been reasoned about. Later the same
-    /// day, with the banishment gap closed and the driver, functional and
-    /// meta cases added: <b>13 passed, 0 failed, 0 known gaps</b>. Every bug
-    /// fixed that day now has a guard, and six of the rules the store
-    /// description promises players are asserted against the code.</para>
+    /// <para>Four engine traps shape the fixtures (docs/TESTING.md, "Four engine traps").
+    /// Pathfinding is asynchronous, so a pawn is staged on the stand's interaction cell. Jobs are
+    /// pooled, so the pump watches the driver, not the job. The clock stands still, so the fixture
+    /// hands out only colonists whose needs do not tick while it is stopped. A generated colonist
+    /// is not tended, so the fixture removes what it arrives needing tended.</para>
     /// </summary>
     internal static class DebugTools_LifecycleHarness
     {
-        /// <summary>Cleared and rebuilt per case, so no case inherits another's mess.</summary>
+        /// <summary>Side of the pad every case is handed, cleared and rebuilt per case.</summary>
         internal const int PadSize = 7;
 
         internal static readonly StringBuilder Report = new StringBuilder();
@@ -116,19 +67,12 @@ namespace ShiftChange
 
 #if SCENES
         /// <summary>
-        /// The hand-driven entry point, SCENES only — so it is absent from a
-        /// shipped build's debug menu. Reached from the "Dev tools..." submenu
-        /// (<see cref="DebugTools_Menu"/>), which carries the game-state and
-        /// Odyssey gating.
-        ///
-        /// <see cref="Run"/> below is the shared body, reached from here on a
-        /// dev build and from <c>-shiftchange-harness</c> under
-        /// <c>run-harness.sh</c>. Neither door exists in a shipping build.
-        ///
-        /// The menu entry is what cannot ship: this is a <c>ToolMap</c> action
-        /// with no confirmation, and on a live colony it clears its 7×7 pad 22
-        /// times over — destroying buildings and stock outright and vanishing
-        /// any pawn standing there, gear and all, with no corpse and no letter.
+        /// The hand-driven entry point, SCENES only: a <c>ToolMap</c> action with no confirmation.
+        /// Cases clear their pad with <c>GenDebug.ClearArea</c>, and some clear past it: a one-cell
+        /// margin, the strip west of the pad and single cells further out, the last two reset to
+        /// soil. ClearArea destroys buildings and items and vanishes any pawn there, gear and all,
+        /// with no corpse and no letter. Reached from the Dev tools submenu
+        /// (<see cref="DebugTools_Menu"/>); <see cref="Run"/> is the shared body.
         /// </summary>
         internal static void RunHarness()
         {
@@ -137,16 +81,14 @@ namespace ShiftChange
 #endif
 
         /// <summary>
-        /// The whole harness, for both entry points — the debug action above
-        /// and the <c>-shiftchange-harness</c> auto-run in
-        /// <see cref="Patch_HarnessAutoRun"/>. One body, because a headless run
-        /// that exercised a different path from the one a human clicks would be
-        /// worth very little.
+        /// Runs every case and reports. The one body behind the debug action and the
+        /// <c>-shiftchange-harness</c> auto-run (<see cref="Patch_HarnessAutoRun"/>), so a headless
+        /// run exercises the path a human click does.
         /// </summary>
         /// <param name="toast">
-        /// Player-facing messages for the interactive run; log lines for the
-        /// headless one, where nobody is watching the screen and a toast on a
-        /// map about to be torn down goes nowhere.
+        /// True for the interactive run: a refusal goes on screen rather than to the log, and the
+        /// tally to both. False for the headless one, where nobody watches the screen: the log
+        /// alone.
         /// </param>
         /// <returns>true when nothing failed. Known gaps do not count as failures.</returns>
         internal static bool Run(Map map, IntVec3 origin, bool toast)
@@ -181,17 +123,19 @@ namespace ShiftChange
             Case(map, pad, "gravship flight keeps the ledger, and the shift ends normally after landing",
                  GravshipFlight);
             Case(map, pad, "gravship flight without the borrower releases it", GravshipFlightLeftBehind);
-            // Flights that leave the borrower and the stand on two maps. The
-            // second map is a pocket map (HarnessFixtures.SecondMap).
+            // Flights that leave the borrower and the stand on two maps, the second a pocket map
+            // (HarnessFixtures.SecondMap).
             Case(map, pad, "a stand that flies without its borrower keeps the shift, and ends it normally when they meet again",
                  StandFliesWithoutItsBorrower);
             Case(map, pad, "a borrower who flies without their stand keeps the shift, and ends it normally on coming back",
                  BorrowerFliesWithoutTheirStand);
+            // The next two build on the second map, so the fixture's Map is the pocket one and the
+            // body is handed the harness's map and pad.
             Case(map, pad, "a stand lost with the map it was left on stops pinning its borrower's uniform",
                  BuildOnSecondMap, fix => StandLostWithItsMap(fix, map, pad));
             Case(map, pad, "a boxed stand lost with its map releases its ledger too",
                  BuildOnSecondMap, fix => BoxedStandLostWithItsMap(fix, map, pad));
-            // The vacuum gate's ground: the second map is a vacuum map.
+            // The vacuum gate's ground: the second map is a vacuum map; the first case checks it.
             Case("a room on the second map, a vacuum map, holds air while the open floor past its door does not",
                  () => HarnessVacuum.VacuumMapStages(map));
             Case(map, pad, "a bill fetching through vacuum keeps a crafter in their vacsuit, where one inside dresses them",
@@ -471,25 +415,24 @@ namespace ShiftChange
             Case(map, pad, "fishing dresses at a stand ticked for it, and at a radius stand by the shore",
                  (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Fishing")),
                  FishingDressesAtAStandTickedForIt);
-            // The pair, and it only means anything as a pair: the refusal that
-            // stops a checked-out pawn re-arming from the spare pile, and the
-            // release that lets them shop once their parked kit is worn out.
+            // A pair that only means anything together: the refusal that stops a checked-out pawn
+            // re-arming from the spare pile, and the release that lets them shop once their parked
+            // kit is worn out.
             Case(map, pad, "a checked-out pawn refuses a spare that duplicates their parked kit",
                  ParkedKitRefusesSpares);
             Case(map, pad, "but takes one once the parked kit is worn through",
                  WornOutParkedKitStillGoesShopping);
-            // Needs a live map and touches no fixture, so it sits at the end of
-            // the map cases and before the game-replacing ones below.
+            // These two need a live map and no fixture, so they sit after the fixture cases and
+            // before the game-replacing ones below.
             Case("a work target with no room of its own still resolves one",
                  () => SolidTargetResolvesARoom(map, pad));
             Case("a work target in an exterior wall resolves the room from either side",
                  () => ExteriorWallTargetResolvesTheRoom(map, pad));
 
-            // Last among the map cases: these replace Current.Game, so `map`,
-            // `pad` and every fixture above them belong to a disposed game once
-            // they have run. They register through the fixture-less overload
-            // for the same reason — Teardown would clear a pad on the disposed
-            // map. See DebugTools_SaveRoundTrip.
+            // Last among the map cases: these replace Current.Game, so `map`, `pad` and every
+            // fixture above belong to a disposed game once they have run. They register through the
+            // fixture-less overload for the same reason, since Teardown would clear a pad on the
+            // disposed map. See DebugTools_SaveRoundTrip.
             Case("a save/load round trip keeps the owner and the ledger, and sweeps the removal flag",
                  () => DebugTools_SaveRoundTrip.RoundTrip(map, pad));
             Case("a legacy-key save gets its owner back and re-saves it prefixed",
@@ -499,8 +442,7 @@ namespace ShiftChange
             Case("an area binding survives a save under a new name, and a deleted area's is dropped",
                  DebugTools_SaveRoundTrip.AreaRoundTrip);
 
-            // The cases below need no map, so they are unaffected by the game
-            // replacement above.
+            // These need no map, so the game replacement above does not touch them.
             Case("the recreation job classifier holds", RecreationClassifierHolds);
             Case("the sleep job classifier holds", RestClassifierHolds);
             Case("the room-role table resolves", RoomRoleTableResolves);
@@ -509,8 +451,8 @@ namespace ShiftChange
             Case("the room-contents markers hold", ContentsMarkersHold);
             Case("the work-type dialog never hands its listing a short rect",
                  WorkTypeDialogBodyRectFitsTheBody);
-            // Last: it drives a deliberately failing assertion, and the tallies
-            // are global.
+            // Last by convention: it restores the tallies, the gap flag and the transcript around
+            // its deliberate failures, so its position does not change the result.
             Case("the harness counts its own results correctly", HarnessAccounting);
 
             Report.Append("result: ").Append(Passed).Append(" passed, ")
@@ -527,9 +469,6 @@ namespace ShiftChange
             return Failed == 0;
         }
 
-        /// <summary>
-        /// A refusal, addressed to whoever is actually there to read it.
-        /// </summary>
         internal static void Complain(string what, bool toast)
         {
             if (toast)
@@ -542,16 +481,9 @@ namespace ShiftChange
             }
         }
 
-        // ------------------------------------------------------------ cases
-
         /// <summary>
-        /// The harness checks itself. Register LAST — it deliberately drives a
-        /// failing assertion, and the tallies are global.
-        ///
-        /// Without this, <c>run-harness.sh</c> greps the log for PASSED and
-        /// exits zero on a harness whose <see cref="Expect"/> has been inverted
-        /// or whose counters have stopped moving — and the cases above are
-        /// trusted on nothing.
+        /// The harness checks itself. Without it <c>run-harness.sh</c> would pass a harness whose
+        /// <see cref="Expect"/> or counters had stopped working.
         /// </summary>
         internal static bool HarnessAccounting()
         {
@@ -569,9 +501,8 @@ namespace ShiftChange
             int failedDelta = Failed - failedBefore;
             int gapsDelta = KnownGaps - gapsBefore;
 
-            // Put the counters and the transcript back before reporting, so the
-            // three deliberate assertions above do not reach the tally or the
-            // log the author reads.
+            // Put the counters and the transcript back first, so the three deliberate assertions
+            // above reach neither the tally nor the log.
             Passed = passedBefore;
             Failed = failedBefore;
             KnownGaps = gapsBefore;
@@ -579,11 +510,8 @@ namespace ShiftChange
             Report.Length = 0;
             Report.Append(saved);
 
-            // Expect REPORTS; Case COUNTS. A case with ten failing assertions
-            // is one failure, not ten — deliberate, so the tally counts
-            // behaviours rather than sentences. Asserted explicitly because
-            // the first version of this self-check assumed the opposite and
-            // was wrong about the harness it was checking.
+            // Expect reports; Case counts. A case with ten failing assertions is one failure, not
+            // ten, so the tally counts behaviours rather than sentences.
             return Expect(truePassed, "Expect(true) returns true")
                  & Expect(!falsePassed, "Expect(false) returns false")
                  & Expect(failedDelta == 0 && passedDelta == 0,
@@ -593,7 +521,10 @@ namespace ShiftChange
                  & Expect(GapThisCase == gapFlagBefore, "the gap flag was restored");
         }
 
-        /// <summary>One case's throwaway world: a stocked stand and a borrower wearing its uniform.</summary>
+        /// <summary>
+        /// One case's throwaway world: a stand, the colonist it is staged for, and what a case adds
+        /// beyond them. <see cref="Teardown"/> sweeps all of it.
+        /// </summary>
         internal class Fixture
         {
             internal Map Map;
@@ -602,97 +533,79 @@ namespace ShiftChange
             internal CompShiftStand Comp;
             internal int StoredCount;
 
-            /// <summary>Extra pawns a case spawned; swept by <see cref="Teardown"/>.</summary>
             internal List<Pawn> Extras = new List<Pawn>();
 
-            /// <summary>
-            /// Allowed areas a case made; deleted by <see cref="Teardown"/>,
-            /// since an area outlives the pad and a map holds ten at most.
-            /// </summary>
+            /// <summary>Allowed areas a case made; a map holds ten at most.</summary>
             internal List<Area> Areas = new List<Area>();
 
             /// <summary>
-            /// The strip of open ground outside the door that
-            /// <see cref="HarnessFixtures.StageWithDoorway"/> cuts into the west
-            /// wall. Empty for every other fixture. <see cref="Teardown"/>
-            /// clears it along with the pad.
+            /// The strip outside the west door that
+            /// <see cref="HarnessFixtures.StageWithDoorway(Map, CellRect)"/> cuts, past the pad;
+            /// empty for every other fixture.
             /// </summary>
             internal CellRect Outside = CellRect.Empty;
 
-            /// <summary>
-            /// Single cells past the pad that a case put things on
-            /// (<see cref="HarnessFixtures.OpenGround"/>); cleared by
-            /// <see cref="Teardown"/>.
-            /// </summary>
+            /// <summary>Cells past the pad that cases put things on (<c>OpenGround</c>).</summary>
             internal List<IntVec3> Claimed = new List<IntVec3>();
 
             /// <summary>
-            /// A second map a case made, so that a flight can leave the
-            /// borrower and their stand apart (<see cref="HarnessFixtures.SecondMap"/>).
-            /// <see cref="Teardown"/> removes it if the case did not.
+            /// A second map (<see cref="HarnessFixtures.SecondMap"/>), so a flight can leave the
+            /// borrower and their stand apart.
             /// </summary>
             internal Map Pocket;
         }
 
         /// <summary>
-        /// What a staged fixture wears and what its stand holds. Named CORE
-        /// defs throughout, never the demo stage's defaults: the harness runs
-        /// on a four-mod profile by default and on the development list under
-        /// <c>--full</c>, and a fixture built from Vanilla Apparel Expanded
-        /// defs would silently become a different test between the two.
+        /// What a staged fixture wears and what its stand holds. Core defs only, never the demo
+        /// stage's: the default list is four mods and <c>--full</c> copies the runner's own, and a
+        /// fixture built from Vanilla Apparel Expanded defs would be a different test on each.
         /// </summary>
         internal enum StageKit
         {
             /// <summary>
-            /// Stand: a duster (Shell). Pawn: shirt and trousers (OnSkin) plus
-            /// a parka (Shell) — so the duster displaces the parka and the
-            /// ledger has something in it.
+            /// Stand: a duster (Shell). Pawn: shirt and trousers (OnSkin) plus a parka (Shell), so
+            /// the duster displaces the parka and the ledger has something in it.
             /// </summary>
             Displacing,
 
             /// <summary>
-            /// The same without the parka, so the duster (Shell) shares no
-            /// layer with shirt and trousers (OnSkin) and displaces NOTHING.
-            /// This is B1's shape, and <see cref="Build"/> structurally cannot
-            /// produce it — it returns null when nothing is displaced.
+            /// The same without the parka, so the duster (Shell) shares no layer with shirt and
+            /// trousers (OnSkin) and displaces nothing. <see cref="Build"/> cannot produce this
+            /// shape: it returns null when nothing is displaced.
             /// </summary>
             NonDisplacing,
         }
 
         /// <summary>
-        /// Fixture builds are retried, because spawning a freshly generated
-        /// pawn is not reliable on a large mod list and the failure is not
-        /// ours. Observed 2026-08-14: `Pawn_HealthTracker.Notify_Spawned`
-        /// threw `Collection was modified` under seven third-party postfixes
-        /// on `Pawn.SpawnSetup` (VEF shields, Athena, LightsOut and others),
-        /// for one pawn roll out of two runs. A gate that fails at random gets
-        /// ignored, so retry — but PRINT every retry, because silently
-        /// swallowing them would hide a genuine intermittent bug of our own.
+        /// Fixture builds are retried because spawning a freshly generated pawn is unreliable on a
+        /// large mod list and the failure is not ours: <c>Pawn.SpawnSetup</c> calls
+        /// <c>Pawn_HealthTracker.Notify_Spawned</c>, which walks the pawn's hediffs, and a hediff
+        /// that adds or removes another there throws <c>Collection was modified</c>. Every retry
+        /// is printed, so an intermittent bug of ours still shows.
         /// </summary>
         internal const int BuildAttempts = 3;
 
-        /// <summary>Set by <see cref="ExpectKnownGap"/>, read by <see cref="Case"/>.</summary>
+        /// <summary>Set by <see cref="ExpectKnownGap"/>, read by <c>Case</c>.</summary>
         internal static bool GapThisCase;
 
+        /// <summary>A case on a checked-out fixture (<see cref="Build"/>).</summary>
         internal static void Case(Map map, CellRect pad, string name, Func<Fixture, bool> body)
         {
             Case(map, pad, name, Build, body);
         }
 
         /// <summary>
-        /// A case with no fixture at all — for anything that asserts about
-        /// static tables or the harness's own machinery and needs no map.
+        /// A case with no fixture, for anything that asserts about static tables or the harness's
+        /// own machinery and needs no map.
         /// </summary>
         internal static void Case(string name, Func<bool> body)
         {
             Report.Append("  ").AppendLine(name);
             GapThisCase = false;
-            // MOD SETTINGS ARE GLOBAL AND CASES RUN IN SEQUENCE. A case that
-            // needs the decency guard in a particular state sets it and does
-            // not clean up; this is the cleanup, so a leak cannot silently
-            // decide the outcome of every case after it. Snapshot-and-restore
-            // rather than force-to-default: the harness must not fight a
-            // player's own configuration on a manual run either.
+            // Mod settings are global and cases run in sequence. A case that needs the decency
+            // guard in a given state sets it and does not clean up; this restores it, so a leak
+            // cannot decide the cases after it. Snapshot and restore rather than reset to the
+            // default, so a manual run does not fight the player's own configuration.
             bool decencyBefore = ShiftChangeMod.Settings != null
                                  && ShiftChangeMod.Settings.keepColonistsDecent;
             try
@@ -720,10 +633,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A case that stages its own fixture. <paramref name="stage"/> returns
-        /// null to mean "this fixture cannot be built", which is a failure —
-        /// the retry loop is for THROWS, which are a modlist hazard rather
-        /// than ours (see <see cref="BuildAttempts"/>).
+        /// A case that stages its own fixture. <paramref name="stage"/> returns null for "this
+        /// fixture cannot be built", which fails the case. The retry loop is for throws (see
+        /// <see cref="BuildAttempts"/>).
         /// </summary>
         internal static void Case(Map map, CellRect pad, string name,
                                   Func<Map, CellRect, Fixture> stage, Func<Fixture, bool> body)
@@ -731,12 +643,7 @@ namespace ShiftChange
             Report.Append("  ").AppendLine(name);
             GapThisCase = false;
             Fixture fix = null;
-            // MOD SETTINGS ARE GLOBAL AND CASES RUN IN SEQUENCE. A case that
-            // needs the decency guard in a particular state sets it and does
-            // not clean up; this is the cleanup, so a leak cannot silently
-            // decide the outcome of every case after it. Snapshot-and-restore
-            // rather than force-to-default: the harness must not fight a
-            // player's own configuration on a manual run either.
+            // Restores the decency setting, as the fixture-less overload does.
             bool decencyBefore = ShiftChangeMod.Settings != null
                                  && ShiftChangeMod.Settings.keepColonistsDecent;
             try
@@ -771,8 +678,7 @@ namespace ShiftChange
                 }
                 else if (!GapThisCase)
                 {
-                    // A case carrying a known gap is counted once, as a gap.
-                    // Counting it as a pass as well overstated the tally.
+                    // A case carrying a known gap counts once, as a gap, and not also as a pass.
                     Passed++;
                 }
             }
@@ -797,9 +703,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// An assertion we expect to fail, with the reason recorded. Counted
-        /// separately so a green run stays meaningful — and so that the day it
-        /// starts passing, the harness says so instead of staying quiet.
+        /// An assertion expected to fail, with the reason recorded. It prints GAP and counts a
+        /// known gap, not a failure, so a green run stays meaningful. When the condition starts to
+        /// hold it prints FIXED instead, so the case gets updated.
         /// </summary>
         internal static bool ExpectKnownGap(bool condition, string what, string why)
         {

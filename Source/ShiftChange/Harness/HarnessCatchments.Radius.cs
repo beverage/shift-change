@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System.Collections.Generic;
 using System.Linq;
@@ -17,12 +15,10 @@ namespace ShiftChange
     internal static partial class HarnessCatchments
     {
         /// <summary>
-        /// A RADIUS COVERS ITS RING, INCLUSIVE: every cell
-        /// <c>GenRadial.NumCellsInRadius</c> counts, which is what
-        /// <c>DrawRadiusRing</c> outlines, and not the next cell of the
-        /// pattern. Asserted against the ring's own cell list rather than a
-        /// distance formula, since the ring is what the player reads. Room
-        /// mode's answer, the room, is the control.
+        /// A radius covers its ring, inclusive: every cell <c>GenRadial.NumCellsInRadius</c>
+        /// counts, which is what <c>DrawRadiusRing</c> outlines, and not the next cell of the
+        /// pattern. Asserted against the ring's own cell list rather than a distance formula,
+        /// since the ring is what the player reads. Room mode's answer, the room, is the control.
         /// </summary>
         internal static bool RadiusCoversItsRing(Fixture fix)
         {
@@ -33,8 +29,8 @@ namespace ShiftChange
             }
             fix.Comp.ToggleWork(doctor);
             IntVec3 at = fix.Stand.Position;
-            // The stand stands one cell in from the pad's south-west corner, so
-            // two cells west of it is the pad's margin, outside the walls.
+            // The stand stands one cell in from the pad's south-west corner, so two cells west of
+            // it is the pad's margin, outside the walls.
             IntVec3 inRoom = at + new IntVec3(2, 0, 2);
             IntVec3 pastWall = at + new IntVec3(-2, 0, 2);
             bool ok = Expect(fix.Comp.serves == CatchmentKind.Room, "a new stand serves its room")
@@ -82,9 +78,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A RADIUS REPLACES THE ROOM. Work outside the stand's room but inside
-        /// its ring dresses; work past the ring does not, even in the stand's
-        /// own room. Room mode's answers on the same cells are the control.
+        /// A radius replaces the room. Work outside the stand's room but inside its ring dresses;
+        /// work past the ring does not, even in the stand's own room. Room mode's answers on the
+        /// same cells are the control.
         /// </summary>
         internal static bool RadiusStandDressesWithinItsRing(Fixture fix)
         {
@@ -128,10 +124,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// THE OUTDOOR GUARD IS FOR ROOM STANDS. A room stand standing in the
-        /// open serves no outdoor recreation, because the outdoor room spans
-        /// the whole map; the same stand given a radius does, because a radius
-        /// is bounded. The radius half is the control.
+        /// The outdoor guard is for room stands. A room stand standing in the open serves no
+        /// outdoor recreation, because the outdoor room spans the whole map; the same stand given
+        /// a radius does, because a radius is bounded. The radius half is the control.
         /// </summary>
         internal static bool RadiusServesOutdoorRecreation(Fixture fix)
         {
@@ -174,10 +169,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// PRECEDENCE IS UNCHANGED: the colonist's own stand first, then the
-        /// nearest. An owned radius stand outside the room beats a nearer
-        /// shared room stand inside it, and without the owner the nearer one
-        /// wins, which is the control.
+        /// Precedence is unchanged: the colonist's own stand first, then the nearest. An owned
+        /// radius stand outside the room beats a nearer shared room stand inside it, and without
+        /// the owner the nearer one wins, which is the control.
         /// </summary>
         internal static bool OwnedRadiusStandBeatsANearerSharedOne(Fixture fix)
         {
@@ -222,9 +216,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A FREED RADIUS STAND INTERRUPTS NOBODY, where a room stand catches up
-        /// a colonist already working bare inside it. Both halves on one
-        /// fixture, the room half as the control.
+        /// A freed radius stand interrupts nobody, where a room stand catches up a colonist
+        /// already working bare inside it. Both halves on one fixture, the room half as the
+        /// control.
         /// </summary>
         internal static bool FreedRadiusStandCatchesNobody(Fixture fix)
         {
@@ -247,8 +241,10 @@ namespace ShiftChange
             fix.Extras.Add(bare);
             WearOne(bare, "Apparel_BasicShirt");
             WearOne(bare, "Apparel_Pants");
-            // Goto aimed at another cell, for the reason FreedStandCatchesUp
-            // gives: it stays open, and it is suspendable.
+            // Goto aimed at another cell: one to the pawn's own cell completes inside StartJob and
+            // the think tree then hands them a Wait_Wander, which is not suspendable, so the
+            // catch-up would pass it over. Aimed elsewhere it stays open, since nothing ticks
+            // this pawn to serve the path request.
             Job working = JobMaker.MakeJob(JobDefOf.Goto, fix.Stand.Position + new IntVec3(3, 0, 2));
             working.workGiverDef = tend;
             bare.jobs.StartJob(working, JobCondition.InterruptForced, null,

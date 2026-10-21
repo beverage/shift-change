@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System;
 using System.Collections.Generic;
@@ -18,24 +16,18 @@ using static ShiftChange.HarnessFixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// Harness cases for who a stand serves: owner lists, the owner dialog's
-    /// filter, the copy of the owner list in another mod's assignable and the
-    /// one-time reconcile that set it up, a stand not used for shift changes
-    /// (one colonist picked, a group from shift use kept), the removal flag
-    /// held off in service, and the two gizmo-chain gates that must hand an
-    /// untouched sequence back.
-    ///
-    /// <para>Case ORDER is decided in one place,
-    /// <see cref="DebugTools_LifecycleHarness.Run"/>.</para>
+    /// Harness cases for who a stand serves: owner lists and the owner dialog's filter, the
+    /// copy of the owner list in another mod's assignable and the reconcile behind it, a
+    /// stand not used for shift changes, the removal flag held off in service, and the two
+    /// gizmo-chain gates. Cases are registered, and ordered, in
+    /// <see cref="DebugTools_LifecycleHarness.Run"/>.
     /// </summary>
     internal static class HarnessOwnership
     {
         /// <summary>
-        /// Ownership is a SET. The single-owner model this replaced would pass
-        /// the first two assertions and fail every one after them, which is the
-        /// point of the case: the danger in going from one owner to many is
-        /// that a reader somewhere still asks "is THE owner this pawn" and
-        /// silently answers no for everyone but the first.
+        /// Ownership is a set. The danger in going from one owner to many is a reader that still
+        /// asks whether the owner is this pawn and answers no for everyone but the first, so the
+        /// assertions about a second owner are the ones that matter.
         /// </summary>
         internal static bool OwnerListRestricts(Fixture fix)
         {
@@ -63,7 +55,7 @@ namespace ShiftChange
             assignable.TryAssignPawn(b);
             ok &= Expect(fix.Comp.AssignedOwners.Count == 2, "two owners are both held")
                 & Expect(fix.Comp.CanBeClaimedBy(a), "the FIRST owner may still claim it")
-                // The one that a single-owner reader gets wrong.
+                // The one a single-owner reader gets wrong.
                 & Expect(fix.Comp.CanBeClaimedBy(b), "the SECOND owner may claim it too")
                 & Expect(!fix.Comp.CanBeClaimedBy(c), "and an outsider still may not");
 
@@ -78,10 +70,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The dialog's candidate list. Two claims worth pinning: the filter
-        /// narrows by gender, and it never hides a pawn who is already an
-        /// owner — a filter that hid the owner you wanted to remove would be a
-        /// trap rather than a shortcut.
+        /// The owner dialog's candidate list: the filter narrows by gender and never hides a pawn
+        /// who is already an owner, since a filter that hid the owner you wanted to remove would
+        /// be a trap.
         /// </summary>
         internal static bool OwnerFilterOffersTheRightPawns(Fixture fix)
         {
@@ -114,8 +105,8 @@ namespace ShiftChange
             ok &= Expect(females.Contains(woman), "Women: the woman is offered")
                 & Expect(!females.Contains(man), "and the man is not");
 
-            // An assigned pawn leaves the CANDIDATE list — they are drawn in
-            // the assigned section above it instead, whatever the filter says.
+            // An assigned pawn leaves the candidate list; the dialog draws them in the assigned
+            // section above it, whatever the filter says.
             assignable.TryAssignPawn(woman);
             dialog.filter = Dialog_AssignStandOwners.Filter.All;
             ok &= Expect(!dialog.Candidates().Contains(woman),
@@ -132,16 +123,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// One owner list per stand, and another mod's assignable holds a copy.
-        ///
-        /// <para>The copy is what keeps that mod's per-pawn button honest.
-        /// Outfit Stands Plus draws its "equip outfit" button for every stand
-        /// whose list names the pawn, so a list nobody can see or maintain is a
-        /// button that walks a colonist to somebody else's stand. Asserted
-        /// through every way our list changes (assign, a second owner that no
-        /// longer fits its one slot, unassign, the reaper) and in both modes,
-        /// because the foreign Set owner used to come back on a stand set to
-        /// "Not used for shift changes".</para>
+        /// One owner list per stand, with another mod's assignable holding a copy of it. Outfit
+        /// Stands Plus draws its "equip outfit" button for every stand whose list names the pawn,
+        /// so a list nobody can see or maintain would send a colonist to somebody else's stand.
+        /// Asserted through every way our list changes (assign, a second owner that no longer
+        /// fits its one slot, unassign, the reaper) and in both modes, since a stand set to "Not
+        /// used for shift changes" must also hide the foreign Set owner and show ours.
         /// </summary>
         internal static bool ForeignOwnersCopyOurs(Fixture fix)
         {
@@ -154,9 +141,8 @@ namespace ShiftChange
             }
             if (foreign.TotalSlots != 1)
             {
-                // Every assertion about a second owner assumes one slot, which
-                // is what Outfit Stands Plus has. A mod list that supplies a
-                // bigger comp is a different test and should say so.
+                // The second-owner assertions assume one slot, as Outfit Stands Plus has; a bigger
+                // foreign comp is a different test.
                 return Expect(false, "the foreign comp holds one owner, as Outfit Stands Plus's does (control)");
             }
 
@@ -177,9 +163,8 @@ namespace ShiftChange
             ours.TryUnassignPawn(a);
             ok &= Expect(Names(foreign, b), "back to one owner: the copy names the one left");
 
-            // The reaper goes through our unassign. Nothing ever reaped the
-            // foreign list before the copy, so a colonist who died or left
-            // kept their button on the stand.
+            // The reaper unassigns through our comp, so the foreign list follows and a colonist
+            // who died or left loses their button on the stand.
             Patch_UnclaimStands.ReapStandsFor(b);
             ok &= Expect(ours.AssignedPawnsForReading.Count == 0, "the reaper clears our list (control)")
                 & Expect(foreign.AssignedPawnsForReading.Count == 0, "and the copy with it");
@@ -207,18 +192,15 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The one-time reconcile for a stand from a save that predates the
-        /// copy, when the two lists were independent. Each arm stages the
-        /// disagreement the way such a save carries it (our list set, then the
-        /// foreign one rewritten behind its back) and runs the same
-        /// <see cref="CompAssignableToPawn_ShiftStand.UnifyOwners"/> a spawn
-        /// does.
+        /// The one-time reconcile for a stand from an older save, where the two owner lists were
+        /// independent. Each arm stages the disagreement as such a save carries it (our list set,
+        /// then the foreign one rewritten behind its back) and runs the
+        /// <see cref="CompAssignableToPawn_ShiftStand.UnifyOwners"/> a spawn does.
         ///
-        /// <para>The rule: if only one list has owners it becomes THE list; if
-        /// both do and they disagree, the one the player could see wins, ours
-        /// on a stand in shift use and theirs on a stand set to "Not used for
-        /// shift changes". The last arm is what makes it one-time: once
-        /// reconciled, a foreign list that differs is overwritten, never
+        /// <para>The rule: if only one list has owners it becomes the list; if both do and they
+        /// disagree, the one the player could see wins, ours on a stand in shift use and theirs
+        /// on a stand set to "Not used for shift changes". The last arm is what makes it
+        /// one-time: once reconciled, a foreign list that differs is overwritten, never
         /// adopted.</para>
         /// </summary>
         internal static bool ReconcileKeepsTheVisibleList(Fixture fix)
@@ -238,8 +220,8 @@ namespace ShiftChange
             Pawn a = fix.Pawn;
             Pawn b = SpawnExtra(fix, Gender.Female, "ReconcileB");
 
-            // In shift use, both lists name someone and they disagree. Ours was
-            // the control the player could see.
+            // In shift use both lists name someone and disagree; ours is the one the player could
+            // see.
             fix.Comp.SetAutomatic();
             ours.TryAssignPawn(a);
             Diverge(foreign, a, b);
@@ -249,7 +231,7 @@ namespace ShiftChange
                              "a stand in shift use keeps its own owner, and the stale foreign one is replaced")
                     & Expect(ours.ownersUnified, "and is marked reconciled");
 
-            // Not used for shift changes: theirs was the visible control.
+            // Not used for shift changes: theirs is the one the player could see.
             fix.Comp.SetExcluded();
             Diverge(foreign, a, b);
             ours.ownersUnified = false;
@@ -257,8 +239,7 @@ namespace ShiftChange
             ok &= Expect(Names(ours, b) && Names(foreign, b),
                          "a stand set to Not used for shift changes takes the foreign owner instead");
 
-            // Only the foreign list names anyone. Adopted, so an assignment made
-            // before this mod arrived is not lost.
+            // Only the foreign list names anyone. Adopted, so an earlier assignment is not lost.
             fix.Comp.SetAutomatic();
             ours.TryUnassignPawn(b);
             foreign.ForceAddPawn(a);
@@ -266,8 +247,8 @@ namespace ShiftChange
             ours.UnifyOwners();
             ok &= Expect(Names(ours, a), "an empty list adopts the only owner there is");
 
-            // Only ours names anyone, and two of them: nothing to adopt, and
-            // nothing that fits the copy.
+            // Only ours names anyone, and two of them: nothing to adopt, and nothing that fits the
+            // copy.
             ours.TryAssignPawn(b);
             ours.ownersUnified = false;
             ours.UnifyOwners();
@@ -287,18 +268,15 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A group stand taken out of shift use keeps its owners, and has them
-        /// all when it goes back.
+        /// A group stand taken out of shift use keeps its owners, and has them all when it goes
+        /// back. A past build that cleared the list on the way out cost a configured group on an
+        /// ordinary edit of the stand.
         ///
-        /// <para>Driven through all four ways into that mode, because three of
-        /// them are not the "Not used for shift changes" row: unticking the
-        /// last work type, Recreation or Sleeping lands in the same state
-        /// (<see cref="CompShiftStand.ToggleWork"/> and its two siblings fall
-        /// through to <see cref="CompShiftStand.SetExcluded"/>). A build that
-        /// cleared the list on the way in cost a configured group on an
-        /// ordinary edit of the stand, so the list is kept (decided
-        /// 2026-09-27). Each arm re-enters shift use through the matching
-        /// tick, which is the control that the arm really left it.</para>
+        /// <para>Driven through all four ways into that mode, since three are not the "Not used
+        /// for shift changes" row: unticking the last work type, Recreation or Sleeping lands in
+        /// the same state (<see cref="CompShiftStand.ToggleWork"/> and its two siblings fall
+        /// through to <see cref="CompShiftStand.SetExcluded"/>). Each arm re-enters shift use
+        /// through the matching tick, the control that it really left.</para>
         /// </summary>
         internal static bool GroupSurvivesLeavingShiftUse(Fixture fix)
         {
@@ -322,8 +300,8 @@ namespace ShiftChange
             ok &= Expect(fix.Comp.IsExcluded && Names(ours, a, b),
                          "the Not used for shift changes row keeps both owners");
 
-            // From here each trigger starts a fresh set, since a stand out of
-            // shift use has no work types to seed one from.
+            // A stand out of shift use has no work types to seed from, so each trigger below
+            // starts a fresh set.
             fix.Comp.ToggleWork(doctor);
             ok &= Expect(!fix.Comp.IsExcluded && fix.Comp.WorkTypes.Count == 1,
                          "ticking Doctor puts it back in shift use with one work type (control)");
@@ -356,15 +334,14 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// On a stand out of shift use the owner dialog's Assign is a pick: one
-        /// colonist replaces the whole list, a kept group included, and the
-        /// copy then names that colonist, so the other mod's button comes back.
+        /// On a stand out of shift use the owner dialog's Assign is a pick: one colonist replaces
+        /// the whole list, a kept group included, and the copy then names that colonist, so the
+        /// other mod's button comes back.
         ///
-        /// <para>Driven through <see cref="Dialog_AssignStandOwners.Assign"/>,
-        /// the call a row's button makes, so the dialog's own choice between
-        /// adding and replacing is under test and not only the comp method
-        /// behind it. The shift-use arm is the control: the same call there has
-        /// to ADD, or a group stand could never be built.</para>
+        /// <para>Driven through <see cref="Dialog_AssignStandOwners.Assign"/>, the call a row's
+        /// button makes, so the dialog's own choice between adding and replacing is under test.
+        /// The shift-use arm is the control: the same call there must add, or a group stand could
+        /// never be built.</para>
         /// </summary>
         internal static bool PickReplacesAKeptGroup(Fixture fix)
         {
@@ -414,23 +391,17 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A group kept on a stand out of shift use reaches nobody through the
-        /// copy, and comes back whole when the stand is moved.
+        /// A group kept on a stand out of shift use reaches nobody through the copy, and comes
+        /// back whole when the stand is moved.
         ///
-        /// <para>The copy half: the group fits Outfit Stands Plus's one slot no
-        /// better out of shift use than in it, so that list stays empty and none
-        /// of the group gets that mod's button for this stand.</para>
-        ///
-        /// <para>The move half is the trap this case exists for. The base parks
-        /// a minified stand's owners and puts them back on landing through
-        /// <c>TryAssignPawn</c>, one at a time
-        /// (<c>CompAssignableToPawn.cs:197-220</c>), so an override that
-        /// replaced there returned the group as its last member. The landing
-        /// also runs <see cref="CompAssignableToPawn_ShiftStand.UnifyOwners"/>,
-        /// the spawn step a load shares, which is where an earlier build of this
-        /// rule cleared a group. Minified and relanded the way
-        /// <see cref="HarnessLifecycle.ReinstallKeepsConfiguration"/> does
-        /// it.</para>
+        /// <para>The copy half: a group fits Outfit Stands Plus's one slot no better out of shift
+        /// use than in it, so that list stays empty. The move half: the base parks a minified
+        /// stand's owners and puts them back on landing through <c>TryAssignPawn</c>, one at a
+        /// time, so an override that replaced the list would bring the group back as its last
+        /// member. The landing also runs
+        /// <see cref="CompAssignableToPawn_ShiftStand.UnifyOwners"/>, the spawn step a load
+        /// shares, which must not clear a group either. Minified and set down as
+        /// <see cref="HarnessLifecycle.ReinstallKeepsConfiguration"/> does it.</para>
         /// </summary>
         internal static bool KeptGroupSurvivesAMove(Fixture fix)
         {
@@ -488,10 +459,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Rewrites the foreign list from <paramref name="from"/> to
-        /// <paramref name="to"/> behind our comp's back. These are the base
-        /// calls on the foreign comp, which no override of ours sees, so no
-        /// sync runs.
+        /// Rewrites the foreign list from <paramref name="from"/> to <paramref name="to"/> behind
+        /// our comp's back: these are the foreign comp's own calls, which none of our overrides
+        /// see, so no sync runs.
         /// </summary>
         internal static void Diverge(CompAssignableToPawn foreign, Pawn from, Pawn to)
         {
@@ -500,21 +470,20 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The invariant the contents protection rests on: while a stand is in
-        /// service, vanilla's <c>allowRemovingItems</c> is off.
+        /// The invariant the contents protection rests on: while a stand is in service, vanilla's
+        /// <c>allowRemovingItems</c> is off.
         ///
-        /// <para>Driven through EVERY entry into service, not just a load,
-        /// because the documented way to reach the flag is to exclude the
-        /// stand, flip it, and put the stand back — and that last step is what
-        /// used to leave a live window. An excluded stand is the control: it
-        /// is ordinary vanilla furniture and the player owns its flag.</para>
+        /// <para>Driven through every entry into service, not only a load, since the way to reach
+        /// the flag is to exclude the stand, flip it and put the stand back, and that last step
+        /// must not leave it on. An excluded stand is the control: it is ordinary vanilla
+        /// furniture and the player owns its flag.</para>
         ///
-        /// <para>The last two assertions are the tripwire for
-        /// <see cref="CompShiftStand.EnforceRemovalFlag"/>'s claim that no
-        /// Harmony patch on <c>ApparelSourceEnabled</c> is needed. They pin the
-        /// engine fact the claim rests on — that the optimizer's gate IS this
-        /// field (<c>Building_OutfitStand.cs:104</c>). If Ludeon ever decouples
-        /// them these fail, and the patch goes back on the table.</para>
+        /// <para>The last two assertions pin the engine fact behind
+        /// <see cref="CompShiftStand.EnforceRemovalFlag"/>: <c>Building_OutfitStand</c> returns
+        /// this one field for both <c>IApparelSource.ApparelSourceEnabled</c> and
+        /// <c>IHaulSource.HaulSourceEnabled</c>, so the optimizer's gate is the flag and no
+        /// Harmony patch on it is needed. If a game update decouples them these fail, and the
+        /// patch is back on the table.</para>
         /// </summary>
         internal static bool RemovalFlagHeldOffInService(Fixture fix)
         {
@@ -522,8 +491,8 @@ namespace ShiftChange
                 Patch_AllowRemovingToggle.AllowRemovingItemsRef;
             if (flag == null)
             {
-                // Not a stale test — the whole guard rides on this field, so a
-                // rename means the protection is silently gone.
+                // A failure here is not a stale test: the protection rides on this field, so a
+                // rename silently removes it.
                 return Expect(false, "allowRemovingItems still resolves");
             }
             WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
@@ -560,21 +529,17 @@ namespace ShiftChange
 
         // --------------------------------------------------- the gizmo gates
         //
-        // Both gizmo postfixes hand the upstream sequence back UNTOUCHED when
-        // they have nothing to add, rather than wrapping it in an iterator
-        // that re-yields every gizmo. `GizmoGridDrawer` rebuilds the
-        // bar once per rendered frame for every selected object, and ours is
-        // the LAST postfix on `Pawn.GetGizmos`, so a wrapper there sits around
-        // every other mod's gizmos for every selected pawn to answer a
-        // question that is usually "no".
+        // Both gizmo postfixes hand the upstream sequence back untouched when they have nothing
+        // to add, instead of wrapping it in an iterator (why: Patch_ChangeBackGizmo.Postfix). The
+        // gizmo bar is rebuilt every rendered frame for every selected object, so a wrapper would
+        // sit around every gizmo handed to it to answer a question that is usually no.
         //
-        // THE CHANGE IS INVISIBLE FROM THE OUTSIDE. The bar a player sees is
-        // identical either way, so a case that only checks which gizmos come
-        // out passes just as happily on a wrapper. What tells the two apart is
-        // REFERENCE IDENTITY of the returned sequence: a gate returns the very
-        // object it was given, and nothing else can. That is the assertion
+        // The bar a player sees is the same either way, so a case that only checks which gizmos
+        // come out passes on a wrapper too. Only the reference identity of the returned sequence
+        // tells the two apart: a gate returns the very object it was given. That is the assertion
         // doing the work below; the rest guard the behaviour around it.
 
+        /// <summary>A pawn on no stand gets the upstream gizmo sequence back itself.</summary>
         internal static bool ChangeBackGateHandsTheChainBack(Fixture fix)
         {
             Pawn bystander = SpawnExtra(fix, Gender.Female, "Bystander");
@@ -588,14 +553,14 @@ namespace ShiftChange
                     & Expect(SameSequence(passed, chain),
                              "with every upstream gizmo still in it, in order");
 
-            // The defensive arm. Harmony will not hand us a null pawn, but the
-            // guard is written and a refactor that drops it should fail here
-            // rather than throw in somebody's colony.
+            // Harmony never hands us a null pawn, but the gate guards against one, and dropping
+            // that guard should fail here rather than throw in somebody's colony.
             ok &= Expect(ReferenceEquals(Patch_ChangeBackGizmo.Postfix(chain, null), chain),
                          "and a null pawn is handed back untouched too");
             return ok;
         }
 
+        /// <summary>For a pawn in uniform the gate appends the Change back button, last.</summary>
         internal static bool ChangeBackGateStillAppends(Fixture fix)
         {
             List<Gizmo> chain = Sentinels();
@@ -612,12 +577,10 @@ namespace ShiftChange
                              && button.groupKey == Patch_ChangeBackGizmo.GroupKey,
                              "and the added one is ours, appended LAST");
 
-            // THE INVARIANT THAT HAD A COMMENT AND NO TEST. Interception
-            // going off stops the mod ACTING on its own; it must not also take
-            // away the player's manual way out, because that is exactly the
-            // moment every pawn already in uniform is stranded there. It goes
-            // off two ways, the standing switch and the fault latch, and each
-            // is asserted on its own so a gate on either one fails here.
+            // Interception going off, by the standing switch or the fault latch, stops the mod
+            // acting on its own and must not also remove the player's manual way out, or every pawn
+            // already in uniform is stranded. Each way is asserted alone, so a gate on either one
+            // fails here.
             bool armedBefore = Patch_JobInterception.Enabled;
             bool faultedBefore = Patch_JobInterception.faulted;
             try
@@ -638,10 +601,10 @@ namespace ShiftChange
                 Patch_JobInterception.faulted = faultedBefore;
             }
 
-            // A boxed stand keeps its ledger — that is the reinstall case's
-            // whole point — so the registry still answers for this pawn. The
-            // Spawned half of the guard is the only thing between that and a
-            // button pointing at a stand inside a crate.
+            // A stand off the map with its ledger kept, after a takeoff's WillReplace despawn or a
+            // minify's Vanish, still answers the registry for this pawn; the takeoff's mode
+            // stands in for both. The gate's Spawned test is all that stops the button pointing at
+            // a stand that is not on the map.
             IntVec3 cell = fix.Stand.Position;
             fix.Stand.DeSpawn(DestroyMode.WillReplace);
             ok &= Expect(ReferenceEquals(Patch_ChangeBackGizmo.Postfix(chain, fix.Pawn), chain),
@@ -651,6 +614,7 @@ namespace ShiftChange
             return ok;
         }
 
+        /// <summary>The gate rewrites only vanilla's removal toggle, and only in service.</summary>
         internal static bool RemovalToggleGateLeavesForeignStandsAlone(Fixture fix)
         {
             string vanillaLabel = "CommandAllowRemovingApparel".Translate().ToString();
@@ -672,11 +636,9 @@ namespace ShiftChange
             fix.Comp.SetAutomatic();
             Command_Toggle governed = RemovalToggle(vanillaLabel, active: false, desc: untouched);
             Command_Toggle alreadyOn = RemovalToggle(vanillaLabel, active: true, desc: untouched);
-            // A toggle that is not vanilla's. The patch matches by LABEL,
-            // because the command is anonymous and there is no other handle —
-            // so if Ludeon renames the key the match stops finding it and the
-            // whole patch reverts to vanilla behaviour. This arm is that
-            // graceful failure, written down.
+            // A toggle that is not vanilla's. The patch finds vanilla's by its label, the command
+            // being an anonymous Command_Toggle with no other handle, so a renamed label key makes
+            // it match nothing and the stand fall back to vanilla. This arm is that fallback.
             Command_Toggle stranger = RemovalToggle("Another mod's toggle", active: false,
                                                     desc: untouched);
             List<Gizmo> governedChain = new List<Gizmo> { governed, alreadyOn, stranger };
@@ -688,11 +650,9 @@ namespace ShiftChange
                          "every gizmo still comes through, in order")
                 & Expect(governed.defaultDesc != untouched && governed.defaultDesc.Contains(ours),
                          "the tooltip now carries our paragraph as well as vanilla's")
-                // .RawText on both halves is load-bearing: TaggedString's
-                // implicit conversion to string calls StripTags, so assigning a
-                // Translate() result straight into the field silently deletes
-                // the markup. It ate the colour and bold on this very tooltip
-                // once, on 2026-08-17, with no error and nothing on screen.
+                // TaggedString's implicit conversion to string strips tags, so the patch must use
+                // .RawText on both halves of the tooltip: assigning a Translate() result straight
+                // to the field silently deletes the colour and bold. This assertion guards that.
                 & Expect(ours.Contains("<color") && governed.defaultDesc.Contains("<color"),
                          "with its rich-text markup intact, not stripped by TaggedString")
                 & Expect(governed.Disabled,

@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System.Collections.Generic;
 using System.Linq;
@@ -17,13 +15,11 @@ namespace ShiftChange
     internal static partial class HarnessCatchments
     {
         /// <summary>
-        /// THE ALERT LISTS A STAND THAT SERVES NOTHING. Vanilla made the alert
-        /// from the subclass alone. It leaves out an area stand that serves
-        /// (control), lists the stand while it stands outside its area and once
-        /// the area is deleted, naming the area each time, and drops it when
-        /// the stand serves its room again. A colonist in the stand's uniform,
-        /// kept in it by work inside the area, changes back for the same work
-        /// once the area is deleted.
+        /// The alert lists a stand that serves nothing. Vanilla creates the alert from the subclass
+        /// alone. It leaves out an area stand that serves (control), lists the stand while it
+        /// stands outside its area and once the area is deleted, naming the area each time, and
+        /// drops it when the stand serves its room again. A colonist in the stand's uniform, kept
+        /// in it by work inside the area, changes back for the same work once the area is deleted.
         /// </summary>
         internal static bool ServesNothingAlertListsTheStand(Fixture fix)
         {
@@ -81,13 +77,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// THE SERVES MENU OFFERS THE MAP'S ALLOWED AREAS, Home excepted, in
-        /// three sections: this room and a radius, the areas, then New allowed
-        /// area and Manage areas, with a gap opening each section after the
-        /// first. Each area carries its own colour. One that leaves the stand
-        /// out is faded, says why in red, and binds all the same when picked,
-        /// leaving the stand serving nothing, which is why it is marked. Read
-        /// off the window's own builder, since no case draws the window.
+        /// The Serves menu offers the map's allowed areas, Home excepted, in three sections: this
+        /// room and a radius, the areas, then New allowed area and Manage areas, with a gap opening
+        /// each section after the first. Each area carries its own colour. One that leaves the
+        /// stand out is faded, says why in red, and binds all the same when picked, leaving the
+        /// stand serving nothing, which is why it is marked. Read off the window's own builder,
+        /// since no case draws the window.
         /// </summary>
         internal static bool ServesMenuOffersTheAllowedAreas(Fixture fix)
         {
@@ -109,6 +104,8 @@ namespace ShiftChange
             List<FloatMenuOption> options = new Dialog_SetStandWorkTypes(fix.Comp).ServesMenuOptions();
             int areas = fix.Map.areaManager.AllAreas.Count(a => a.AssignableAsAllowed() && !(a is Area_Home));
             string withoutLabel = Dialog_SetStandWorkTypes.AreaLeavingStandOut(without.Label);
+            // Colorize wraps its text in a tag pair, so colorizing nothing and dropping the closing
+            // tag leaves the opening tag the marked label should start with.
             string redTag = string.Empty.Colorize(ColorLibrary.RedReadable).Replace("</color>", string.Empty);
             string home = fix.Map.areaManager.Home?.Label;
             ServesMenuOption pickWith = options.Find(o => o.Label == with.Label) as ServesMenuOption;
@@ -146,7 +143,8 @@ namespace ShiftChange
                 return false;
             }
 
-            // The gaps, as the menu would get them once it has sized the rows.
+            // Read the heights first, then add the gaps as the menu does, after its constructor has
+            // sized the rows.
             Dictionary<FloatMenuOption, float> heights = options.ToDictionary(o => o, o => o.RequiredHeight);
             ServesMenuOption.MarkSections(options);
             List<ServesMenuOption> gapped = options.OfType<ServesMenuOption>().Where(o => o.gapAbove > 0f).ToList();
@@ -169,10 +167,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// NEW ALLOWED AREA COPIES THE STAND'S ROOM and binds it, named for the
-        /// stand's work and numbered when that name is taken. In the open it
-        /// holds the stand's own cell alone. At vanilla's cap of ten allowed
-        /// areas it is greyed, with vanilla's reason, and makes nothing.
+        /// New allowed area copies the stand's room and binds it, named for the stand's work and
+        /// numbered when that name is taken. In the open it holds the stand's own cell alone. At
+        /// vanilla's cap of ten allowed areas it is greyed, with vanilla's reason, and makes
+        /// nothing; greyed, it sorts below Manage areas, so the section's gap opens there instead.
         /// </summary>
         internal static bool NewAllowedAreaCopiesTheRoom(Fixture fix)
         {
@@ -244,13 +242,13 @@ namespace ShiftChange
                                "and makes nothing, the stand keeping its area");
         }
 
-        /// <summary>The texture a float menu row draws as its icon, which vanilla keeps private.</summary>
+        /// <summary>The icon texture of a float menu row, which vanilla keeps private.</summary>
         internal static object Swatch(FloatMenuOption option)
         {
             return AccessTools.Field(typeof(FloatMenuOption), "iconTex")?.GetValue(option);
         }
 
-        /// <summary>The Serves menu's New allowed area option for <paramref name="comp"/>, or null.</summary>
+        /// <summary>The Serves menu's New allowed area option for the stand, or null.</summary>
         internal static FloatMenuOption NewAreaOption(CompShiftStand comp)
         {
             string label = "ShiftChange.ServesOptionNewArea".Translate();
@@ -258,9 +256,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Picks New allowed area from <paramref name="comp"/>'s Serves menu and
-        /// returns the area it made, or null. Recorded on the fixture, whose
-        /// teardown deletes it.
+        /// Picks New allowed area from <paramref name="comp"/>'s Serves menu and returns the area
+        /// it made, or null. Recorded on the fixture, whose teardown deletes it.
         /// </summary>
         internal static Area_Allowed MakeFromMenu(Fixture fix, CompShiftStand comp)
         {
@@ -275,11 +272,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// PAINT AND MANAGE AREAS CLOSE THE SETTINGS WINDOW FIRST, since it
-        /// absorbs clicks around itself and would swallow the brush. Paint
-        /// leaves vanilla's Expand allowed area tool selected on the stand's
-        /// area; Manage areas opens vanilla's dialog. Both windows really open
-        /// on the stack here, and everything is closed and put down after.
+        /// Paint and Manage areas close the settings window first, since it absorbs clicks around
+        /// itself and would swallow the brush. Paint leaves vanilla's Expand allowed area tool
+        /// selected on the stand's area; Manage areas opens vanilla's dialog. Both windows really
+        /// open on the stack here, and everything is closed and put down after.
         /// </summary>
         internal static bool PaintAndManageAreasCloseTheWindowFirst(Fixture fix)
         {
@@ -330,11 +326,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// AN AREA STAND'S WORDS NAME ITS AREA, and say when it serves nothing.
-        /// The Serves row, the inspect pane and the switch's tooltip name the
-        /// area; with the stand outside it, or the area gone, the row and the
-        /// pane say which and the switch reads "serves nothing", as it does for
-        /// a room stand in the open. The serving state of each is the control.
+        /// An area stand's words name its area, and say when it serves nothing. The Serves row, the
+        /// inspect pane and the switch's tooltip name the area; with the stand outside it, or the
+        /// area gone, the row and the pane say which and the switch reads "serves nothing", as it
+        /// does for a room stand in the open. The serving state of each is the control.
         /// </summary>
         internal static bool AreaWordsNameTheArea(Fixture fix)
         {
@@ -406,9 +401,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The explanation <paramref name="alert"/> gives with a fresh report
-        /// contains <paramref name="text"/>. Vanilla asks for the report first
-        /// too: the explanation is built from what the report found.
+        /// The explanation <paramref name="alert"/> gives with a fresh report contains
+        /// <paramref name="text"/>. Vanilla asks for the report first too: the explanation is built
+        /// from what the report found.
         /// </summary>
         internal static bool Explains(Alert alert, string text)
         {

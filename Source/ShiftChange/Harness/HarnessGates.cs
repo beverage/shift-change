@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System;
 using System.Collections.Generic;
@@ -19,30 +17,19 @@ using static ShiftChange.HarnessFixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// Harness cases for the gates on interception: the promises the store
-    /// description makes, meal breaks, the danger gate, and the catch-up pass
-    /// that dresses a colonist already working bare.
-    ///
-    /// <para>Case ORDER is decided in one place,
-    /// <see cref="DebugTools_LifecycleHarness.Run"/>.</para>
+    /// Harness cases for the gates on interception: the player-facing promises, meal breaks, the
+    /// danger and duty gates, the change-back latch, the allowed-area refusals, and the catch-up
+    /// that dresses a colonist already working bare. Case order is set where the cases are
+    /// registered, <see cref="DebugTools_LifecycleHarness.Run"/>.
     /// </summary>
     internal static class HarnessGates
     {
         /// <summary>
-        /// THE PROMISES, as a decision table.
-        ///
-        /// Everything above this is bug-shaped — a guard against something
-        /// that once went wrong. This is the other kind: the mod's advertised
-        /// behaviour, asserted against the rules the README and the store
-        /// description actually print. Those are promises to players, and M4
-        /// showed a promise can be wrong in all three descriptions at once
-        /// with nothing to notice.
-        ///
-        /// <para>Driven through <c>TryInsertSwap</c>, the real decision
-        /// function the interception prefix calls. Every negative is paired
-        /// with a POSITIVE CONTROL — the same setup without the gate — because
-        /// "did not divert" is worthless on its own: a stand that was never
-        /// eligible would satisfy it just as well.</para>
+        /// The player-facing promises as a decision table: automatic work only, emergencies never
+        /// delayed, drafted pawns left alone, work the stand does not serve ignored. They are
+        /// advertised behaviour, not a past bug. Driven through <c>TryInsertSwap</c>, the decision
+        /// function the interception prefix calls. Each negative sits beside the same setup without
+        /// the gate, since a stand that was never eligible satisfies "did not divert" too.
         /// </summary>
         internal static bool PromisesHold(Fixture fix)
         {
@@ -53,8 +40,7 @@ namespace ShiftChange
             {
                 return Expect(false, "the doctor work defs resolve");
             }
-            // The pad's room has no role, so name the work explicitly rather
-            // than relying on an inference this fixture cannot make.
+            // The pad's room has no role to infer work from, so name the work.
             fix.Comp.ToggleWork(doctor);
 
             bool ok = Expect(fix.Comp.HandlesWork(doctor), "the stand serves doctoring")
@@ -81,8 +67,6 @@ namespace ShiftChange
                              "and is diverted again once undrafted (control)");
             }
 
-            // "Only doing the room's work does." A job of a work type this
-            // stand does not serve must not dress anyone.
             WorkGiverDef cook = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoBillsCook");
             if (cook != null)
             {
@@ -93,17 +77,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The meal-break promise — and the one the copy got WRONG.
-        ///
-        /// All three descriptions used to say "eating in a room changes
-        /// nothing". The code has always said the opposite, deliberately
-        /// (decided 2026-08-08): a meal is a sit-down break, so the uniform
-        /// comes off first wherever the food is stored, because otherwise a
-        /// cook carries a meal across the base in whites to reach a chair —
-        /// the exact walk this mod exists to prevent. The single exception is
-        /// food already in hand or pack, which is just eaten.
-        ///
-        /// Nothing caught that for months. This is what would have.
+        /// On a work stand a meal is a sit-down break: the uniform comes off first wherever the
+        /// food is stored, or a cook would carry a meal across the base in whites to reach a chair.
+        /// The one exception is food already in hand or pack, which is just eaten.
         /// </summary>
         internal static bool MealBreakChangesOut(Fixture fix)
         {
@@ -133,28 +109,15 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The same promise one arm over — and the one the REST arm got wrong.
+        /// The meal-break rule on a sleep stand, where food already in the inventory still changes
+        /// the pawn out of sleepwear first. At the wake-up the pawn is still in the stand's room,
+        /// near it, so eating elsewhere in sleepwear and walking back to change is the trip the
+        /// rest arm exists to prevent. On a work or recreation stand carried food is just eaten
+        /// (<see cref="MealBreakChangesOut"/>: same colonist, same meal, the opposite answer).
         ///
-        /// <para>Eat-as-is (decided 2026-08-08) is a work and recreation rule.
-        /// The sleep stand inherited it silently when the rest trigger landed
-        /// 2026-09-02, and the result was found in play 2026-09-17: a
-        /// colonist with a meal already in inventory woke, walked out in
-        /// sleepwear, ate elsewhere, and only then came back to change. That is
-        /// the exact walk the rest arm exists to prevent, and the wake-up is the
-        /// one moment it cannot be excused as a detour — the pawn is standing AT
-        /// the stand when the decision is made.</para>
-        ///
-        /// <para><b>Both halves, and the stored one is not filler.</b> A
-        /// stockpile breakfast has always diverted: it fails
-        /// FoodSourceIsOnPawn, reaches Insert, changes them back. Only the
-        /// food's LOCATION ever changed the answer, which is why the fix is a
-        /// carve-out and not a new behaviour. Asserting the carried half alone
-        /// would pass against a build that had simply stopped serving ingest
-        /// jobs on rest stands altogether.</para>
-        ///
-        /// <para><see cref="MealBreakChangesOut"/> holds the work side
-        /// unchanged, and the pair is the point: same colonist, same meal,
-        /// opposite answers, decided by which trigger dressed them.</para>
+        /// <para>Both halves are asserted. The stored half is the control: a stockpile breakfast
+        /// changes the pawn out of sleepwear, and the carried half must answer the same, so the two
+        /// differ only in where the food is.</para>
         /// </summary>
         internal static bool SleepwearMealBreakChangesOut(Fixture fix)
         {
@@ -165,11 +128,10 @@ namespace ShiftChange
                 return Expect(false, "the bed and meal defs resolve");
             }
 
-            // DO NOT TOGGLE REST ON BY HAND. A bed makes the pad a Bedroom —
-            // RoomRoleWorker_Bedroom scores a single unowned humanlike bed at
-            // 100000 — so HandlesRest() is already true from the RestRoles
-            // table and a Toggle would turn it OFF. Same trap, and the same
-            // reasoning, as SleepJobInTheRoomDresses.
+            // Do not toggle rest on by hand. A bed makes the pad a bedroom (RoomRoleWorker_Bedroom
+            // scores a single unowned humanlike bed at 100000), so HandlesRest() is already true
+            // from the RestRoles table and a toggle would turn it off. Same trap as
+            // SleepJobInTheRoomDresses.
             Building_Bed bed = DebugTools_Fixtures.Spawn(
                 fix.Map, bedDef, ThingDefOf.WoodLog,
                 new IntVec3(fix.Stand.Position.x + 2, 0, fix.Stand.Position.z + 2),
@@ -205,14 +167,11 @@ namespace ShiftChange
             ok &= Expect(Diverts(fix, IngestJob(carried)),
                          "and so does one already in their inventory, which is the regression this guards");
 
-            // THE WAKE-UP GEOMETRY. Everything above decides from beside the
-            // stand; the real breakfast is decided with the pawn still standing
-            // on the bed, and StaysInBed must not swallow it there.
-            // JobDriver_Ingest does not override CanBeginNowWhileLyingDown (the
-            // base returns false) and an Ingest job's targetB is not a bed, so
-            // eating is not something you do lying down and the return trip is
-            // reached. Pinned here because if that ever changes, this bug comes
-            // back wearing a different guard.
+            // The wake-up: the real breakfast is decided with the pawn still standing on the bed,
+            // and StaysInBed must not swallow it there. JobDriver_Ingest does not override
+            // CanBeginNowWhileLyingDown (the base returns false) and an ingest job's targetB is not
+            // a bed, so eating is not something done lying down and the return trip is reached. If
+            // that changes, the bug returns behind a different guard; this pins it.
             IntVec3 wasAt = fix.Pawn.Position;
             fix.Pawn.pather?.StopDead();
             fix.Pawn.Position = bed.Position;
@@ -229,34 +188,22 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The danger gate is ONE-DIRECTIONAL. Under threat a pawn may not
-        /// change INTO a uniform, but a pawn already wearing one still changes
-        /// back. Its control is the same work job dressing on a calm map. The
-        /// shipped regression it guards (2026-08-31): docs/DESIGN.md, "The
-        /// gates".
+        /// The danger gate is one-directional: under threat a pawn may not change into a uniform,
+        /// but one already wearing it still changes back. The control is the same work job dressing
+        /// on a calm map. Guards a shipped regression where one gate answered for both arms
+        /// (docs/DESIGN.md, "The gates"), so both halves run against the same threat: a case that
+        /// only proved dressing blocked would pass on the broken build.
         ///
-        /// Both halves are asserted against the SAME threat, because the bug
-        /// was not either arm in isolation — it was that one gate answered for
-        /// both. A test that only proved dressing is blocked would have passed
-        /// on the broken build.
+        /// <para>The return leg is triggered by a meal break rather than by geometry: on a work
+        /// stand an ingest job whose food is not on the pawn diverts wherever the food sits, so no
+        /// second room is needed.</para>
         ///
-        /// The return leg is triggered by a meal break rather than by geometry:
-        /// for a work stand an ingest job whose food is not already on the pawn
-        /// diverts wherever the food sits (the sit-down-break rule), so the
-        /// case needs no second room and cannot drift when the pad moves.
-        ///
-        /// <para><b>No hostile is on the map while the colonist is ticked.</b>
-        /// The threat never acts on its own — the harness ticks fixture pawns
-        /// one at a time and never the map — but <see cref="RunSwap"/> ticks
-        /// the COLONIST, and a colonist reacts to a hostile three tiles away.
-        /// The first version staged one threat for the whole case and the swap
-        /// died with <c>InterruptForced</c> at toil 1 while the pawn stood on
-        /// the interaction cell: the think tree had overridden the job
-        /// mid-run. Intermittently, which is worse than never — it passed
-        /// once and failed the release preflight. So the threat is staged
-        /// twice, around the driver run, and cleared before anything ticks.
-        /// That also models the report more honestly: the colonists were
-        /// dressed BEFORE the raid landed.</para>
+        /// <para>No hostile is on the map while the colonist is ticked. The harness ticks fixture
+        /// pawns one at a time and never the map, so a threat never acts on its own, but
+        /// <see cref="RunSwap"/> ticks the colonist, and a ticked colonist reacts to a hostile
+        /// three tiles away: the think tree overrides the swap mid-run (<c>InterruptForced</c> at
+        /// toil 1), intermittently. So the threat is staged twice, around the driver run, and
+        /// cleared before anything ticks.</para>
         /// </summary>
         internal static bool DangerGateIsOneDirectional(Fixture fix)
         {
@@ -269,17 +216,16 @@ namespace ShiftChange
             }
             fix.Comp.ToggleWork(doctor);
 
-            // ARRANGE the control, do not hope for it. Everything below sits
-            // behind this one reading, and the map it runs on was generated
-            // rather than built — see MakeCalm for the run that proved it.
+            // Arrange the calm rather than assume it: a generated map can start with a hostile on
+            // it (see MakeCalm).
             MakeCalm(fix.Map);
             bool ok = Expect(fix.Map.dangerWatcher.DangerRating == StoryDanger.None,
                              "the map starts calm (control)")
                     & Expect(Diverts(fix, WorkJob(fix, tend)),
                              "and an automatic work job dresses while calm (control)");
 
-            // The half that stays gated. Diverts() never ticks the pawn, so a
-            // hostile standing in the room cannot disturb it.
+            // The half that stays gated. Diverts() never ticks the pawn, so the hostile cannot
+            // disturb it.
             Pawn threat = Threat(fix);
             if (threat == null)
             {
@@ -291,10 +237,8 @@ namespace ShiftChange
                          "under threat, an automatic work job does NOT dress");
             ClearThreat(fix, threat);
 
-            // Dressed through the DRIVER rather than the trigger, since the
-            // trigger is what the assertion above just proved is shut — and on
-            // a map with no hostile on it, because this is the only part of
-            // the case that ticks the colonist.
+            // Dressed through the driver, not the trigger the assertion above just showed is shut,
+            // and with no hostile on the map: this is the only step that ticks the colonist.
             ok &= Expect(RunSwap(fix), "dressed for the shift on a calm map")
                 & Expect(fix.Comp.OnShift, "and is on shift (control)");
             if (!fix.Comp.OnShift)
@@ -302,7 +246,6 @@ namespace ShiftChange
                 return false;
             }
 
-            // The half the one-directional gate opened.
             threat = Threat(fix);
             if (threat == null)
             {
@@ -322,20 +265,16 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// THE DUTY GATE, and it shuts BOTH arms. Each refusal sits beside the
-        /// same job on a free colonist as its control. Found in play
-        /// (2026-09-20): docs/DESIGN.md, "The gates".
+        /// The duty gate shuts both arms: a pawn under a lord duty is neither dressed nor sent back
+        /// to change until the duty ends, and a bare duty with no lord holds it shut too. Each
+        /// refusal sits beside the same job on a free colonist. Guards a shipped stranding bug
+        /// (docs/DESIGN.md, "The gates").
         ///
-        /// <para>Staged through <c>LordMaker</c> rather than by hand-setting
-        /// the fields, because the gate reads what the engine writes and a
-        /// fixture that writes them itself would certify its own guess. Any
-        /// lord duty reproduces it; this one defends a point, which needs no
-        /// ritual, no DLC and no second pawn.</para>
-        ///
-        /// <para>The RELEASE half matters as much as the refusal: the case
-        /// asserts the gate opens again the moment the duty ends, so it cannot
-        /// latch a colonist out of the mod, and that a bare duty with no lord
-        /// holds it shut too.</para>
+        /// <para>Staged through <c>LordMaker</c> rather than by setting fields, because the gate
+        /// reads what the engine writes and a fixture that wrote them itself would certify its own
+        /// guess. <c>LordJob_DefendPoint</c> needs no ritual, no DLC and no second pawn; any lord
+        /// duty would do. The case also asserts the gate opens again the moment the duty ends, so
+        /// it cannot latch a colonist out of the mod.</para>
         /// </summary>
         internal static bool DutyGateShutsBothArms(Fixture fix)
         {
@@ -363,8 +302,8 @@ namespace ShiftChange
                 & Expect(!Diverts(fix, WorkJob(fix, tend)),
                          "so an automatic work job does NOT dress them");
 
-            // The arm that did the stranding. Dressed while free, because the
-            // dress arm is the one just proved shut.
+            // Dressed while free, since the dress arm is shut under a duty. The return arm is the
+            // one that strands a pawn.
             lord.RemovePawn(fix.Pawn);
             ok &= Expect(RunSwap(fix), "dressed for the shift once released")
                 & Expect(fix.Comp.OnShift, "and is on shift (control)");
@@ -374,9 +313,8 @@ namespace ShiftChange
                 return false;
             }
 
-            // A meal break is the cleanest return-trip trigger in this
-            // fixture: the ingest branch changes them out wherever the food
-            // is, so it needs no second room. Same call the danger case uses.
+            // A meal break triggers the return trip without a second room: the ingest branch
+            // changes them out wherever the food is.
             Thing meal = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef),
                                         fix.Pawn.Position, fix.Map);
             ok &= Expect(Diverts(fix, IngestJob(meal)),
@@ -393,8 +331,8 @@ namespace ShiftChange
                 & Expect(Diverts(fix, IngestJob(meal)),
                          "so the change-back fires the moment the duty ends");
 
-            // A duty with no Lord owning it — what a mod's own think node can
-            // leave on a pawn, and the reason the gate tests both.
+            // A duty with no lord owning it, which a mod's own think node can leave on a pawn. The
+            // gate tests the duty as well as the lord for this.
             fix.Pawn.mindState.duty = new PawnDuty(DutyDefOf.Idle);
             ok &= Expect(!Diverts(fix, IngestJob(meal)),
                          "a bare duty with no lord holds the gate shut too");
@@ -407,13 +345,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A JOB HANDED TO A PAWN MID-SWAP IS NOT DEFERRED ON TOP OF THE SWAP.
-        /// The duty case names the cause that was found; this names the
-        /// general shape (docs/DESIGN.md, "The gates"). Its control is the
-        /// same work job before the swap starts and after it ends.
-        ///
-        /// <para>The pawn is put on a real swap job through their own tracker,
-        /// because <c>Diverts</c> reads <c>curJob</c> from exactly there.</para>
+        /// A job handed to a pawn mid-swap is not deferred on top of the swap, whatever pre-empted
+        /// it (docs/DESIGN.md, "The gates"); the duty case is one cause. The control is the same
+        /// work job before the swap starts and after it ends. The pawn is put on a real swap job
+        /// through their own tracker, because <c>Diverts</c> reads <c>curJob</c> from exactly
+        /// there.
         /// </summary>
         internal static bool MidSwapJobIsNotDeferredAgain(Fixture fix)
         {
@@ -447,19 +383,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// M3'S REGRESSION GUARD: a freed stand catches up a colonist already
-        /// working bare in its room.
-        ///
-        /// The announcement used to fire from a TOIL finish action, while the
-        /// departing pawn still held the stand's <c>maxPawns = 1</c>
-        /// reservation — so every candidate died on
-        /// <c>CanReserveAndReach</c> and the interrupt simply never happened.
-        /// It moved to a global finish action, which the tracker runs after
-        /// <c>CleanupCurrentJob</c> releases reservations
-        /// (<c>:492</c> then <c>:497</c>).
-        ///
-        /// Binary, with no timing subtlety: under the regression the second
-        /// colonist is never interrupted at all.
+        /// A freed stand catches up a colonist already working bare in its room. Guards the
+        /// announcement's timing: the swap driver announces the freed stand from a global finish
+        /// action, which the job tracker runs after it releases the departing pawn's reservation (a
+        /// toil's finish action runs earlier). Announced from a toil, every candidate fails
+        /// <c>CanReserveAndReach</c> against the stand's single reservation and the colonist is
+        /// never interrupted at all, which makes the case binary.
         /// </summary>
         internal static bool FreedStandCatchesUp(Fixture fix)
         {
@@ -471,10 +400,6 @@ namespace ShiftChange
             }
             fix.Comp.ToggleWork(doctor);
 
-            // Same reason as the case above: arranged, not assumed. The
-            // preceding case leaves the map calm on its ordinary path, but
-            // "the case before me cleaned up" is not a precondition this one
-            // should be resting on either.
             MakeCalm(fix.Map);
             bool ok = Expect(fix.Map.dangerWatcher.DangerRating == StoryDanger.None,
                              "the map is calm — the catch-up is danger-gated")
@@ -488,18 +413,13 @@ namespace ShiftChange
             WearOne(bare, "Apparel_BasicShirt");
             WearOne(bare, "Apparel_Pants");
 
-            // Working in the room, in their own clothes, on a job the catch-up
-            // is allowed to interrupt.
-            //
-            // Goto rather than Wait, because Core's Wait is suspendable=false
-            // and the filter rejects it outright. Targeted at ANOTHER cell,
-            // not this pawn's own: StartJob runs ReadyForNextToil
-            // synchronously, so a Goto to where the pawn already stands
-            // arrives and completes inside StartJob, and the think tree hands
-            // them a Wait_Wander — suspendable=false, filtered out, and the
-            // case then fails for a reason that has nothing to do with M3.
-            // Aimed elsewhere the job stays open: the path request is never
-            // served, because nothing ticks this pawn.
+            // Working in the room, in their own clothes, on a job the catch-up may interrupt. A
+            // Goto, not a Wait: a Goto is suspendable and Core's Wait is not, so the catch-up's
+            // filter rejects it. Aimed at another cell, not the pawn's own: StartJob runs
+            // ReadyForNextToil synchronously, so a Goto to where the pawn already stands completes
+            // inside StartJob and the think tree hands them a Wait_Wander, which is not suspendable
+            // either. Aimed elsewhere the job stays open, since the path request is never served
+            // while nothing ticks this pawn.
             Job working = JobMaker.MakeJob(JobDefOf.Goto,
                                            fix.Stand.Position + new IntVec3(3, 0, 2));
             working.workGiverDef = tend;
@@ -517,15 +437,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// THE CHANGE-BACK LATCH, AS IT SHIPS. After Change back the colonist
-        /// is not dressed again in that stand's room until they leave it, a
-        /// stand in another room still dresses them meanwhile, drafting drops
-        /// the latch, and the mid-job catch-up honours it. Every refusal sits
-        /// beside the same job without the latch as its control.
-        ///
-        /// <para>Written before the catchment work reworks the latch, so room
-        /// mode has something to hold the rework to. docs/DESIGN.md, "Change
-        /// back".</para>
+        /// The change-back latch: after Change back, neither the stand they changed at nor another
+        /// stand serving the same trigger in that room dresses them until they leave the room; a
+        /// stand in another room still dresses them meanwhile, drafting drops the latch, and the
+        /// mid-job catch-up honours it. Every refusal sits beside the same job without the latch as
+        /// its control (docs/DESIGN.md, "Change back").
         /// </summary>
         internal static bool ChangeBackLatchHoldsUntilTheyLeave(Fixture fix)
         {
@@ -552,10 +468,9 @@ namespace ShiftChange
                 return false;
             }
 
-            // The button's own path, which orders a swap and sets the latch.
-            // The ordered swap is cut short and run again through RunSwap,
-            // which pumps the driver to completion; a swap interrupted before
-            // its transfer announces nothing, so the cut leaves no trace.
+            // The button's own path: it orders a swap and sets the latch. The ordered swap is cut
+            // short and run through RunSwap, which pumps the driver to completion; a swap
+            // interrupted before its transfer announces nothing, so the cut leaves no trace.
             Patch_ChangeBackGizmo.ChangeBack(fix.Pawn, fix.Comp);
             ok &= Expect(Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
                          "Change back set the latch");
@@ -568,12 +483,9 @@ namespace ShiftChange
                 & Expect(Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
                          "and a job boundary inside the room keeps the latch");
 
-            // A stand in ANOTHER room still dresses them: the latch belongs to
-            // the room they changed back in. The second stand stands outside
-            // the door and the colonist stays inside, so the latch is still
-            // held while the work arm looks out there. A room stand in the
-            // open serves nothing, so the second stand serves the smallest
-            // ring instead.
+            // A stand in another room still dresses them meanwhile. It is outside the door and the
+            // colonist stays inside, so the latch is still held while the work arm looks out there.
+            // A room stand in the open serves nothing, so it serves the smallest ring instead.
             IntVec3 outsideCell = new IntVec3(fix.Outside.minX, 0, fix.Outside.maxZ - 1);
             Building_OutfitStand other = (Building_OutfitStand)DebugTools_Fixtures.Spawn(
                 fix.Map, fix.Stand.def, ThingDefOf.WoodLog, outsideCell, Rot4.North);
@@ -595,8 +507,8 @@ namespace ShiftChange
                          "while the latch on their own room holds");
             other.Destroy();
 
-            // Leaving releases it, at the next job boundary wherever that job
-            // is: a giver-less Wait here, which no arm dresses for.
+            // Leaving releases it at the next job boundary, whatever the job: here a giver-less
+            // Wait, which no arm dresses for.
             IntVec3 inside = fix.Pawn.Position;
             fix.Pawn.pather?.StopDead();
             fix.Pawn.Position = outsideCell;
@@ -608,7 +520,6 @@ namespace ShiftChange
             ok &= Expect(Diverts(fix, WorkJob(fix, tend)),
                          "so back inside, the room's work dresses them again (control)");
 
-            // Drafting drops it outright.
             Patch_JobInterception.ChangedBackAt[fix.Pawn] = new Patch_JobInterception.ChangeBackLatch(fix.Stand);
             ok &= Expect(!Diverts(fix, WorkJob(fix, tend)),
                          "latched again, the room's work does not dress them");
@@ -622,10 +533,9 @@ namespace ShiftChange
                              "so the room's work dresses them again (control)");
             }
 
-            // The catch-up honours it too, or a stand returning to the pool
-            // would re-dress the colonist the player just pulled out. Goto
-            // aimed at another cell in the room, for the reason
-            // FreedStandCatchesUp gives.
+            // The catch-up honours it too, or a stand returning to the pool would re-dress the
+            // colonist the player just pulled out. The Goto is aimed at another cell, for the
+            // reason FreedStandCatchesUp gives.
             Patch_JobInterception.ChangedBackAt[fix.Pawn] = new Patch_JobInterception.ChangeBackLatch(fix.Stand);
             Job working = JobMaker.MakeJob(JobDefOf.Goto, fix.Stand.Position + new IntVec3(3, 0, 2));
             working.workGiverDef = tend;
@@ -653,10 +563,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Every cell of the stand's room except the stand's own, as an allowed
-        /// area: the work is inside it and the stand is not. What Better Pawn
-        /// Control's alert areas, or any hand-painted area, produce when the
-        /// stand happens to fall outside.
+        /// An allowed area holding every cell of the stand's room except the stand's own: the work
+        /// is inside it and the stand is not. Better Pawn Control's alert areas, or any
+        /// hand-painted area, can leave a stand out the same way.
         /// </summary>
         internal static Area_Allowed AreaWithoutTheStand(Fixture fix)
         {
@@ -676,15 +585,11 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A STAND OUTSIDE THE PAWN'S ALLOWED AREA DRESSES NOBODY, and an
-        /// allowed one is chosen instead. Why it used to: docs/DESIGN.md,
-        /// "Allowed areas".
-        ///
-        /// <para>Three paths dress, and each is driven: the work arm, the
-        /// selector's ranking (a pawn's OWN stand outranks a shared one, so a
-        /// forbidden personal stand used to win over an allowed shared stand
-        /// beside it), and the mid-job catch-up. Every refusal has the same
-        /// setup with the stand allowed beside it as its control.</para>
+        /// A stand outside the pawn's allowed area dresses nobody, and an allowed one is chosen
+        /// instead (docs/DESIGN.md, "Allowed areas"). Each of the three paths that dress is driven:
+        /// the work arm, the selector's ranking (a pawn's own stand outranks a shared one, but not
+        /// when the own stand is forbidden to them), and the mid-job catch-up. Every refusal has
+        /// the same setup with the stand allowed as its control.
         /// </summary>
         internal static bool StandOutsideTheAreaDressesNobody(Fixture fix)
         {
@@ -730,8 +635,8 @@ namespace ShiftChange
                 }
                 Settle(pawn);
 
-                // The catch-up: a colonist already doctoring bare in the room,
-                // under the same area. Built like FreedStandCatchesUp's.
+                // The catch-up: a colonist already doctoring bare in the room, under the same area,
+                // built like FreedStandCatchesUp's.
                 bare = DebugTools_Fixtures.AveragePawn(Gender.Female, "Bare", doctor);
                 bare.apparel?.DestroyAll();
                 bare.workSettings?.EnableAndInitialize();
@@ -742,10 +647,9 @@ namespace ShiftChange
                 bare.playerSettings.AreaRestrictionInPawnCurrentMap = area;
                 Job working = JobMaker.MakeJob(JobDefOf.Goto, fix.Stand.Position + new IntVec3(3, 0, 2));
                 working.workGiverDef = tend;
-                // Staged with interception off. The stand is free, so starting
-                // this job with it on would be the very decision under test,
-                // made once already, and the catch-up would then have nothing
-                // left to catch up.
+                // Staged with interception off: the stand is free, so starting this job with it on
+                // would already make the decision under test and leave the catch-up nothing to
+                // catch up.
                 bool armed = Patch_JobInterception.Enabled;
                 try
                 {
@@ -771,9 +675,8 @@ namespace ShiftChange
                              "with the area lifted, the same freed stand does (control)");
                 Settle(bare);
 
-                // The ranking: their own stand outside the area, a shared one
-                // inside it. A personal stand always wins a tie on everything
-                // else, which is exactly how the forbidden one used to win.
+                // The ranking: their own stand outside the area, a shared one inside it. A personal
+                // stand wins any tie on everything else, so only the area can decide this.
                 Building_OutfitStand shared = DebugTools_Fixtures.Spawn(fix.Map, standDef, ThingDefOf.WoodLog,
                     fix.Stand.Position + new IntVec3(2, 0, 0), Rot4.North) as Building_OutfitStand;
                 CompShiftStand sharedComp = shared?.TryGetComp<CompShiftStand>();
@@ -812,23 +715,16 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A COLONIST WHOSE STAND IS OUTSIDE THEIR ALLOWED AREA KEEPS THE OUTFIT
-        /// ON, and the stand says why.
+        /// A colonist whose stand is outside their allowed area keeps the outfit on, and the stand
+        /// says why. This is the return trip: an area painted after dressing, or switched by Better
+        /// Pawn Control's alerts, leaves a borrower whose stand they may no longer walk to. The
+        /// uniform rides along, the retry cooldown is set, and the inspect pane names the cause.
+        /// The Change back button is unaffected: it is an order, and orders ignore allowed areas in
+        /// vanilla too.
         ///
-        /// <para>The return trip is where this shipped: an area painted after
-        /// dressing, or switched by Better Pawn Control's alerts, leaves a
-        /// borrower whose stand they may no longer walk to. Every job boundary
-        /// that took them out of the room started a change-back that ended
-        /// before it began. Now the uniform rides along, the retry cooldown is
-        /// set, and the inspect pane names the cause, since otherwise a
-        /// colonist simply never changing back is all a player sees. The Change
-        /// back button is unaffected: it is an order, and orders ignore
-        /// allowed areas in vanilla too.</para>
-        ///
-        /// <para>The control is the same out-of-room job with the stand inside
-        /// their area, asked before the area is painted and again once the
-        /// stand is back in it: it changes them back as usual, and the inspect
-        /// line is absent.</para>
+        /// <para>The control is the same out-of-room job with the stand inside their area, asked
+        /// before the area is painted and again once the stand is back in it: it changes them back
+        /// as usual and the inspect line is absent.</para>
         /// </summary>
         internal static bool StandOutsideTheAreaKeepsTheOutfitOn(Fixture fix)
         {
@@ -914,19 +810,16 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// THE RECREATION AND SLEEP ARMS PASS OVER A STAND OUTSIDE THE AREA
-        /// TOO.
+        /// The recreation and sleep arms pass over a stand outside the area too. Neither has a gate
+        /// of its own: both find their stand through
+        /// <c>Patch_JobInterception.FindAvailableStand</c>, which is where the work arm's
+        /// gate sits, and this pins that they keep sharing it. Each arm is asked three times of the
+        /// same stand: with no area (dresses), with the stand left out (does not), and with it
+        /// painted back in (dresses again).
         ///
-        /// <para>Neither arm has a gate of its own: both find their stand
-        /// through <see cref="Patch_JobInterception.FindAvailableStand"/>, which
-        /// is where the work arm's gate sits. This pins that they keep sharing
-        /// it. Each arm is asked three times on the same stand: with no area
-        /// (dresses), with the stand left out of the area (does not), and with
-        /// it painted back in (dresses again).</para>
-        ///
-        /// <para>Recreation goes first, while the room has no role. The bed the
-        /// sleep half needs would make it a bedroom, and both triggers are
-        /// switched on explicitly, so the room's role decides nothing here.</para>
+        /// <para>Recreation goes first, while the room has no role: the bed the sleep half needs
+        /// would make it a bedroom. Both triggers are switched on explicitly, so the room's role
+        /// decides nothing here.</para>
         /// </summary>
         internal static bool StandOutsideTheAreaServesNoRecreationOrSleep(Fixture fix)
         {

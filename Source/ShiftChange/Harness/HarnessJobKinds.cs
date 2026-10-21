@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System.Linq;
 using RimWorld;
@@ -15,18 +13,17 @@ using JobKind = ShiftChange.Patch_JobInterception.JobKind;
 namespace ShiftChange
 {
     /// <summary>
-    /// The job classifier (<see cref="Patch_JobInterception.Classify"/>) as a
-    /// table: every job shape the other cases build, and the kind and work
-    /// type each one gets. The cases that drive a job through the prefix
-    /// test what each reader does with the answer; this one tests the answer,
-    /// so a change to the order of the classifier's tests fails here by name.
+    /// The job classifier (<see cref="Patch_JobInterception.Classify"/>) as a table: every job
+    /// shape the other cases build, and the kind and work type each gets. The cases that drive a
+    /// job through the prefix test what each reader does with the answer; this one tests the
+    /// answer, so a change to the order of the classifier's tests fails here by name.
     /// </summary>
     internal static class HarnessJobKinds
     {
         /// <summary>
-        /// One row: <paramref name="job"/>, started with <paramref name="tag"/>,
-        /// is <paramref name="kind"/> charged to <paramref name="work"/>. A
-        /// failing line says what came back.
+        /// One row: <paramref name="job"/>, started with <paramref name="tag"/>, is
+        /// <paramref name="kind"/> charged to <paramref name="work"/>. A failing line says what
+        /// came back.
         /// </summary>
         internal static bool Sorts(Fixture fix, string what, Job job, JobTag? tag, JobKind kind, WorkTypeDef work)
         {
@@ -46,6 +43,7 @@ namespace ShiftChange
             return Patch_JobInterception.Classify(fix.Pawn, job, tag);
         }
 
+        /// <summary>A job of <paramref name="def"/> stamped with its giver.</summary>
         internal static Job Stamped(JobDef def, WorkGiverDef giver)
         {
             Job job = JobMaker.MakeJob(def);
@@ -54,16 +52,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// THE CLASSIFIER SORTS EVERY JOB SHAPE IN THE ARMS' ORDER. Work from
-        /// a giver, recreation, reading and eating; ordinary sleep, sleeping on
-        /// the ground, and medical lay-downs tagged and untagged for a patient
-        /// who is and is not urgent, with the medical-emergency setting off and
-        /// on; a delivery and a site job from every delivery giver on the list;
-        /// a meal run from every feeding giver; the jobs that ride along, a
-        /// direct order and the emergencies; and Odyssey's fishing, stamped
-        /// and not. VisitSickPawn is the row the order exists for: Doctor work
-        /// that carries a joyKind is Work, and the same job from the joy giver
-        /// is Recreation.
+        /// Sorts every job shape the other cases build, in the arms' order, which is the order of
+        /// <c>Classify</c>'s tests. VisitSickPawn is the row the order exists for: Doctor work that
+        /// carries a joyKind is Work, and the same job from the joy giver is Recreation. It runs in
+        /// a fixture because medical rest depends on the colonist's health and on a bed.
         /// </summary>
         internal static bool ClassifierSortsEveryJobShape(Fixture fix)
         {
@@ -122,7 +114,9 @@ namespace ShiftChange
                 & Sorts(fix, "eating", IngestJob(meal), null, JobKind.Other, null)
                 & Expect(Of(fix, IngestJob(meal)).Ingest, "and it is an ingest job");
 
-            // Sleep and medical rest, the setting off and on.
+            // Sleep and medical rest, the setting off and on. The patient givers tag a medical
+            // lay-down RestingForMedicalReasons, and vanilla requeues it untagged when it slips a
+            // haul in ahead.
             bool was = ShiftChangeMod.Settings.medicalEmergenciesChangeFirst;
             Hediff wound = null;
             try
@@ -145,6 +139,8 @@ namespace ShiftChange
 
                 BodyPartRecord part = fix.Pawn.health.hediffSet.GetNotMissingParts().FirstOrDefault();
                 wound = HediffMaker.MakeHediff(HediffDefOf.Cut, fix.Pawn, part);
+                // An untended wound makes the colonist an urgent patient; the precondition below
+                // checks they stay on their feet.
                 wound.Severity = 6f;
                 fix.Pawn.health.AddHediff(wound, part);
                 JobClass urgent = Of(fix, JobMaker.MakeJob(JobDefOf.LayDown, bed));
@@ -193,8 +189,8 @@ namespace ShiftChange
                             JobKind.Work, seeds.workType);
             }
 
-            // Meal runs from every feeding giver, and an ignored giver's job
-            // that is not one: the shape of Rimatomics' chemfuel run.
+            // Meal runs from every feeding giver, and an ignored giver's job that is not one, the
+            // shape of Rimatomics' chemfuel run.
             foreach (string name in HarnessRideAlong.FeedPatientGivers.Concat(HarnessRideAlong.DeliverFoodGivers))
             {
                 WorkGiverDef giver = DefDatabase<WorkGiverDef>.GetNamedSilentFail(name);
@@ -212,8 +208,8 @@ namespace ShiftChange
             ok &= Sorts(fix, "a feeding giver's haul", HarnessCatchments.Haul(doctorFeed, steel, cell), null,
                         JobKind.IgnoredGiver, doctor);
 
-            // The gates: the jobs that ride along, a direct order, the
-            // emergencies, and the giver-less walks.
+            // The gates: the jobs that ride along (the job tracker's pause, an unload), a direct
+            // order, the emergencies, and the giver-less walks.
             Job forced = HarnessCatchments.WorkAt(tend, cell);
             forced.playerForced = true;
             JobClass order = Of(fix, forced);
@@ -257,7 +253,8 @@ namespace ShiftChange
                 & Expect(Of(fix, walk).Incidental, "and it is incidental")
                 & Expect(!Of(fix, walkForWork).Incidental, "and the same walk from a giver is not");
 
-            // Odyssey's fishing, stamped and not, by tag.
+            // Odyssey hands fishing out with no giver, so it is classified by tag. Vanilla requeues
+            // a job without its tag when it slips a haul in ahead, hence the untagged row.
             WorkGiverDef fishGiver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("Fish");
             JobDef fish = JobDefOf.Fish;
             if (fishGiver != null && fish != null)

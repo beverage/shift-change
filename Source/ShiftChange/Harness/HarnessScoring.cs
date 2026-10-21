@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System.Collections.Generic;
 using RimWorld;
@@ -12,40 +10,26 @@ using static ShiftChange.DebugTools_LifecycleHarness;
 namespace ShiftChange
 {
     /// <summary>
-    /// Harness cases for <see cref="Patch_ParkedKitOutscoresSpares"/>: the
-    /// refusal that stops a checked-out pawn re-arming from the colony's
-    /// spare pile while their own kit is parked in the stand.
+    /// Harness cases for <see cref="Patch_ParkedKitOutscoresSpares"/>, which stops a checked-out
+    /// pawn re-arming from the colony's spare pile while their own kit is parked in the stand. The
+    /// failure is invisible in play: a pawn in an identical garment looks like one who never moved.
     ///
-    /// <para><b>These cases are why this exists rather than a play
-    /// observation.</b> The failure is invisible from the outside — a pawn
-    /// wearing an identical garment looks exactly like a pawn who never
-    /// moved, and the only tell on the colony it was found on was that gear
-    /// had quietly crossed owners over many days. Nothing about that is
-    /// catchable by looking.</para>
-    ///
-    /// <para><b>The second case is the load-bearing one.</b> The rule is a
-    /// comparison, never an equivalence test (the patch says why), and an
-    /// equivalence test would look perfectly healthy in the first case. So
-    /// the pair is the assertion: refuse while the parked kit is sound, allow
-    /// once it is not. Delete either half and the other stops meaning
+    /// <para>The two cases are one assertion. The rule is a comparison, never an equivalence test
+    /// (the patch says why), and the first case alone cannot tell the two apart. Refuse while the
+    /// parked kit is sound, allow once it is not; delete either half and the other stops meaning
     /// anything.</para>
     ///
-    /// <para><b>Nothing is spawned.</b> <c>ApparelScoreRaw</c> reads def
-    /// stats, hit points, quality and stuff, and never asks where a garment
-    /// is standing — so a spare made with <c>ThingMaker</c> exercises the
-    /// scorer exactly as a garment in a stockpile does, without a cell to
-    /// find or clean up. What the patch keys on is the pawn's ledger entry,
-    /// and the fixture builds that for real through
+    /// <para>Nothing is spawned: <c>ApparelScoreRaw</c> reads a garment's def stats, hit points,
+    /// quality and stuff and never asks where it is, so a spare from <c>ThingMaker</c> scores as
+    /// one in a stockpile does. The ledger entry the patch keys on is built for real, through
     /// <c>SwapPlan.BuildDress</c> and <c>NotifyDressed</c>.</para>
     /// </summary>
     internal static class HarnessScoring
     {
         /// <summary>
-        /// A checked-out pawn refuses a spare that duplicates what is parked,
-        /// with three controls: a spare that displaces nothing parked, the
-        /// worn garment itself, and the same spare once the pawn is off
-        /// shift. Without those, "the score was low" could just as easily be
-        /// a garment nobody would ever have taken.
+        /// A checked-out pawn refuses a spare duplicating what is parked. Three controls keep the
+        /// refusal honest: a spare that displaces nothing parked, the worn garment itself, and the
+        /// same spare once the pawn is off shift.
         /// </summary>
         internal static bool ParkedKitRefusesSpares(Fixture fix)
         {
@@ -67,16 +51,11 @@ namespace ShiftChange
                     & Expect(Refused(fix.Pawn, spare),
                              "a spare duplicating the parked garment is refused");
 
-            // A garment that displaces nothing parked answers no question the
-            // parked one has already answered, so it must come through
-            // untouched. CHOSEN AGAINST WHAT IS ACTUALLY PARKED, never
-            // hard-coded: this control named Apparel_Pants on the assumption
-            // that the fixture parks a duster, which is what it does with
-            // Vanilla Apparel Expanded loaded. Without it, Stock falls back to
-            // a shirt and pants and the garment displaced is the pawn's
-            // tribalwear — Legs on OnSkin, which conflicts with pants. The
-            // control then asserted the exact opposite of the truth and read
-            // as the patch being broken.
+            // A garment that displaces nothing parked must come through untouched. Chosen against
+            // what is actually parked, never hard-coded: with Vanilla Apparel Expanded loaded the
+            // fixture parks a duster, without it the pawn's tribalwear, whose legs conflict with
+            // pants, so a fixed pants control would assert the opposite of the truth and read as a
+            // broken patch.
             Apparel unrelated = NonConflictingSpare(fix);
             ok &= Expect(unrelated != null,
                          "a control garment that displaces nothing parked could be made");
@@ -86,9 +65,8 @@ namespace ShiftChange
                              "a spare that displaces nothing parked is not refused (control)");
             }
 
-            // The same conflict, but WORN. ApparelScoreGain subtracts worn
-            // scores, so refusing one would inflate every candidate instead
-            // of suppressing it — the inverse of the bug.
+            // The same conflict, but worn. ApparelScoreGain subtracts the worn scores, so refusing
+            // a worn garment would inflate every candidate instead of suppressing it.
             Apparel worn = fix.Pawn.apparel != null && fix.Pawn.apparel.WornApparel.Count > 0
                 ? fix.Pawn.apparel.WornApparel[0]
                 : null;
@@ -98,8 +76,8 @@ namespace ShiftChange
                              "a WORN garment is never refused (control)");
             }
 
-            // Last, because it drops the ledger entry the case depends on.
-            // Teardown removes it anyway, so nothing is put back.
+            // Last: it drops the ledger entry the rest of the case needs. Teardown removes it
+            // anyway.
             CompShiftStand.OnShiftStands.Remove(fix.Pawn);
             ok &= Expect(!Refused(fix.Pawn, spare),
                          "and the same spare scores normally once off shift (control)");
@@ -107,11 +85,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The half that keeps the refusal honest: a parked garment that is
-        /// worn through no longer answers for the pawn, and the spare is
-        /// allowed again. Both arms run against the same pawn and the same
-        /// spare, so the only thing that differs is the parked garment's
-        /// condition.
+        /// A parked garment worn through no longer answers for the pawn, so the same spare is
+        /// allowed again. Only the parked garment's condition differs between the two arms.
         /// </summary>
         internal static bool WornOutParkedKitStillGoesShopping(Fixture fix)
         {
@@ -134,9 +109,9 @@ namespace ShiftChange
             bool ok = Expect(Refused(fix.Pawn, spare),
                              "the spare is refused while the parked garment is sound (control)");
 
-            // Under the knee of HitPointsPercentScoreFactorCurve, which is
-            // flat at 1.0 above 52% and drops to 0.3 below it — so a fifth of
-            // full is unambiguously the worse garment by the game's own
+            // A fifth of full hit points is well under the knee of the game's
+            // HitPointsPercentScoreFactorCurve, which is 1.0 from 52% up, 0.3 from 22% to 50% and
+            // at most 0.2 from 20% down, so the parked garment is the worse one by the game's own
             // reckoning, not by a threshold of ours.
             parked.HitPoints = Mathf.Max(1, parked.MaxHitPoints / 5);
             ok &= Expect(!Refused(fix.Pawn, spare),
@@ -144,13 +119,7 @@ namespace ShiftChange
             return ok;
         }
 
-        // ------------------------------------------------------------ helpers
-
-        /// <summary>
-        /// The first garment the fixture's swap parked. The default fixture
-        /// stores a duster to make room for a lab coat, and both sit on the
-        /// Shell layer, so a duplicate duster is a genuine conflict.
-        /// </summary>
+        /// <summary>The first garment the fixture's swap parked.</summary>
         internal static Apparel ParkedGarment(Fixture fix)
         {
             if (fix == null || fix.Comp == null)
@@ -169,10 +138,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A sound copy of a garment: same def, same stuff, same quality,
-        /// full hit points. Quality especially — leave it at whatever
-        /// <c>ThingMaker</c> hands back and the copy scores differently from
-        /// its original, which would decide both cases for the wrong reason.
+        /// A sound copy of a garment: same def, stuff and quality, full hit points. Quality
+        /// especially, or the copy scores differently from its original and decides both cases for
+        /// the wrong reason.
         /// </summary>
         internal static Apparel Duplicate(Apparel source)
         {
@@ -199,11 +167,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A spare that provably displaces nothing the fixture parked, picked
-        /// by asking <c>CanWearTogether</c> rather than by assuming a layer.
-        /// Returns null when no candidate qualifies, which the caller asserts
-        /// on — a control that cannot be built must fail the case, not vanish
-        /// from it.
+        /// A spare that provably displaces nothing the fixture parked, picked by asking
+        /// <c>CanWearTogether</c> rather than assuming a layer. Null when none qualifies; the
+        /// caller asserts on that, since a control that cannot be built must fail the case.
         /// </summary>
         internal static Apparel NonConflictingSpare(Fixture fix)
         {
@@ -250,14 +216,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Did our postfix refuse this garment for this pawn?
-        ///
-        /// <para>Reads the refusal by its magnitude, which is safe because
-        /// vanilla's own refusals inside <c>ApparelScoreRaw</c> are -10, an
-        /// order of magnitude shallower. A neighbouring mod that multiplies
-        /// scores could in principle drive a vanilla -10 past -1000, so if
-        /// this ever reads as a failure on a full modlist, check what else is
-        /// postfixing the scorer before believing the patch broke.</para>
+        /// Whether our postfix refused this garment, read by magnitude: vanilla's own refusals
+        /// inside <c>ApparelScoreRaw</c> are -10, far shallower than <c>RefusedScore</c>. A mod
+        /// that multiplies scores could push one past it, so if this fails on a full modlist, look
+        /// for other postfixes on the scorer before blaming the patch.
         /// </summary>
         internal static bool Refused(Pawn pawn, Apparel apparel)
         {

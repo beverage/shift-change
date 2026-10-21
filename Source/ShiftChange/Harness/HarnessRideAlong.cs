@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System;
 using System.Collections.Generic;
@@ -17,24 +15,19 @@ using static ShiftChange.HarnessFixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// Harness cases for jobs the uniform RIDES ALONG on: errands that are
-    /// part of work already under way, where changing out and back in again
-    /// costs two wardrobe walks and buys nothing. Feeding a patient or a
-    /// prisoner, a haul slotted in ahead of a bill, and the follow-up jobs a
-    /// hauling mod queues behind its own haul.
+    /// Harness cases for jobs the uniform rides along on: errands that are part of work already
+    /// under way, where changing out and back in again costs two wardrobe walks and buys nothing.
     ///
-    /// <para>Each one reached this file the same way: the return trip judged
-    /// the errand by where its first target stands, which is the storeroom
-    /// for a meal or an ingredient, and sent a colonist who was about to come
-    /// straight back to the stand to change first.</para>
+    /// <para>The return trip judges a job by where its first target stands, which for a meal or an
+    /// ingredient is the storeroom, so each of these would otherwise send a colonist who is about
+    /// to come straight back to the stand to change first.</para>
     /// </summary>
     internal static class HarnessRideAlong
     {
         /// <summary>
-        /// The seven vanilla feeding givers, with <see cref="DeliverFoodGivers"/>
-        /// below. Each builds its job with the FOOD in targetA and the patient
-        /// or prisoner in targetB: docs/DESIGN.md, "Mod compatibility". The
-        /// hemogen givers are Biotech's and resolve only with it loaded.
+        /// Five of vanilla's seven feeding givers; <see cref="DeliverFoodGivers"/> has the other
+        /// two. Each builds its job with the food in targetA and the patient or prisoner in
+        /// targetB. The hemogen givers are Biotech's and resolve only with it loaded.
         /// </summary>
         internal static readonly string[] FeedPatientGivers =
         {
@@ -56,18 +49,17 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// FEEDING DRESSES NOBODY, and sends nobody back to change whose stand
-        /// serves its work, for a patient in the stand's room. A colonist in
-        /// another stand's outfit, pyjamas here, changes back first. A patient
-        /// elsewhere, and a haul slipped in ahead of the meal run, are
-        /// <see cref="MealRunKeepsTheUniformForAPatientInside"/>'s. The
-        /// doctor's and the warden's halves, and why the giver is ignored
-        /// rather than targetB read: docs/DESIGN.md, "Mod compatibility".
+        /// Feeding dresses nobody, and a colonist whose stand serves its work is not sent back to
+        /// change for it, for a patient in the stand's room. In another stand's outfit, pyjamas
+        /// here, they change back first. A patient elsewhere is
+        /// <see cref="MealRunKeepsTheUniformForAPatientInside"/>'s. The giver is ignored because
+        /// a meal run needs no uniform and neither target places it: the meal in targetA puts the
+        /// job wherever the meal is stored, and targetB, where it ends up, would dress a bare
+        /// doctor for a trip that starts at the storeroom.
         ///
-        /// <para>Every refusal is paired with the SAME job shape under a giver
-        /// that is not on the list, which still dresses and still changes them
-        /// back. Without that pair, a feeding job failing its reservation dry run
-        /// would satisfy every negative here.</para>
+        /// <para>Every refusal is paired with the same job shape under a giver that is not on the
+        /// list, which still dresses and still changes them back. Without that pair, a feeding job
+        /// failing its reservation dry run would satisfy every negative here.</para>
         /// </summary>
         internal static bool FeedingRidesAlong(Fixture fix)
         {
@@ -128,8 +120,7 @@ namespace ShiftChange
                                 + $" (spawned at {outside}, {(mealAway.Spawned ? "spawned" : "not spawned")}), there: "
                                 + string.Join(", ", mealAway.Position.GetThingList(map).Select(t => t.def.defName))));
 
-            // Not yet dressed. The meal is stored IN the stand's room, so the
-            // job reads as this room's doctoring or wardening.
+            // Not yet dressed, with the meal stored in the stand's room: the job is this room's.
             ok &= Expect(Probe(fix, FeedingJob(JobDefOf.FeedPatient, mealHere, patient, tend)),
                          "the same job under a giver NOT on the list dresses (control: the shape can dress)");
             foreach (KeyValuePair<WorkGiverDef, JobDef> row in rows)
@@ -145,8 +136,6 @@ namespace ShiftChange
                 return false;
             }
 
-            // Dressed, and the meal is in storage elsewhere: the trip that
-            // used to change them out first.
             ok &= Expect(Probe(fix, FeedingJob(JobDefOf.FeedPatient, mealAway, patient, tend)),
                          "the same job under a giver NOT on the list still changes them back "
                          + "(control: the return trip is live)");
@@ -156,9 +145,8 @@ namespace ShiftChange
                              row.Key.defName + " keeps the uniform on while they fetch a meal from storage");
             }
 
-            // The meal run keeps the uniform on only for a stand serving its
-            // work. In another stand's outfit, pyjamas here, it changes them
-            // back first, as any job out of the room does.
+            // The meal run keeps the uniform on only for a stand serving its work; in another
+            // stand's outfit, pyjamas here, it changes them back first.
             fix.Comp.ToggleWork(doctor);
             fix.Comp.ToggleWork(warden);
             fix.Comp.ToggleWork(handling);
@@ -175,17 +163,14 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A MEAL RUN KEEPS THE UNIFORM ON ONLY FOR A PATIENT INSIDE. On shift
-        /// at a stand serving doctoring and wardening, the meal stored out past
-        /// the door: a patient in the room keeps the uniform on (control), and
-        /// a patient out past the door changes them back now, while the stand
-        /// is near; a prisoner's meal left at a spot out there does the same,
-        /// and at a spot in the room keeps it on (control). A haul vanilla
-        /// slips in ahead of the meal run keeps the uniform on when the meal
-        /// run would, and only then. In pyjamas, a meal from the room for a
-        /// patient in the room is the room's (control), and one carried to a
-        /// patient out past the door changes them back first.
-        /// docs/DESIGN.md, "Mod compatibility".
+        /// A meal run keeps the uniform on only for a patient inside. On shift at a stand serving
+        /// doctoring and wardening, with the meal stored out past the door: a patient in the room
+        /// keeps the uniform on (control), and one out past the door changes them back now, while
+        /// the stand is near. A prisoner's meal left at a spot out there does the same, and at a
+        /// spot in the room keeps it on (control). A haul vanilla slips in ahead of the meal run
+        /// keeps the uniform on when the meal run would, and only then. In pyjamas, a meal from the
+        /// room for a patient in the room is the room's (control), and one carried to a patient out
+        /// past the door changes them back first.
         /// </summary>
         internal static bool MealRunKeepsTheUniformForAPatientInside(Fixture fix)
         {
@@ -243,8 +228,8 @@ namespace ShiftChange
                 & Expect(Probe(fix, spotOut),
                          "and one left at a spot out past the door changes them back");
 
-            // The shape vanilla's opportunistic haul leaves: the meal run put
-            // back at the head of the queue, untagged, and a haul started first.
+            // The shape vanilla's opportunistic haul leaves: the meal run put back at the head of
+            // the queue, untagged, and a haul started first.
             JobQueue queue = fix.Pawn.jobs.jobQueue;
             ok &= Expect(Probe(fix, GiverlessHaul(steel, store)),
                          "a haul out past the door with nothing queued behind it changes them back (control)");
@@ -269,9 +254,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A job of the given giver at a cell, for the queue. Never started: it
-        /// only has to be what sits at the head of the queue when the errand
-        /// in front of it arrives.
+        /// A job of the given giver at a cell, for the queue. Never started: it only has to be what
+        /// sits at the head of the queue when the errand in front of it arrives.
         /// </summary>
         internal static Job QueuedWork(WorkGiverDef giver, IntVec3 at)
         {
@@ -290,18 +274,15 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// AN ERRAND SLOTTED IN AHEAD OF WORK THE STAND SERVES KEEPS THE
-        /// UNIFORM ON. The shape, with vanilla jobs only, so it runs on every
-        /// mod list; the two engine-built versions have cases of their own
-        /// below. The shape and why it rides along: docs/DESIGN.md, "Errands
+        /// An errand slotted in ahead of work the stand serves keeps the uniform on. The shape is
+        /// built from vanilla jobs only, so it runs on every mod list; the two engine-built
+        /// versions have cases of their own below. Why it rides along: docs/DESIGN.md, "Errands
         /// queued ahead of work".
         ///
-        /// <para>The rule is narrow on purpose, and the controls are the
-        /// narrowness. Nothing queued, work this stand does not serve, served
-        /// work in another room, and another errand at the head all still
-        /// change them back. A meal break still does too, since it has its own
-        /// policy. And it never dresses anyone: a colonist not on shift is
-        /// left alone by every job without a giver.</para>
+        /// <para>The controls are the rule's narrowness: nothing queued, work this stand does not
+        /// serve, served work in another room, and another errand at the head all still change them
+        /// back, and so does a meal break, which has its own policy. It never dresses anyone: a
+        /// colonist not on shift is left alone by every job without a giver.</para>
         /// </summary>
         internal static bool DetourAheadOfServedWorkKeepsTheUniform(Fixture fix)
         {
@@ -368,7 +349,7 @@ namespace ShiftChange
             ok &= Expect(!Probe(fix, JobMaker.MakeJob(JobDefOf.UnloadYourInventory)),
                          "vanilla's UnloadYourInventory keeps the uniform on (it carries no target at all)");
 
-            // Off shift: the rule is about STAYING dressed and nothing else.
+            // Off shift: the rule is about staying dressed and nothing else.
             ok &= Expect(RunSwap(fix), "changed back for the dressing half")
                 & Expect(!fix.Comp.OnShift, "and is off shift (control)");
             queue.EnqueueFirst(QueuedWork(cookBills, bench));
@@ -379,33 +360,26 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// VANILLA'S OWN OPPORTUNISTIC HAUL, driven for real: a crafter in
-        /// uniform who picks something up on the way to a bill does it in
-        /// uniform.
+        /// Vanilla's own opportunistic haul, driven for real: a crafter in uniform who picks
+        /// something up on the way to a bill does it in uniform.
         ///
-        /// <para><see cref="DetourAheadOfServedWorkKeepsTheUniform"/> builds the
-        /// shape by hand. This case lets the engine build it. The bill is started
-        /// through the pawn's own tracker, so <c>Pawn_JobTracker.StartJob</c>
-        /// runs <c>TryOpportunisticJob</c> itself, puts the bill at the front of
-        /// the queue and starts the haul in its place, from inside its own
-        /// <c>StartJob</c> and therefore through our prefix a second time.</para>
+        /// <para><see cref="DetourAheadOfServedWorkKeepsTheUniform"/> builds the shape by hand;
+        /// here the engine builds it. The bill is started through the pawn's own tracker, so
+        /// <c>Pawn_JobTracker.StartJob</c> runs <c>TryOpportunisticJob</c> itself, puts the bill at
+        /// the front of the queue and starts the haul in its place, from inside its own
+        /// <c>StartJob</c> and so through our prefix a second time.</para>
         ///
-        /// <para><b>The geometry is vanilla's, and it is tight.</b> The search
-        /// takes an item only when it is within half the distance to the bench,
-        /// its storage is within 0.6 of that distance of the bench, and the whole
-        /// detour stays within 1.7 times the straight walk
-        /// (<c>Pawn_JobTracker.TryOpportunisticJob</c>). In a five-cell room with
-        /// the item outside the wall, the walk to the bench has to be the room's
-        /// full diagonal: the pawn in the north-west corner beside the west wall,
-        /// the bench in the south-east corner, the item straight outside the wall
-        /// from the pawn, and the stockpile beside the bench. The stand's own cell
-        /// would sit nearer the door, but it is pass-through rather than
-        /// standable. The two detour limits have about 0.4 of a cell to spare.
-        /// The case asks vanilla's search directly first, so a geometry that stops
-        /// qualifying fails there with a reason, not later as our bug.</para>
-        ///
-        /// <para>A crafting spot is the bench because it is one cell: a stove's
-        /// position is the middle of three, which cannot reach the corner.</para>
+        /// <para>The geometry is vanilla's and it is tight. The search takes an item only when it
+        /// is within half the distance to the bench, its storage is within 0.6 of that distance of
+        /// the bench, and the whole detour stays within 1.7 times the straight walk. In a five-cell
+        /// room with the item outside the wall, that needs the walk to the bench to be the room's
+        /// full diagonal: the pawn in the north-west corner beside the west wall, the bench in the
+        /// south-east corner, the item straight outside the wall from the pawn, the stockpile
+        /// beside the bench. The stand's cell is nearer the door but pass-through, not standable.
+        /// The two detour limits have about 0.4 of a cell to spare. The case asks vanilla's search
+        /// directly first, so a geometry that stops qualifying fails there with a reason, not later
+        /// as our bug. A crafting spot is the bench because it is one cell: a stove's position is
+        /// the middle of three, which cannot reach the corner.</para>
         /// </summary>
         internal static bool VanillaOpportunisticHaulKeepsTheUniform(Fixture fix)
         {
@@ -424,17 +398,16 @@ namespace ShiftChange
             fix.Comp.ToggleWork(crafting);
             MakeCalm(map);
 
-            // Relative to the pad's corner, which the doorway strip pins: it runs
-            // up the pad's west side, one column out. The stand is at (1, 1) and
-            // the door at (0, 1).
+            // Relative to the pad's corner, which the doorway strip pins: it runs up the pad's west
+            // side, one column out. The stand is at (1, 1) and the door at (0, 1).
             IntVec3 corner = new IntVec3(fix.Outside.minX + 1, 0, fix.Outside.minZ);
             IntVec3 waitAt = corner + new IntVec3(1, 0, 5);
             IntVec3 itemAt = corner + new IntVec3(-1, 0, 5);
             IntVec3 benchAt = corner + new IntVec3(5, 0, 1);
             IntVec3 storeAt = corner + new IntVec3(4, 0, 2);
 
-            // Facing south, so its interaction cell is inside the room rather
-            // than in the south wall.
+            // Facing south, so its interaction cell is inside the room rather than in the south
+            // wall.
             Building_WorkTable spot = DebugTools_Fixtures.Spawn(map, spotDef, null, benchAt, Rot4.South)
                 as Building_WorkTable;
             if (spot == null)
@@ -470,8 +443,8 @@ namespace ShiftChange
                 billJob.bill = bill;
                 billJob.workGiverDef = spotBills;
 
-                // The engine half, asked directly: vanilla's own search offers a
-                // giver-less haul of the potatoes for this bill from here.
+                // The engine half, asked directly: vanilla's own search offers a giver-less haul of
+                // the potatoes for this bill from here.
                 Job offered = pawn.jobs.TryOpportunisticJob(null, billJob);
                 bool shaped = offered != null && offered.def == JobDefOf.HaulToCell
                               && offered.targetA.Thing == potatoes && offered.workGiverDef == null;
@@ -487,8 +460,8 @@ namespace ShiftChange
                     return false;
                 }
 
-                // Our half: start the bill as the think tree would, and let
-                // vanilla's StartJob make the swap itself.
+                // Our half: start the bill as the think tree would, and let vanilla's StartJob
+                // queue the bill and start the haul.
                 pawn.jobs.StartJob(billJob, JobCondition.None, null,
                     resumeCurJobAfterwards: false, cancelBusyStances: true, null, null);
                 JobQueue queue = pawn.jobs.jobQueue;
@@ -513,11 +486,10 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Start the queue's head the way the engine does: end whatever the
-        /// pawn is doing and let the think tree's queue node hand it out. That
-        /// runs every <c>StartJob</c> prefix in the load order, ours and any
-        /// other mod's, in their real order. Returns the def the pawn ended up
-        /// on, then leaves the pawn idle and the queue empty.
+        /// Start the queue's head the way the engine does: end whatever the pawn is doing and let
+        /// the think tree's queue node hand it out, which runs every <c>StartJob</c> prefix, ours
+        /// and any other mod's, in Harmony's order, which need not be the load order. Returns the
+        /// def the pawn ended up on, then leaves the pawn idle and the queue empty.
         /// </summary>
         internal static JobDef StartFromQueue(Fixture fix, Job job, JobTag? tag)
         {
@@ -547,16 +519,15 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// COMMON SENSE'S BILL HAUL KEEPS A COOK IN UNIFORM. As it ships, Common
-        /// Sense queues a haul of an out-of-room ingredient, with no giver,
-        /// ahead of the bill. Why that changed a cook out, and why its prefix
-        /// always runs before ours: docs/DESIGN.md, "Errands queued ahead of
-        /// work".
+        /// Common Sense's bill haul keeps a cook in uniform. As it ships, Common Sense queues a
+        /// haul of an out-of-room ingredient, with no giver, ahead of the bill, and its
+        /// <c>StartJob</c> prefix always runs before ours. Why that would change a cook out first,
+        /// and why the prefix order is fixed: docs/DESIGN.md, "Errands queued ahead of work".
         ///
-        /// <para>Driven end to end through the pawn's own tracker, so Common
-        /// Sense's real prefix builds the queue and ours then judges the haul
-        /// it hands out. The control is the same haul with no bill behind it,
-        /// which still changes them back. A known gap without the mod.</para>
+        /// <para>Driven end to end through the pawn's own tracker, so Common Sense's real prefix
+        /// builds the queue and ours then judges the haul it hands out. The control is the same
+        /// haul with no bill behind it, which still changes them back. A known gap without the
+        /// mod.</para>
         /// </summary>
         internal static bool CommonSenseBillHaulKeepsTheUniform(Fixture fix)
         {
@@ -587,10 +558,9 @@ namespace ShiftChange
             fix.Comp.ToggleWork(cooking);
             MakeCalm(map);
 
-            // A kitchen: the stove across the room from the stand, the
-            // potatoes on the ground outside, and a stockpile just outside the
-            // door, nearer the cook than the stove is. That distance is Common
-            // Sense's own condition for queueing the haul at all.
+            // A kitchen: the stove across the room from the stand, the potatoes on the ground
+            // outside, and a stockpile just outside the door, nearer the cook than the stove is,
+            // which is Common Sense's own condition for queueing the haul at all.
             IntVec3 stoveAt = fix.Stand.Position + new IntVec3(2, 0, 3);
             Building_WorkTable stove = DebugTools_Fixtures.Spawn(map, stoveDef, null, stoveAt, Rot4.North)
                 as Building_WorkTable;
@@ -646,8 +616,8 @@ namespace ShiftChange
             }
             JobDef haulDef = haul.def;
 
-            // Our half: the haul starts at the next job boundary, from the
-            // queue, through every prefix in their real order.
+            // Our half: the haul starts at the next job boundary, from the queue, through every
+            // prefix in their real order.
             pawn.jobs.EndCurrentJob(JobCondition.InterruptForced, startNewJob: true);
             ok &= Expect(pawn.CurJobDef != ShiftChangeDefOf.ShiftChange_SwapAtStand,
                          "the cook is NOT sent to change out for Common Sense's haul")
@@ -663,16 +633,14 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// PICK UP AND HAUL'S FOLLOW-UP JOBS KEEP THE UNIFORM ON: the unload at
-        /// the end of the haul (<c>JobDriver_HaulToInventory</c>, the last
-        /// toil), the unload its checker queues (<c>PawnUnloadChecker</c>), and
-        /// the next haul its driver queues. Why they read as leaving the room:
-        /// docs/DESIGN.md, "Mod compatibility".
+        /// Pick Up And Haul's follow-up jobs keep the uniform on: the unload at the end of the haul
+        /// (<c>JobDriver_HaulToInventory</c>, the last toil), the unload its checker queues
+        /// (<c>PawnUnloadChecker</c>), and the next haul its driver queues. Why they read as
+        /// leaving the room: docs/DESIGN.md, "Mod compatibility".
         ///
-        /// <para>Each row is started from the queue through the pawn's own
-        /// tracker, the way the mod's driver hands it over. The control is a
-        /// haul from its own work giver, starting outside, which still changes
-        /// them back first. A known gap without the mod.</para>
+        /// <para>Each row is started from the queue through the pawn's own tracker, the way the
+        /// mod's driver hands it over. The control is a haul from its own work giver, starting
+        /// outside, which still changes them back first. A known gap without the mod.</para>
         /// </summary>
         internal static bool PickUpAndHaulFollowUpsKeepTheUniform(Fixture fix)
         {
@@ -695,8 +663,8 @@ namespace ShiftChange
             fix.Comp.ToggleWork(cooking);
             MakeCalm(map);
 
-            // Their driver reads its comp off the pawn the moment it starts, so
-            // a pawn without it would throw for a reason that is not ours.
+            // Their driver reads its comp off the pawn the moment it starts, so a pawn without it
+            // would throw for a reason that is not ours.
             if (!Expect(pawn.AllComps.Any(c => c.GetType().Name == "CompHauledToInventory"),
                         "the colonist carries Pick Up And Haul's inventory comp (control)"))
             {
@@ -717,9 +685,8 @@ namespace ShiftChange
                 return false;
             }
 
-            // The haul as their work giver hands it out: stamped, judged at its
-            // first item, outside the kitchen. That has always changed them
-            // back first, and still does.
+            // The haul as their work giver hands it out: stamped, and judged at its first item,
+            // outside the kitchen, so it changes them back first.
             Job handedOut = HaulToInventoryJob(toInventory, potatoes, storeCell);
             handedOut.workGiverDef = theirGiver;
             ok &= Expect(Probe(fix, handedOut),
@@ -747,7 +714,7 @@ namespace ShiftChange
             return ok & Expect(fix.Comp.OnShift, "and they are still on shift at the end");
         }
 
-        /// <summary>A Pick Up And Haul haul, shaped the way their giver and driver build one.</summary>
+        /// <summary>A Pick Up And Haul haul, shaped as their giver and driver build one.</summary>
         internal static Job HaulToInventoryJob(JobDef def, Thing thing, IntVec3 storeCell)
         {
             Job job = JobMaker.MakeJob(def, LocalTargetInfo.Invalid, storeCell);

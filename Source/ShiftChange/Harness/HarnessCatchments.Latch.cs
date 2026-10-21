@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System.Collections.Generic;
 using System.Linq;
@@ -17,14 +15,12 @@ namespace ShiftChange
     internal static partial class HarnessCatchments
     {
         /// <summary>
-        /// THE CHANGE-BACK LATCH IS PER STAND AND TRIGGER. After Change back at
-        /// a radius stand, neither it nor a pooled room stand beside it, with
-        /// the same trigger, dresses the colonist. A recreation stand in the
-        /// same room does, and so does a radius stand in the open whose ring
-        /// does not reach the latched one. Lifting the latch by hand
-        /// is the control for the refusal. One cell past the ring, beside a
-        /// covered cell, still holds it, and a job boundary with no covered
-        /// cell beside it releases it.
+        /// The change-back latch is per stand and trigger. After Change back at a radius stand,
+        /// neither it nor a pooled room stand beside it, with the same trigger, dresses the
+        /// colonist. A recreation stand in the same room does, and so does a radius stand in the
+        /// open whose ring does not reach the latched one. Lifting the latch by hand is the
+        /// control for the refusal. One cell past the ring, beside a covered cell, still holds
+        /// it, and a job boundary with no covered cell beside it releases it.
         /// </summary>
         internal static bool LatchHoldsItsStandAndTriggerOnly(Fixture fix)
         {
@@ -47,9 +43,9 @@ namespace ShiftChange
             IntVec3 at = fix.Stand.Position;
             CompShiftStand pooled = StageStand(fix, at + new IntVec3(0, 0, 2));
             CompShiftStand play = StageStand(fix, at + new IntVec3(0, 0, 4));
-            // Three cells along the open strip from the door: a ring of the
-            // smallest radius there reaches the work beside the door (3 cells)
-            // and neither the latched stand (about 3.6) nor the room's work.
+            // Three cells along the open strip from the door: a ring of the smallest radius
+            // there reaches the work beside the door (3 cells) and neither the latched stand
+            // (about 3.6) nor the room's work.
             CompShiftStand open = StageStand(fix, new IntVec3(fix.Outside.minX, 0, at.z + 3));
             if (pooled == null || play == null || open == null)
             {
@@ -104,8 +100,8 @@ namespace ShiftChange
 
             Patch_JobInterception.ChangedBackAt[fix.Pawn] = new Patch_JobInterception.ChangeBackLatch(fix.Stand);
             IntVec3 wasAt = fix.Pawn.Position;
-            // One cell past the ring is beside a covered cell, where work at
-            // the ring's edge is done from, so the pause there is not leaving.
+            // One cell past the ring is beside a covered cell, where work at the ring's edge is
+            // done from, so the pause there is not leaving.
             fix.Pawn.pather?.StopDead();
             fix.Pawn.Position = pastRing;
             Diverts(fix, JobMaker.MakeJob(JobDefOf.Wait_MaintainPosture, 1));
@@ -125,16 +121,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// AT A SLEEP RACK THE LATCH HOLDS THROUGH THE NIGHT AND LIFTS ON
-        /// WAKING. After Change back, going to bed does not dress the colonist
-        /// again, and the job tracker's pause does not count as waking; the
-        /// first job after the lay-down releases the latch, and bed dresses
-        /// them again, which is the control. A haul vanilla starts ahead of the
-        /// lay-down, putting it back in the queue, is not the waking either.
-        /// Released on lying down instead,
-        /// the latch would undo the order at the very next boundary. A Change
-        /// back that wakes a sleeper is not itself the waking: the latch holds
-        /// through the job after it.
+        /// At a sleep rack the latch holds through the night and lifts on waking. After Change
+        /// back, going to bed does not dress the colonist again, and the job tracker's pause does
+        /// not count as waking; the first job after the lay-down releases the latch, and bed
+        /// dresses them again, which is the control. A haul vanilla starts ahead of the lay-down,
+        /// putting it back in the queue, is not the waking either, and neither is a Change back
+        /// that wakes a sleeper: the latch holds through the job after it.
         /// </summary>
         internal static bool SleepRackLatchLiftsOnWaking(Fixture fix)
         {
@@ -143,7 +135,8 @@ namespace ShiftChange
             {
                 return Expect(false, "the bed def resolves");
             }
-            // Ticked before the bed lands, as in RadiusSleepStandKeepsItOnlyForBed.
+            // Ticked before the bed lands: a bed makes the pad a bedroom, and on an automatic
+            // stand ToggleRest would then turn sleep off.
             fix.Comp.ToggleRest();
             fix.Comp.SetServes(CatchmentKind.Radius);
             fix.Comp.SetServeRadius(3);
@@ -178,8 +171,8 @@ namespace ShiftChange
                 & Expect(Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
                          "and lying down does not release the latch");
 
-            // Vanilla's StartJob can put the lay-down back in the queue and
-            // start a haul first (Pawn_JobTracker.TryOpportunisticJob).
+            // Vanilla's StartJob can put the lay-down back in the queue and start a haul first
+            // (Pawn_JobTracker.TryOpportunisticJob).
             fix.Pawn.jobs.jobQueue.EnqueueFirst(JobMaker.MakeJob(JobDefOf.LayDown, bed));
             Diverts(fix, JobMaker.MakeJob(JobDefOf.HaulToCell, inside, inside));
             fix.Pawn.jobs.ClearQueuedJobs();
@@ -214,15 +207,12 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// AN AREA STAND'S LATCH HOLDS BESIDE THE STAND. Changing back leaves
-        /// the colonist on a cell next to the stand, which the area need not
-        /// hold, and a painted field or rock face is worked from the unpainted
-        /// cell beside it. Neither is leaving the catchment: the pause after
-        /// the swap, work in the field and the pause after that work all keep
-        /// the latch, and the latched stand still refuses the work. Lifting
-        /// the latch by hand is the
-        /// control for the refusal, and a job on unpainted ground away from
-        /// the stand releases it.
+        /// An area stand's latch holds beside the stand. Changing back leaves the colonist on a
+        /// cell next to the stand, which the area need not hold, and a painted field or rock face
+        /// is worked from the unpainted cell beside it. Neither is leaving the catchment: the
+        /// pause after the swap, work in the field and the pause after that work all keep the
+        /// latch, and the latched stand still refuses the work. Lifting the latch by hand is the
+        /// control for the refusal, and a job on unpainted ground away from the stand releases it.
         /// </summary>
         internal static bool AreaLatchHoldsBesideItsStand(Fixture fix)
         {

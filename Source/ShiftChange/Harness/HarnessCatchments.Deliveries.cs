@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System.Collections.Generic;
 using System.Linq;
@@ -17,21 +15,15 @@ namespace ShiftChange
     internal static partial class HarnessCatchments
     {
         /// <summary>
-        /// A DELIVERY DRESSES NOBODY AT A ROOM OR RADIUS STAND, AND KEEPS THE
-        /// UNIFORM OF ITS OWN WORK ON. Each delivery is built with the job def
-        /// its giver uses (<see cref="HarnessTables.DeliveryDefFor"/>). A bare
-        /// builder fetching steel stays bare, the whole trip inside the ring;
-        /// a dressed one keeps the hardhat on with the stack past the ring and
-        /// the site inside, since the stand serves the delivery's work, and
-        /// changes back now for a site past the ring. The site jobs the same
-        /// givers hand out are ordinary work: removing an old floor inside the
-        /// ring dresses a bare builder, and past it changes a dressed one
-        /// back. A haul vanilla puts ahead of a queued delivery keeps the
-        /// uniform on, where the same haul alone changes them back. The stand
-        /// ticks each giver's own work type, so each refusal is the delivery
-        /// rule and not an unserved job. Core's five delivery-class givers and
-        /// the seed planter are probed; Complex Jobs' two delivery givers are
-        /// a known gap without it.
+        /// A delivery dresses nobody at a radius stand, and a dressed colonist keeps the
+        /// uniform of the delivery's own work on: with the stack past the ring and the site
+        /// inside, since the stand serves that work, and changing back now for a site past it.
+        /// The site jobs the same givers hand out (removing an old floor) are ordinary work, and
+        /// a haul vanilla puts ahead of a queued delivery keeps the uniform on, where the same
+        /// haul alone changes them back. Each delivery is built with its giver's job def
+        /// (<see cref="HarnessTables.DeliveryDefFor"/>), for Core's five delivery-class givers
+        /// and the seed planter; Complex Jobs' two are a known gap without that mod. The stand
+        /// ticks each giver's work type, so a refusal is the delivery rule and not an unserved job.
         /// </summary>
         internal static bool DeliveriesKeepTheirOwnWorkOn(Fixture fix)
         {
@@ -71,8 +63,8 @@ namespace ShiftChange
                     }
                 }
             }
-            // Each giver's own work type, whatever a mod has repointed it to:
-            // Complex Jobs moves Core's two deliveries to FSFDeliver.
+            // Each giver's own work type, whatever a mod has repointed it to: Complex Jobs moves
+            // Core's two hauler deliveries to FSFDeliver.
             foreach (WorkGiverDef giver in givers)
             {
                 if (giver.workType != null && !fix.Comp.HandlesWork(giver.workType))
@@ -116,9 +108,8 @@ namespace ShiftChange
                 ok &= Expect(!Probe(fix, DeliveryAt(giver, past, insideSite)),
                              giver.defName + "'s delivery keeps the uniform on, its stack past the ring and its site inside: the stand serves its work");
             }
-            // JobDriver_PlantSeed writes the seed stack it splits into targetC,
-            // so a planting resumed after an interruption carries the stack's
-            // end of the trip there, not a site.
+            // JobDriver_PlantSeed writes the seed stack it splits into targetC, so a planting
+            // resumed after an interruption has the stack's end of the trip there, not a site.
             WorkGiverDef seedPlanter = DefDatabase<WorkGiverDef>.GetNamedSilentFail(JobRoomTargets.SeedPlanter);
             if (seedPlanter != null)
             {
@@ -127,15 +118,15 @@ namespace ShiftChange
                 ok &= Expect(!Probe(fix, resumed),
                              "a seed planting resumed with its seed stack past the ring in targetC keeps it on: that is no site");
             }
-            // Real things here, since this one reaches Insert's reservation dry run.
+            // Real things, since this delivery reaches Insert's reservation dry run.
             Thing steelInside = Steel(fix.Map, inside);
             Thing siteOutside = WallBlueprint(fix.Map, pastSite);
             ok &= Expect(siteOutside != null && Probe(fix, Delivery(blueprints, steelInside, siteOutside)),
                          "a delivery to a site past the ring changes them back now, while the stand is near");
 
-            // Jobs are pooled, so the next delivery from the same steel can be
-            // the same Job object, handed out again with a new id. The record
-            // of the job they were dressed for must not let it through.
+            // Jobs are pooled, so the next delivery from the same steel can be the same Job object
+            // handed out again with a new id; the record of the job they were dressed for must
+            // not let it through.
             Job dressedFor = Delivery(blueprints, steelInside, siteOutside);
             Patch_JobInterception.DressedFor[fix.Pawn] = new Patch_JobInterception.DeferredJob(dressedFor);
             ok &= Expect(!Probe(fix, dressedFor),
@@ -146,8 +137,8 @@ namespace ShiftChange
                          "but the same Job object handed out again, its def and steel unchanged, changes them back");
             Patch_JobInterception.DressedFor.Remove(fix.Pawn);
 
-            // The shape vanilla's opportunistic haul leaves: the delivery put
-            // back at the head of the queue, untagged, and a haul started first.
+            // The shape vanilla's opportunistic haul leaves: the delivery put back at the head of
+            // the queue, untagged, and a haul started first.
             ok &= Expect(Probe(fix, JobMaker.MakeJob(JobDefOf.HaulToCell, past, pastSite)),
                          "a haul past the ring changes them back (control)");
             fix.Pawn.jobs.jobQueue.EnqueueFirst(DeliveryAt(blueprints, past, insideSite));
@@ -166,27 +157,22 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A DELIVERY OUTSIDE THE STAND'S WORK TAKES THE RETURN TRIP, judged
-        /// by the whole trip. A colonist in pyjamas from a bedroom stand, with
-        /// steel out past the door, changes back first, to a site out there or
-        /// in the room, while steel and site both in the room are the room's
-        /// (control); so does a cook in whites, the stand now ticked for
-        /// cooking. Once the stand serves construction, a delivery to a site in
-        /// the room keeps the uniform on, from steel out past the door, which
-        /// is the control, and so does the same fetch filed under Hauling. Every
-        /// site counts, with the first drop and the site set apart as the giver
-        /// sets them: a first drop, a site or a further site out past the door
-        /// each change them back now. A radius sleep stand changes them back
-        /// for a delivery with the whole trip inside its ring as well: the
-        /// first job out of bed always does.
+        /// A delivery outside the stand's work takes the return trip, judged by the whole trip.
+        /// Pyjamas from a bedroom stand and a cook's whites change back first for steel out past
+        /// the door, to a site there or in the room; steel and site both in the room are the
+        /// room's (control). Once the stand serves construction, a site in the room keeps the
+        /// uniform on from steel past the door, the same fetch filed under Hauling included but
+        /// not one filed under another work type; a first drop, a site or a further site past
+        /// the door each change them back now. A radius sleep stand changes them back for a trip
+        /// wholly inside its ring as well: the first job out of bed always does.
         /// </summary>
         internal static bool DeliveryOutsideTheStandsWorkChangesThemBack(Fixture fix)
         {
             WorkTypeDef construction = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Construction");
             WorkTypeDef cooking = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Cooking");
             WorkGiverDef deliver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("ConstructDeliverResourcesToBlueprints");
-            // Vanilla files the same fetch under Hauling when hauling outranks
-            // construction, or the blueprint needs more skill.
+            // Vanilla files the same fetch under Hauling when hauling outranks construction, or
+            // the blueprint needs more skill.
             WorkGiverDef haulDeliver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DeliverResourcesToBlueprints");
             if (construction == null || cooking == null || deliver == null)
             {
@@ -241,9 +227,7 @@ namespace ShiftChange
                          "so a delivery from steel out past the door to a site in the room keeps the uniform on (control)")
                 & Expect(Probe(fix, Delivery(deliver, steelIn, siteOut)),
                          "and one to a site out past the door changes them back now, while the stand is near");
-            // The giver's own shape: the first drop in targetB is the needer
-            // nearest the steel, the site it chose is in targetC, and further
-            // sites queue behind targetB.
+            // First drop and site set apart, as the giver sets them (see DeliveryVia).
             ok &= Expect(!Probe(fix, DeliveryVia(deliver, steelOut, siteInToo, siteIn)),
                          "a first drop and a site that differ, both in the room, keep it on (control)")
                 & Expect(Probe(fix, DeliveryVia(deliver, steelOut, siteOut, siteIn)),
@@ -259,9 +243,9 @@ namespace ShiftChange
                              "the same fetch filed under " + haulDeliver.workType.defName
                              + ", which the stand does not tick, keeps it on too: it supplies construction");
             }
-            // A fetch filed under a work type that is not hauling is that
-            // work's: VEF's art-skill deliveries go under Art. The replanting
-            // giver (Growing, and the delivery class) stands in for them here.
+            // A fetch filed under a work type that is not hauling is that work's: VEF's art-skill
+            // deliveries go under Art. The replanting giver (Growing, and the delivery class)
+            // stands in for them here.
             WorkGiverDef replant = DefDatabase<WorkGiverDef>.GetNamedSilentFail("Replant");
             if (replant != null && replant.workType != null)
             {
@@ -287,27 +271,23 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// AN AREA STAND DRESSES FOR A DELIVERY ITS AREA HOLDS WHOLE. With the
-        /// steel, the site and a second site painted in, a bare builder handed
-        /// the delivery is sent to change first, through the real dressing
-        /// decision and its reservation dry run. Steel outside the area, a
-        /// site outside it, and a second site outside it each dress nobody,
-        /// and room and radius modes over the same cells are the controls. The
-        /// same fetch filed under Hauling dresses nobody, the stand ticking
-        /// construction alone, though the colonist does construction: vanilla
-        /// files it there for one who ranks hauling higher or lacks the skill,
-        /// whose next job is seldom the frame. On shift, a delivery to a site
-        /// in the area keeps the uniform on wherever the steel lies, filed
-        /// under Hauling or not, and one to a site outside it changes them
-        /// back now, as a frame outside it does (control).
+        /// An area stand dresses for a delivery its area holds whole: with the steel, the site and
+        /// a second site painted in, a bare builder is sent to change first, through the real
+        /// dressing decision and its reservation dry run. Steel, a site or a second site outside
+        /// the area each dress nobody, and room and radius modes over the same cells are the
+        /// controls. The same fetch filed under Hauling dresses nobody either, with the stand
+        /// ticking construction alone, though the colonist does construction: a builder it is
+        /// filed for seldom has the frame as their next job. On shift, a site in the area keeps
+        /// the uniform on wherever the steel lies, filed under Hauling or not, and a site
+        /// outside it changes them back now, as a frame outside it does (control).
         /// </summary>
         internal static bool AreaStandDressesForADeliveryItHolds(Fixture fix)
         {
             WorkTypeDef construction = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Construction");
             WorkGiverDef deliver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("ConstructDeliverResourcesToBlueprints");
             WorkGiverDef finish = DefDatabase<WorkGiverDef>.GetNamedSilentFail("ConstructFinishFrames");
-            // Vanilla files the same fetch under Hauling when hauling outranks
-            // construction, or the blueprint needs more skill.
+            // Vanilla files the same fetch under Hauling when hauling outranks construction, or
+            // the blueprint needs more skill.
             WorkGiverDef haulDeliver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DeliverResourcesToBlueprints");
             if (construction == null || deliver == null || finish == null)
             {
@@ -389,11 +369,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A construction delivery whose site asked about is also the one
-        /// nearest the stack, so it stands in both targetB (the first drop) and
-        /// targetC (the site the giver chose), with the other sites the trip
-        /// supplies in targetB's queue. <see cref="DeliveryVia"/> separates the
-        /// first drop from the site.
+        /// A construction delivery whose first drop and site are the same needer, the one nearest
+        /// the stack. <see cref="DeliveryVia"/> sets them apart and gives the giver's full shape.
         /// </summary>
         internal static Job Delivery(WorkGiverDef giver, Thing stack, Thing site, params Thing[] others)
         {
@@ -402,10 +379,9 @@ namespace ShiftChange
 
         /// <summary>
         /// A construction delivery shaped as the giver shapes it
-        /// (<c>WorkGiver_ConstructDeliverResources.ResourceDeliverJobFor</c>):
-        /// the stack in targetA, the first drop, the needer nearest the stack,
-        /// in targetB, the site asked about in targetC, and the other sites the
-        /// trip supplies in targetB's queue.
+        /// (<c>WorkGiver_ConstructDeliverResources.ResourceDeliverJobFor</c>): the stack in
+        /// targetA, the first drop (the needer nearest the stack) in targetB, the site asked
+        /// about in targetC, and the other sites the trip supplies in targetB's queue.
         /// </summary>
         internal static Job DeliveryVia(WorkGiverDef giver, Thing stack, Thing firstDrop, Thing site,
                                         params Thing[] others)
@@ -422,10 +398,9 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// A delivery under its giver's job def (<see cref="HarnessTables.DeliveryDefFor"/>),
-        /// the stack's cell in A and the site's in B, with no targetC: an
-        /// install's shape, and a seed planting's or a replanting's, rather
-        /// than a construction delivery's. Reserves nothing.
+        /// A delivery under its giver's job def (<see cref="HarnessTables.DeliveryDefFor"/>), the
+        /// stack's cell in A and the site's in B and no targetC: the shape of an install, a seed
+        /// planting or a replanting, not of a construction delivery. Reserves nothing.
         /// </summary>
         internal static Job DeliveryAt(WorkGiverDef giver, IntVec3 stack, IntVec3 site)
         {
@@ -435,8 +410,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Removing an old floor under a blueprint, as the blueprint delivery
-        /// giver hands it out (<c>RemoveExistingFloorJob</c>): a site job.
+        /// Removing an old floor under a blueprint, as the blueprint delivery giver hands it out
+        /// (<c>RemoveExistingFloorJob</c>): a site job.
         /// </summary>
         internal static Job FloorRemovalAt(WorkGiverDef giver, IntVec3 at)
         {
@@ -445,7 +420,7 @@ namespace ShiftChange
             return job;
         }
 
-        /// <summary>A steel wall's blueprint on a cell, the colony's.</summary>
+        /// <summary>A steel wall blueprint on a cell, owned by the colony.</summary>
         internal static Thing WallBlueprint(Map map, IntVec3 at)
         {
             return GenConstruct.PlaceBlueprintForBuild(ThingDefOf.Wall, at, map, Rot4.North, Faction.OfPlayer,

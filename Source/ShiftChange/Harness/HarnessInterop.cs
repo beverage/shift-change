@@ -1,7 +1,5 @@
-// HARNESS only: dev tooling, compiled out of a plain Release build (the
-// configuration table is in ShiftChange.csproj). The guard is whole-file,
-// always, and check-invariants.py enforces it; why: docs/DESIGN.md,
-// "Development tooling".
+// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
+// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
 using System;
 using System.Collections.Generic;
@@ -16,40 +14,32 @@ using static ShiftChange.HarnessFixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// Harness cases for code of ours that runs inside another mod's.
-    /// Today that is <see cref="Patch_OutfitStandsPlusUseButton"/>, whose case
-    /// needs Outfit Stands Plus loaded: on the default list it is a known gap,
-    /// and <c>run-harness.sh --with=khamenman.outfitstandsplus</c> adds the mod
-    /// to that list.
+    /// Cases for code of ours that runs inside another mod's: today
+    /// <see cref="Patch_OutfitStandsPlusUseButton"/>, a known gap unless Outfit Stands Plus is
+    /// loaded (run-harness.sh --with=khamenman.outfitstandsplus).
     /// </summary>
     internal static class HarnessInterop
     {
         /// <summary>
-        /// Their stand button, reading our stand list, offers the same stands
-        /// in the same order as it does walking every building.
+        /// Their stand button, reading our stand list, offers the same stands in the same order as
+        /// their own walk over every building.
         ///
-        /// <para>First the patch itself: the walk is in their original IL, and
-        /// what runs calls the list in its place.</para>
+        /// <para>It first reads their method's IL: the original walks the colony's buildings once,
+        /// and what runs calls the stand list in its place.</para>
         ///
-        /// <para>Then a world built to show either half going wrong. The
-        /// fixture's stand belongs to a second colonist. The owner gets a
-        /// mechanized stand of theirs and then a second vanilla stand, spawned
-        /// in that order. A third stand names the owner but belongs to no
-        /// faction, which both lookups must leave out. Owners go straight into
-        /// their lists through the base class, so the case asserts the lookup
-        /// and nothing about how our copy fills those lists. The mechanized
-        /// stand then goes to no faction and back, which moves it to the end of
-        /// the colony building list, and the list has to follow.</para>
+        /// <para>The world is built to show either half going wrong. The fixture's stand belongs to
+        /// a second colonist. The owner gets a mechanized stand and then a second vanilla stand,
+        /// spawned in that order, and a third stand that names the owner but has no faction, which
+        /// both lookups must leave out. Owners go into their lists through the base class, so the
+        /// case asserts the lookup and nothing about how our copy fills those lists. Giving the
+        /// mechanized stand no faction and back appends it to the end of the colony building list,
+        /// and the stand list has to follow.</para>
         ///
-        /// <para>Order is asserted because it is behaviour: the owner's two
-        /// buttons merge into one, and a click goes to the first. The case
-        /// checks the merge happens, so the reason is tested as well as the
-        /// order.</para>
-        ///
-        /// <para>Their method runs with the switch off and on. That the off arm
-        /// is their walk rests on two checks: their method calls the list (the
-        /// IL above), and the list hands back the walk when switched off
-        /// (asked directly, at the end).</para>
+        /// <para>Order is asserted because it is behaviour: the owner's two buttons merge into one
+        /// and a click goes to the first, which the case checks. Their method runs with the switch
+        /// off and on; that the off arm is their walk rests on their method calling the list (the
+        /// IL check) and the list handing back the walk when off (asked directly, at the
+        /// end).</para>
         /// </summary>
         internal static bool OutfitStandsPlusButtonMatchesTheirs(Fixture fix)
         {
@@ -134,6 +124,8 @@ namespace ShiftChange
 
             poweredStand.SetFaction(null);
             poweredStand.SetFaction(Faction.OfPlayer);
+            // No faction change clears an owner list, in the game, Outfit Stands Plus or this mod,
+            // so this adds nothing; it stays so the second gather tests the order alone.
             lists[1].ForceAddPawn(owner);
             ok &= BothAgree(ownerUse, otherUse, standField, new[] { secondVanilla, poweredStand }, fix.Stand,
                             "after the mechanized stand changed hands and came back", out _);
@@ -157,9 +149,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Gathers both colonists' buttons with the switch off, then on, and
-        /// asserts the walk gives what the world says it should (the control)
-        /// and the list gives exactly the same.
+        /// Gathers both colonists' buttons with the switch off, then on, and asserts the walk gives
+        /// what the world says (the control) and the list gives exactly the same.
         /// </summary>
         internal static bool BothAgree(ThingComp ownerUse, ThingComp otherUse, FieldInfo standField,
                                        Building_OutfitStand[] ownerExpected, Building_OutfitStand otherExpected,
@@ -198,7 +189,7 @@ namespace ShiftChange
             return pawn.AllComps.FirstOrDefault(c => Patch_OutfitStandsPlusUseButton.useCompType.IsInstanceOfType(c));
         }
 
-        /// <summary>One gather, as the command bar does it: the buttons, and the stand behind each.</summary>
+        /// <summary>Gathers the command bar's buttons, and the stand behind each.</summary>
         internal static List<Building_OutfitStand> Gather(ThingComp use, FieldInfo standField, out List<Gizmo> buttons)
         {
             buttons = use.CompGetGizmosExtra()?.ToList() ?? new List<Gizmo>();
