@@ -7,6 +7,14 @@ posted on the Steam Workshop for that version, sorted into Added, Changed, Remov
 
 ## [Unreleased]
 
+### Fixed
+
+- If a stand's owner was kidnapped while the stand was boxed up for a move, setting it down made
+  them its owner again and kept the shift they had open at it, so nobody else could use it until
+  they came home. A kidnapped owner is now dropped when the stand is placed, as they already were
+  from a stand left standing. In a save where a stand was already set down this way, loading the
+  save releases the shift; the owner still needs removing once with Set owner.
+
 ## [1.5.3] - 2026-10-21
 
 ### Fixed

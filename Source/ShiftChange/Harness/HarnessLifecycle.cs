@@ -599,6 +599,77 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// A colonist kidnapped while their stand is boxed neither owns it nor keeps their shift
+        /// at it when it is set down, as they would not had it stood on a map. Kidnapping reaches
+        /// the reaper, which cannot find a boxed stand, and a kidnapped pawn keeps the player
+        /// faction, so <c>IsColonist</c> and <see cref="CompShiftStand.StillOurs"/> both pass.
+        /// The fixture's borrower is the owner; the kidnapping is undone before teardown.
+        /// Minified and set down as <see cref="ReinstallKeepsConfiguration"/> does it.
+        /// </summary>
+        internal static bool KidnappedOwnerNotRestoredOnReinstall(Fixture fix)
+        {
+            CompAssignableToPawn assignable =
+                fix.Stand.TryGetComp<CompAssignableToPawn_ShiftStand>();
+            Faction kidnappers = Find.FactionManager.AllFactionsListForReading
+                .FirstOrDefault(f => !f.IsPlayer && f.def.humanlikeFaction);
+            if (assignable == null || kidnappers == null)
+            {
+                return Expect(false, "the stand carries our assignable comp, and a faction exists "
+                                     + "to kidnap with");
+            }
+
+            assignable.TryAssignPawn(fix.Pawn);
+            Apparel uniform = fix.Comp.IssuedUniformForReading.FirstOrDefault();
+            bool ok = Expect(assignable.AssignedPawnsForReading.Contains(fix.Pawn),
+                             "the colonist owns the stand (control)")
+                    & Expect(fix.Comp.OnShift && fix.Comp.Borrower == fix.Pawn,
+                             "and is on shift at it (control)")
+                    & Expect(uniform != null, "wearing its uniform (control)");
+
+            Map map = fix.Map;
+            IntVec3 from = fix.Stand.Position;
+            IntVec3 to = new IntVec3(from.x, 0, from.z + 2);
+            Rot4 rot = fix.Stand.Rotation;
+
+            MinifiedThing box = fix.Stand.MakeMinified();
+            if (box == null)
+            {
+                return ok & Expect(false, "the stand minified");
+            }
+
+            kidnappers.kidnapped.Kidnap(fix.Pawn, null);
+            try
+            {
+                ok &= Expect(fix.Pawn.IsKidnapped(), "the owner is kidnapped while the stand is "
+                                                     + "boxed (control)")
+                    & Expect(fix.Pawn.IsColonist, "and still counts as a colonist (control)");
+
+                box.InnerThing = null;
+                box.Destroy();
+                GenSpawn.Spawn(fix.Stand, to, map, rot);
+
+                ok &= Expect(fix.Stand.Spawned, "the stand is set down again (control)")
+                    & Expect(!assignable.AssignedPawnsForReading.Contains(fix.Pawn),
+                             "the kidnapped colonist does not own the reinstalled stand")
+                    & Expect(!fix.Comp.OnShift, "and their shift there is released")
+                    & Expect(CompShiftStand.OnShiftStandFor(fix.Pawn) == null,
+                             "so no stand still has them checked out");
+                if (uniform != null && fix.Pawn.outfits != null)
+                {
+                    ok &= Expect(!fix.Pawn.outfits.forcedHandler.IsForced(uniform),
+                                 "the uniform they were taken in is ordinary clothing");
+                }
+            }
+            finally
+            {
+                kidnappers.kidnapped.RemoveKidnappedPawn(fix.Pawn);
+            }
+
+            assignable.TryUnassignPawn(fix.Pawn);
+            return ok;
+        }
+
+        /// <summary>
         /// Death runs <c>Pawn.Kill</c>, then <c>Pawn.Destroy(KillFinalize)</c>, then
         /// <c>Pawn_Ownership.UnclaimAll</c>, which <see cref="Patch_UnclaimStands"/> hooks. The
         /// case asserts the ledger is reaped and the registry entry cleared on that path.

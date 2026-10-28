@@ -186,6 +186,9 @@ namespace ShiftChange
                  ReinstallKeepsConfiguration);
             Case(map, pad, "an owner who dies while their stand is boxed does not own it again",
                  DeadOwnerNotRestoredOnReinstall);
+            Case(map, pad, "an owner kidnapped while their stand is boxed neither owns it nor "
+                           + "keeps their shift there",
+                 KidnappedOwnerNotRestoredOnReinstall);
             Case(map, pad, "borrower death reaps the ledger", DeathReaps);
             Case(map, pad, "borrower banishment reaps the ledger", BanishmentReaps);
             Case(map, pad, "repeated faults disable interception, a load re-arms it", FaultLatchRecovers);

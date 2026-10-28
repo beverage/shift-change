@@ -370,12 +370,13 @@ namespace ShiftChange
         /// list either way, and only beds and thrones override it. Deliberately not gated on
         /// <see cref="AssigningCandidates"/>: it reads work from the room, which mid-move is
         /// wherever the player set the stand down, and re-checking would drop the owner.
-        /// Never a dead pawn: the reaper cannot reach a boxed stand, so an owner who died during
-        /// the move is still parked, and <c>IsColonist</c> stays true for a dead colonist.
+        /// Never a pawn who has left: the reaper cannot reach a boxed stand, so an owner who died
+        /// or was kidnapped during the move is still parked, and <c>IsColonist</c> stays true for
+        /// both. <see cref="CompShiftStand.Departed"/> is the test the reaper's release stands for.
         /// </summary>
         protected override bool CanSetUninstallAssignedPawn(Pawn pawn)
         {
-            if (pawn == null || pawn.Dead || AssignedAnything(pawn) || !(bool)CanAssignTo(pawn))
+            if (CompShiftStand.Departed(pawn) || AssignedAnything(pawn) || !(bool)CanAssignTo(pawn))
             {
                 return false;
             }

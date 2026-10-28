@@ -84,6 +84,20 @@ namespace ShiftChange
             return pawn.Faction == player || pawn.HostFaction == player;
         }
 
+        /// <summary>Whether the reaper would have released this pawn, had the stand been on a
+        /// map to find when they left: dead, gone from the colony, or kidnapped. Kidnapping
+        /// runs <c>UnclaimAll</c> but keeps the player faction, so <see cref="StillOurs"/>
+        /// alone passes a kidnapped colonist.</summary>
+        internal static bool Departed(Pawn pawn)
+        {
+            if (pawn == null || pawn.Dead || !StillOurs(pawn))
+            {
+                return true;
+            }
+            // KidnapUtility.IsKidnapped reads Find.FactionManager, which throws without a world.
+            return Find.World?.factionManager != null && pawn.IsKidnapped();
+        }
+
         /// <summary>The pawns this stand is reserved for, empty for a pool stand. Never null:
         /// the assignable comp's own list, or the shared <see cref="NoOwners"/> on a stand
         /// without one, so callers only read it.</summary>
@@ -188,12 +202,12 @@ namespace ShiftChange
             // Unconditional, not load-only: a stand set down from a box needs it too.
             EnforceRemovalFlag();
 
-            if (OnShift && (borrower == null || borrower.Dead || !StillOurs(borrower)))
+            if (OnShift && Departed(borrower))
             {
                 // Nobody left to honour the ledger: no borrower (older saves), one who
-                // died while the stand was boxed, when no map's lister holds it for
-                // StandsBorrowedBy to find, or one who left the colony by a route no patch
-                // catches. Not AbandonLedger: its map sweep is unsafe inside
+                // died or was kidnapped while the stand was boxed, when no map's lister holds
+                // it for StandsBorrowedBy to find, or one who left the colony by a route no
+                // patch catches. Not AbandonLedger: its map sweep is unsafe inside
                 // Map.FinalizeLoading.
                 ReleaseBorrower();
             }
