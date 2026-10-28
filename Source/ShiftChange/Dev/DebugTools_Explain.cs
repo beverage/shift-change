@@ -153,7 +153,7 @@ namespace ShiftChange
                     bool path = SwimPathFinder.TryFindSwimPath(pawn, water, out List<IntVec3> found);
                     report.Append("  swim: path from that cell: ")
                           .AppendLine(path
-                              ? found.Count + " hops"
+                              ? found.Count + " cells"
                               : "NONE  <-- BLOCKS swimming (pool too small or obstructed)");
                 }
             }
@@ -180,15 +180,20 @@ namespace ShiftChange
                 else
                 {
                     Job offered = null;
+                    Exception threw = null;
                     try
                     {
                         offered = giver.Worker.TryGiveJob(pawn);
                     }
                     catch (Exception e)
                     {
-                        verdict = "THREW: " + e.GetType().Name;
+                        threw = e;
                     }
-                    if (offered != null)
+                    if (threw != null)
+                    {
+                        verdict = "THREW: " + threw.GetType().Name;
+                    }
+                    else if (offered != null)
                     {
                         yielding++;
                         IntVec3 where = offered.targetB.IsValid

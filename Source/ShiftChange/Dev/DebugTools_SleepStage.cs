@@ -374,8 +374,8 @@ namespace ShiftChange
             }
             if (!stand.AddApparel(MakeGarment(def, colour)))
             {
-                Messages.Message(defName + " did not fit on the stand — it conflicts with a piece "
-                    + "already on it.", MessageTypeDefOf.RejectInput, historical: false);
+                Messages.Message(defName + " could not be added to the stand: its container "
+                    + "refused it.", MessageTypeDefOf.RejectInput, historical: false);
             }
         }
     }

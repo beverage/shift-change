@@ -86,6 +86,9 @@ namespace ShiftChange
         /// <c>-shiftchange-harness</c> auto-run (<see cref="Patch_HarnessAutoRun"/>), so a headless
         /// run exercises the path a human click does.
         /// </summary>
+        /// <param name="map">The map every case stages on.</param>
+        /// <param name="origin">The pad's south-west corner: the clicked cell, or the cell the
+        /// auto-run's finder chose.</param>
         /// <param name="toast">
         /// True for the interactive run: a refusal goes on screen rather than to the log, and the
         /// tally to both. False for the headless one, where nobody watches the screen: the log

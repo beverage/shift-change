@@ -73,6 +73,7 @@ FORBIDDEN_TYPES = [
     "DebugTools_Menu",
     "DebugTools_Explain",
     "DebugTools_RecRoomStage",
+    "DebugTools_SleepStage",
     "DebugTools_ExportScene",
     "Patch_HarnessAutoRun",
     "DebugTools_LifecycleHarness",
