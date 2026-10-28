@@ -14,6 +14,8 @@ posted on the Steam Workshop for that version, sorted into Added, Changed, Remov
   they came home. A kidnapped owner is now dropped when the stand is placed, as they already were
   from a stand left standing. In a save where a stand was already set down this way, loading the
   save releases the shift; the owner still needs removing once with Set owner.
+- On RimWorld 1.7, clicking the greyed Automatic option in a stand's settings, on a stand
+  serving a radius or an allowed area, played a click though nothing changed. It is silent now.
 
 ## [1.5.3] - 2026-10-21
 

@@ -15,6 +15,7 @@ namespace ShiftChange
     /// or excluded. The checkboxes always show the effective set, so ticking one while automatic
     /// seeds the custom set from the room's defaults rather than starting from nothing.
     /// </summary>
+    [StaticConstructorOnStartup]
     public class Dialog_SetStandWorkTypes : Window
     {
         internal const float RowHeight = 26f;
@@ -36,6 +37,13 @@ namespace ShiftChange
         /// Width the automatic row's label gives up on the right for its radio button, plus a gap.
         /// </summary>
         internal const float RadioButtonWidth = 28f;
+
+        /// <summary>
+        /// Vanilla's unchosen radio, which <c>Widgets</c> keeps private: the automatic row draws
+        /// it, with no click target, when it cannot be chosen.
+        /// </summary>
+        internal static readonly Texture2D RadioButOffTex =
+            ContentFinder<Texture2D>.Get("UI/Widgets/RadioButOff");
 
         /// <summary>Extra height the automatic label's wrap needed beyond one row.</summary>
         internal float autoLabelOverflow;
@@ -294,18 +302,24 @@ namespace ShiftChange
             Widgets.Label(new Rect(autoRect.x, autoRect.y,
                                    autoRect.width - RadioButtonWidth, autoRect.height),
                           autoLabel);
-            // On 1.6, GUI.enabled false makes both click targets refuse, so no sound plays. 1.7's
-            // GUI ignores GUI.enabled and RadioButton's disabled flag only greys it, so there
-            // the click lands and plays its sound: the autoAvailable test below is what refuses it.
-            bool wasEnabled = GUI.enabled;
-            GUI.enabled = autoAvailable;
-            bool autoClicked = Widgets.RadioButton(autoRect.xMax - 24f,
-                                                   autoRect.y + autoRect.height / 2f - 12f,
-                                                   comp.IsAutomatic, disabled: !autoAvailable)
-                               | Widgets.ButtonInvisible(autoRect);
-            GUI.enabled = wasEnabled;
+            float radioX = autoRect.xMax - 24f;
+            float radioY = autoRect.y + autoRect.height / 2f - 12f;
+            bool autoClicked = false;
+            if (autoAvailable)
+            {
+                autoClicked = Widgets.RadioButton(radioX, radioY, comp.IsAutomatic)
+                              | Widgets.ButtonInvisible(autoRect);
+            }
+            else
+            {
+                // Drawn in grey with no click target. Widgets.RadioButton plays its click on any
+                // click of an unchosen button, its disabled flag only greys it, and 1.7's GUI
+                // ignores GUI.enabled, so calling it here would tick on a row that refuses.
+                GUI.DrawTexture(new Rect(radioX, radioY, 24f, 24f),
+                                comp.IsAutomatic ? Widgets.RadioButOnTex : RadioButOffTex);
+            }
             GUI.color = Color.white;
-            if (autoClicked && autoAvailable)
+            if (autoClicked)
             {
                 comp.SetAutomatic();
             }
