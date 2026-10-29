@@ -76,7 +76,7 @@ The rules it follows:
 
 Four things recreation will not do: drinking and drug-taking do not count, because fetching a beer is the same job in a bar or a corridor; reading is left alone, because a colonist picks their reading spot after setting off; outdoors needs a radius or an allowed area, since every outdoor cell resolves to the same map-spanning room, though a walled but roofless yard is its own room and still counts; and nobody is pulled out of bed, because vanilla gives patients recreation they can take lying down.
 
-Three settings: Unassigned stands are shared, on by default; Keep colonists decent and Medical emergencies change first, both off by default.
+Four settings: New stands are used for shift changes and Unassigned stands are shared, both on by default; Keep colonists decent and Medical emergencies change first, both off by default.
 
 Adds no clothing, no buildings and no art of its own; it uses the vanilla outfit stand and whatever apparel you put on it.
 
