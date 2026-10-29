@@ -190,6 +190,21 @@ namespace ShiftChange
             return comp;
         }
 
+        /// <summary>Applies the new-stand setting. <c>ThingMaker.MakeThing</c> is the only caller,
+        /// a finished frame included; a load rebuilds the comp without it and reads
+        /// <see cref="excluded"/> back from the save, so a stand that already exists never
+        /// changes when the setting does.</summary>
+        public override void PostPostMake()
+        {
+            base.PostPostMake();
+            if (!ShiftChangeMod.NewStandsInService)
+            {
+                // The field alone: every other setting is still at its default here, and the
+                // stand is not spawned, so SetExcluded's catchment reset has nothing to do.
+                excluded = true;
+            }
+        }
+
         public override void PostSpawnSetup(bool respawningAfterLoad)
         {
             base.PostSpawnSetup(respawningAfterLoad);

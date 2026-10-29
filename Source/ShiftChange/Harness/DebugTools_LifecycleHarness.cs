@@ -238,6 +238,9 @@ namespace ShiftChange
             Case(map, pad, "the medical emergency setting covers doctors and patients, never fires",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  MedicalEmergencySettingCoversTheRightWork);
+            Case(map, pad, "the new-stand setting decides what a stand made from then on starts as",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 NewStandSettingDecidesOnlyNewStands);
             Case(map, pad, "the job classifier sorts every job shape in the arms' order",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  HarnessJobKinds.ClassifierSortsEveryJobShape);

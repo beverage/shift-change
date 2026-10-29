@@ -7,7 +7,20 @@ posted on the Steam Workshop for that version, sorted into Added, Changed, Remov
 
 ## [Unreleased]
 
+### Added
+
+- A mod setting, **New stands are used for shift changes**, on by default. Turn it off and every
+  outfit stand built from then on starts as "Not used for shift changes": ordinary furniture
+  until you set it up with its switch. Stands that already exist keep their own setting, whichever
+  way it is set.
+
 ### Fixed
+
+- The description of **Unassigned stands are shared** said that with it off, an unassigned stand
+  behaves exactly like vanilla furniture. It does not: it dresses nobody, but
+  "Allow removing items" stays off and its contents stay out of trade. The description now says
+  so, and points at "Not used for shift changes" for a stand that should be ordinary furniture.
+  How the setting works is unchanged.
 
 - If a stand's owner was kidnapped while the stand was boxed up for a move, setting it down made
   them its owner again and kept the shift they had open at it, so nobody else could use it until

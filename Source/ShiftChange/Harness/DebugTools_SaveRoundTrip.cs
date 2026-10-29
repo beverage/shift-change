@@ -211,7 +211,18 @@ namespace ShiftChange
                         && saved.Contains("<shiftChangeServeRadius>9</shiftChangeServeRadius>"),
                     "the save carries the catchment under its prefixed keys");
 
-            SavedGameLoaderNow.LoadGameFromSaveFileNow(SaveName);
+            // Loaded with the new-stand setting off, which must not reach a stand that already
+            // exists: the setting is read only as a stand is made.
+            bool newStandsWas = ShiftChangeMod.Settings.newStandsInService;
+            ShiftChangeMod.Settings.newStandsInService = false;
+            try
+            {
+                SavedGameLoaderNow.LoadGameFromSaveFileNow(SaveName);
+            }
+            finally
+            {
+                ShiftChangeMod.Settings.newStandsInService = newStandsWas;
+            }
 
             // Positive control for the absence assertions, logged after the load so that a load
             // which cleared the queue could not hide it.
@@ -265,7 +276,8 @@ namespace ShiftChange
                     "and the load put it back in the registry")
                 & DebugTools_LifecycleHarness.Expect(
                     !ledger.IsExcluded,
-                    "the loaded stand is in service (control for the sweep below)")
+                    "the loaded stand is in service though the new-stand setting was off "
+                    + "(and the control for the sweep below)")
                 & DebugTools_LifecycleHarness.Expect(
                     Patch_AllowRemovingToggle.AllowRemovingItemsRef != null
                         && !Patch_AllowRemovingToggle.AllowRemovingItemsRef(loaded),

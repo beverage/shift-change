@@ -6,9 +6,19 @@ namespace ShiftChange
     public class ShiftChangeSettings : ModSettings
     {
         /// <summary>
+        /// When true (the default), a newly made stand starts in service, reading its room. When
+        /// false it starts as "Not used for shift changes". Read once, as the stand is made
+        /// (<see cref="CompShiftStand.PostPostMake"/>), so stands that already exist keep their
+        /// own setting whichever way this is flipped.
+        /// </summary>
+        public bool newStandsInService = true;
+
+        /// <summary>
         /// When true (the default), an unassigned stand in a work room is a pool stand that any
         /// capable colonist may claim. When false, only a stand assigned to a colonist dresses
-        /// anyone, and every unassigned stand behaves like vanilla furniture.
+        /// anyone. An unassigned stand still counts as in service, so it keeps the removal toggle
+        /// off and its contents out of trade; only "Not used for shift changes" makes a stand
+        /// vanilla furniture.
         /// </summary>
         public bool poolUnassignedStands = true;
 
@@ -44,6 +54,7 @@ namespace ShiftChange
         public override void ExposeData()
         {
             base.ExposeData();
+            Scribe_Values.Look(ref newStandsInService, "newStandsInService", defaultValue: true);
             Scribe_Values.Look(ref poolUnassignedStands, "poolUnassignedStands", defaultValue: true);
             Scribe_Values.Look(ref keepColonistsDecent, "keepColonistsDecent", defaultValue: false);
             Scribe_Values.Look(ref medicalEmergenciesChangeFirst,
@@ -59,6 +70,12 @@ namespace ShiftChange
         internal static ShiftChangeSettings settings;
 
         public static ShiftChangeSettings Settings => settings;
+
+        /// <summary>
+        /// The read point for <see cref="ShiftChangeSettings.newStandsInService"/>. Unloaded
+        /// settings read as on, its default, as for <see cref="PoolingEnabled"/>.
+        /// </summary>
+        public static bool NewStandsInService => Settings == null || Settings.newStandsInService;
 
         /// <summary>
         /// The read point for <see cref="ShiftChangeSettings.poolUnassignedStands"/>.
@@ -97,6 +114,10 @@ namespace ShiftChange
         {
             Listing_Standard listing = new Listing_Standard();
             listing.Begin(inRect);
+            listing.CheckboxLabeled(
+                "ShiftChange.SettingNewStandsInService".Translate(),
+                ref Settings.newStandsInService,
+                "ShiftChange.SettingNewStandsInServiceDesc".Translate());
             listing.CheckboxLabeled(
                 "ShiftChange.SettingPoolUnassigned".Translate(),
                 ref Settings.poolUnassignedStands,

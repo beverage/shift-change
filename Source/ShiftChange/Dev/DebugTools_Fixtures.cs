@@ -21,10 +21,17 @@ namespace ShiftChange
         /// <summary>The green tint of the researcher's duster.</summary>
         internal static readonly Color DusterGreen = new Color(0.62f, 0.9f, 0.7f);
 
-        /// <summary>Spawns a player-faction thing with no style and graphic variant 0.</summary>
+        /// <summary>Spawns a player-faction thing with no style and graphic variant 0. A stand
+        /// starts in service whatever the new-stand setting says, so a fixture or a stage does not
+        /// depend on the profile it runs in.</summary>
         internal static Thing Spawn(Map map, ThingDef def, ThingDef stuff, IntVec3 cell, Rot4 rot)
         {
             Thing thing = ThingMaker.MakeThing(def, stuff);
+            CompShiftStand stand = thing.TryGetComp<CompShiftStand>();
+            if (stand != null)
+            {
+                stand.excluded = false;
+            }
             thing.SetFactionDirect(Faction.OfPlayer);
             thing.SetStyleDef(null);
             thing.overrideGraphicIndex = 0;

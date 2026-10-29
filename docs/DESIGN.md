@@ -450,7 +450,16 @@ gizmo on load. The cost is discipline about touching a shared building.
 **Unassigned means pooled.** Any capable colonist may claim a free stand, the bed
 model, and the answer to "a kitchen has eight possible cooks": you need one stand
 per *concurrent* cook. An assigned stand is reserved for its owner. A mod setting
-(default on) turns pooling off globally.
+(default on) turns pooling off globally. That only stops unassigned stands
+dressing anyone: they are still declared in service, so the removal toggle and
+trade withholding, which key on the declaration, still apply.
+
+**Whether a new stand starts in service is a mod setting** (default on). It is
+read once, in `CompShiftStand.PostPostMake`, which `ThingMaker.MakeThing` alone
+calls, a finished frame included. A load rebuilds the comp without that call and
+reads `excluded` back from the save, so flipping the setting never changes a
+stand that already exists. A player with many storage or display stands sets
+it once instead of opening each stand's settings.
 
 **One owner list per stand, and it is ours.** A stand can carry a second
 `CompAssignableToPawn`: Outfit Stands Plus adds one, and nothing stops another mod
