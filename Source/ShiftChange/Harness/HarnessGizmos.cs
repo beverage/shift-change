@@ -1,8 +1,11 @@
 // HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
 // (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
 #if HARNESS
+using System.Collections.Generic;
 using System.Linq;
+using HarmonyLib;
 using RimWorld;
+using UnityEngine;
 using Verse;
 using static ShiftChange.DebugTools_LifecycleHarness;
 using static ShiftChange.HarnessFixtures;
@@ -10,8 +13,9 @@ using static ShiftChange.HarnessFixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// Cases for the stand's buttons: what the switch says, and that selecting several stands keeps
-    /// each stand's buttons its own. Read from the comps' gizmos, never drawn.
+    /// Cases for the stand's buttons: what the switch says, that selecting several stands keeps
+    /// each stand's buttons its own, and that hovering one marks its stand. Read from the comps'
+    /// gizmos and from what vanilla queues to draw, never from the screen.
     /// </summary>
     internal static class HarnessGizmos
     {
@@ -116,6 +120,87 @@ namespace ShiftChange
                 & Expect(myOwner != null && theirOwner != null
                          && !myOwner.GroupsWith(theirOwner) && !theirOwner.GroupsWith(myOwner),
                          "and those stay separate too");
+        }
+
+        /// <summary>
+        /// Hovering a stand's switch or Set owner button marks that stand and no other, so with
+        /// several stands selected a player can find whose button is whose. The arrow is read
+        /// from vanilla's list, which the next frame draws and empties. The square is read from
+        /// the targeting material, whose colour vanilla rewrites each time it hands it out to
+        /// draw, so a colour set beforehand changes only if the square was drawn. A direct call
+        /// for the other stand is the control that both are read right.
+        /// </summary>
+        internal static bool HoveredButtonsMarkTheirOwnStand(Fixture fix)
+        {
+            ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
+            List<Vector3> arrows = AccessTools.Field(typeof(TargetHighlighter), "arrowPositions")
+                ?.GetValue(null) as List<Vector3>;
+            Material square = GenDraw.CurTargetingMat;
+            if (!Expect(standDef != null, "the stand def resolves")
+                || !Expect(arrows != null, "vanilla's arrow list resolves")
+                || !Expect(fix.Map == Find.CurrentMap, "the fixture's map is the current map (control)"))
+            {
+                return false;
+            }
+            Building_OutfitStand other = DebugTools_Fixtures.Spawn(fix.Map, standDef, ThingDefOf.WoodLog,
+                fix.Stand.Position + new IntVec3(2, 0, 0), Rot4.North) as Building_OutfitStand;
+            CompShiftStand otherComp = other?.TryGetComp<CompShiftStand>();
+            if (otherComp == null)
+            {
+                return Expect(false, "a second stand could be staged");
+            }
+
+            void Reset()
+            {
+                arrows.Clear();
+                // Vanilla hands the square out opaque, never clear.
+                square.color = Color.clear;
+            }
+            bool Squared()
+            {
+                return square.color != Color.clear;
+            }
+            bool Marks(Thing stand)
+            {
+                return arrows.Any(a => (a - stand.DrawPos).Yto0().magnitude < 0.6f);
+            }
+            string Seen()
+            {
+                return " (" + arrows.Count + " arrows, square " + (Squared() ? "drawn" : "not drawn") + ")";
+            }
+            bool OnlyMarks(Command_Action button, Thing mine, Thing theirs, string name)
+            {
+                Reset();
+                if (!Expect(button?.onHover != null, name + " has a hover action"))
+                {
+                    return false;
+                }
+                button.onHover();
+                return Expect(Marks(mine) && !Marks(theirs) && Squared(),
+                              name + " marks its own stand and not the other" + Seen());
+            }
+
+            Reset();
+            bool ok = Expect(!Squared(), "the square's material keeps a colour set on it (control)");
+            CompShiftStand.PointAt(other);
+            ok = ok
+                & Expect(Marks(other) && !Marks(fix.Stand) && Squared(),
+                         "a direct call for the second stand marks that stand only (control)" + Seen())
+                & OnlyMarks(Switch(fix.Comp), fix.Stand, other, "the first stand's switch")
+                & OnlyMarks(Switch(otherComp), other, fix.Stand, "the second stand's switch")
+                & OnlyMarks(OwnerButton(fix.Stand), fix.Stand, other, "the first stand's Set owner")
+                & OnlyMarks(OwnerButton(other), other, fix.Stand, "the second stand's Set owner");
+
+            // Vanilla keeps calling the last hovered button while another main tab is open, so a
+            // button can outlive its stand.
+            Command_Action stale = Switch(otherComp);
+            other.Destroy();
+            Reset();
+            stale?.onHover?.Invoke();
+            ok &= Expect(stale != null && arrows.Count == 0 && !Squared(),
+                         "a button kept from a destroyed stand marks nothing" + Seen());
+            arrows.Clear();
+            return ok;
         }
     }
 }

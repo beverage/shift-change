@@ -425,6 +425,8 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), SwitchNamesWhatTheStandServes);
             Case(map, pad, "selecting several stands shows each stand's own buttons",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), StandButtonsStaySeparate);
+            Case(map, pad, "hovering a stand's button marks that stand and no other",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), HoveredButtonsMarkTheirOwnStand);
             Case(map, pad, "fishing dresses at a stand ticked for it, and at a radius stand by the shore",
                  (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Fishing")),
                  FishingDressesAtAStandTickedForIt);

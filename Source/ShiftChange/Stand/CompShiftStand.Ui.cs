@@ -192,7 +192,26 @@ namespace ShiftChange
                 // looking as if it set them all.
                 groupable = false,
                 action = () => Find.WindowStack.Add(new Dialog_SetStandWorkTypes(this)),
+                onHover = () => PointAt(parent),
             };
+        }
+
+        /// <summary>
+        /// Marks a stand on the map while one of its buttons is hovered: with several stands
+        /// selected their buttons sit side by side, and none of them says where its stand is.
+        /// </summary>
+        internal static void PointAt(Thing stand)
+        {
+            // Vanilla's arrow sits just below a stand near the screen centre, pointing up at it;
+            // further out it points from the centre towards it, so the square marks the stand.
+            TargetHighlighter.Highlight(stand, arrow: true, colonistBar: false);
+            if (stand.Map != Find.CurrentMap)
+            {
+                return;
+            }
+            // The targeter's square sits above buildings; the highlighter's circle hides under the
+            // sprite. Hover runs in the map interface's update, so it shows this frame.
+            GenDraw.DrawTargetHighlight(stand);
         }
     }
 }

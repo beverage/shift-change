@@ -13,6 +13,10 @@ posted on the Steam Workshop for that version, sorted into Added, Changed, Remov
   outfit stand built from then on starts as "Not used for shift changes": ordinary furniture
   until you set it up with its switch. Stands that already exist keep their own setting, whichever
   way it is set.
+- Hovering a stand's switch or its Set owner button now marks that stand on the map with the
+  pulsing square vanilla shows on a target you are about to pick. An arrow points to it as well,
+  as it does when you hover a storage link. With several stands selected, each stand shows its
+  own pair of buttons, and until now nothing on them said which stand they belong to.
 
 ### Fixed
 

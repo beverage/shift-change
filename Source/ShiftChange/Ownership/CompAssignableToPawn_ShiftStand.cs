@@ -384,7 +384,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The base's Set owner gizmo with its hotkey stripped and its window swapped for ours.
+        /// The base's Set owner gizmo with its hotkey stripped, its window swapped for ours, and
+        /// the stand marked on the map while it is hovered.
         /// <see cref="Patch_ForeignOwnerGizmos"/> hides other mods' own, so this is the only one.
         /// </summary>
         public override IEnumerable<Gizmo> CompGetGizmosExtra()
@@ -409,6 +410,13 @@ namespace ShiftChange
                     // and a merged button opens every stand's dialog, each closing the one
                     // before, so it edits one list while looking as if it edits all.
                     assign.groupable = false;
+                    // Chained, not replaced: a hover another mod put on the base gizmo still runs.
+                    System.Action hovered = assign.onHover;
+                    assign.onHover = () =>
+                    {
+                        hovered?.Invoke();
+                        CompShiftStand.PointAt(parent);
+                    };
                 }
                 yield return gizmo;
             }
