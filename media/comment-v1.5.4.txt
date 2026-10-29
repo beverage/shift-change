@@ -1,0 +1,13 @@
+v1.5.4 update:
+
+New setting: New stands are used for shift changes. Turn it off and stands built from then on start as "Not used for shift changes", while the stands you already have keep their own setting.
+
+Hovering a stand's switch or Set owner button now marks that stand on the map, so with several stands selected you can tell which buttons belong to which stand.
+
+Fixed: a stand whose owner was kidnapped while it was boxed for a move no longer goes back to them when it is set down.
+
+Fixed: the description of Unassigned stands are shared no longer says an unassigned stand behaves like vanilla furniture.
+
+Fixed: on 1.7, the greyed Automatic option in a stand's settings no longer clicks.
+
+With the new setting left on, new stands start in service as before.

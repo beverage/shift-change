@@ -7,12 +7,14 @@ posted on the Steam Workshop for that version, sorted into Added, Changed, Remov
 
 ## [Unreleased]
 
+## [1.5.4] - 2026-10-29
+
 ### Added
 
 - A mod setting, **New stands are used for shift changes**, on by default. Turn it off and every
   outfit stand built from then on starts as "Not used for shift changes": ordinary furniture
   until you set it up with its switch. Stands that already exist keep their own setting, whichever
-  way it is set.
+  way it is set. Requested by a player.
 - Hovering a stand's switch or its Set owner button now marks that stand on the map with the
   pulsing square vanilla shows on a target you are about to pick. An arrow points to it as well,
   as it does when you hover a storage link. With several stands selected, each stand shows its
@@ -25,7 +27,6 @@ posted on the Steam Workshop for that version, sorted into Added, Changed, Remov
   "Allow removing items" stays off and its contents stay out of trade. The description now says
   so, and points at "Not used for shift changes" for a stand that should be ordinary furniture.
   How the setting works is unchanged.
-
 - If a stand's owner was kidnapped while the stand was boxed up for a move, setting it down made
   them its owner again and kept the shift they had open at it, so nobody else could use it until
   they came home. A kidnapped owner is now dropped when the stand is placed, as they already were
@@ -33,6 +34,9 @@ posted on the Steam Workshop for that version, sorted into Added, Changed, Remov
   save releases the shift; the owner still needs removing once with Set owner.
 - On RimWorld 1.7, clicking the greyed Automatic option in a stand's settings, on a stand
   serving a radius or an allowed area, played a click though nothing changed. It is silent now.
+
+Unchanged: with the new setting left on, a new stand starts in service as before, and turning it
+off changes no stand you already have.
 
 ## [1.5.3] - 2026-10-21
 
@@ -737,7 +741,8 @@ The first release. It needs Odyssey, for the outfit stand, and Harmony.
 - A Change back button on any colonist in uniform takes them out of it at once.
 - One setting, Unassigned stands are shared, on by default.
 
-[Unreleased]: https://github.com/beverage/shift-change/compare/v1.5.3...HEAD
+[Unreleased]: https://github.com/beverage/shift-change/compare/v1.5.4...HEAD
+[1.5.4]: https://github.com/beverage/shift-change/compare/v1.5.3...v1.5.4
 [1.5.3]: https://github.com/beverage/shift-change/compare/v1.5.2...v1.5.3
 [1.5.2]: https://github.com/beverage/shift-change/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/beverage/shift-change/compare/v1.5.0...v1.5.1
