@@ -373,10 +373,17 @@ stands are the mechanized ones from
   their own, raid or no raid, but "on their own next job" can be a long time if
   the job they just started was sleep.
 
-Three mod settings, under Options → Mod settings:
+Four mod settings, under Options → Mod settings:
 
+- **New stands are used for shift changes**, on by default. Turn it off and
+  every stand built from then on starts as "Not used for shift changes", so
+  stands kept for storage or display need nothing done to them, and you switch
+  on only the ones you want. Stands already built keep their own setting.
 - **Unassigned stands are shared**, on by default. Turn it off and only stands
-  with an explicit owner list ever dress anyone.
+  with an explicit owner list ever dress anyone. An unassigned stand is still a
+  shift stand, though: "Allow removing items" stays off and its contents stay
+  out of trade. "Not used for shift changes" is what makes a stand ordinary
+  furniture.
 - **Keep colonists decent**, off by default, described further up.
 - **Medical emergencies change first**, off by default. On, a doctor answering
   an emergency tend puts scrubs on first and a colonist in critical condition

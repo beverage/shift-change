@@ -450,7 +450,16 @@ gizmo on load. The cost is discipline about touching a shared building.
 **Unassigned means pooled.** Any capable colonist may claim a free stand, the bed
 model, and the answer to "a kitchen has eight possible cooks": you need one stand
 per *concurrent* cook. An assigned stand is reserved for its owner. A mod setting
-(default on) turns pooling off globally.
+(default on) turns pooling off globally. That only stops unassigned stands
+dressing anyone: they are still declared in service, so the removal toggle and
+trade withholding, which key on the declaration, still apply.
+
+**Whether a new stand starts in service is a mod setting** (default on). It is
+read once, in `CompShiftStand.PostPostMake`, which `ThingMaker.MakeThing` alone
+calls, a finished frame included. A load rebuilds the comp without that call and
+reads `excluded` back from the save, so flipping the setting never changes a
+stand that already exists. A player with many storage or display stands sets
+it once instead of opening each stand's settings.
 
 **One owner list per stand, and it is ours.** A stand can carry a second
 `CompAssignableToPawn`: Outfit Stands Plus adds one, and nothing stops another mod
@@ -848,6 +857,24 @@ one stand's state, an automatic stand's ticks are seeded from its own room, and
 one set ticked across stands in different rooms would overwrite each room's own
 reading with a custom set — the clobbering that kept stand settings off the
 copy and paste buttons.
+
+Unmerged buttons leave a selection of stands showing a row of pairs, and
+nothing on a pair says which stand it belongs to. So hovering either button
+marks its stand, from the command's `onHover`, which runs every frame the
+button is hovered, in the map interface's update. Both marks are vanilla's.
+The arrow is `TargetHighlighter.Highlight`, as a storage link or an ITab's
+contents use it. Within nine cells of the screen centre it sits just below the
+target, pointing up at it; further out it is drawn seven cells from the centre,
+pointing towards the target, which among thirty stands names a direction and
+not a stand. So the stand also gets `GenDraw.DrawTargetHighlight`, the pulsing
+square a targeter draws on the thing under the cursor, above the building
+layer.
+
+Two marks that look like the answer do not work here. The highlighter's own
+circle is drawn at the target's altitude with the footprint's radius, so on a
+one-cell stand the sprite and the selection brackets cover all but a few
+pixels of it. A line ring drawn above the stand shows, but the line texture is
+faint, and a selection of radius stands is already covered in rings.
 
 The trigger is the **job**, not the doorway: work-type-in-set AND
 job-target-in-room. A doctor crossing the hospital to reach the storeroom, or

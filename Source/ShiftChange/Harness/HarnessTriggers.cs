@@ -505,6 +505,51 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// The new-stand setting decides what a stand made from then on starts as, through
+        /// <c>ThingMaker.MakeThing</c>, the call a finished frame makes. A stand made with it off
+        /// spawns as vanilla furniture; the fixture's stand, made before the flip, stays in
+        /// service (control). That a load never applies it is asserted in
+        /// <see cref="DebugTools_SaveRoundTrip.RoundTrip"/>.
+        /// </summary>
+        internal static bool NewStandSettingDecidesOnlyNewStands(Fixture fix)
+        {
+            bool was = ShiftChangeMod.Settings.newStandsInService;
+            bool ok = Expect(was, "the setting ships on, which is the default under test");
+            try
+            {
+                CompShiftStand on = (ThingMaker.MakeThing(fix.Stand.def, ThingDefOf.WoodLog)
+                    as ThingWithComps)?.TryGetComp<CompShiftStand>();
+                ok &= Expect(on != null && on.IsAutomatic, "with it on a new stand starts automatic");
+
+                ShiftChangeMod.Settings.newStandsInService = false;
+                Building_OutfitStand stand =
+                    ThingMaker.MakeThing(fix.Stand.def, ThingDefOf.WoodLog) as Building_OutfitStand;
+                CompShiftStand off = stand?.TryGetComp<CompShiftStand>();
+                if (off == null || Patch_AllowRemovingToggle.AllowRemovingItemsRef == null)
+                {
+                    return ok & Expect(false, "a stand and its removal flag could be made with it off");
+                }
+                ok &= Expect(off.IsExcluded, "with it off a new stand starts as not used for shift changes");
+
+                // Spawned with the removal flag on: a stand in service would force it off here.
+                stand.SetFactionDirect(Faction.OfPlayer);
+                Patch_AllowRemovingToggle.AllowRemovingItemsRef(stand) = true;
+                GenSpawn.Spawn(stand, fix.Stand.Position + new IntVec3(2, 0, 0), fix.Map, Rot4.North);
+                ok &= Expect(off.IsExcluded, "and spawning it keeps it so")
+                    & Expect(Patch_AllowRemovingToggle.AllowRemovingItemsRef(stand),
+                             "its Allow removing items stays as set, as on a vanilla stand")
+                    & Expect(!off.BlocksTrade, "and its contents can be traded")
+                    & Expect(!fix.Comp.IsExcluded, "while the stand made before the flip is still in service");
+            }
+            finally
+            {
+                ShiftChangeMod.Settings.newStandsInService = was;
+            }
+            return ok & Expect(ShiftChangeMod.Settings.newStandsInService,
+                               "the setting was restored for the cases that follow");
+        }
+
+        /// <summary>
         /// Deposit only: a colonist parks what the stand's filter accepts, keeps the rest of their
         /// clothes on, and gets it all back on the return trip. The stand must be claimed at all:
         /// <c>OnShift</c> counts a stored garment as well as an issued one, or the parka sits in a

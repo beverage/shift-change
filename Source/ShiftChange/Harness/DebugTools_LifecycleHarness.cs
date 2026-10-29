@@ -238,6 +238,9 @@ namespace ShiftChange
             Case(map, pad, "the medical emergency setting covers doctors and patients, never fires",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  MedicalEmergencySettingCoversTheRightWork);
+            Case(map, pad, "the new-stand setting decides what a stand made from then on starts as",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                 NewStandSettingDecidesOnlyNewStands);
             Case(map, pad, "the job classifier sorts every job shape in the arms' order",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  HarnessJobKinds.ClassifierSortsEveryJobShape);
@@ -422,6 +425,8 @@ namespace ShiftChange
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), SwitchNamesWhatTheStandServes);
             Case(map, pad, "selecting several stands shows each stand's own buttons",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), StandButtonsStaySeparate);
+            Case(map, pad, "hovering a stand's button marks that stand and no other",
+                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), HoveredButtonsMarkTheirOwnStand);
             Case(map, pad, "fishing dresses at a stand ticked for it, and at a radius stand by the shore",
                  (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Fishing")),
                  FishingDressesAtAStandTickedForIt);
