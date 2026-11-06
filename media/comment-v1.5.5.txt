@@ -1,0 +1,5 @@
+v1.5.5 update:
+
+Fixed: a crafter at a radius or area stand no longer changes out of uniform to store a bill's product in a stockpile inside the ring or the area, whether or not Hauling is ticked.
+
+A stockpile past the edge still changes them back first, and room stands work as before.
