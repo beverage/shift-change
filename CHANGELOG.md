@@ -7,6 +7,19 @@ posted on the Steam Workshop for that version, sorted into Added, Changed, Remov
 
 ## [Unreleased]
 
+## [1.5.5] - 2026-11-06
+
+### Fixed
+
+- A crafter on shift at a radius or area stand changed out of uniform to store each bill's product,
+  even with the stockpile inside the ring or the area. They left the product at the bench, walked
+  to the stand, came back for it in their own clothes and dressed again for the next bill. They now
+  carry it to that stockpile in uniform, whether or not Hauling is ticked. Reported by a player.
+
+Unchanged: a stockpile past the edge of the ring or the area still changes them back first, and
+they leave the product at the bench to do it. Bills set to drop on the floor work as before, and
+so do room stands.
+
 ## [1.5.4] - 2026-10-29
 
 ### Added
@@ -741,7 +754,8 @@ The first release. It needs Odyssey, for the outfit stand, and Harmony.
 - A Change back button on any colonist in uniform takes them out of it at once.
 - One setting, Unassigned stands are shared, on by default.
 
-[Unreleased]: https://github.com/beverage/shift-change/compare/v1.5.4...HEAD
+[Unreleased]: https://github.com/beverage/shift-change/compare/v1.5.5...HEAD
+[1.5.5]: https://github.com/beverage/shift-change/compare/v1.5.4...v1.5.5
 [1.5.4]: https://github.com/beverage/shift-change/compare/v1.5.3...v1.5.4
 [1.5.3]: https://github.com/beverage/shift-change/compare/v1.5.2...v1.5.3
 [1.5.2]: https://github.com/beverage/shift-change/compare/v1.5.1...v1.5.2
