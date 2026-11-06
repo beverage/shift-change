@@ -1035,6 +1035,22 @@ only for these (`StaysDressed`):
   work type first, then ordinary sleep (`IsOrdinarySleep`, which the sleep arm
   shares), then recreation.
 - **At a work stand, also pass-through work and the incidental jobs** (below).
+- **At a work stand, also the haul that stores a served bill's product**, judged
+  at the stockpile alone (`StoresServedBillProduct`). A finished bill puts the
+  stack in the crafter's hands and starts a new `HaulToCell` that names no giver,
+  so the haul has no work type of its own. Read as any other job with no work
+  type, it would change the colonist back after each bill that stores its
+  product, with the stack dropped at the bench. It counts as the bill's last
+  step, so Hauling need not be ticked. The bill must be work the stand serves,
+  the bill must still be the current job as the haul starts, and the stack must
+  be in hand, which keeps every other giver-less haul out. The stack's own place
+  is left out on purpose: it is at the crafter's cell, and a player who painted
+  the bench and the stockpile but not the cell in front of the bench should not
+  lose the rule to that one cell. A stockpile outside the catchment changes them
+  back first, and the stack goes down at the bench for the walk to the stand,
+  unless served work is queued behind the haul ("Errands queued ahead of work").
+  A room stand keeps its own rule, which reads the stack's place and never the
+  stockpile, so a room's crafter carries the product out of the door in uniform.
 - **At a recreation stand, also the incidental jobs**, pass-through work
   excepted. A swimmer wanders between pools in swimwear, but changes before
   hauling.

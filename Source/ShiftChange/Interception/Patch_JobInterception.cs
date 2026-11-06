@@ -445,6 +445,12 @@ namespace ShiftChange
         internal static bool StaysDressed(Job job, JobClass c, Pawn pawn, CompShiftStand onShift,
                                           JobPlace target, Map map)
         {
+            // The last step of work the stand serves, so only where it ends can send them back.
+            if (StoresServedBillProduct(job, pawn, onShift))
+            {
+                bool named = false;
+                return PlaceCovered(job.targetB, onShift, map, ref named);
+            }
             // Changing back for a job this stand dresses for would only dress them again next job.
             // By work type, not kind: a delivery or meal run goes by its giver's work.
             WorkTypeDef work = c.Work;
@@ -472,6 +478,25 @@ namespace ShiftChange
             // where the pawn stands.
             return c.Incidental
                    && onShift.Covers(target.IsValid ? target : JobPlace.At(pawn.Position), map);
+        }
+
+        /// <summary>
+        /// Whether this is the haul that stores a finished bill's product, for a bill whose work
+        /// the stand serves. The bill's last toil puts the stack in the pawn's hands and starts
+        /// the haul with no giver, so the haul has no work type, and the bill is still the current
+        /// job here. The stack in hand tells it from a haul that begins by walking to a stack.
+        /// </summary>
+        internal static bool StoresServedBillProduct(Job job, Pawn pawn, CompShiftStand stand)
+        {
+            if (job.def != JobDefOf.HaulToCell || job.workGiverDef != null)
+            {
+                return false;
+            }
+            Pawn_JobTracker jobs = pawn.jobs;
+            return jobs.curDriver is JobDriver_DoBill
+                   && stand.HandlesWork(jobs.curJob.workGiverDef?.workType)
+                   && job.targetA.Thing != null
+                   && pawn.carryTracker?.CarriedThing == job.targetA.Thing;
         }
 
         /// <summary>The map is under threat, so no arm dresses anyone.</summary>

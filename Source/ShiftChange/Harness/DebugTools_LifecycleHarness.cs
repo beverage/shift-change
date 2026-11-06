@@ -319,6 +319,46 @@ namespace ShiftChange
             Case(map, pad, "pass-through work is judged at both ends, and an errand ahead of the stand's work rides along",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  PassThroughWorkIsJudgedAtBothEnds);
+            WorkTypeDef crafting = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Crafting");
+            Case(map, pad, "a bill's product hauled to a stockpile in the area keeps the uniform on",
+                 (m, p) => StageWithDoorway(m, p, crafting),
+                 f => BillProductHaul(f, CatchmentKind.Area, true, true, true));
+            Case(map, pad, "a bill's product hauled to a stockpile in the ring keeps the uniform on",
+                 (m, p) => StageWithDoorway(m, p, crafting),
+                 f => BillProductHaul(f, CatchmentKind.Radius, true, true, true));
+            Case(map, pad, "the same with Hauling not ticked, because the bill's work is what the stand serves",
+                 (m, p) => StageWithDoorway(m, p, crafting),
+                 f => BillProductHaul(f, CatchmentKind.Area, false, true, true));
+            Case(map, pad, "a bill's product bound for a stockpile past the area changes them back first",
+                 (m, p) => StageWithDoorway(m, p, crafting),
+                 f => BillProductHaul(f, CatchmentKind.Area, true, false, false));
+            Case(map, pad, "a bill's product bound for a stockpile past the ring changes them back first",
+                 (m, p) => StageWithDoorway(m, p, crafting),
+                 f => BillProductHaul(f, CatchmentKind.Radius, true, false, false));
+            Case(map, pad, "the same with Hauling not ticked",
+                 (m, p) => StageWithDoorway(m, p, crafting),
+                 f => BillProductHaul(f, CatchmentKind.Area, false, false, false));
+            Case(map, pad, "a room stand keeps the uniform on for a bill's product bound for a stockpile in the room",
+                 (m, p) => StageWithDoorway(m, p, crafting),
+                 f => BillProductHaul(f, CatchmentKind.Room, true, true, true));
+            Case(map, pad, "and for one bound past its door, as it always has",
+                 (m, p) => StageWithDoorway(m, p, crafting),
+                 f => BillProductHaul(f, CatchmentKind.Room, true, false, true));
+            Case(map, pad, "a bill's product is judged at the stockpile, not the crafter's unpainted cell",
+                 (m, p) => StageWithDoorway(m, p, crafting),
+                 BillProductIsJudgedAtTheStockpile);
+            Case(map, pad, "a bill's product goes by the ordinary rule once the stand stops serving the bill",
+                 (m, p) => StageWithDoorway(m, p, crafting),
+                 BillProductOfUnservedWorkChangesThemBack);
+            Case(map, pad, "a haul that starts with the stack on the ground is no bill's product",
+                 (m, p) => StageWithDoorway(m, p, crafting),
+                 BillProductMustBeInHand);
+            Case(map, pad, "the same stack in hand after other served work is no bill's product",
+                 (m, p) => StageWithDoorway(m, p, crafting),
+                 BillProductMustComeFromABill);
+            Case(map, pad, "a crafter off shift is not dressed to store what they made",
+                 (m, p) => StageWithDoorway(m, p, crafting),
+                 BillProductDressesNobody);
             Case(map, pad, "a radius sleep stand changes them back on the first job out of bed",
                  (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
                  RadiusSleepStandKeepsItOnlyForBed);

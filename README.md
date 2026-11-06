@@ -279,7 +279,11 @@ either, a colonist keeps the outfit on only for:
   heat or cold;
 - at a work stand, hauling, cleaning and building, provided every place the job
   names is inside the ring or the area. A haul out to a freezer past its edge
-  changes them back before they leave, while the stand is still close.
+  changes them back before they leave, while the stand is still close;
+- at a work stand, carrying a finished bill's product to its stockpile, provided
+  the stand serves that bill's work and the stockpile is inside the ring or the
+  area. Hauling does not have to be ticked. A stockpile past the edge changes
+  them back first, and they leave the stack at the bench to do it.
 
 Most other jobs send them back to change first: a sit-down meal, bed,
 recreation at a work stand, work the stand does not serve. A sleep stand keeps pyjamas on only

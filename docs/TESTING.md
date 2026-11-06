@@ -363,7 +363,15 @@ Staying dressed goes by what the stand is for, with a case per trigger
 (`RadiusWorkStandKeepsTheUniformInItsRing`,
 `RadiusSleepStandKeepsItOnlyForBed`, `RadiusRecreationStandKeepsItForPlay`).
 Pass-through work is judged at both ends, and an errand ahead of the stand's
-own work rides along (`PassThroughWorkIsJudgedAtBothEnds`). The two lists that
+own work rides along (`PassThroughWorkIsJudgedAtBothEnds`). A finished bill's
+product is driven through the real `DoBill` at an area, a radius and a room
+stand, with the stockpile inside and outside, and Hauling ticked and not
+(`BillProductHaul`). It is judged at the stockpile and not at the crafter's cell
+(`BillProductIsJudgedAtTheStockpile`), goes by the ordinary rule once the stand
+stops serving the bill (`BillProductOfUnservedWorkChangesThemBack`), needs the
+stack in hand and a bill behind it (`BillProductMustBeInHand`,
+`BillProductMustComeFromABill`), and sends nobody to dress
+(`BillProductDressesNobody`). The two lists that
 decide it are checked as tables, with no map
 (`PassThroughAndIncidentalTablesHold`). Each case that dresses its colonist
 then asserts that the job tracker's pause after the swap did not send them
