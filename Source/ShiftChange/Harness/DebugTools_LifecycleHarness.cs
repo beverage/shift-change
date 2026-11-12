@@ -332,6 +332,9 @@ namespace ShiftChange
                      (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), RadiusCoversItsRing);
             cases.On("a stand leaves room mode only with something ticked, and comes back with nothing",
                      (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), CatchmentNeedsSomethingTicked);
+            cases.On("an automatic stand reads its room's new role on the same tick, with the contents scan on",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     AutomaticReadingFollowsTheRoomsRole);
             cases.On("a freed radius stand interrupts nobody, a room stand still does",
                      (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
                                      capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
@@ -548,8 +551,8 @@ namespace ShiftChange
             cases.On("the recreation job classifier holds", RecreationClassifierHolds);
             cases.On("the sleep job classifier holds", RestClassifierHolds);
             cases.On("the room-role table resolves", RoomRoleTableResolves);
-            cases.On("each feeding giver's work is served where its patients lie",
-                     FeedingWorkIsServedWherePatientsLie);
+            cases.On("each hospital and barn patient giver's work is served there",
+                     PatientWorkIsServedWherePatientsLie);
             cases.On("the job-target and ignored-giver tables hold", JobTablesHold);
             cases.On("the pass-through tags and the incidental job list hold", PassThroughAndIncidentalTablesHold);
             cases.On("the room-contents markers hold", ContentsMarkersHold);

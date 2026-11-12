@@ -7,6 +7,21 @@ posted on the Steam Workshop for that version, sorted into Added, Changed, Remov
 
 ## [Unreleased]
 
+### Fixed
+
+- With Complex Jobs, a barn stand changed a colonist out of uniform before they fed a sick animal
+  in that barn, and never dressed anyone to operate on one. Complex Jobs moves both jobs off
+  Doctor, feeding to Nurse and animal surgery to Surgeon, and the barn's list had neither. Barns
+  now pick up Nurse and Surgeon, as hospitals already did, so a barn stand covers the same jobs
+  with Complex Jobs as without it.
+- With Rimatomics, an automatic stand took about four seconds of game time to notice its room
+  taking a new role, such as a bed set to medical turning the room into a hospital, and while
+  paused it waited for you to unpause. It notices at once now.
+
+Unchanged: a stand in a prison cell serves only what you tick. Complex Jobs moves feeding
+prisoners from Warden to Nurse, or to its own Prison Care if you switch that on, so tick that
+beside Warden, or a warden changes out of uniform before carrying a meal to a prisoner.
+
 ## [1.5.5] - 2026-11-06
 
 ### Fixed

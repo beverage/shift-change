@@ -107,11 +107,11 @@ on another mod runs both ways before it is trusted.
 The cases whose givers Complex Jobs moves tick each giver's own work type, not
 its vanilla name, so they test the same thing with that mod loaded: the bill
 products and the feeding cases. The hospital catchment ticks whatever its room
-reads. Complex Jobs files
-stonecutting under Stone Cut and most feeding under Nurse (prisoner feeding
-under Prison Care with XML Extensions), and Shift Change's compatibility rows
-arm a hospital for Nurse and Surgeon beside Doctor. A case that ticks a vanilla
-name still breaks under a mod that moves its giver.
+reads. Complex Jobs files stonecutting under Stone Cut, feeding patients under
+Nurse and surgery under Surgeon, and prisoner feeding under Nurse (or under its
+Prison Care, an option that needs XML Extensions). Shift Change's compatibility
+rows arm a hospital and a barn for Nurse and Surgeon beside Doctor. A case that
+ticks a vanilla name still breaks under a mod that moves its giver.
 
 **The window does not need focus.** An unfocused instance used to stall on its
 loading screen: the log froze around line 49, the process sat near 0% CPU, and
@@ -370,7 +370,12 @@ area instead of its room. The ring is inclusive, exactly the cells it draws
 gives); a stand leaves room mode only with something ticked and returns to it
 on leaving shift use, an automatic stand taken to a radius and back is automatic
 again unless its ticks changed meanwhile, and its Serves row greys exactly where
-the setter refuses (`CatchmentNeedsSomethingTicked`); and a freed radius stand catches nobody up,
+the setter refuses (`CatchmentNeedsSomethingTicked`). With the room-contents
+scan on, which caches an automatic stand's reading, the stand still reads its
+room turning into a hospital on the same tick
+(`AutomaticReadingFollowsTheRoomsRole`, which swaps in a marker that matches
+nothing so it runs without Rimatomics); and a freed radius stand catches nobody
+up,
 where a room stand records the job it interrupts as the one they dressed for
 (`FreedRadiusStandCatchesNobody`). The registry forgets a stand that is no
 longer spawned at the next stand search (`RegistryForgetsAStandNoLongerSpawned`).
@@ -512,18 +517,19 @@ never walks under the harness, so it stops the job once it has started.
 **Tables and rooms** (`HarnessTables`). Four cases need no map and check that
 the static tables still match the def database, where every lookup is
 silent-fail and a renamed def empties its row with no error: the room-role
-table (`RoomRoleTableResolves`), each feeding giver's work against the place
-its patients lie, a hospital's or a barn's automatic stand or a stand ticked
-for Warden (`FeedingWorkIsServedWherePatientsLie`), the job-target,
-ignored-giver and ride-along tables, delivery givers by class, deliveries by
-job, and every official giver of a feeding class on the ignored list included
+table (`RoomRoleTableResolves`), the work of each giver that tends, feeds or
+operates on a patient in a hospital or barn bed against that room's automatic
+stand, and of each prisoner feeding giver against a stand ticked for Warden
+(`PatientWorkIsServedWherePatientsLie`), the job-target, ignored-giver and
+ride-along tables, delivery givers by class, deliveries by job, and every
+official giver of a feeding class on the ignored list included
 (`JobTablesHold`), and the room-contents markers (`ContentsMarkersHold`). The
-feeding case counts the misses it knows of as one known gap: Complex Jobs moves
-animal feeding to Nurse, which no barn row names, and prisoner feeding to work
-a Warden tick does not serve. Any other miss fails. `JobTablesHold` and
-`ContentsMarkersHold` check Rimatomics' names only when it is loaded, and count
-as known gaps without it. A fifth asserts the arithmetic that sizes the
-work-type dialog's body (`WorkTypeDialogBodyRectFitsTheBody`). Two need a map
+patient case notes, and passes, a prisoner giver a mod moves to work of its
+own: a cell's stand serves what the player ticks, and the README says to tick
+that work beside Warden. `JobTablesHold` and `ContentsMarkersHold` check
+Rimatomics' names only when it is loaded, and count as known gaps without it. A
+fifth asserts the arithmetic that sizes the work-type dialog's body
+(`WorkTypeDialogBodyRectFitsTheBody`). Two need a map
 and resolve a work target's room: one with no room of its own
 (`SolidTargetResolvesARoom`), and one in an exterior wall, from either side
 (`ExteriorWallTargetResolvesTheRoom`).

@@ -124,43 +124,37 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The feeding givers whose patients lie in a room with a role, by that role's defName.
-        /// The rest of <see cref="DeliberatelyIgnoredOfficialGivers"/> feed prisoners.
+        /// The givers that tend, feed or operate on a patient in a hospital or barn bed, by that
+        /// role's defName. Left out: emergency tending dresses nobody, self-tending is the
+        /// patient's own, Anomaly's entities lie on holding platforms, and taking a patient to bed
+        /// for an operation starts wherever the patient is. The rest of
+        /// <see cref="DeliberatelyIgnoredOfficialGivers"/> feed prisoners.
         /// </summary>
-        internal static readonly Dictionary<string, string> FeedingGiverRoles =
+        internal static readonly Dictionary<string, string> PatientGiverRoles =
             new Dictionary<string, string>
             {
+                { "DoctorTendToHumanlikes", "Hospital" },
                 { "DoctorFeedHumanlikes", "Hospital" },
                 { "FeedHemogen", "Hospital" },
+                { "DoBillsMedicalHumanOperation", "Hospital" },
+                { "DoctorTendToAnimals", "Barn" },
                 { "DoctorFeedAnimals", "Barn" },
                 { "HandlingFeedPatientAnimals", "Barn" },
+                { "DoBillsMedicalAnimalOperation", "Barn" },
             };
 
         /// <summary>
-        /// The feeding givers a mod is known to move to work their place does not serve: Complex
-        /// Jobs files animal feeding under Nurse, which no barn row names, and prisoner feeding
-        /// under Nurse or Prison Care, which a Warden tick does not cover.
+        /// Each patient giver's work is served where its patients lie, by a hospital's or a barn's
+        /// automatic stand: the stand dresses for tending and operating there, and a meal run keeps
+        /// the uniform on only at a stand serving the giver's work. A cell's roles arm nothing, so
+        /// its stand serves what is ticked: Warden in vanilla, and the work a mod moves prisoner
+        /// feeding to, which the README tells the player to tick beside it.
         /// </summary>
-        internal static readonly HashSet<string> KnownUnservedFeedingGivers = new HashSet<string>
-        {
-            "DoctorFeedAnimals",
-            "FeedPrisoner", "DeliverFoodToPrisoner", "DeliverHemogenToPrisoner",
-        };
-
-        /// <summary>
-        /// Each feeding giver's work is served where its patients lie: by a hospital's or a barn's
-        /// automatic stand, or for a prisoner by a stand ticked for Warden. A meal run keeps the
-        /// uniform on only at a stand serving the giver's work, so a giver moved to work the place
-        /// does not serve sends its colonist off to change in the middle of the errand. Misses on
-        /// <see cref="KnownUnservedFeedingGivers"/> under a mod's work are one known gap; any other
-        /// miss fails.
-        /// </summary>
-        internal static bool FeedingWorkIsServedWherePatientsLie()
+        internal static bool PatientWorkIsServedWherePatientsLie()
         {
             WorkTypeDef warden = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Warden");
             bool ok = Expect(warden != null, "the Warden work type resolves");
-            FeedingGaps gaps = new FeedingGaps();
-            foreach (KeyValuePair<string, string> row in FeedingGiverRoles)
+            foreach (KeyValuePair<string, string> row in PatientGiverRoles)
             {
                 WorkGiverDef giver = DefDatabase<WorkGiverDef>.GetNamedSilentFail(row.Key);
                 RoomRoleDef role = DefDatabase<RoomRoleDef>.GetNamedSilentFail(row.Value);
@@ -174,80 +168,35 @@ namespace ShiftChange
                                         + " role resolve");
                     continue;
                 }
-                ok &= gaps.Check(RoomWorkTypes.ForRole(role).Contains(giver.workType), giver, false,
-                                 row.Key + " (" + giver.workType.defName + ") is served by a "
-                                 + row.Value + "'s automatic stand");
+                ok &= Expect(RoomWorkTypes.ForRole(role).Contains(giver.workType),
+                             row.Key + " (" + giver.workType.defName + ") is served by a "
+                             + row.Value + "'s automatic stand");
             }
             foreach (string name in DeliberatelyIgnoredOfficialGivers)
             {
                 WorkGiverDef giver = DefDatabase<WorkGiverDef>.GetNamedSilentFail(name);
-                if (FeedingGiverRoles.ContainsKey(name) || BiotechGiverWithoutBiotech(giver, name))
+                if (PatientGiverRoles.ContainsKey(name) || BiotechGiverWithoutBiotech(giver, name))
                 {
                     continue;
                 }
-                if (giver?.workType == null || warden == null)
+                WorkTypeDef work = giver?.workType;
+                if (work == null)
                 {
                     ok &= Expect(false, name + " and its work type resolve");
                     continue;
                 }
-                ok &= gaps.Check(giver.workType == warden, giver, true,
-                                 name + " (" + giver.workType.defName + ") is Warden work, so "
-                                 + "a stand ticked for Warden serves it");
+                if (work != warden && IsModWork(work))
+                {
+                    Report.Append("      ").Append(name).Append(" is ").Append(work.defName)
+                          .Append(" work from ").Append(work.modContentPack?.Name ?? "a patch")
+                          .AppendLine(", which a cell's stand serves once ticked beside Warden");
+                    continue;
+                }
+                ok &= Expect(work == warden,
+                             name + " (" + work.defName + ") is Warden work, so a stand ticked "
+                             + "for Warden serves it");
             }
-            return ok & gaps.Close();
-        }
-
-        /// <summary>
-        /// Collects <see cref="FeedingWorkIsServedWherePatientsLie"/>'s known misses into its one
-        /// gap, which turns FIXED once every known giver a mod has moved is served.
-        /// </summary>
-        internal class FeedingGaps
-        {
-            internal readonly List<string> Unserved = new List<string>();
-            internal bool Moved;
-            internal bool RoomMiss;
-            internal bool PrisonerMiss;
-
-            /// <summary>Expects <paramref name="served"/>, or records a known miss.</summary>
-            internal bool Check(bool served, WorkGiverDef giver, bool prisoner, string what)
-            {
-                bool known = KnownUnservedFeedingGivers.Contains(giver.defName)
-                             && IsModWork(giver.workType);
-                Moved |= known;
-                if (served || !known)
-                {
-                    return Expect(served, what);
-                }
-                Report.Append("      ").Append(what)
-                    .Append(": no, it is work from ")
-                    .AppendLine(giver.workType.modContentPack?.Name ?? "a patch");
-                Unserved.Add(giver.defName);
-                RoomMiss |= !prisoner;
-                PrisonerMiss |= prisoner;
-                return true;
-            }
-
-            /// <summary>The case's known gap, if a mod has moved any of the known givers.</summary>
-            internal bool Close()
-            {
-                if (!Moved)
-                {
-                    return true;
-                }
-                List<string> why = new List<string>();
-                if (RoomMiss)
-                {
-                    why.Add("no compatibility row names the mod's work in the patients' room");
-                }
-                if (PrisonerMiss)
-                {
-                    why.Add("a Warden tick does not cover the mod's work, and no role arms a cell");
-                }
-                return ExpectKnownGap(Unserved.Count == 0,
-                                      "the feeding a mod moves is served where its patients lie ("
-                                      + string.Join(", ", Unserved) + ")",
-                                      string.Join("; ", why));
-            }
+            return ok;
         }
 
         /// <summary>Whether a giver is missing only because Biotech, its source, is off.</summary>

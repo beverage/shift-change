@@ -78,7 +78,9 @@ namespace ShiftChange
                         "FSFFabrication", "FSFRefining", "FSFProduction",
                     }
                 },
-                { "Barn",       new[] { "FSFTraining", "FSFSlaughter" } },
+                // Sick animals lie in the barn, and Complex Jobs moves feeding and operating on
+                // them off Doctor.
+                { "Barn",       new[] { "FSFTraining", "FSFSlaughter", "FSFNurse", "FSFSurgeon" } },
             };
 
         internal static Dictionary<RoomRoleDef, List<WorkTypeDef>> resolved;

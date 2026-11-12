@@ -442,14 +442,22 @@ only the vanilla names served part of its room's work and passed over the rest,
 which read as the stand working intermittently. The room table now names its
 work types as well: hospital picks up Nurse and Surgeon, laboratory Drugs,
 kitchen Butcher, workshop Stone Cut, Smelt, Machining, Fabricate, Refine and
-Production, barn Train and slaughter. Slaughter exists only if you switch it on
-in Complex Jobs' own settings, which needs XML Extensions; anything absent is
-passed over, so nothing changes for a game without it.
+Production, barn Train, slaughter, Nurse and Surgeon (Complex Jobs moves part
+of the barn's Doctor work there, such as feeding and operating on sick animals,
+so a barn stand covers the same jobs as without it). Slaughter exists only if
+you switch it on in Complex Jobs' own settings, which needs XML Extensions;
+anything absent is passed over, so nothing changes for a game without it.
 
 Taming is the one piece deliberately left out. A stand is chosen by where the
 job happens, and taming happens wherever the wild animal is standing, which is
 not the barn. Vanilla's own Handling row never fired for it either, so no barn
 stand has ever dressed anyone for taming.
+
+A prison stand needs one tick more. Complex Jobs moves feeding prisoners from
+Warden to Nurse, or to its own Prison Care if you switch that on. A stand in a
+cell never arms itself, so it serves only what you tick: tick Nurse (or Prison
+Care) beside Warden, or a warden in uniform changes out of it before carrying a
+meal to a prisoner.
 
 **[Dubs Rimatomics](https://steamcommunity.com/sharedfiles/filedetails/?id=1127530465)**
 needs no setup. A stand arms itself in any room holding a reactor core, the

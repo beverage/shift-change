@@ -91,6 +91,7 @@ namespace ShiftChange
         internal List<WorkTypeDef> automaticCache;
         internal int automaticCacheTick = -1;
         internal int automaticCacheRoomId = -1;
+        internal RoomRoleDef automaticCacheRole;
 
         /// <summary>
         /// The room's role defaults plus the work its contents earn
@@ -100,9 +101,10 @@ namespace ShiftChange
         /// which clears and rebuilds a set and a list on every call, and the gizmo label reads
         /// this every frame. An entry expires when the stand's room ID changes (a rebuilt room
         /// usually gets a new one, but one split by a fence can keep it when only part is
-        /// rebuilt) and after <see cref="AutomaticCacheTicks"/> of <c>TicksGame</c>, which
-        /// notices a building added to an existing room. <c>TicksGame</c> stops while the game
-        /// is paused, so such a building shows on unpause.</para>
+        /// rebuilt), when the room's role changes (a bed set to medical keeps the ID), and after
+        /// <see cref="AutomaticCacheTicks"/> of <c>TicksGame</c>, which notices a building added
+        /// to an existing room. <c>TicksGame</c> stops while the game is paused, so such a
+        /// building shows on unpause.</para>
         /// </summary>
         internal List<WorkTypeDef> AutomaticWorkTypes
         {
@@ -118,17 +120,19 @@ namespace ShiftChange
                     return RoomWorkTypes.ForRole(room.Role);
                 }
 
+                // The engine keeps the role, so reading it is cheap unless the room just changed.
+                RoomRoleDef role = room.Role;
                 TickManager ticks = Find.TickManager;
                 int now = ticks != null ? ticks.TicksGame : -1;
                 if (automaticCache != null
-                    && automaticCacheRoomId == room.ID
+                    && automaticCacheRoomId == room.ID && automaticCacheRole == role
                     && now >= 0 && automaticCacheTick >= 0
                     && now - automaticCacheTick < AutomaticCacheTicks)
                 {
                     return automaticCache;
                 }
 
-                List<WorkTypeDef> byRole = RoomWorkTypes.ForRole(room.Role);
+                List<WorkTypeDef> byRole = RoomWorkTypes.ForRole(role);
                 List<WorkTypeDef> combined = new List<WorkTypeDef>(byRole);
                 RoomContentsWork.Collect(room, combined);
                 if (combined.Count == byRole.Count)
@@ -138,6 +142,7 @@ namespace ShiftChange
 
                 automaticCache = combined;
                 automaticCacheRoomId = room.ID;
+                automaticCacheRole = role;
                 automaticCacheTick = now;
                 return combined;
             }

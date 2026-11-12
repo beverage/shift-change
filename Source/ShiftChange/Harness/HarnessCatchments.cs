@@ -21,6 +21,61 @@ namespace ShiftChange
     {
 
         /// <summary>
+        /// An automatic stand reads its room's new role on the tick the role changes, with the
+        /// contents scan on, which is what makes the stand cache its reading. A bed set to medical
+        /// keeps the room's ID, so only the role tells the old reading from the new. A stand-in
+        /// marker that matches nothing turns the scan on without the mod it is for.
+        /// </summary>
+        internal static bool AutomaticReadingFollowsTheRoomsRole(Fixture fix)
+        {
+            WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+            ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Bed");
+            if (doctor == null || bedDef == null)
+            {
+                return Expect(false, "the Doctor and bed defs resolve");
+            }
+            List<RoomContentsWork.Marker> saved = RoomContentsWork.active;
+            RoomContentsWork.active = new List<RoomContentsWork.Marker>
+            {
+                new RoomContentsWork.Marker("RimWorld.Building_CommsConsole", false, new string[0])
+                {
+                    type = typeof(Building_CommsConsole),
+                    works = new List<WorkTypeDef>(),
+                },
+            };
+            try
+            {
+                Room room = fix.Stand.GetRoom();
+                bool ok = Expect(room != null && RoomContentsWork.Any && fix.Comp.IsAutomatic
+                                 && !fix.Comp.HandlesWork(doctor),
+                                 "with the scan on, the stand reads its unroled room (control)")
+                        & Expect(room != null && fix.Comp.automaticCache != null
+                                 && fix.Comp.automaticCacheRoomId == room.ID
+                                 && fix.Comp.automaticCacheRole == room.Role
+                                 && fix.Comp.automaticCacheTick == Find.TickManager.TicksGame,
+                                 "and caches that reading for this room, role and tick (control)");
+                Building_Bed bed = DebugTools_Fixtures.Spawn(
+                    fix.Map, bedDef, ThingDefOf.WoodLog,
+                    new IntVec3(fix.Stand.Position.x + 2, 0, fix.Stand.Position.z + 2),
+                    Rot4.North) as Building_Bed;
+                if (bed == null)
+                {
+                    return ok & Expect(false, "a bed spawns in the stand's room");
+                }
+                bed.Medical = true;
+                return ok & Expect(fix.Stand.GetRoom() == room,
+                                   "the medical bed leaves the room, and its ID, as they were "
+                                   + "(control)")
+                          & Expect(fix.Comp.HandlesWork(doctor),
+                                   "and on the same tick the stand reads the hospital");
+            }
+            finally
+            {
+                RoomContentsWork.active = saved;
+            }
+        }
+
+        /// <summary>
         /// A stand leaves room mode only with something ticked, and on leaving shift use returns to
         /// its room with its radius kept. Automatic is a room's own reading, so an automatic
         /// stand's set becomes ticks on the way out, and a stand with nothing to tick stays in its
@@ -58,9 +113,6 @@ namespace ShiftChange
                 return Expect(false, "a bed spawns in the stand's room");
             }
             bed.Medical = true;
-            // A room-contents mod such as Rimatomics turns on the stand's cache of its room's
-            // reading, which would hold the bedless answer above until it expires.
-            fix.Comp.automaticCache = null;
             // Doctor alone in vanilla; the Complex Jobs compatibility rows add Nurse and Surgeon.
             List<WorkTypeDef> hospital = new List<WorkTypeDef>(fix.Comp.WorkTypes);
             ok &= Expect(fix.Comp.IsAutomatic && fix.Comp.HandlesWork(doctor)

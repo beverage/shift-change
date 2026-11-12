@@ -1457,9 +1457,9 @@ the player-forced rule for one mod's job def is not worth it: "go do X now"
 should mean X. In practice the colonist who loaded the fuel is already suited
 when sent to the console.
 
-The contents answer is cached per stand, on room ID plus a short interval,
-because `Room.ContainedAndAdjacentThings` clears and rebuilds a set on every
-call and `WorkTypes` is read every frame to draw the gizmo label. It also
+The contents answer is cached per stand, on room ID and role plus a short
+interval, because `Room.ContainedAndAdjacentThings` clears and rebuilds a set on
+every call and `WorkTypes` is read every frame to draw the gizmo label. It also
 carries the work-wins guard: contents-supplied work does not pass through a
 role, so the disjointness the role tables used to guarantee by construction is
 now enforced in `HandlesRecreation` and `HandlesRest` directly.

@@ -87,10 +87,8 @@ loaded, and the Outfit Stands Plus, Common Sense and Pick Up And Haul cases
 when their mod is not (`--with=` loads each). The sixth is Complex Jobs'
 two delivery givers, probed by the delivery case only when that mod is loaded
 (`--with=FrozenSnowFox.ComplexJobs`). So a clean default run reads
-`0 failed, 6 known gaps` and exits 0. Under `--with=FrozenSnowFox.ComplexJobs`
-the delivery gap closes and the feeding table case opens one: that mod moves
-animal and prisoner feeding to work no barn row or Warden tick serves. Any other
-gap, or any failure, is real. It does now run
+`0 failed, 6 known gaps` and exits 0, or 5 under `--with=FrozenSnowFox.ComplexJobs`,
+where the delivery gap closes. Any other gap, or any failure, is real. It does now run
 `JobDriver_SwapAtStand` for real, through the pawn's own tracker, so "the
 driver builds a correct ledger" is covered, and the player-facing rules have
 functional cases. Save/load round trips are covered by four cases that load
@@ -172,7 +170,8 @@ which is a pawn walking between the stand and the work forever.
 **Anything reading `Room.ContainedAndAdjacentThings` needs a cache.** It clears
 and rebuilds a set and a list on every call, and `WorkTypes` — which
 `RoomContentsWork` feeds — is read every frame to draw a gizmo label. Cache on
-room ID plus a tick interval, as `CompShiftStand.AutomaticWorkTypes` does.
+room ID and role plus a tick interval, as `CompShiftStand.AutomaticWorkTypes`
+does: a bed set to medical changes the role and keeps the ID.
 
 **The Outfit Stands Plus button patch changes one call, and keeps its
 order.** `Patch_OutfitStandsPlusUseButton` is a transpiler on their stand
