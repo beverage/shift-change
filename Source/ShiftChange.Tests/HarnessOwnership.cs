@@ -17,7 +17,7 @@ namespace ShiftChange.Tests
     /// copy of the owner list in another mod's assignable and the reconcile behind it, a
     /// stand not used for shift changes, the removal flag held off in service, and the two
     /// gizmo-chain gates. Cases are listed, and ordered, in
-    /// <see cref="DebugTools_LifecycleHarness.Cases"/>.
+    /// HarnessCases.cs.
     /// </summary>
     internal static class HarnessOwnership
     {

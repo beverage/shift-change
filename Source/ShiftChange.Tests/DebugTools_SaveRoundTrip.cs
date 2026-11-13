@@ -20,9 +20,8 @@ namespace ShiftChange.Tests
     ///
     /// <para>A load replaces <c>Current.Game</c>, so the map the harness was handed and every
     /// reference held across the call belong to a disposed game. Hence these cases run last
-    /// among the map cases, as listed in <see cref="DebugTools_LifecycleHarness.Cases"/>, and
-    /// through the fixture-less <c>Case</c> overload, since <c>Teardown</c> would clear a pad on
-    /// the disposed map. The cases are numbered legs in run order: <c>RoundTrip</c> (1),
+    /// of all, in their own fixture (HarnessCases.cs), and through the fixture-less <c>Case</c>
+    /// overload, since <c>Teardown</c> would clear a pad on the disposed map. The cases are numbered legs in run order: <c>RoundTrip</c> (1),
     /// <c>LegacyMigration</c> (2), <c>ForeignAssignable</c> (3), <c>AreaRoundTrip</c> (4). Each
     /// runs on the game the one before left: leg 2 rewrites leg 1's file, and legs 3 and 4
     /// stage on whatever map is current.</para>
@@ -35,8 +34,7 @@ namespace ShiftChange.Tests
         /// <summary>
         /// The five save files, left in place so that a failed assertion about file contents
         /// leaves the file to inspect. <c>run-harness.sh</c> wipes its isolated save folder at
-        /// the start of each run; a run from the debug menu writes them to that profile's own
-        /// Saves folder.
+        /// the start of each run.
         /// </summary>
         internal const string SaveName = "shiftchange-harness-roundtrip";
         internal const string LegacySaveName = "shiftchange-harness-legacy";

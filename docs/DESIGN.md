@@ -2344,9 +2344,22 @@ from the old arrangement: a test you have to switch build configurations to run
 stops being run, so nobody does. `run-harness.sh` passes `-p:Harness=true`
 itself, and the command is the one it always was.
 
-`SCENES` (Debug and Media, never Release) still carries the stage files and the
-harness's `[DebugAction]`; `DebugTools_Fixtures` sits under `SCENES || HARNESS`
-because both dev-only callers build their fixtures from it. A shipped build
+**The harness left the mod's dll altogether on 2026-11-13.** With the cases
+running under SmashPhil's DevTools, which is 1.7 only, the harness moved into a
+project of its own, `Source/ShiftChange.Tests`: .NET 10, built against the
+Release dll, which grants it its internals and carries nothing else of it, into
+`Tests/`, which `LoadFolders.xml` loads only while DevTools is active. Neither
+ships, since both packaging steps copy a fixed list of folders. So the tests
+assert against a plain Release build, the build that goes out, which is what the
+second argument above wanted all along, and `-p:Harness=true` is gone.
+The debug menu's run of every case went with it: it was 1.6's only way to run
+them, and 1.7's DevTools run is the release gate. `check-invariants.py` keeps
+harness files out of the mod's project.
+
+`SCENES` (Debug and Media, never Release) still carries the stage files;
+`DebugTools_Fixtures` sits under `SCENES || HARNESS` because the stage builders
+and the tests both build their fixtures from it, and the tests' project compiles
+it in, defining `HARNESS`, which the mod's project never does. A shipped build
 registers no debug actions at all, so the "Shift Change" category never renders.
 
 **The six `[TweakValue]` fields do still ship**, and that is not an

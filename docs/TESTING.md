@@ -14,7 +14,7 @@ decompilation.
 |---|---|
 | The engine cannot be mocked | Every claim this mod makes is about how RimWorld behaves. A test double would assert the author's model of the engine, which is the thing most likely to be wrong. The suite therefore runs **inside the game**, and drives the engine's own entry points. |
 | A test that is slow is not run | One command, no hands, about half a minute on the four-mod list. Anything requiring a human to click through menus stops happening within a week. |
-| A test that is flaky is worse than none | Every negative assertion carries a positive control; every timeout reports state; the harness asserts its own accounting. Three assertions in draft were satisfiable by the thing they were meant to exclude. |
+| A test that is flaky is worse than none | Every negative assertion carries a positive control; every timeout reports state; a test checks that every case runs once, in order. Three assertions in draft were satisfiable by the thing they were meant to exclude. |
 | It must not touch a live game | Runs against its own save-data folder and its own log, and refuses to signal a process it did not start. The machine this was written on is also the machine somebody plays on. |
 | Some things stay out of reach | A real gravship launch cannot be driven in-process, and is named below rather than approximated. The save/load round trip sat in this row until 2026-08-19 — it now runs for real, through the engine's own synchronous loader. |
 
@@ -28,22 +28,29 @@ devtools/run-harness.sh --with=khamenman.outfitstandsplus   # the four, plus one
 devtools/run-harness.sh --with-after=khamenman.outfitstandsplus   # loaded after us
 ```
 
-Builds Release with `-p:Harness=true` and launches RimWorld 1.7 with
-`--pid MrBeverage.ShiftChange --test -e`: SmashPhil's DevTools test framework
-runs every case as a test of its own and quits the game, and the script prints
-DevTools' `Test.log` and exits non-zero on any failure. `RIMWORLD_APP` names the
-app when it is not the Steam install's. The instance has no window (`-NoWindow`)
-and a `HOME` of its own under `dist/testhome`, which keeps its log and caches
-off the player's. DevTools runs on 1.7 only, so the script does too; on 1.6 the
-debug menu's run below is the one there is.
+Builds the shipping Release dll, then the tests against it, and launches
+RimWorld 1.7 with `--pid MrBeverage.ShiftChange --test -e`: SmashPhil's DevTools
+test framework runs every case as a test of its own and quits the game, and the
+script prints DevTools' `Test.log` and exits non-zero on any failure.
+`RIMWORLD_APP` names the app when it is not the Steam install's. The instance
+has no window (`-NoWindow`) and a `HOME` of its own under `dist/testhome`, which
+keeps its log and caches off the player's.
+
+The tests are an assembly of their own, `Source/ShiftChange.Tests`, built into
+`Tests/Assemblies/`, and the game loads `Tests/` only while DevTools is active
+(`LoadFolders.xml`). So they run against the dll that ships, and a player who
+has not installed DevTools loads none of them. Neither `Tests/` nor
+`LoadFolders.xml` ships: both packaging steps copy a fixed list of folders.
+DevTools runs on 1.7 only, so the tests do too: they target .NET 10 and compile
+against 1.7, while the mod's own dll stays net472.
 
 It needs a DevTools build in `Mods/DevTools`, from DevTools' `develop` with
 SmashPhil/DevTools#17 (until it merges, beverage/DevTools `8966779`), where a
 save of DevTools' own test map loads, the warnings the game logs by itself are
 allowed, and an allowance can require a frame on the line's stack
 (`WarningsAllowedFrom`, `ErrorsAllowedFrom`, repeatable). The script refuses a
-build without them. The harness build compiles against that dll, and DevTools
-joins the mod list just ahead of this mod. The verdict is the game's exit code
+build without them. The tests compile against that dll, and DevTools joins the
+mod list just ahead of this mod. The verdict is the game's exit code
 read with the result line DevTools writes last in `Test.log` (0 passed, 1 a test
 failed, 2 nothing ran). A game stopped any other way can still exit 0, so an
 exit without that line is no verdict, and the script exits 3. An exception that
@@ -52,36 +59,36 @@ and never to `Player.log`, and it ends the coroutine. When that is DevTools'
 test runner, nothing is left to quit the game, so the script stops it as soon as
 stderr shows it and prints the exception.
 
-The script's run and the debug menu's read one list,
-`DebugTools_LifecycleHarness.Cases()`, in which every case belongs to a
-`CaseGroup`. The debug menu's run walks the list in order. Under DevTools each
-group is one fixture (`Harness/HarnessDevTools.cs`), whose tests DevTools
-generates from the group's cases (`[ParametersSource]`) and names `Run(<case>)`.
-DevTools sorts a fixture's tests by priority with an unstable sort, which keeps
-equal tests in the order given only up to 16, so no group holds more than 16
-cases; the fixtures take their order from `ExecutionPriority`, in the order the
-groups are declared (in an unfiltered run, which is what the script starts),
-except that the save/load fixture runs last. So a case listed after the
-save/load legs runs after them from the debug menu and before them under
-DevTools, and must need no map. A new case goes into `Cases()` under the group
-it belongs with, and a group that would pass 16 is split, which takes a new
-`CaseGroup` value and a fixture for it. One more DevTools test,
-`HarnessCaseList`, reads the tests DevTools registered (each fixture's sorted
-into run order) and fails unless each group runs in one fixture, at its group's
-priority, as exactly its cases in list order; it also fails when `Cases()` lists
-a group out of `CaseGroup` order, a case listed after the save/load legs needs a
-pad, a fixture's group is empty, a group passes 16 or two cases share a name.
-Another, `HarnessLoadNote`, checks how a save/load leg's load notes an abort:
-which log entries it counts as its own, on queues it builds itself, and that the
-note applies only to the game that load made. A case runs on a pad only if it
-needs one, and the pad is found once per map and named in Test.log, so a case
-that spoils it fails the cases after it rather than moving them elsewhere. One
-difference from the debug menu's run is left alone: that run takes every case
-within one frame, while DevTools' game is unpaused and its clock runs between
-tests. Pausing it would change how the job tracker counts a pawn's jobs per
-tick, which it does only while unpaused or within one frame. A case with a mod
-of its own to test against is still a known gap without it, which DevTools
-reports as a skipped test.
+Each case is a test of its own, in `Source/ShiftChange.Tests/HarnessCases.cs`:
+a `[Test]` named after the case's body, whose `[TestDescription]` is the
+sentence its transcript in `Test.log` opens with, and whose one line is a `Run`
+call ([Adding a case](#adding-a-case)). The file lists the cases in run order,
+in sixteen fixtures. DevTools runs the fixtures by `ExecutionPriority`, each at
+its place in `CaseGroup`, except the save/load fixture, which runs last, and a
+fixture's tests in declaration order. It sorts a fixture's tests by priority
+with an unstable sort, which keeps equal tests in declaration order only up to
+16, so no fixture holds more than 16; one that would is split, which takes a
+new `CaseGroup` value and a fixture for it. One more DevTools test,
+`HarnessTestOrder`, reads the tests DevTools registered and fails unless every
+fixture runs exactly the tests it declares, in declaration order, every case
+fixture runs at a priority of its own and the save/load legs at the lowest, and
+every case has a sentence of its own. Another, `HarnessLoadNote`, checks how a
+save/load leg's load notes an abort: which log entries it counts as its own, on
+queues it builds itself, and that the note applies only to the game that load
+made. A case runs on a pad only if it needs one, and the pad is found once per
+map and named in Test.log, so a case that spoils it fails the cases after it
+rather than moving them elsewhere. Each case runs within one frame, but
+DevTools' game is unpaused and its clock runs between tests. Pausing it would
+change how the job tracker counts a pawn's jobs per tick, which it does only
+while unpaused or within one frame.
+
+An assertion (`Expect`) writes its line to the case's transcript and signals
+DevTools, which fails the test without stopping it, so the transcript shows
+every assertion and the first that failed labels the test in Test.log. A case
+also fails when its body returns false, throws, or cannot build its fixture. A
+case with a mod of its own to test against is still a known gap without it
+(`ExpectKnownGap`), which DevTools reports as a skipped test unless the case
+failed too.
 
 DevTools fails a test on any warning it does not allow, apart from the few the
 game logs by itself, which DevTools allows everywhere. The fault-latch fixture
@@ -104,11 +111,6 @@ this mod's own load call on the stack, when the message names that mod's
 map-component cache; the leg records the abort as a known gap. The save/load
 fixture runs last, out of its group's place: it asks DevTools for a world of its
 own, and DevTools then generates one again for whichever fixture follows.
-
-By hand, in a Debug or Media build: dev mode → **Shift Change** → **Dev tools…** → **Run lifecycle harness**,
-then click ground you can lose. Cases clear a 7×7 pad, a cell of margin round
-it, a strip west of it and single cells further out, and reset some of that to
-soil.
 
 `--with=<packageId>` adds a mod to the minimal list, ahead of this one, for a
 case that tests against that mod and is a known gap without it. It can be given
@@ -167,27 +169,29 @@ has a real pid, and only ever waits on — or signals — that one. Another inst
 already running is somebody's colony with unsaved progress in it: the default is
 to stop, and `--alongside` is the deliberate opt-in.
 
-With `--alongside`, the running game keeps the dll it loaded.
+With `--alongside`, the running game keeps the dlls it loaded.
 `Mods/ShiftChange` is a symlink to this checkout, so that game loaded
-`Assemblies/ShiftChange.dll` from here. Neither build writes that file: both
-compile into `dist/build/`, and each result is copied in as
-`ShiftChange.dll.new` and renamed over the target. A rename swaps the directory
-entry and nothing else, so the running game keeps the file it opened and the
-next one to start loads the new one. On the way out the script runs
-`check-shipped-dll.py` and lists `Assemblies/`, and warns if that directory
-holds anything but the one shipping dll.
+`Assemblies/ShiftChange.dll` from here, and with DevTools active also
+`Tests/Assemblies/ShiftChange.Tests.dll`. Neither build writes those files:
+both compile into `dist/build/`, and each result is copied in as `<name>.new`
+and renamed over the target. A rename swaps the directory entry and nothing
+else, so the running game keeps the file it opened and the next one to start
+loads the new one. Before the game starts, the script runs
+`check-shipped-dll.py` on the Release build and stops if `Assemblies/` holds
+anything but the one shipping dll. Both dlls are what a game would load from
+this checkout anyway, so nothing is put back when the run ends.
 
-Beside a Debug session the run swaps nothing in: the hot-reload watchdog polls
-`ShiftChange.dll_orig`, which only a Debug build writes, and both harness builds
-are Release. Their sweep does delete that file, though, so reload ends for that
-session, exactly as [building Release during a hot session](DEVELOPMENT.md#hot-reload)
+Beside a Debug session the hot-reload watchdog takes nothing from the run: it
+polls `ShiftChange.dll_orig`, which only a Debug build writes, and the run's
+builds are Release. The sweep deletes that file, though, so reload ends for
+that session, exactly as [building Release during a hot session](DEVELOPMENT.md#hot-reload)
 does.
 
 ## What the cases assert
 
 About a hundred and fifty cases. This section is a map: the detail lives with each case, in
-the comment on its method under `Source/ShiftChange/Harness/`, and the report
-prints the cases in the order `DebugTools_LifecycleHarness.Cases` lists them.
+the comment on its method under `Source/ShiftChange.Tests/`, and Test.log
+prints the cases in the order `HarnessCases.cs` declares them.
 
 Most guard a bug that happened, and fail without its fix. Some instead assert a
 rule the store description promises players. That kind exists because all
@@ -566,10 +570,9 @@ reconcile instead; no other case reaches the decline. These cases replace
 `Current.Game`, so they run last among the map cases; the class doc says what
 else follows from that.
 
-**The harness itself.** `HarnessAccounting`, listed last, asserts that `Expect`
-reports and returns, that `Case` counts, and that a known gap is counted apart
-from a failure (under DevTools the save/load fixture runs after it, being last).
-Without it the runner can grep a green log out of a suite that checks nothing.
+**The harness itself.** `HarnessTestOrder` and `HarnessLoadNote`, above, run at
+the main menu before any case. Each assertion signals DevTools as it is made, so
+the counts are DevTools' own and no case checks them.
 `FixtureColonistHoldsStill` (`HarnessFixtureChecks`), listed first, asserts what
 every other case takes for granted about its fixture. Forty colonists from the
 fixture in a row have no needs that tick under the stopped clock, and none needs
@@ -583,8 +586,8 @@ or on the margin outside its door, and the mod tests "in the open" with
 `Room.TouchesMapEdge`. A generated map can put its centre in open ground cut off
 from the edge by rock, deep water or walls, where all six fail at once, so the
 pad finder (`DebugTools_LifecycleHarness.TryFindPad`) requires it, and this
-check names the cause when a pad picked by hand from the debug menu lands in
-such a place. The report's first line says where the pad is.
+check names the cause should a pad ever land in such a place. Test.log says
+where the pad is.
 
 ## What is not covered
 
@@ -667,7 +670,8 @@ below were diagnosed in one run each because of it; a bare "timed out" would hav
 several ten-minute cycles apiece.
 
 **Count known gaps apart from failures.** A case can be marked `GAP` with its
-reason recorded — it still runs, and reports `FIXED` if it starts passing. Most
+reason recorded — it still runs, and reports `FIXED` if it starts passing.
+DevTools counts such a case as skipped. Most
 gaps are a case whose mod is not on the list. Until v1.5.0 one was a real gap,
 kept on purpose on every list: fishing never dressed, because Odyssey hands
 fishing out with no giver, and the fix waited for stands that can serve beyond
@@ -692,7 +696,7 @@ across its own completion silently becomes a different job. The pump watches
 `JobCondition` the job ended with, because "the driver changed" is equally true
 of a job that failed its reservations and died before its transfer toil.
 
-**The clock stands still.** The harness runs inside one frame, so `TicksGame`
+**The clock stands still.** A case runs inside one frame, so `TicksGame`
 never moves while the pump ticks a pawn. A pawn's needs and its random
 mental-break check are gated on `IsHashIntervalTick(150, delta)`
 (`Pawn_NeedsTracker.cs:112`, `MentalBreaker.cs:253`), which reads that clock
@@ -746,14 +750,22 @@ actually writes — the greps found none of seven.
 
 ## Adding a case
 
-Add it to `DebugTools_LifecycleHarness.Cases` with `cases.On(...)`, under the
-`CaseGroup` it belongs with. The list is the order the debug menu's run takes
-the cases in, and DevTools runs them in the same order except the save/load
-legs, which it runs last, so a case after those legs must need no map. `On(name,
-body)` with a fixture body gives a fixture with a checked-out ledger; `On(name,
-stage, body)` stages its own; `On(name, body)` with a `Func<bool>` needs no map;
-and `On(name, (map, pad, caseName) => ...)` hands a body that needs the
-harness's map or pad both, to make its own `Case` call with.
+Add a test to the fixture it belongs with in
+`Source/ShiftChange.Tests/HarnessCases.cs`, at the point it should run: a
+`[Test]` with the case's sentence as its `[TestDescription]`, named after its
+body, which goes in the body files beside it. The test's one line is a `Run`
+call (`HarnessFixture`, in `HarnessDevTools.cs`):
+
+| Call | The body gets |
+|---|---|
+| `Run(body)`, `body` a `Func<Fixture, bool>` | a fixture with a checked-out ledger (`Build`), on the pad |
+| `Run(stage, body)` | the fixture `stage`, a `(map, pad) => Fixture`, builds on the pad |
+| `RunOnPad(body)`, `body` a `Func<bool>` | DevTools' map and the pad, as `Map` and `Pad`, and no fixture |
+| `Run(body)`, `body` a `Func<bool>` | no map, no pad and no camera move |
+
+Inside the fixture the test's own name hides a body of the same name, so the
+body is named with its class (`Run(HarnessTables.JobTablesHold)`). A fixture
+holds at most 16 tests ([Running it](#running-it) says why).
 
 `Build()` hand-assembles a checked-out state for lifecycle cases. `Stage(map,
 pad, kit, enclose, capableOf, gender)` produces an undressed pawn for cases that

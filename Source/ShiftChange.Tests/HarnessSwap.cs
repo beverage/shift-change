@@ -16,8 +16,7 @@ namespace ShiftChange.Tests
     /// Cases for the swap itself: the driver's round trip, full change, and the four decency cases
     /// that decide what a stand may take.
     ///
-    /// <para>Case order is decided in one place,
-    /// <see cref="DebugTools_LifecycleHarness.Cases"/>.</para>
+    /// <para>Case order is decided in one place, HarnessCases.cs.</para>
     /// </summary>
     internal static class HarnessSwap
     {

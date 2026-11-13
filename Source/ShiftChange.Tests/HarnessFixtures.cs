@@ -845,12 +845,11 @@ namespace ShiftChange.Tests
         ///
         /// <para>It also drops the redraw the map queued for itself. A new map asks for its first
         /// full redraw once the long event it was made in is over (<c>Map.FinalizeInit</c>, through
-        /// <c>LongEventHandler.ExecuteWhenFinished</c>). The headless run is itself one of those
-        /// queued actions, so the redraw would run after the harness, on a map already gone, and
-        /// log a failure for every layer of every section; <see cref="SecondMap"/> drew the map
-        /// already. The queue is walked by index and this map's entries sit after the running
-        /// harness's, so removing them is safe. A run from the debug menu queues nothing, since
-        /// there the redraw runs at once.</para>
+        /// <c>LongEventHandler.ExecuteWhenFinished</c>). A case running inside a long event would
+        /// see the redraw run after it, on a map already gone, logging a failure for every layer
+        /// of every section; <see cref="SecondMap"/> drew the map already. The queue is walked by
+        /// index and this map's entries sit after the running case's, so removing them is safe.
+        /// With no long event running nothing is queued, since the redraw then runs at once.</para>
         /// </summary>
         internal static void RemoveSecondMap(Map away)
         {

@@ -1,5 +1,6 @@
-// Dev tooling, compiled under either dev guard (configuration table: ShiftChange.csproj).
-// A shipping build defines neither, so this compiles out along with both callers.
+// Dev tooling, compiled under either dev guard. SCENES is the mod's Debug and Media builds
+// (configuration table: ShiftChange.csproj); HARNESS is defined only by the tests' project
+// (Source/ShiftChange.Tests), which compiles this file in. A shipping build defines neither.
 #if SCENES || HARNESS
 using System.Collections.Generic;
 using RimWorld;
@@ -9,9 +10,9 @@ using Verse;
 namespace ShiftChange
 {
     /// <summary>
-    /// Fixture primitives shared by the lifecycle harness and the SCENES-only stage builders:
-    /// make a thing, a pawn, a garment, and dress them. The guard names both constants because
-    /// each caller builds its fixtures from these; code that builds a whole scene stays in the
+    /// Fixture primitives shared by the tests and the SCENES-only stage builders: make a thing,
+    /// a pawn, a garment, and dress them. The guard names both constants because each caller
+    /// builds its fixtures from these; code that builds a whole scene stays in the
     /// <c>DebugTools_*Stage</c> files. Spawn and AveragePawn make player-faction things and
     /// colonists, so shipped code must never call into this file; a shipped need for one of
     /// them is new code with its own go/no-go.

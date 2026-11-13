@@ -17,7 +17,7 @@ namespace ShiftChange.Tests
     /// Harness cases for the gates on interception: the player-facing promises, meal breaks, the
     /// danger and duty gates, the change-back latch, the allowed-area refusals, and the catch-up
     /// that dresses a colonist already working bare. Case order is set where the cases are
-    /// listed, <see cref="DebugTools_LifecycleHarness.Cases"/>.
+    /// listed, in HarnessCases.cs.
     /// </summary>
     internal static class HarnessGates
     {

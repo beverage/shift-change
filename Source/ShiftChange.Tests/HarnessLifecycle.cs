@@ -17,7 +17,7 @@ namespace ShiftChange.Tests
     /// flight, map removal, teardown, reinstall, death and banishment, and the fault latch
     /// that disables interception after repeated throws. Also holds the flight and meal-break
     /// helpers <see cref="HarnessVacuum"/> reuses. Cases are listed, and ordered, in
-    /// <see cref="DebugTools_LifecycleHarness.Cases"/>.
+    /// HarnessCases.cs.
     /// </summary>
     internal static class HarnessLifecycle
     {

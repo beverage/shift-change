@@ -11,8 +11,8 @@ namespace ShiftChange.Tests
 {
     /// <summary>
     /// Cases for catchments: a stand serving a radius around itself, or an allowed area, instead of
-    /// its room (docs/DESIGN.md, "Catchments"). <see cref="DebugTools_LifecycleHarness.Cases"/>
-    /// lists every case and so decides their order.
+    /// its room (docs/DESIGN.md, "Catchments"). HarnessCases.cs lists
+    /// every case and so decides their order.
     /// </summary>
     internal static partial class HarnessCatchments
     {

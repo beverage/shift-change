@@ -14,7 +14,7 @@ namespace ShiftChange.Tests
 {
     /// <summary>
     /// Cases for what arms a stand (work, recreation, sleep) and for deposit-only, listed and
-    /// ordered in <see cref="DebugTools_LifecycleHarness.Cases"/>.
+    /// ordered in HarnessCases.cs.
     /// </summary>
     internal static class HarnessTriggers
     {

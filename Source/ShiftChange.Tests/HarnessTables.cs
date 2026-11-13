@@ -16,8 +16,7 @@ namespace ShiftChange.Tests
     /// Cases for the static tables, the room resolver and the work-type dialog's sizing: a def name
     /// a table holds still resolves, and a work target with no room of its own still finds one.
     ///
-    /// <para>Case order is decided in one place,
-    /// <see cref="DebugTools_LifecycleHarness.Cases"/>.</para>
+    /// <para>Case order is decided in one place, HarnessCases.cs.</para>
     /// </summary>
     internal static class HarnessTables
     {

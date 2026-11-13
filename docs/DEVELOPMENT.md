@@ -23,28 +23,39 @@ it finds there, including hot-reload leftovers.
 
 ### Three configurations
 
-| Config | `SCENES` | `HARNESS` | ECR | Job |
-|---|---|---|---|---|
-| `Debug` | yes | yes | yes | test runs — the default for observation and iteration |
-| `Media` | yes | yes | no | footage and screenshots: Release codegen, fixtures present |
-| `Release` | no | no | no | shipping |
-| `Release -p:Harness=true` | no | yes | no | what `run-harness.sh` builds and drives |
+| Config | `SCENES` | ECR | Job |
+|---|---|---|---|
+| `Debug` | yes | yes | test runs — the default for observation and iteration |
+| `Media` | yes | no | footage and screenshots: Release codegen, fixtures present |
+| `Release` | no | no | shipping, and what the tests run against |
 
-`SCENES` compiles in the demo and preview stage builders and the harness's
-`[DebugAction]`. **Release ships none of them** — the stages are destructive
-enough that a player reaching one is a colony-scale accident, and the reasoning
-is in [DESIGN.md](DESIGN.md#development-tooling).
+`SCENES` compiles in the demo and preview stage builders. **Release ships none
+of them** — the stages are destructive enough that a player reaching one is a
+colony-scale accident, and the reasoning is in
+[DESIGN.md](DESIGN.md#development-tooling).
 
-`HARNESS` compiles in the harness itself, and **Release does not ship it**. Dev
-tooling is not a player's to carry: a run clears a pad, spawns colonists and
-writes save files.
-`run-harness.sh` passes `-p:Harness=true` itself and sweeps `Assemblies/` back
-to the shipping dll afterwards, so nothing in the loop changes for you.
+The tests are not a configuration but an assembly of their own,
+`Source/ShiftChange.Tests`: .NET 10, for 1.7, against DevTools and the Release
+dll, which grants it its internals (`InternalsVisibleTo`) and carries nothing
+else of it. It builds into `Tests/Assemblies/`, which `LoadFolders.xml` loads
+only while DevTools is active. Dev tooling is not a player's to carry: a run
+clears a pad, spawns colonists and writes save files. Neither `Tests/` nor
+`LoadFolders.xml` ships, since both packaging steps copy a fixed list of
+folders. `run-harness.sh` builds both dlls and runs the tests; with a .NET 10
+SDK, by hand:
 
-The guard is **whole-file, never inline** — that is what keeps the build the
-harness runs against and the build that ships different only in which types are
-present, rather than different in shape. `check-invariants.py` enforces the
-rule; `check-shipped-dll.py` enforces the outcome on the artifact.
+```bash
+dotnet build Source/ShiftChange/ShiftChange.csproj -c Release
+dotnet build Source/ShiftChange.Tests/ShiftChange.Tests.csproj -c Release -p:DevToolsDll=<path>/DevTools.dll
+```
+
+Dev-only code in the mod's project is guarded **whole-file, never inline**, by
+`SCENES` or `DEBUG`, so a Debug build and the build that ships differ in which
+types are present rather than in shape. One file, `Dev/DebugTools_Fixtures.cs`,
+is guarded `SCENES || HARNESS`: the tests' project compiles it too and defines
+`HARNESS`, which the mod's never does. `check-invariants.py` enforces the rule,
+and keeps harness files out of the mod's project; `check-shipped-dll.py`
+enforces the outcome on the artifact.
 
 `SCENES` on Debug is mandatory rather than a nicety: test runs happen on Debug,
 and without it that build loses the fixtures they exist to drive.
@@ -260,27 +271,25 @@ minutes.
 on.** This mod patches a vanilla building other mods also touch, so the small
 list is precisely the environment in which a conflict cannot appear.
 
-### Driving it by hand
+### Watching a case
 
-What you want when a case fails and you need to watch it: **on a Debug or Media
-build**, dev mode → **Shift Change** → **Dev tools…** → **Run lifecycle
-harness**, then click a clear 7×7 area — the pad is cleared before use, so
-anything standing in it is destroyed.
+The cases run only under DevTools. A failing case's transcript in `Test.log`
+prints every assertion it made, pass or fail, and the pad's position; DevTools'
+test explorer, in dev mode, lists each case with its sentence as the tooltip.
 
+The debug menu keeps the scene builders, on a Debug or Media build.
 **Search only filters the level you are looking at.** `DebugTabMenu.VisibleActions`
 is `CurrentNode.children` and the filter tests each node's own label, so it does
-not descend into submenus: typing `lifecycle` at the top level now matches
-nothing. Type `dev tools` to filter down to our entry — the category header still
+not descend into submenus: typing `demo` at the top level matches nothing. Type `dev tools` to filter down to our entry — the category header still
 renders above it, so a collision with another mod's identically-named entry is
 still distinguishable — then open it and pick. This is the one ergonomic cost of
-collapsing three loose entries into one; it is paid on a dev build only,
-where the submenu holds three items and hunting is not the problem it was when
+collapsing loose entries into one; it is paid on a dev build only, where the
+submenu holds a handful of items and hunting is not the problem it was when
 they sat loose among vanilla's hundreds.
 
-A **Release** build has neither the menu entry nor the harness at all; drive it
-with `run-harness.sh`, which builds `-p:Harness=true` and runs the cases under
-DevTools. That is not a lesser path — it is the release gate, and it is the only
-one.
+A **Release** build has no debug-menu entry at all, and it is what the tests run
+against: `run-harness.sh` builds it, then the tests, and runs the cases under
+DevTools. That is the release gate, and the only one.
 
 For a fast interactive session without the headless run,
 `devtools/rimworld-profile.sh minimal` / `restore` swaps the live mod list. It
@@ -299,14 +308,14 @@ broke that way once; the rest block a failure that would land silently.
 | `devtools/check-invariants.py` | hot-reload hazards, translation keys in both directions, XML-to-C# type bindings, the `<Patch>` root walk, the Workshop preview size, Workshop comments over Steam's 1,000-character limit, and dates or line citations in source comments. Runs locally too — see [TESTING.md](TESTING.md). |
 | `devtools/bbcode-preview.py` | an unclosed tag in the store description, which makes Steam render the rest of the page as literal text |
 | Committed dll is uninstrumented, and alone | an instrumented Debug build reaching the mod's load path |
-| `devtools/check-shipped-dll.py` | a `SCENES` build shipping the destructive scene builders, a `-p:Harness=true` build shipping the harness, and the opposite failure — over-gating that leaves the feature surface out. Run against the committed dll and again against the fresh Release build. |
+| `devtools/check-shipped-dll.py` | a `SCENES` build shipping the destructive scene builders, a harness file in the mod's project shipping the harness, and the opposite failure — over-gating that leaves the feature surface out. Run against the committed dll and again against the fresh Release build. |
 | Media build | the filming config rotting between shoots, discovered on a shoot |
 | Release build | compile errors against Krafs |
 
 The lifecycle harness runs in a second workflow,
-`.github/workflows/harness.yml`, on every push to any branch: a
-`-p:Harness=true` build against a dll of the DevTools the test machine carries,
-then every case as a DevTools test in RimWorld 1.7 on a Linux machine with
+`.github/workflows/harness.yml`, on every push to any branch: the Release
+build, then the tests against it and a dll of the DevTools the test machine
+carries, then every case as a DevTools test in RimWorld 1.7 on a Linux machine with
 Harmony, Core, DevTools and this mod (and the machine's own shim for running
 without a window), once with every DLC and once with Odyssey alone.
 The job passes on DevTools' exit code together with the `Result: Passed` line
@@ -425,7 +434,7 @@ flowchart LR
 
 ### `Source/ShiftChange/`
 
-Folders by concern. Everything outside `Dev/` and `Harness/` ships, and `check-invariants.py` holds that line: a file in `Dev/` must be dev-only, and a dev-only file anywhere else fails. Every file keeps the one `ShiftChange` namespace, so a file moves between folders without touching a def, a save or a patch.
+Folders by concern. Everything outside `Dev/` ships, and `check-invariants.py` holds that line: a file in `Dev/` must be dev-only, a dev-only file anywhere else fails, and so does a harness file, which belongs in the tests' project ([`Source/ShiftChange.Tests/`](#sourceshiftchangetests)). Every file keeps the one `ShiftChange` namespace, so a file moves between folders without touching a def, a save or a patch.
 
 | File | Role |
 |---|---|
@@ -495,7 +504,7 @@ Folders by concern. Everything outside `Dev/` and `Harness/` ships, and `check-i
 | File | Role |
 |---|---|
 | `Interop_OutfitStandsPlus.cs` | Reflection bridge to Outfit Stands Plus. Silent-fail; absent mod means an inert file. |
-| `Patch_OutfitStandsPlusUseButton.cs` | Transpiler that swaps the walk over every colony building, in Outfit Stands Plus' per-colonist stand button, for a per-map list of the colony's stands kept in the same order. Applied by hand from `HarmonyInit`, and only while their original IL still makes that call; otherwise it leaves the button alone and says why. Its case is in `Harness/HarnessInterop.cs`. |
+| `Patch_OutfitStandsPlusUseButton.cs` | Transpiler that swaps the walk over every colony building, in Outfit Stands Plus' per-colonist stand button, for a per-map list of the colony's stands kept in the same order. Applied by hand from `HarmonyInit`, and only while their original IL still makes that call; otherwise it leaves the button alone and says why. Its case is in `ShiftChange.Tests/HarnessInterop.cs`. |
 | `Patch_ForeignOwnerGizmos.cs` | Hides the other mod's Set owner control on every stand carrying ours, in both modes. Its list is a copy of ours, so an edit made through it would only be overwritten. |
 
 #### `Dev/`
@@ -504,7 +513,7 @@ Each file here is guarded whole, by `SCENES`, `DEBUG` or `SCENES || HARNESS`, an
 
 | File | Role |
 |---|---|
-| `DebugTools_Fixtures.cs` | Fixture primitives — make a thing, a pawn, a garment. `SCENES \|\| HARNESS`: both dev-only callers gate independently and both build their fixtures from these. |
+| `DebugTools_Fixtures.cs` | Fixture primitives — make a thing, a pawn, a garment. `SCENES \|\| HARNESS`: the scene builders and the tests both build their fixtures from these, and the tests' project compiles this file in, defining `HARNESS`. |
 | `DebugTools_Menu.cs` | `SCENES` only. The mod's entire debug-menu surface: one "Dev tools…" submenu. Absent in Release, so the category never renders. |
 | `DebugTools_DemoStage.cs` | `SCENES` only. The demo stage. Test fixture and film set. Clears 13×16 before building. |
 | `DebugTools_PreviewStage.cs` | `SCENES` only. The title-card stage, sized to crop to Workshop cards. Clears 32×10 before building. |
@@ -517,17 +526,22 @@ Each file here is guarded whole, by `SCENES`, `DEBUG` or `SCENES || HARNESS`, an
 | `EcrWatchdog.cs` | Debug only. Polls for rebuilds, because Mono's `FileSystemWatcher` never fires on macOS. |
 | `Patch_ModeBadge.cs` | Debug only. The on-screen live/lab badge. |
 
-#### `Harness/`
+### `Source/ShiftChange.Tests/`
+
+The tests' project (`ShiftChange.Tests.csproj`): .NET 10, for 1.7, built against
+the Release dll and DevTools into `Tests/Assemblies/`, and loaded only with
+DevTools. Its namespace is `ShiftChange.Tests`. None of it ships.
 
 | File | Role |
 |---|---|
-| `DebugTools_LifecycleHarness.cs` | `HARNESS` only. The test suite: the runner, its assertions, its self-check, and `Cases()`, the list of every case in the order they run, each in its `CaseGroup`. Both runners read that list. The other cases' bodies, which drive real engine entry points, live in the files beside it — see [TESTING.md](TESTING.md). Its debug-menu entry, `RunHarness`, a node in `DebugTools_Menu`'s Dev tools submenu, is `SCENES` on top of that. |
-| `DebugTools_SaveRoundTrip.cs` | `HARNESS` only. The four save/load cases. Separate file because they replace `Current.Game` and must run last. |
-| `HarnessCatchments.cs` | `HARNESS` only. The catchment cases, one `partial` class: `.Radius` for coverage and dressing in a ring, `.ReturnTrip`, `.BillProduct` for the haul that stores a finished bill's product, `.Deliveries`, `.Area`, `.AreaUi` for the alert and the Serves menu, and `.Latch`. The main file holds the cases true in every mode and the helpers several files share. |
-| `HarnessVacuum.cs` | `HARNESS` only. The vacuum cases, on the second map, which is a vacuum map: the ground they stand on, then a staged ship of a room, open floor and a second room, and the cases a review of the gate added (each dress path, doors, a stranded colonist, the cooldown, an urgent patient, a stand on another map). |
-| `HarnessJobKinds.cs` | `HARNESS` only. The job classifier as a table: every job shape the other cases build, and the kind and work type it must get. |
-| `HarnessFixtureChecks.cs` | `HARNESS` only. What every case takes for granted about its fixture: a colonist who needs no doctor and whose needs hold still under the stopped clock, and open ground past the pad. Listed first. |
-| `HarnessDevTools.cs` | `HARNESS` and `DEVTOOLS` only, so a build handed a DevTools dll, as `run-harness.sh` builds. One DevTools fixture per `CaseGroup`, each generating a test per case of its group; the adapter that runs a case on a pad (found once per map) out of the camera's sight when it needs one, and turns its tally into the test's status; and `HarnessCaseList`, which checks DevTools registered every case once, in list order, at its group's priority. |
+| `HarnessCases.cs` | Every case, one DevTools `[Test]` each, in run order, in one fixture per `CaseGroup` and the save/load fixture last. A test is named after its case's body, its `[TestDescription]` is the case's sentence, and its one line is a `Run` call. |
+| `HarnessDevTools.cs` | `CaseGroup`, the fixtures' order; `HarnessFixture`, which every fixture derives from: the `Run` calls, which find the pad (once per map) out of the camera's sight when a case needs one, stage the case and write its transcript to Test.log, and the log lines every fixture allows; `HarnessTestOrder`, which checks DevTools runs every fixture's tests once, in declaration order, at priorities of their own; and `HarnessLoadNote`. |
+| `DebugTools_LifecycleHarness.cs` | The case machinery: `Case`, which stages, runs and tears down one case, its assertions (`Expect`, `ExpectKnownGap`, `Fail`), which signal DevTools as they go, the fixture types and the pad finder. The cases' bodies, which drive real engine entry points, live in the files beside it — see [TESTING.md](TESTING.md). |
+| `DebugTools_SaveRoundTrip.cs` | The four save/load cases. Separate file because they replace `Current.Game` and must run last. |
+| `HarnessCatchments.cs` | The catchment cases, one `partial` class: `.Radius` for coverage and dressing in a ring, `.ReturnTrip`, `.BillProduct` for the haul that stores a finished bill's product, `.Deliveries`, `.Area`, `.AreaUi` for the alert and the Serves menu, and `.Latch`. The main file holds the cases true in every mode and the helpers several files share. |
+| `HarnessVacuum.cs` | The vacuum cases, on the second map, which is a vacuum map: the ground they stand on, then a staged ship of a room, open floor and a second room, and the cases a review of the gate added (each dress path, doors, a stranded colonist, the cooldown, an urgent patient, a stand on another map). |
+| `HarnessJobKinds.cs` | The job classifier as a table: every job shape the other cases build, and the kind and work type it must get. |
+| `HarnessFixtureChecks.cs` | What every case takes for granted about its fixture: a colonist who needs no doctor and whose needs hold still under the stopped clock, and open ground past the pad. Runs first. |
 
 ### Content
 
