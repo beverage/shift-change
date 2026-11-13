@@ -1,0 +1,133 @@
+# On every push, builds Shift Change with its lifecycle harness compiled in
+# and runs the harness in RimWorld 1.7 on a Fly machine, as
+# devtools/run-harness.sh runs it: Harmony, Core and this mod, booted with
+# -quicktest -shiftchange-harness. It runs twice, once with every DLC and
+# once with Odyssey alone, the one DLC this mod requires. The game exits 0
+# whatever the verdict, so a run passes only when Player.log holds the
+# harness's own "harness auto-run: PASSED". The build replaces the committed
+# Assemblies/ShiftChange.dll in this job's checkout only.
+#
+# The runner has no game, so the build compiles against Krafs.Rimworld.Ref,
+# as ci.yml's do. flybridge.py, the step that starts the machine, comes from
+# the lab's bucket by the hash below and is checked against it.
+# `flybridge.py upload-tool` puts a new version in the bucket and prints its
+# hash.
+#
+# Repository secrets: FLY_API_TOKEN (a deploy token for the lab's Fly app),
+# AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (the bucket's keys).
+# Repository variables: AWS_ENDPOINT_URL_S3, AWS_REGION, BUCKET_NAME.
+# Nothing runs on pull_request, so a fork never sees them; a fork's change is
+# tested once its branch is pushed here. This repository is public, and so is
+# the artifact each run leaves: the game's logs and the saves the harness
+# wrote, from a throwaway colony.
+
+name: Harness on Fly
+
+on:
+  push:
+    branches: ['**']
+    paths-ignore: ['**.md', 'media/**', 'docs/**']
+  workflow_dispatch:
+
+concurrency:
+  group: harness-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # RW_DLCS on the Fly machine: every DLC the image has, then Odyssey
+        # alone. The second has one known gap more, the recolor case, which
+        # needs Ideology.
+        dlcs: [all, odyssey]
+    # The run waits up to --queue-minutes below for a slot under flybridge's
+    # machine cap, then the machine stops itself after --max-minutes. The
+    # timeout covers both, with room for the build and the uploads. A
+    # cancelled job, the timeout's included, stops the machine at once.
+    timeout-minutes: 35
+    env:
+      FLYBRIDGE_SHA256: 0a396c022352de98de6efc08ac1e73bd800a62643256c8d9d8f64565efa73ee3
+      RUN_ID: gh-${{ github.event.repository.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.dlcs }}
+      AWS_ENDPOINT_URL_S3: ${{ vars.AWS_ENDPOINT_URL_S3 }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      BUCKET_NAME: ${{ vars.BUCKET_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # flybridge reads flyctl's output, so flyctl is pinned too.
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+        with:
+          version: 0.5.3
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Fetch flybridge
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          aws s3 cp "s3://$BUCKET_NAME/tools/flybridge/$FLYBRIDGE_SHA256.py" "$RUNNER_TEMP/flybridge.py" --only-show-errors
+          printf '%s  %s\n' "$FLYBRIDGE_SHA256" "$RUNNER_TEMP/flybridge.py" | sha256sum -c -
+
+      # Release codegen with the harness and its launch flag, the build
+      # run-harness.sh drives. DisableLocalGameRefs keeps it on Krafs whatever
+      # the machine has installed.
+      - name: Build with the harness
+        run: |
+          dotnet build Source/ShiftChange/ShiftChange.csproj -c Release -p:Harness=true -p:DisableLocalGameRefs=true -nologo
+          sha256sum Assemblies/ShiftChange.dll
+
+      # Uploads this checkout's mod folder for this run alone (Source/,
+      # devtools/, docs/, media/ and .git/ stay behind), activates it after
+      # Harmony, waits for the machine to go, prints result.json and exits:
+      # 0 the harness passed, 1 it failed or never reported, 124 the time
+      # limit stopped the game, 130 or 143 the job was cancelled; or 2 when a
+      # mod or DLC was missing and 4 when no slot opened under the cap in
+      # time, and the game never started. `exec` makes flybridge the step's
+      # own process: a cancel signals only that process, and bash would not
+      # pass it on. --image pins the game, so a new image reaches this
+      # workflow in a commit of its own.
+      - name: Run the harness
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          DLCS: ${{ matrix.dlcs }}
+        run: >-
+          exec python3 "$RUNNER_TEMP/flybridge.py" run "$RUN_ID"
+          --image ready-1 --mod "$GITHUB_WORKSPACE" --env "RW_DLCS=$DLCS"
+          --queue-minutes 15 --max-minutes 10 --pull
+          --pass-line "harness auto-run: PASSED"
+          -- -quicktest -shiftchange-harness
+
+      # result.json, then the harness's verdict: its GAP and FAIL lines and
+      # its totals. A GAP is a case that skips itself without a mod or DLC
+      # this list leaves out, and does not fail the run.
+      - name: Summary
+        if: always()
+        run: |
+          dir="$RUNNER_TEMP/flybridge-runs/$RUN_ID"
+          if [ -f "$dir/result.json" ]; then
+            { echo '```json'; cat "$dir/result.json"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f "$dir/Player.log" ]; then
+            { echo '```'; grep -E '^ +(GAP|FAIL) |^result: |harness auto-run: ' "$dir/Player.log" || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Player.log, result.json and the harness's saves, from the bucket's
+      # copy of the run.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ env.RUN_ID }}
+          path: ${{ runner.temp }}/flybridge-runs/${{ env.RUN_ID }}/
+          if-no-files-found: ignore
+          retention-days: 14

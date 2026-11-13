@@ -300,8 +300,19 @@ broke that way once; the rest block a failure that would land silently.
 | Media build | the filming config rotting between shoots, discovered on a shoot |
 | Release build | compile errors against Krafs |
 
-The behavioural suite is **not** in CI and cannot be: it needs the game. It runs
-on this machine, and `--full` is what a release is signed off on.
+The lifecycle harness runs in a second workflow,
+`.github/workflows/harness.yml`, on every push to any branch: a
+`-p:Harness=true` build, then the harness in RimWorld 1.7 on a Linux machine
+with Harmony, Core and this mod, once with every DLC and once with Odyssey
+alone. The game exits 0 whatever the verdict, so the job reads `Player.log` and
+passes only on `harness auto-run: PASSED`; its summary lists the run's `GAP`
+and `FAIL` lines and the totals. The Odyssey run has one gap more than the
+other, the recolor case, which needs Ideology. The workflow needs secrets, so
+unlike `ci.yml` it does not run on pull requests: a fork's change is tested
+once its branch is pushed here.
+
+That is the four-mod list only. `--full` on this machine, against a real mod
+list, is still what a release is signed off on.
 
 Tagging a commit `v*` additionally packages the mod folder and publishes a
 GitHub release.
