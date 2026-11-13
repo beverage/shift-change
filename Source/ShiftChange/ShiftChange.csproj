@@ -29,15 +29,17 @@
     <Nullable>disable</Nullable>
   </PropertyGroup>
 
-  <!-- Three configurations and one switch, four jobs.
+  <!-- Three configurations, three jobs.
 
-         Debug             SCENES, HARNESS, ECR      test runs: the default for observation
-         Media             SCENES, HARNESS, no ECR   footage: Release codegen, fixtures present
-         Release           neither                   shipping
-         Release+Harness   HARNESS                   what run-harness.sh drives
+         Debug             SCENES, ECR               test runs: the default for observation
+         Media             SCENES, no ECR            footage: Release codegen, fixtures present
+         Release           neither                   shipping, and what the tests run against
 
-       SCENES compiles in the demo/preview stage fixtures and the harness's
-       [DebugAction] attribute. Release ships NEITHER, because the debug
+       The tests are an assembly of their own, ../ShiftChange.Tests, built
+       against this one's Release dll.
+
+       SCENES compiles in the demo/preview stage fixtures and the debug menu.
+       Release ships NEITHER, because the debug
        actions menu is a surface players use, and the stages are destructive:
        each one GenDebug.ClearArea's a footprint of 200-320 cells (vanishing
        any pawn standing there), then leaves permanent player-faction
@@ -57,41 +59,12 @@
     <Optimize>true</Optimize>
   </PropertyGroup>
 
-  <!-- HARNESS: the lifecycle harness. It does not ship: it is dev tooling,
-       and a run clears a pad, spawns colonists and writes save files.
-
-       It used to ship in every configuration on the argument that a gate is
-       only worth running if it asserts against the literal assembly players
-       install. That argument is now paid differently: HARNESS may only ever
-       be a WHOLE-FILE guard, so a shipping build and a harness build differ by
-       the presence of harness types and by nothing else — no shipping code
-       path changes shape with it. check-invariants.py enforces that, and
-       check-shipped-dll.py enforces the absence in the dll that goes out.
-
-       The condition holds SCENES => HARNESS (Debug and Media are both "not
-       Release"), which is what lets the debug menu's "Run lifecycle harness"
-       entry call into the harness with no second guard. -->
-  <PropertyGroup Condition="'$(Configuration)' != 'Release' Or '$(Harness)' == 'true'">
-    <DefineConstants>$(DefineConstants);HARNESS</DefineConstants>
-  </PropertyGroup>
-
-  <!-- DEVTOOLS: the harness cases as tests for SmashPhil's DevTools.
-       Only a build handed a DevTools dll (-p:DevToolsDll=<path>) defines it and
-       references DevTools; every other build, CI's included, compiles those files
-       away, since their guard is HARNESS && DEVTOOLS.
-
-       DevTools targets .NET 10 and this assembly .NET Framework 4.7.2, so MSBuild
-       reports two versions of System.Runtime. Harness runs happen on 1.7 only,
-       which runs on .NET 10 and loads 4.7.2 assemblies, so the report is noise. -->
-  <PropertyGroup Condition="'$(DevToolsDll)' != ''">
-    <DefineConstants>$(DefineConstants);DEVTOOLS</DefineConstants>
-    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB3277</MSBuildWarningsAsMessages>
-  </PropertyGroup>
-  <ItemGroup Condition="'$(DevToolsDll)' != ''">
-    <Reference Include="DevTools">
-      <HintPath>$(DevToolsDll)</HintPath>
-      <Private>false</Private>
-    </Reference>
+  <!-- The tests reach the mod's internals, as the hot-reload twins do (the
+       mod declares members internal, never private). The grant names an
+       assembly and references nothing: this dll loads the same with or
+       without the tests, and holds no test code. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="ShiftChange.Tests" />
   </ItemGroup>
 
   <ItemGroup>

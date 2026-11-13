@@ -39,8 +39,6 @@ namespace ShiftChange
                                     DebugTools_DemoStage.BuildDemoStage),
                 new DebugActionNode("Build preview stage", DebugActionType.ToolMap,
                                     DebugTools_PreviewStage.BuildPreviewStage),
-                new DebugActionNode("Run lifecycle harness", DebugActionType.ToolMap,
-                                    DebugTools_LifecycleHarness.RunHarness),
                 new DebugActionNode("Build pool room stage", DebugActionType.ToolMap,
                                     DebugTools_PoolStage.BuildPoolStage),
                 // A ToolMapForPawns child passes its delegate as the constructor's fourth

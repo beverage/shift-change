@@ -1,6 +1,3 @@
-// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
-// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
-#if HARNESS
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,9 +8,9 @@ using UnityEngine;
 using Verse;
 using Verse.AI;
 using Verse.AI.Group;
-using static ShiftChange.DebugTools_LifecycleHarness;
+using static ShiftChange.Tests.DebugTools_LifecycleHarness;
 
-namespace ShiftChange
+namespace ShiftChange.Tests
 {
     /// <summary>Staging, pumping and teardown shared by every harness case.</summary>
     internal static class HarnessFixtures
@@ -933,4 +930,3 @@ namespace ShiftChange
 
     }
 }
-#endif

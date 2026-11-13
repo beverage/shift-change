@@ -75,9 +75,8 @@ jobs:
       # whether or not it shipped. The script explains the trap and searches
       # both encodings.
       #
-      # run-harness.sh writes this same path with -p:Harness=true and sweeps
-      # itself afterwards; this is what catches the run where the sweep did
-      # not happen and the harness build got committed.
+      # Debug and Media builds write this same path; this is what catches one
+      # of them committed in place of a Release build.
       - name: Committed dll ships no debug scenes or harness
         run: python3 devtools/check-shipped-dll.py
 
@@ -96,18 +95,12 @@ jobs:
 
       # Re-run against the FRESHLY BUILT dll, not just the committed one. The
       # committed check catches a mis-staged config; this catches a new debug
-      # action that nobody wrapped in #if SCENES, or a new harness file nobody
-      # wrapped in #if HARNESS — the failures that would otherwise ship
-      # silently.
+      # action that nobody wrapped in #if SCENES, or a harness file put in the
+      # mod's project instead of the tests' — the failures that would
+      # otherwise ship silently. The tests themselves build in harness.yml,
+      # on every push, since they need the DevTools dll from the lab's bucket.
       - name: Release build ships no debug scenes or harness
         run: python3 devtools/check-shipped-dll.py
-
-      # The harness must still COMPILE, and nothing above builds it: Release
-      # strips it, and a harness file that stopped compiling would be found at
-      # the next release instead of here. Built to a scratch path so it cannot
-      # become the dll that gets zipped.
-      - name: Build (Release + harness)
-        run: dotnet build Source/ShiftChange/ShiftChange.csproj -c Release -p:Harness=true -p:OutputPath=$RUNNER_TEMP/harness/
 
       - name: Assemblies swept after Release build
         run: |

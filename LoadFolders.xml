@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This file owns ALL folder resolution once it exists: the "/" entries are
+     what load the mod at all. Tests/ holds the DevTools tests, a separate
+     assembly the game loads only while DevTools is active, and DevTools is
+     1.7 only. A release ships neither this file nor Tests/: both packaging
+     steps copy a fixed list of folders, which leaves them out, and without
+     this file the game loads the root folder alone, as before. -->
+<loadFolders>
+  <v1.6>
+    <li>/</li>
+  </v1.6>
+  <v1.7>
+    <li>/</li>
+    <li IfModActive="SmashPhil.DevTools">Tests</li>
+  </v1.7>
+</loadFolders>

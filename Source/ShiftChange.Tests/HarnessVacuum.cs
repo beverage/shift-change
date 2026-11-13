@@ -1,6 +1,3 @@
-// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
-// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
-#if HARNESS
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,10 +5,10 @@ using HarmonyLib;
 using RimWorld;
 using Verse;
 using Verse.AI;
-using static ShiftChange.DebugTools_LifecycleHarness;
-using static ShiftChange.HarnessFixtures;
+using static ShiftChange.Tests.DebugTools_LifecycleHarness;
+using static ShiftChange.Tests.HarnessFixtures;
 
-namespace ShiftChange
+namespace ShiftChange.Tests
 {
     /// <summary>
     /// Harness cases on a vacuum map. The second map (<see cref="HarnessFixtures.SecondMap"/>) is
@@ -1004,4 +1001,3 @@ namespace ShiftChange
         }
     }
 }
-#endif

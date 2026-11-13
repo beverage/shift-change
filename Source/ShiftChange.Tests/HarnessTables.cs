@@ -1,6 +1,3 @@
-// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
-// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
-#if HARNESS
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,10 +7,10 @@ using RimWorld;
 using UnityEngine;
 using Verse;
 using Verse.AI;
-using static ShiftChange.DebugTools_LifecycleHarness;
-using static ShiftChange.HarnessFixtures;
+using static ShiftChange.Tests.DebugTools_LifecycleHarness;
+using static ShiftChange.Tests.HarnessFixtures;
 
-namespace ShiftChange
+namespace ShiftChange.Tests
 {
     /// <summary>
     /// Cases for the static tables, the room resolver and the work-type dialog's sizing: a def name
@@ -40,6 +37,14 @@ namespace ShiftChange
         /// </summary>
         internal static bool WorkTypeDialogBodyRectFitsTheBody()
         {
+            // Called by reflection: the mod's dll names Rect's 1.6 assembly, which 1.7 maps to its
+            // own Rect when it loads the dll, so the compiler sees two types where the game has one.
+            System.Reflection.MethodInfo bodyRect = AccessTools.Method(
+                typeof(Dialog_SetStandWorkTypes), nameof(Dialog_SetStandWorkTypes.BodyRect));
+            if (bodyRect == null)
+            {
+                return Expect(false, "the dialog's BodyRect is there to call");
+            }
             float[] bodies = { 180f, 533f, 665f, 847f, 1200f };
             float[] contents = { 143f, 220f, 306f, 373f, 900f };
             bool ok = true;
@@ -48,8 +53,9 @@ namespace ShiftChange
                 for (int c = 0; c < contents.Length; c++)
                 {
                     Rect content = new Rect(0f, 0f, 480f, contents[c]);
-                    bool scrolling;
-                    Rect given = Dialog_SetStandWorkTypes.BodyRect(bodies[b], content, out scrolling);
+                    object[] args = { bodies[b], content, null };
+                    Rect given = (Rect)bodyRect.Invoke(null, args);
+                    bool scrolling = (bool)args[2];
 
                     ok &= Expect(given.height >= bodies[b] - 0.5f,
                         "body " + bodies[b].ToString("0") + " into a "
@@ -702,4 +708,3 @@ namespace ShiftChange
         }
     }
 }
-#endif

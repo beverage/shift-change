@@ -1,6 +1,3 @@
-// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
-// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
-#if HARNESS
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,21 +10,21 @@ using Verse;
 using Verse.AI;
 // Case bodies live in sibling types under Harness/, imported statically so the case list in Cases
 // reads as plain method names. That list is the order authority.
-using static ShiftChange.HarnessCatchments;
-using static ShiftChange.HarnessFixtures;
-using static ShiftChange.HarnessGates;
-using static ShiftChange.HarnessInterop;
-using static ShiftChange.HarnessLifecycle;
-using static ShiftChange.HarnessGizmos;
-using static ShiftChange.HarnessOwnership;
-using static ShiftChange.HarnessRecolor;
-using static ShiftChange.HarnessRideAlong;
-using static ShiftChange.HarnessScoring;
-using static ShiftChange.HarnessSwap;
-using static ShiftChange.HarnessTables;
-using static ShiftChange.HarnessTriggers;
+using static ShiftChange.Tests.HarnessCatchments;
+using static ShiftChange.Tests.HarnessFixtures;
+using static ShiftChange.Tests.HarnessGates;
+using static ShiftChange.Tests.HarnessInterop;
+using static ShiftChange.Tests.HarnessLifecycle;
+using static ShiftChange.Tests.HarnessGizmos;
+using static ShiftChange.Tests.HarnessOwnership;
+using static ShiftChange.Tests.HarnessRecolor;
+using static ShiftChange.Tests.HarnessRideAlong;
+using static ShiftChange.Tests.HarnessScoring;
+using static ShiftChange.Tests.HarnessSwap;
+using static ShiftChange.Tests.HarnessTables;
+using static ShiftChange.Tests.HarnessTriggers;
 
-namespace ShiftChange
+namespace ShiftChange.Tests
 {
     /// <summary>
     /// The regression suite's runner. Most cases build a throwaway fixture, drive it, check the
@@ -962,4 +959,3 @@ namespace ShiftChange
         }
     }
 }
-#endif

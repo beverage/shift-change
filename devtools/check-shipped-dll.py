@@ -12,17 +12,17 @@ Three properties:
      mistake puts that in a player's debug menu, one unconfirmed click away.
 
   2. NO HARNESS. Dev tooling is not a player's to carry: a harness run clears
-     a pad, spawns colonists and writes save files. It is compiled out of
-     Release entirely
-     (ShiftChange.csproj's HARNESS switch), so this asserts an ABSENCE, and
-     the absence is the whole point of the switch.
+     a pad, spawns colonists and writes save files. The harness is an assembly
+     of its own (Source/ShiftChange.Tests, built into Tests/, which
+     LoadFolders.xml loads only with DevTools and no packaging step copies),
+     so none of it belongs in this dll, and this asserts that ABSENCE.
+     check-invariants.py keeps harness files out of the mod's project; this
+     catches one that got in anyway, under whatever name.
 
      It used to be the opposite check — the harness was REQUIRED to ship, on
      the argument that a gate asserting against a build nobody installs
-     asserts nothing. What replaced that argument: HARNESS is only ever a
-     whole-file guard, so the harness build and the shipping build differ by
-     the presence of harness types and by nothing else. check-invariants.py
-     enforces that half; this file enforces this one.
+     asserts nothing. The tests now run against the shipping dll itself, so
+     that argument holds without the harness inside it.
 
   3. The feature surface IS there. Absence checks pass trivially on an empty
      or truncated file, so something has to be asserted present. These are the
@@ -65,7 +65,7 @@ DEFAULT_DLL = os.path.join(ROOT, "Assemblies", "ShiftChange.dll")
 
 # Type names, so UTF-8 — see the heap note above. The scene builders compile
 # out under Release because their files are wrapped in #if SCENES; the harness
-# types because theirs are wrapped in #if HARNESS.
+# types live in the tests' assembly.
 FORBIDDEN_TYPES = [
     "DebugTools_DemoStage",
     "DebugTools_PreviewStage",
@@ -147,9 +147,9 @@ def main():
 
     for name in FORBIDDEN_TYPES:
         if utf8_count(blob, name):
-            fail("%s is present — this is a Debug, Media or -p:Harness=true "
-                 "build. Rebuild with plain -c Release, which also sweeps "
-                 "Assemblies/." % name)
+            fail("%s is present — this is a Debug or Media build, or a "
+                 "harness file is in the mod's project. Rebuild with plain "
+                 "-c Release, which also sweeps Assemblies/." % name)
 
     for literal in FORBIDDEN_LITERALS:
         if utf16_count(blob, literal):
@@ -161,7 +161,8 @@ def main():
         hits = token_hits(blob, token)
         if hits:
             fail("the word \"%s\" survives in the assembly (%d place(s), e.g. "
-                 "%r) — something dev-only is not behind #if HARNESS."
+                 "%r) — something dev-only is in the mod's project, not the "
+                 "tests' (Source/ShiftChange.Tests)."
                  % (token, len(hits), hits[0]))
 
     for name in REQUIRED_TYPES:

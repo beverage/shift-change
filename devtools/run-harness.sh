@@ -9,11 +9,12 @@
 #   devtools/run-harness.sh --with-after=khamenman.outfitstandsplus
 #                                    # the same mod, loaded after this one
 #
-# Builds Release with the harness, launches RimWorld 1.7 with
-# `--pid MrBeverage.ShiftChange --test -e` against a throwaway save-data folder,
-# and SmashPhil's DevTools test framework runs every case, one test each, then
-# quits the game. It needs a DevTools build at Mods/DevTools that has
-# SmashPhil/DevTools#17 (DEVTOOLS_NEEDS): the harness build compiles against that
+# Builds the shipping Release dll and the tests against it (their own assembly,
+# in Tests/, which LoadFolders.xml loads only with DevTools), launches RimWorld
+# 1.7 with `--pid MrBeverage.ShiftChange --test -e` against a throwaway
+# save-data folder, and SmashPhil's DevTools test framework runs every case,
+# one test each, then quits the game. It needs a DevTools build at Mods/DevTools that has
+# SmashPhil/DevTools#17 (DEVTOOLS_NEEDS): the tests compile against that
 # same dll, and DevTools joins the mod list just ahead of this mod. The verdict is
 # the game's exit code read with the result line DevTools writes last in Test.log
 # (0 passed, 1 a test failed, 2 nothing ran); an exit without that line is no
@@ -44,8 +45,9 @@
 #
 # AND WITH --alongside IT STILL NEVER WRITES INTO THE DLL THAT GAME LOADED.
 # Mods/ShiftChange is a symlink to this checkout, so a colony running beside
-# the run loaded Assemblies/ShiftChange.dll from here. Neither build writes that
-# file: both compile into dist/build/, and deploy() swaps each one in by rename.
+# the run loaded Assemblies/ShiftChange.dll from here, and with DevTools also
+# Tests/Assemblies/ShiftChange.Tests.dll. Neither build writes those files: both
+# compile into dist/build/, and deploy() swaps each one in by rename.
 #
 set -euo pipefail
 
@@ -287,26 +289,40 @@ DEVTOOLS_DLL="$(realpath_of "$MODS_DIR/DevTools")/1.7/Assemblies/DevTools.dll"
 grep -a -q WarningsAllowedFromAttribute "$DEVTOOLS_DLL" \
   || die "$DEVTOOLS_DLL has no WarningsAllowedFrom; build $DEVTOOLS_NEEDS"
 
-# The dll the game loads is the one on disk, not the one in your editor.
+# The dlls the game loads are the ones on disk, not the ones in your editor.
 #
-# -p:Harness=true compiles the harness back in, and -p:DevToolsDll its DevTools
-# tests. Neither is in a shipping build (see the configuration table in the
-# csproj), so plain Release would launch a game with no tests to run. Release
-# codegen otherwise, exactly as shipped.
+# Two builds. First the mod's plain Release build, the dll that ships: the
+# tests run against it as it is. Then the tests, an assembly of their own
+# (Source/ShiftChange.Tests), compiled against that dll, the DevTools dll above
+# and the game this run starts. LoadFolders.xml loads their folder, Tests/,
+# only while DevTools is active, so the mod list below is what turns them on.
 #
-# Into dist/build/, not Assemblies/: -p:OutputPath moves MSBuild's copy step and
-# the csproj's CleanDevArtifacts sweep together, so nothing here has touched the
-# load path yet. The dll check is what proves the redirect took. An OutDir set
-# anywhere beats OutputPath, and a build sent elsewhere that way still reports
-# success.
-rm -rf "$BUILD/harness"
-dotnet build "$CSPROJ" -c Release -p:Harness=true "-p:DevToolsDll=$DEVTOOLS_DLL" \
-  "-p:OutputPath=$BUILD/harness/" >/dev/null \
-  || die "harness build failed — fix that first"
-[ -f "$BUILD/harness/ShiftChange.dll" ] \
-  || die "the harness build succeeded but left no dll in $BUILD/harness/.
+# Both into dist/build/, not the folders the game reads: -p:OutputPath moves
+# the mod build's copy step and the csproj's CleanDevArtifacts sweep together,
+# and -p:TestsDir the tests' copy, so nothing here has touched the load path
+# yet. The dll checks are what prove the redirects took. An OutDir set anywhere
+# beats OutputPath, and a build sent elsewhere that way still reports success.
+TESTS_CSPROJ="$REPO/Source/ShiftChange.Tests/ShiftChange.Tests.csproj"
+TESTS_DLL="$REPO/Tests/Assemblies/ShiftChange.Tests.dll"
+rm -rf "$BUILD/release" "$BUILD/tests"
+dotnet build "$CSPROJ" -c Release "-p:OutputPath=$BUILD/release/" >/dev/null \
+  || die "the Release build failed — fix that first"
+[ -f "$BUILD/release/ShiftChange.dll" ] \
+  || die "the Release build succeeded but left no dll in $BUILD/release/.
        Something overrides OutDir, so the build went somewhere else, possibly
        straight into Assemblies/. Find out where before running this again."
+dotnet build "$TESTS_CSPROJ" -c Release "-p:GameDir=$APP/Contents/MacOS/" \
+  "-p:DevToolsDll=$DEVTOOLS_DLL" "-p:ShiftChangeDll=$BUILD/release/ShiftChange.dll" \
+  "-p:TestsDir=$BUILD/tests/" >/dev/null \
+  || die "the tests' build failed — fix that first"
+[ -f "$BUILD/tests/ShiftChange.Tests.dll" ] \
+  || die "the tests' build succeeded but left no dll in $BUILD/tests/.
+       Something overrides TestsDir, so the copy went somewhere else, possibly
+       straight into Tests/Assemblies/. Find out where before running this again."
+# Release with nothing of the debug scenes or the tests in it, as it ships.
+python3 "$REPO/devtools/check-shipped-dll.py" "$BUILD/release/ShiftChange.dll" >/dev/null \
+  || die "the Release build is not a shipping build: run
+         python3 devtools/check-shipped-dll.py $BUILD/release/ShiftChange.dll"
 
 # THE BUILD IS NOT THE THING THE GAME LOADS.
 #
@@ -345,6 +361,7 @@ printf 'devtools: %s\n' "$DEVTOOLS_DLL"
 # file can change bytes under a live process. mv only swaps the directory
 # entry: a game that loaded the old file keeps it, the next one to start gets
 # the new one, and one starting mid-swap finds one complete dll or the other.
+# The tests' dll is the same case for a game running with DevTools.
 #
 # A plain build into Assemblies/ promises none of that. On macOS with the .NET 9
 # SDK it happens to spare a running game, because MSBuild's copy unlinks the old
@@ -355,56 +372,36 @@ printf 'devtools: %s\n' "$DEVTOOLS_DLL"
 #
 # The .new sits beside its target because a rename is only atomic within one
 # filesystem; from anywhere else, mv falls back to copying.
-#
-# Last, the csproj's own CleanDevArtifacts, pointed back at Assemblies/. The
-# builds sweep dist/build/ now, and Assemblies/ must still hold exactly the one
-# dll. That target only deletes, and -t runs it without building anything. It
-# also deletes the .dll_orig a hot Debug session polls, so a run beside one ends
-# that session's reload, as any Release build does (docs/DEVELOPMENT.md).
 deploy() {
-  rm -f "$DLL.new"
-  if cp "$1" "$DLL.new" && mv -f "$DLL.new" "$DLL"
+  rm -f "$2.new"
+  if cp "$1" "$2.new" && mv -f "$2.new" "$2"
   then
-    dotnet msbuild "$CSPROJ" -nologo -v:q -t:CleanDevArtifacts -p:Configuration=Release >/dev/null
-  else
-    rm -f "$DLL.new"
-    return 1
+    return 0
   fi
+  rm -f "$2.new"
+  return 1
 }
 
-# Leave Assemblies/ holding the SHIPPING dll again, whatever happens below.
-# The game's Mods entry is a symlink to this checkout, so an un-swept harness
-# build is what the next play session loads and what a careless `git add`
-# commits. Same philosophy as the csproj's CleanDevArtifacts target: hygiene by
-# construction, not by memory.
+# Both dlls are the ones a player's game would load from this checkout: the
+# shipping dll, and the tests, which load only with DevTools. So nothing needs
+# putting back when the run ends.
 #
-# It never changes this script's exit status, so nothing in it may fail
-# unguarded. Under set -e, a bare failing command in an EXIT trap stops the trap
-# where it stands and exits with its own status instead: a PASS becomes a
-# failure, with the harness dll still in place. Measured on macOS's bash 3.2.
-#
-# Whatever happened, it then looks at what it left: the shipping check on the
-# dll, and a listing, because that check reads one file and cannot see what
-# else is in the directory.
-restore_shipping_dll() {
-  rm -rf "$BUILD/release" || true
-  dotnet build "$CSPROJ" -c Release "-p:OutputPath=$BUILD/release/" >/dev/null \
-    && deploy "$BUILD/release/ShiftChange.dll" \
-    || printf 'WARNING: restoring the shipping build failed partway; the checks below say what is left.\n' >&2
-  python3 "$REPO/devtools/check-shipped-dll.py" \
-    || printf 'WARNING: Assemblies/ShiftChange.dll is not the shipping build. If a game
-         may have it loaded, swap one in by rename, as this script does:
-           dotnet build Source/ShiftChange/ShiftChange.csproj -c Release -p:OutputPath="%s/"
-           cp "%s/ShiftChange.dll" Assemblies/ShiftChange.dll.new
-           mv Assemblies/ShiftChange.dll.new Assemblies/ShiftChange.dll\n' \
-      "$BUILD/release" "$BUILD/release" >&2
-  extra="$(ls -A "$REPO/Assemblies" 2>/dev/null | grep -vxF 'ShiftChange.dll' || true)"
-  [ -z "$extra" ] \
-    || printf 'WARNING: Assemblies/ must hold only ShiftChange.dll, and also holds:\n%s\n' "$extra" >&2
-}
-trap restore_shipping_dll EXIT
-
-deploy "$BUILD/harness/ShiftChange.dll" || die "could not deploy the harness build into Assemblies/"
+# Then the csproj's own CleanDevArtifacts, pointed back at Assemblies/, which
+# must still hold exactly the one dll. That target only deletes, and -t runs it
+# without building anything. It also deletes the .dll_orig a hot Debug session
+# polls, so a run beside one ends that session's reload, as any Release build
+# does (docs/DEVELOPMENT.md).
+deploy "$BUILD/release/ShiftChange.dll" "$DLL" \
+  || die "could not deploy the Release build into Assemblies/"
+dotnet msbuild "$CSPROJ" -nologo -v:q -t:CleanDevArtifacts -p:Configuration=Release >/dev/null \
+  || die "CleanDevArtifacts failed; check Assemblies/ by hand"
+extra="$(ls -A "$REPO/Assemblies" | grep -vxF 'ShiftChange.dll' || true)"
+[ -z "$extra" ] \
+  || die "Assemblies/ must hold only ShiftChange.dll, and also holds:
+$extra"
+mkdir -p "$(dirname "$TESTS_DLL")"
+deploy "$BUILD/tests/ShiftChange.Tests.dll" "$TESTS_DLL" \
+  || die "could not deploy the tests into Tests/Assemblies/"
 
 rm -rf "$TESTDATA"
 mkdir -p "$TESTDATA/Config"

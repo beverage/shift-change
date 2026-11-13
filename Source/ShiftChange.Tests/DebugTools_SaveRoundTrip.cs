@@ -1,6 +1,3 @@
-// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
-// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
-#if HARNESS
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,7 +6,7 @@ using System.Text.RegularExpressions;
 using RimWorld;
 using Verse;
 
-namespace ShiftChange
+namespace ShiftChange.Tests
 {
     /// <summary>
     /// Save/load round trips for the state an outfit stand scribes: the assignable comp's owner
@@ -1114,4 +1111,3 @@ namespace ShiftChange
         }
     }
 }
-#endif

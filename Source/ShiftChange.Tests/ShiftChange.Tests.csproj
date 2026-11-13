@@ -1,0 +1,101 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shift Change's tests, run by SmashPhil's DevTools: every case of the
+       lifecycle harness, one DevTools test each. A separate assembly in
+       Tests/Assemblies/, which LoadFolders.xml loads only while DevTools is
+       active, so a player who has not installed DevTools loads none of it.
+       DevTools is 1.7 only, so this compiles for 1.7: net10 against the
+       game's own assemblies, unlike the mod's net472 dll, which it references
+       as built (Release, from ../ShiftChange), so the tests run against the
+       dll that ships. That dll grants this one its internals
+       (InternalsVisibleTo in ../ShiftChange/ShiftChange.csproj).
+
+       Builds with a .NET 10 SDK, after the mod:
+
+         dotnet build Source/ShiftChange/ShiftChange.csproj -c Release
+         dotnet build Source/ShiftChange.Tests/ShiftChange.Tests.csproj -c Release -p:DevToolsDll=<path>/DevTools.dll
+
+       devtools/run-harness.sh does both and runs the tests in a game.
+
+       Game references, two modes, as in ../ShiftChange. A machine with
+       RimWorld 1.7 installed compiles against the game's own assemblies, from
+       GameDir, the folder holding Assembly-CSharp.dll (on a Mac,
+       RimWorld.app/Contents/MacOS/). Any other machine (CI, a fresh clone)
+       falls back to Krafs.Rimworld.Ref at the game version the CI machine
+       runs. To reproduce CI locally, pass -p:DisableLocalGameRefs=true. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>ShiftChange.Tests</RootNamespace>
+    <AssemblyName>ShiftChange.Tests</AssemblyName>
+    <Version>0.0.1</Version>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- The fixture primitives below are shared with the mod's SCENES-only
+         stage builders and guarded by SCENES || HARNESS. -->
+    <DefineConstants>$(DefineConstants);HARNESS</DefineConstants>
+
+    <OutputPath>bin/$(Configuration)/</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <DebugType>none</DebugType>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <GameDir Condition="'$(GameDir)' == '' AND Exists('$(HOME)/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorld.app/Contents/MacOS/Assembly-CSharp.dll')">$(HOME)/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorld.app/Contents/MacOS/</GameDir>
+    <GameDir Condition="'$(GameDir)' == '' AND Exists('C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Assembly-CSharp.dll')">C:\Program Files (x86)\Steam\steamapps\common\RimWorld\</GameDir>
+    <GameDir Condition="'$(GameDir)' == '' AND Exists('$(HOME)/.steam/steam/steamapps/common/RimWorld/Assembly-CSharp.dll')">$(HOME)/.steam/steam/steamapps/common/RimWorld/</GameDir>
+    <LocalGameRefs Condition="'$(GameDir)' != '' AND '$(DisableLocalGameRefs)' != 'true'">true</LocalGameRefs>
+  </PropertyGroup>
+
+  <!-- The mod's dll the tests compile against, and the folder the test dll
+       is copied to. run-harness.sh points both into dist/build/, so neither
+       build writes a file a game may have loaded; it then swaps each dll in
+       by rename. -->
+  <PropertyGroup>
+    <ShiftChangeDll Condition="'$(ShiftChangeDll)' == ''">$(MSBuildThisFileDirectory)../../Assemblies/ShiftChange.dll</ShiftChangeDll>
+    <TestsDir Condition="'$(TestsDir)' == ''">$(MSBuildThisFileDirectory)../../Tests/Assemblies/</TestsDir>
+  </PropertyGroup>
+
+  <Target Name="CheckReferences" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(LocalGameRefs)' == 'true' AND !Exists('$(GameDir)Assembly-CSharp.dll')" Text="No Assembly-CSharp.dll in GameDir ($(GameDir)); pass -p:GameDir=&lt;folder holding Assembly-CSharp.dll&gt;/" />
+    <Error Condition="'$(DevToolsDll)' == '' OR !Exists('$(DevToolsDll)')" Text="Pass -p:DevToolsDll=&lt;path to DevTools.dll&gt;" />
+    <Error Condition="!Exists('$(ShiftChangeDll)')" Text="No $(ShiftChangeDll): build ../ShiftChange first (Release)" />
+  </Target>
+
+  <ItemGroup>
+    <Compile Include="../ShiftChange/Dev/DebugTools_Fixtures.cs" Link="DebugTools_Fixtures.cs" />
+  </ItemGroup>
+
+  <!-- The build goes to bin/, and only the test dll is copied on to TestsDir,
+       by default Tests/Assemblies/, the folder the game loads. -->
+  <Target Name="CopyToTestsFolder" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(TestsDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Bump with the Fly image's game: the version flybridge.py's result.json
+       reports as "game". -->
+  <ItemGroup Condition="'$(LocalGameRefs)' != 'true'">
+    <PackageReference Include="Krafs.Rimworld.Ref" Version="1.7.5005-unstable" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <!-- Private=false throughout: compile-time only, so Tests/Assemblies/
+       holds this one dll. -->
+  <ItemGroup Condition="'$(LocalGameRefs)' == 'true'">
+    <Reference Include="Assembly-CSharp" HintPath="$(GameDir)Assembly-CSharp.dll" Private="false" />
+    <Reference Include="UnityStubs" HintPath="$(GameDir)UnityStubs.dll" Private="false" />
+    <Reference Include="Waylith" HintPath="$(GameDir)Waylith.dll" Private="false" />
+    <Reference Include="Waylith.UnityCompat" HintPath="$(GameDir)Waylith.UnityCompat.dll" Private="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Harmony ships as its own mod (brrainz.harmony). -->
+    <PackageReference Include="Lib.Harmony" Version="2.*" ExcludeAssets="runtime" />
+    <Reference Include="DevTools" HintPath="$(DevToolsDll)" Private="false" />
+    <Reference Include="ShiftChange" HintPath="$(ShiftChangeDll)" Private="false" />
+  </ItemGroup>
+
+</Project>

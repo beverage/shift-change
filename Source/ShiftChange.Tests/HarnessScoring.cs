@@ -1,13 +1,10 @@
-// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
-// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
-#if HARNESS
 using System.Collections.Generic;
 using RimWorld;
 using UnityEngine;
 using Verse;
-using static ShiftChange.DebugTools_LifecycleHarness;
+using static ShiftChange.Tests.DebugTools_LifecycleHarness;
 
-namespace ShiftChange
+namespace ShiftChange.Tests
 {
     /// <summary>
     /// Harness cases for <see cref="Patch_ParkedKitOutscoresSpares"/>, which stops a checked-out
@@ -228,4 +225,3 @@ namespace ShiftChange
         }
     }
 }
-#endif

@@ -1,7 +1,3 @@
-// HARNESS and DEVTOOLS only. DEVTOOLS is defined only by a harness build handed a DevTools dll,
-// so every other build, CI's included, compiles this file away. The guard is whole-file, as for
-// all harness code (check-invariants.py enforces it).
-#if HARNESS && DEVTOOLS
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -11,9 +7,9 @@ using DevTools;
 using DevTools.Testing;
 using RimWorld;
 using Verse;
-using static ShiftChange.DebugTools_LifecycleHarness;
+using static ShiftChange.Tests.DebugTools_LifecycleHarness;
 
-namespace ShiftChange
+namespace ShiftChange.Tests
 {
     /// <summary>
     /// Every harness case, run by SmashPhil's DevTools test runner. Each fixture below is one
@@ -414,7 +410,7 @@ namespace ShiftChange
         /// The abort's stack holds only engine frames and this call, and its message names the
         /// cache, which no code of this mod can.
         /// </summary>
-        internal const string OwnLoadFrame = @"ShiftChange\.DebugTools_SaveRoundTrip\.NoteLoad\(";
+        internal const string OwnLoadFrame = @"ShiftChange\.Tests\.DebugTools_SaveRoundTrip\.NoteLoad\(";
 
         /// <summary>The FinalizeLoading abort that names Vehicle Framework's cache.</summary>
         internal const string VehicleCacheAbort =
@@ -673,4 +669,3 @@ namespace ShiftChange
         }
     }
 }
-#endif

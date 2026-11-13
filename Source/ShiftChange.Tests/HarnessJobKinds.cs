@@ -1,16 +1,13 @@
-// HARNESS only, compiled out of a plain Release build. The guard is whole-file, always
-// (check-invariants.py enforces it); why: docs/DESIGN.md, "Development tooling".
-#if HARNESS
 using System.Linq;
 using RimWorld;
 using Verse;
 using Verse.AI;
-using static ShiftChange.DebugTools_LifecycleHarness;
-using static ShiftChange.HarnessFixtures;
+using static ShiftChange.Tests.DebugTools_LifecycleHarness;
+using static ShiftChange.Tests.HarnessFixtures;
 using JobClass = ShiftChange.Patch_JobInterception.JobClass;
 using JobKind = ShiftChange.Patch_JobInterception.JobKind;
 
-namespace ShiftChange
+namespace ShiftChange.Tests
 {
     /// <summary>
     /// The job classifier (<see cref="Patch_JobInterception.Classify"/>) as a table: every job
@@ -279,4 +276,3 @@ namespace ShiftChange
         }
     }
 }
-#endif
