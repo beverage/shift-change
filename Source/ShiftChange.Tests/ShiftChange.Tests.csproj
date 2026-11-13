@@ -4,6 +4,10 @@
        lifecycle harness, one DevTools test each. A separate assembly in
        Tests/Assemblies/, which LoadFolders.xml loads only while DevTools is
        active, so a player who has not installed DevTools loads none of it.
+       It ships that way, installing DevTools being the opt-in, and is committed, as
+       Assemblies/ShiftChange.dll is: CI's release job has no DevTools to
+       build it with. devtools/check-shipped-tests.py fails a commit whose
+       dll was built from other sources (the SourceFingerprint target below).
        DevTools is 1.7 only, so this compiles for 1.7: net10 against the
        game's own assemblies, unlike the mod's net472 dll, which it references
        as built (Release, from ../ShiftChange), so the tests run against the
@@ -74,6 +78,24 @@
        by default Tests/Assemblies/, the folder the game loads. -->
   <Target Name="CopyToTestsFolder" AfterTargets="Build">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(TestsDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- The fingerprint of the sources this dll is built from, as an
+       [AssemblyMetadata], so check-shipped-tests.py can tell a committed dll
+       built from older sources: a build is not byte-identical from one
+       machine to the next, so its hash cannot. The script defines the
+       fingerprint, here and in the check. Before GetAssemblyAttributes, so the
+       inputs cache that decides whether AssemblyInfo is regenerated sees it. -->
+  <Target Name="SourceFingerprint" BeforeTargets="GetAssemblyAttributes">
+    <Exec Command="python3 &quot;$(MSBuildThisFileDirectory)../../devtools/check-shipped-tests.py&quot; --fingerprint" ConsoleToMSBuild="true" StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="SourceFingerprint" />
+    </Exec>
+    <ItemGroup>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>ShiftChange.SourceFingerprint</_Parameter1>
+        <_Parameter2>$(SourceFingerprint)</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
   </Target>
 
   <!-- Bump with the Fly image's game: the version flybridge.py's result.json

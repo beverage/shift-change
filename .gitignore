@@ -51,9 +51,11 @@ devtools/profiles/
 # Shift Change ships no textures today; the rule is here so it cannot start.
 *.dds
 
-# The DevTools tests' dll, built from Source/ShiftChange.Tests into the folder
-# LoadFolders.xml gates on DevTools. It never ships, so it is never tracked.
-Tests/
+# The DevTools tests' folder, which LoadFolders.xml loads only with DevTools.
+# Its one dll, built from Source/ShiftChange.Tests, ships, so it is
+# committed as Assemblies/ShiftChange.dll is; nothing else there is tracked.
+Tests/Assemblies/*
+!Tests/Assemblies/ShiftChange.Tests.dll
 
 # Hot-reload dev artifacts (ECR). Debug builds drop the reloader runtime, its
 # dependencies and an instrumented-original copy beside our dll; the Release

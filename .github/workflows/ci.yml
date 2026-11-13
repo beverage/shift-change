@@ -80,6 +80,14 @@ jobs:
       - name: Committed dll ships no debug scenes or harness
         run: python3 devtools/check-shipped-dll.py
 
+      # The DevTools tests ship too, in Tests/, which LoadFolders.xml loads only
+      # while DevTools is active. No job here can build them, since DevTools
+      # comes only from the lab's bucket, so the committed dll is what ships.
+      # This fails one built from other sources than this commit's, and a gate
+      # that would load the tests for every player.
+      - name: Committed tests ship gated, built from this source
+        run: python3 devtools/check-shipped-tests.py
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
@@ -124,16 +132,20 @@ jobs:
         run: dotnet build Source/ShiftChange/ShiftChange.csproj -c Release
 
       # The zip is a thing players install, so it gets the same gate the
-      # Workshop copy gets: no debug scenes, no harness.
+      # Workshop copy gets: no debug scenes or harness in the mod's dll.
       - name: Release zip ships no debug scenes or harness
         run: python3 devtools/check-shipped-dll.py
 
       # The zip is the mod folder a player drops into Mods/ — game-loaded
       # content plus the human documents, no Source/, no CI, no dev tooling.
+      # The same list as devtools/publish-workshop.sh's CONTENT. Tests/ and
+      # LoadFolders.xml are the DevTools tests, committed and loaded only with
+      # DevTools, checked here as the staged copy.
       - name: Assemble mod folder
         run: |
           mkdir -p dist/ShiftChange
-          cp -R About Assemblies Defs Patches Languages docs LICENSE README.md dist/ShiftChange/
+          cp -R About Assemblies Defs Patches Languages LoadFolders.xml Tests docs LICENSE README.md dist/ShiftChange/
+          python3 devtools/check-shipped-tests.py dist/ShiftChange
           cd dist && zip -r "ShiftChange-${GITHUB_REF_NAME}.zip" ShiftChange
 
       - name: Create GitHub release

@@ -2348,10 +2348,21 @@ itself, and the command is the one it always was.
 running under SmashPhil's DevTools, which is 1.7 only, the harness moved into a
 project of its own, `Source/ShiftChange.Tests`: .NET 10, built against the
 Release dll, which grants it its internals and carries nothing else of it, into
-`Tests/`, which `LoadFolders.xml` loads only while DevTools is active. Neither
-ships, since both packaging steps copy a fixed list of folders. So the tests
-assert against a plain Release build, the build that goes out, which is what the
-second argument above wanted all along, and `-p:Harness=true` is gone.
+`Tests/`, which `LoadFolders.xml` loads only while DevTools is active. So the
+tests assert against a plain Release build, the build that goes out, which is
+what the second argument above wanted all along, and `-p:Harness=true` is gone.
+
+**And the tests ship again, the same day, behind that gate.** Both packaging
+steps copy `Tests/` and `LoadFolders.xml`, as v1.0.0 through v1.3.x carried the
+harness inside the dll, but what made that wrong, that every player loaded it,
+no longer holds: the game loads the folder only while DevTools is active, so a
+player who has not installed a dev tool loads none of it, and one who has can
+run the tests against their own mod list, the one environment we cannot
+reproduce. The test dll is committed and ships as committed, because the
+release job has no DevTools to build it with. A build is not byte-identical
+from one machine to the next, so it embeds a fingerprint of the sources it was
+built from, and `check-shipped-tests.py` compares that with the checkout's in
+CI and on each staged copy, along with the gate and the root entries.
 The debug menu's run of every case went with it: it was 1.6's only way to run
 them, and 1.7's DevTools run is the release gate. `check-invariants.py` keeps
 harness files out of the mod's project.

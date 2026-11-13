@@ -39,14 +39,23 @@ debug menu — goes behind `#if SCENES` and must never reach a player. These are
 builder clears a 200–320 cell footprint, destroying every building, item and
 pawn inside it, then leaves permanent colonists and buildings behind.
 
-**The harness ships in NO configuration.** It is a project of its own,
-`Source/ShiftChange.Tests` (.NET 10, for 1.7, against DevTools), built against
-the Release dll into `Tests/Assemblies/`, which `LoadFolders.xml` loads only
-while DevTools is active. Neither `Tests/` nor `LoadFolders.xml` is in either
-packaging step's folder list, and the mod's dll carries nothing of the harness
-but an `InternalsVisibleTo` for it. `run-harness.sh` builds both and runs the
-tests. Dev tooling is not a player's to carry, and a harness run clears a pad,
-spawns colonists and writes save files.
+**The tests ship, and load only with DevTools.** The harness is a project of
+its own, `Source/ShiftChange.Tests` (.NET 10, for 1.7, against DevTools), built
+against the Release dll into `Tests/Assemblies/`, which `LoadFolders.xml` loads
+only while DevTools is active. Both packaging steps ship `Tests/` and
+`LoadFolders.xml`; a player who has not installed DevTools loads none of it,
+and the mod's dll carries nothing of the harness but an `InternalsVisibleTo`
+for it. A harness run clears a pad, spawns colonists and writes save files, so
+the gate is what keeps it from any player who has not opted in.
+`run-harness.sh` builds both and runs the tests.
+
+**Commit the test dll with the mod's.** No CI job can build the tests without
+DevTools, so `Tests/Assemblies/ShiftChange.Tests.dll` ships as committed. It
+carries a fingerprint of every source under `Source/`, and
+`check-shipped-tests.py` fails a push whose dll was built from other sources,
+a `LoadFolders.xml` that loads `Tests/` ungated or drops the root for a
+version, and a test dll anywhere else. After any change under `Source/`,
+rebuild both dlls (`run-harness.sh` leaves them in place) and commit both.
 
 **Harness code goes in the tests' project, never the mod's.** No file under
 `Source/ShiftChange/` may be named for the harness, use DevTools or read

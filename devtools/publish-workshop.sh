@@ -55,7 +55,9 @@ LINK_RECORD="$REPO/dist/.dev-link"
 
 # Exactly the set in .github/workflows/ci.yml's "Assemble mod folder" step:
 # what the game loads, plus the human-readable documents. Keep the two in step.
-CONTENT=(About Assemblies Defs Patches Languages docs LICENSE README.md)
+# LoadFolders.xml and Tests/ are the DevTools tests, which the game loads only
+# while DevTools is active.
+CONTENT=(About Assemblies Defs Patches Languages LoadFolders.xml Tests docs LICENSE README.md)
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
 
@@ -73,7 +75,10 @@ cmd_stage() {
   command -v dotnet >/dev/null || die "dotnet not on PATH"
 
   # Release, always. A Debug build writes the hot-reload rig to the same
-  # Assemblies/ path, and shipping one is a broken mod.
+  # Assemblies/ path, and shipping one is a broken mod. The tests' dll is not
+  # rebuilt: the committed one ships, as from CI's release job, which has no
+  # DevTools to build it with, and check-shipped-tests.py below fails it if
+  # it was built from other sources than these.
   dotnet build "$REPO/Source/ShiftChange/ShiftChange.csproj" -c Release
 
   rm -rf "$DIST"
@@ -106,6 +111,11 @@ cmd_stage() {
   # the assertion that it did, on the one file a subscriber actually receives.
   python3 "$REPO/devtools/check-shipped-dll.py" "$DIST/Assemblies/ShiftChange.dll" \
     || die "the staged dll is not shippable — see above, and do not upload it"
+
+  # And the tests: gated on DevTools under 1.7, the root loaded for both
+  # versions, the test dll only in the gated folder and built from this source.
+  python3 "$REPO/devtools/check-shipped-tests.py" "$DIST" \
+    || die "the staged tests are not shippable — see above, and do not upload them"
 
   printf '\nstaged %s\n' "$DIST"
   du -sh "$DIST"

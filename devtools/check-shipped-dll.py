@@ -11,13 +11,15 @@ Three properties:
      buildings and rewritten terrain behind. A Debug or Media dll staged by
      mistake puts that in a player's debug menu, one unconfirmed click away.
 
-  2. NO HARNESS. Dev tooling is not a player's to carry: a harness run clears
-     a pad, spawns colonists and writes save files. The harness is an assembly
-     of its own (Source/ShiftChange.Tests, built into Tests/, which
-     LoadFolders.xml loads only with DevTools and no packaging step copies),
-     so none of it belongs in this dll, and this asserts that ABSENCE.
-     check-invariants.py keeps harness files out of the mod's project; this
-     catches one that got in anyway, under whatever name.
+  2. NO HARNESS. A harness run clears a pad, spawns colonists and writes
+     save files, so it must not load for a player who has not asked for it.
+     The harness is an assembly of its own (Source/ShiftChange.Tests, built
+     into Tests/, which ships and which LoadFolders.xml loads only with
+     DevTools; check-shipped-tests.py checks that side), so none of it belongs
+     in this dll, and this asserts that ABSENCE. check-invariants.py keeps
+     harness files out of the mod's project; this catches one that got in
+     anyway, under whatever name. The sweep covers this dll only: the tests'
+     own names and literals may say "harness".
 
      It used to be the opposite check — the harness was REQUIRED to ship, on
      the argument that a gate asserting against a build nobody installs

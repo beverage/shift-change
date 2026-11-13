@@ -10,7 +10,8 @@
 #                                    # the same mod, loaded after this one
 #
 # Builds the shipping Release dll and the tests against it (their own assembly,
-# in Tests/, which LoadFolders.xml loads only with DevTools), launches RimWorld
+# in Tests/, which LoadFolders.xml loads only with DevTools; both ship, and
+# both are committed), launches RimWorld
 # 1.7 with `--pid MrBeverage.ShiftChange --test -e` against a throwaway
 # save-data folder, and SmashPhil's DevTools test framework runs every case,
 # one test each, then quits the game. It needs a DevTools build at Mods/DevTools that has
@@ -382,9 +383,10 @@ deploy() {
   return 1
 }
 
-# Both dlls are the ones a player's game would load from this checkout: the
-# shipping dll, and the tests, which load only with DevTools. So nothing needs
-# putting back when the run ends.
+# Both dlls are the ones a player's game would load from this checkout, and
+# both are committed and ship: the mod's, and the tests, which load only with
+# DevTools. So nothing needs putting back when the run ends, and a
+# run that passes leaves the pair to commit.
 #
 # Then the csproj's own CleanDevArtifacts, pointed back at Assemblies/, which
 # must still hold exactly the one dll. That target only deletes, and -t runs it
@@ -402,6 +404,10 @@ $extra"
 mkdir -p "$(dirname "$TESTS_DLL")"
 deploy "$BUILD/tests/ShiftChange.Tests.dll" "$TESTS_DLL" \
   || die "could not deploy the tests into Tests/Assemblies/"
+# The checkout as CI and the packaging steps check it: the gate, the folders,
+# and a test dll built from the sources as they are now.
+python3 "$REPO/devtools/check-shipped-tests.py" >/dev/null \
+  || die "the checkout's tests are not shippable: run python3 devtools/check-shipped-tests.py"
 
 rm -rf "$TESTDATA"
 mkdir -p "$TESTDATA/Config"

@@ -38,11 +38,13 @@ The tests are not a configuration but an assembly of their own,
 `Source/ShiftChange.Tests`: .NET 10, for 1.7, against DevTools and the Release
 dll, which grants it its internals (`InternalsVisibleTo`) and carries nothing
 else of it. It builds into `Tests/Assemblies/`, which `LoadFolders.xml` loads
-only while DevTools is active. Dev tooling is not a player's to carry: a run
-clears a pad, spawns colonists and writes save files. Neither `Tests/` nor
-`LoadFolders.xml` ships, since both packaging steps copy a fixed list of
-folders. `run-harness.sh` builds both dlls and runs the tests; with a .NET 10
-SDK, by hand:
+only while DevTools is active. Both ship, `Tests/` and `LoadFolders.xml` with
+them: installing DevTools is a player's opt-in, and a player who has not loads
+none of it. No CI job can build the tests without DevTools, so their dll is
+committed and ships as committed, and it carries a fingerprint of the sources
+it was built from: after a change under `Source/`, rebuild both dlls and commit
+both, or `check-shipped-tests.py` fails the push. `run-harness.sh` builds both
+dlls, leaves them in place and runs the tests; with a .NET 10 SDK, by hand:
 
 ```bash
 dotnet build Source/ShiftChange/ShiftChange.csproj -c Release
@@ -309,6 +311,7 @@ broke that way once; the rest block a failure that would land silently.
 | `devtools/bbcode-preview.py` | an unclosed tag in the store description, which makes Steam render the rest of the page as literal text |
 | Committed dll is uninstrumented, and alone | an instrumented Debug build reaching the mod's load path |
 | `devtools/check-shipped-dll.py` | a `SCENES` build shipping the destructive scene builders, a harness file in the mod's project shipping the harness, and the opposite failure — over-gating that leaves the feature surface out. Run against the committed dll and again against the fresh Release build. |
+| `devtools/check-shipped-tests.py` | a committed test dll built from other sources than the commit's, which would ship calls to members the mod no longer has; a `LoadFolders.xml` that loads `Tests/` for every player or drops the root for a version; the test dll anywhere but `Tests/Assemblies/`; a mod dll that references DevTools or grants the tests no internals. The release job runs it again on the zip's folder. |
 | Media build | the filming config rotting between shoots, discovered on a shoot |
 | Release build | compile errors against Krafs |
 
@@ -509,7 +512,7 @@ Folders by concern. Everything outside `Dev/` ships, and `check-invariants.py` h
 
 #### `Dev/`
 
-Each file here is guarded whole, by `SCENES`, `DEBUG` or `SCENES || HARNESS`, and none of it ships.
+Each file here is guarded whole, by `SCENES`, `DEBUG` or `SCENES || HARNESS`, and none of it is in the mod's dll. `DebugTools_Fixtures.cs` ships only compiled into the tests'.
 
 | File | Role |
 |---|---|
@@ -530,7 +533,8 @@ Each file here is guarded whole, by `SCENES`, `DEBUG` or `SCENES || HARNESS`, an
 
 The tests' project (`ShiftChange.Tests.csproj`): .NET 10, for 1.7, built against
 the Release dll and DevTools into `Tests/Assemblies/`, and loaded only with
-DevTools. Its namespace is `ShiftChange.Tests`. None of it ships.
+DevTools. Its namespace is `ShiftChange.Tests`. It ships, in `Tests/`, as the
+committed `Tests/Assemblies/ShiftChange.Tests.dll`.
 
 | File | Role |
 |---|---|
@@ -552,17 +556,20 @@ DevTools. Its namespace is `ShiftChange.Tests`. None of it ships.
 | `Patches/` | Adds the two comps to the vanilla outfit stand def. |
 | `Languages/English/Keyed/` | Gizmo and inspect strings. |
 | `Assemblies/` | Build output. Exactly one dll. |
+| `LoadFolders.xml` | The root for 1.6 and 1.7, and `Tests/` under 1.7 only while DevTools is active. Once the file exists it decides every folder the game loads, so the root entries are what load the mod at all. |
+| `Tests/Assemblies/` | The tests' build output, `ShiftChange.Tests.dll`, committed. |
 
 ### `devtools/`
 
 Not shipped — the release allowlist is `About Assemblies Defs Patches Languages
-docs LICENSE README.md`.
+LoadFolders.xml Tests docs LICENSE README.md`.
 
 | Script | Does |
 |---|---|
 | `run-harness.sh` | Runs the test suite as DevTools tests, headless in an isolated 1.7 instance. `--full`, `--alongside`, `--with`, `--with-after`. |
 | `check-invariants.py` | The static checks CI runs. Run it before pushing. |
 | `check-shipped-dll.py` | Asserts the built assembly ships no debug scenes and no harness, and still carries the feature surface. Run it before pushing; `publish-workshop.sh` runs it against the staged copy too. |
+| `check-shipped-tests.py` | Asserts a mod folder ships the tests gated on DevTools, the root loaded for both versions, and a test dll built from the checkout's sources. `--fingerprint` prints the value the tests' build embeds. CI, `publish-workshop.sh` and `run-harness.sh` run it. |
 | `rimworld-profile.sh` | Swaps the live mod list for a fast interactive session. |
 | `publish-workshop.sh` | Stages a Workshop upload out of the working tree, and swaps it into `Mods/`. |
 | `bbcode-preview.py` | Validates the store description and renders a local preview. |

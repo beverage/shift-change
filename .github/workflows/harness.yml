@@ -85,7 +85,8 @@ jobs:
       # The shipping dll, then the tests against it, into Tests/Assemblies/,
       # which LoadFolders.xml loads with DevTools: the builds run-harness.sh
       # drives. DisableLocalGameRefs keeps both on Krafs whatever the machine
-      # has installed.
+      # has installed. Both replace the committed dlls in this job's checkout
+      # only; ci.yml checks the committed test dll matches these sources.
       - name: Build the mod and its tests
         run: |
           dotnet build Source/ShiftChange/ShiftChange.csproj -c Release -p:DisableLocalGameRefs=true -nologo

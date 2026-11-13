@@ -38,9 +38,12 @@ keeps its log and caches off the player's.
 
 The tests are an assembly of their own, `Source/ShiftChange.Tests`, built into
 `Tests/Assemblies/`, and the game loads `Tests/` only while DevTools is active
-(`LoadFolders.xml`). So they run against the dll that ships, and a player who
-has not installed DevTools loads none of them. Neither `Tests/` nor
-`LoadFolders.xml` ships: both packaging steps copy a fixed list of folders.
+(`LoadFolders.xml`). So they run against the dll that ships, and they ship
+too: a player who installs DevTools can run them against their own mod list,
+and one who has not loads none of them. The test dll is committed, like the
+mod's: after a change under `Source/`, rebuild and commit both (a run of
+`run-harness.sh` leaves both in place), or CI's `check-shipped-tests.py` fails
+the push, since the dll was built from other sources.
 DevTools runs on 1.7 only, so the tests do too: they target .NET 10 and compile
 against 1.7, while the mod's own dll stays net472.
 

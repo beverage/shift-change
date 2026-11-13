@@ -409,11 +409,12 @@ def check_patch_roots():
 
 # -------------------------------------------------------------- harness gating
 
-# The harness is dev tooling and does not ship: its cases are DevTools tests in
-# an assembly of their own, Source/ShiftChange.Tests, which the game loads only
-# while DevTools is active and which no release packages. So the shipping
-# project holds no harness or test code at all, and the tests run against the
-# very dll that ships. Three properties keep it that way, none of them visible
+# The harness's cases are DevTools tests in an assembly of their own,
+# Source/ShiftChange.Tests, which ships in Tests/ and which the game loads only
+# while DevTools is active (check-shipped-tests.py checks the gate).
+# So the shipping project holds no harness or test code at all, the mod loads
+# the same without DevTools, and the tests run against the very dll that
+# ships. Three properties keep it that way, none of them visible
 # at a glance:
 #
 #   1. Nothing under Source/ShiftChange is harness or test code: no file named
