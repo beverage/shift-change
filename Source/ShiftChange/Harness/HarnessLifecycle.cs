@@ -19,8 +19,8 @@ namespace ShiftChange
     /// Harness cases for the engine lifecycle events a ledger has to survive: gravship
     /// flight, map removal, teardown, reinstall, death and banishment, and the fault latch
     /// that disables interception after repeated throws. Also holds the flight and meal-break
-    /// helpers <see cref="HarnessVacuum"/> reuses. Cases are registered, and ordered, in
-    /// <see cref="DebugTools_LifecycleHarness.Run"/>.
+    /// helpers <see cref="HarnessVacuum"/> reuses. Cases are listed, and ordered, in
+    /// <see cref="DebugTools_LifecycleHarness.Cases"/>.
     /// </summary>
     internal static class HarnessLifecycle
     {

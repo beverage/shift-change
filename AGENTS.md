@@ -72,6 +72,7 @@ devtools/run-harness.sh          # ~20s, a four-mod list, no hands
 devtools/run-harness.sh --full   # whatever mod list is active; run before a release
 devtools/run-harness.sh --with=khamenman.outfitstandsplus   # the four, plus one mod a case needs
 devtools/run-harness.sh --with-after=khamenman.outfitstandsplus   # the same, loaded after us
+devtools/run-harness.sh --devtools   # DevTools tests; 1.7, DevTools develop 0eea1a1+ in Mods/
 ```
 
 It asserts where the ledger lands after each despawn/death/banishment event, by
@@ -86,7 +87,10 @@ loaded, and the Outfit Stands Plus, Common Sense and Pick Up And Haul cases
 when their mod is not (`--with=` loads each). The sixth is Complex Jobs'
 two delivery givers, probed by the delivery case only when that mod is loaded
 (`--with=FrozenSnowFox.ComplexJobs`). So a clean default run reads
-`0 failed, 6 known gaps` and exits 0. Any other gap, or any failure, is real. It does now run
+`0 failed, 6 known gaps` and exits 0. Under `--with=FrozenSnowFox.ComplexJobs`
+the delivery gap closes and the feeding table case opens one: that mod moves
+animal and prisoner feeding to work no barn row or Warden tick serves. Any other
+gap, or any failure, is real. It does now run
 `JobDriver_SwapAtStand` for real, through the pawn's own tracker, so "the
 driver builds a correct ledger" is covered, and the player-facing rules have
 functional cases. Save/load round trips are covered by four cases that load

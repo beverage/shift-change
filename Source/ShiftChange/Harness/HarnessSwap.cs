@@ -20,7 +20,7 @@ namespace ShiftChange
     /// that decide what a stand may take.
     ///
     /// <para>Case order is decided in one place,
-    /// <see cref="DebugTools_LifecycleHarness.Run"/>.</para>
+    /// <see cref="DebugTools_LifecycleHarness.Cases"/>.</para>
     /// </summary>
     internal static class HarnessSwap
     {

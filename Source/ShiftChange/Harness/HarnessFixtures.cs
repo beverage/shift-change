@@ -276,6 +276,15 @@ namespace ShiftChange
             return job;
         }
 
+        /// <summary>Toggles each of <paramref name="works"/> on the fixture's stand.</summary>
+        internal static void ToggleEach(Fixture fix, IEnumerable<WorkTypeDef> works)
+        {
+            foreach (WorkTypeDef work in works)
+            {
+                fix.Comp.ToggleWork(work);
+            }
+        }
+
         /// <summary>
         /// Makes interception throw <paramref name="times"/> times, via the real patch entry.
         /// </summary>

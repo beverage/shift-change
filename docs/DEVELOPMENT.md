@@ -200,11 +200,13 @@ engine traps it had to pay for are all in [TESTING.md](TESTING.md).
 devtools/run-harness.sh              # a four-mod list — the iteration loop
 devtools/run-harness.sh --full       # your own mod list — the release gate
 devtools/run-harness.sh --alongside  # a second instance beside a live game
+devtools/run-harness.sh --devtools   # every case as a DevTools test, on 1.7
 ```
 
 One command, no hands: builds Release, launches an isolated instance, waits for
 it to run every case and quit itself, prints the report, exits non-zero on
-failure. Measured 2026-08-14, launch to process exit:
+failure. It runs on 1.6 and 1.7; on 1.7 the instance is windowless, with a
+`HOME` of its own under `dist/testhome`. TESTING.md covers `--devtools`. Measured 2026-08-14, launch to process exit:
 
 | Mod list | Wall clock |
 |---|---|
@@ -516,13 +518,14 @@ Each file here is guarded whole, by `SCENES`, `DEBUG` or `SCENES || HARNESS`, an
 
 | File | Role |
 |---|---|
-| `DebugTools_LifecycleHarness.cs` | `HARNESS` only. The test suite: the runner, its assertions, its self-check, and the list that registers every case in the order they run. The other cases' bodies, which drive real engine entry points, live in the files beside it — see [TESTING.md](TESTING.md). Its debug-menu entry, `RunHarness`, a node in `DebugTools_Menu`'s Dev tools submenu, is `SCENES` on top of that. |
+| `DebugTools_LifecycleHarness.cs` | `HARNESS` only. The test suite: the runner, its assertions, its self-check, and `Cases()`, the list of every case in the order they run, each in its `CaseGroup`. Both runners read that list. The other cases' bodies, which drive real engine entry points, live in the files beside it — see [TESTING.md](TESTING.md). Its debug-menu entry, `RunHarness`, a node in `DebugTools_Menu`'s Dev tools submenu, is `SCENES` on top of that. |
 | `DebugTools_SaveRoundTrip.cs` | `HARNESS` only. The four save/load cases. Separate file because they replace `Current.Game` and must run last. |
 | `HarnessCatchments.cs` | `HARNESS` only. The catchment cases, one `partial` class: `.Radius` for coverage and dressing in a ring, `.ReturnTrip`, `.BillProduct` for the haul that stores a finished bill's product, `.Deliveries`, `.Area`, `.AreaUi` for the alert and the Serves menu, and `.Latch`. The main file holds the cases true in every mode and the helpers several files share. |
 | `HarnessVacuum.cs` | `HARNESS` only. The vacuum cases, on the second map, which is a vacuum map: the ground they stand on, then a staged ship of a room, open floor and a second room, and the cases a review of the gate added (each dress path, doors, a stranded colonist, the cooldown, an urgent patient, a stand on another map). |
 | `HarnessJobKinds.cs` | `HARNESS` only. The job classifier as a table: every job shape the other cases build, and the kind and work type it must get. |
-| `HarnessFixtureChecks.cs` | `HARNESS` only. What every case takes for granted about its fixture: a colonist who needs no doctor and whose needs hold still under the stopped clock, and open ground past the pad. Registered first. |
+| `HarnessFixtureChecks.cs` | `HARNESS` only. What every case takes for granted about its fixture: a colonist who needs no doctor and whose needs hold still under the stopped clock, and open ground past the pad. Listed first. |
 | `Patch_HarnessAutoRun.cs` | `HARNESS` only. Runs the harness and quits, when launched with `-shiftchange-harness`. Neither it nor the flag exists in a shipping build. |
+| `HarnessDevTools.cs` | `HARNESS` and `DEVTOOLS` only, so a build handed a DevTools dll (`run-harness.sh --devtools`). One DevTools fixture per `CaseGroup`, each generating a test per case of its group; the adapter that runs a case on a pad (found once per map) out of the camera's sight when it needs one, and turns its tally into the test's status; and `HarnessCaseList`, which checks DevTools registered every case once, in list order, at its group's priority. |
 
 ### Content
 
@@ -541,7 +544,7 @@ docs LICENSE README.md`.
 
 | Script | Does |
 |---|---|
-| `run-harness.sh` | Runs the test suite headless in an isolated instance. `--full`, `--alongside`. |
+| `run-harness.sh` | Runs the test suite headless in an isolated instance. `--full`, `--alongside`, `--with`, `--with-after`, `--devtools`. |
 | `check-invariants.py` | The static checks CI runs. Run it before pushing. |
 | `check-shipped-dll.py` | Asserts the built assembly ships no debug scenes, no harness and no launch flag, and still carries the feature surface. Run it before pushing; `publish-workshop.sh` runs it against the staged copy too. |
 | `rimworld-profile.sh` | Swaps the live mod list for a fast interactive session. |

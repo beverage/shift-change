@@ -19,8 +19,8 @@ namespace ShiftChange
     /// Harness cases for who a stand serves: owner lists and the owner dialog's filter, the
     /// copy of the owner list in another mod's assignable and the reconcile behind it, a
     /// stand not used for shift changes, the removal flag held off in service, and the two
-    /// gizmo-chain gates. Cases are registered, and ordered, in
-    /// <see cref="DebugTools_LifecycleHarness.Run"/>.
+    /// gizmo-chain gates. Cases are listed, and ordered, in
+    /// <see cref="DebugTools_LifecycleHarness.Cases"/>.
     /// </summary>
     internal static class HarnessOwnership
     {

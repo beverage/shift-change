@@ -78,6 +78,25 @@
     <DefineConstants>$(DefineConstants);HARNESS</DefineConstants>
   </PropertyGroup>
 
+  <!-- DEVTOOLS: harness cases run by SmashPhil's DevTools instead of the auto-run.
+       Only a build handed a DevTools dll (-p:DevToolsDll=<path>) defines it and
+       references DevTools; every other build, CI's included, compiles those files
+       away, since their guard is HARNESS && DEVTOOLS.
+
+       DevTools targets .NET 10 and this assembly .NET Framework 4.7.2, so MSBuild
+       reports two versions of System.Runtime. Harness runs happen on 1.7 only,
+       which runs on .NET 10 and loads 4.7.2 assemblies, so the report is noise. -->
+  <PropertyGroup Condition="'$(DevToolsDll)' != ''">
+    <DefineConstants>$(DefineConstants);DEVTOOLS</DefineConstants>
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB3277</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(DevToolsDll)' != ''">
+    <Reference Include="DevTools">
+      <HintPath>$(DevToolsDll)</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Lib.Harmony" Version="2.*" ExcludeAssets="runtime" />
     <!-- net472 reference assemblies, so this builds on a machine with only

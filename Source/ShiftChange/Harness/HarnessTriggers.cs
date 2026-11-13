@@ -16,8 +16,8 @@ using static ShiftChange.HarnessFixtures;
 namespace ShiftChange
 {
     /// <summary>
-    /// Cases for what arms a stand (work, recreation, sleep) and for deposit-only, registered and
-    /// ordered in <see cref="DebugTools_LifecycleHarness.Run"/>.
+    /// Cases for what arms a stand (work, recreation, sleep) and for deposit-only, listed and
+    /// ordered in <see cref="DebugTools_LifecycleHarness.Cases"/>.
     /// </summary>
     internal static class HarnessTriggers
     {

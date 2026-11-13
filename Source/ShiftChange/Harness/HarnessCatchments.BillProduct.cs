@@ -147,9 +147,9 @@ namespace ShiftChange
                 {
                     return false;
                 }
-                bool ok = FinishBill(fix, stage, () => fix.Comp.ToggleWork(stage.Crafting));
-                return ok & Expect(!fix.Comp.HandlesWork(stage.Crafting),
-                                   "the stand stopped serving Crafting during the bill (control)")
+                bool ok = FinishBill(fix, stage, () => fix.Comp.ToggleWork(stage.Work));
+                return ok & Expect(!fix.Comp.HandlesWork(stage.Work),
+                                   "the stand stopped serving the bill's work during it (control)")
                           & ChangedBackFirst(fix, stage);
             }
             finally
@@ -255,12 +255,12 @@ namespace ShiftChange
             {
                 fix.Comp.ToggleWork(hauling);
             }
-            fix.Comp.ToggleWork(stage.Crafting);
+            fix.Comp.ToggleWork(stage.Work);
             fix.Comp.SetServeArea(PaintRoom(fix, stage, IntVec3.Invalid));
             Zone_Stockpile stockpile = StageStockpile(fix.Map, stage.Corner + FarCorner);
             try
             {
-                bool ok = Expect(!fix.Comp.OnShift && !fix.Comp.HandlesWork(stage.Crafting),
+                bool ok = Expect(!fix.Comp.OnShift && !fix.Comp.HandlesWork(stage.Work),
                                  "the crafter starts off shift at a stand that serves Hauling alone (control)")
                         & FinishBill(fix, stage);
                 return ok & Expect(fix.Pawn.CurJobDef == JobDefOf.HaulToCell,
@@ -281,32 +281,33 @@ namespace ShiftChange
             internal Building_WorkTable Table;
             internal Bill_Production Bill;
             internal WorkGiverDef Giver;
-            internal WorkTypeDef Crafting;
+            internal WorkTypeDef Work;
             internal ThingDef Chunk;
             internal ThingDef Blocks;
         }
 
         /// <summary>
-        /// Ticks Crafting, then stages a stonecutter's table along the room's south wall with one
-        /// granite block bill. Ticked before the table lands: it would make an automatic stand
-        /// read the room as a workshop.
+        /// Ticks the bill giver's own work type, then stages a stonecutter's table along the room's
+        /// south wall with one granite block bill. The giver's work is Crafting, or Stone Cut with
+        /// Complex Jobs, which moves it. Ticked before the table lands: it would make an automatic
+        /// stand read the room as a workshop.
         /// </summary>
         internal static BillStage StageBill(Fixture fix)
         {
-            WorkTypeDef crafting = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Crafting");
             WorkGiverDef giver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoBillsStonecut");
+            WorkTypeDef work = giver?.workType;
             ThingDef tableDef = DefDatabase<ThingDef>.GetNamedSilentFail("TableStonecutter");
             ThingDef chunkDef = DefDatabase<ThingDef>.GetNamedSilentFail("ChunkGranite");
             RecipeDef recipe = DefDatabase<RecipeDef>.GetNamedSilentFail("Make_StoneBlocksGranite");
-            if (crafting == null || giver == null || tableDef == null || chunkDef == null
+            if (work == null || tableDef == null || chunkDef == null
                 || recipe == null || fix.Outside.Area == 0)
             {
                 Expect(false, "the stonecutting defs resolve and the doorway fixture staged");
                 return null;
             }
-            if (!fix.Comp.HandlesWork(crafting))
+            if (!fix.Comp.HandlesWork(work))
             {
-                fix.Comp.ToggleWork(crafting);
+                fix.Comp.ToggleWork(work);
             }
             MakeCalm(fix.Map);
 
@@ -329,7 +330,7 @@ namespace ShiftChange
                 Table = table,
                 Bill = bill,
                 Giver = giver,
-                Crafting = crafting,
+                Work = work,
                 Chunk = chunkDef,
                 Blocks = recipe.products[0].thingDef,
             };

@@ -11,8 +11,8 @@ using RimWorld;
 using UnityEngine;
 using Verse;
 using Verse.AI;
-// Case bodies live in sibling types under Harness/, imported statically so the registration list in
-// Run reads as plain method names. That list is the order authority.
+// Case bodies live in sibling types under Harness/, imported statically so the case list in Cases
+// reads as plain method names. That list is the order authority.
 using static ShiftChange.HarnessCatchments;
 using static ShiftChange.HarnessFixtures;
 using static ShiftChange.HarnessGates;
@@ -33,7 +33,7 @@ namespace ShiftChange
     /// The regression suite's runner. Most cases build a throwaway fixture, drive it, check the
     /// outcome and tear it down; a lifecycle case fires one real engine event at a checked-out
     /// stand and checks where the ledger lands. Results go to the dev log, and a toast gives the
-    /// tally. <see cref="Run"/> registers the cases, and its list is the order they run in.
+    /// tally. <see cref="Cases"/> lists the cases, in the order <see cref="Run"/> runs them.
     ///
     /// <para>Each lifecycle case splits in two. The engine's half is read from the game's code and
     /// taken as given: a gravship flight, say, despawns what is aboard with <c>WillReplace</c>. The
@@ -124,394 +124,10 @@ namespace ShiftChange
             Report.Append("[ShiftChange] lifecycle harness, pad at (").Append(origin.x).Append(", ")
                   .Append(origin.z).AppendLine(origin == centre ? "), the map centre" : "), not the map centre");
 
-            // First: every case below takes for granted what this checks.
-            Case(map, pad, "the fixture colonist is healthy and holds still under the stopped clock, and ground past the pad is ground open to the map edge",
-                 fix => HarnessFixtureChecks.FixtureColonistHoldsStill(fix, pad));
-            Case(map, pad, "gravship flight keeps the ledger, and the shift ends normally after landing",
-                 GravshipFlight);
-            Case(map, pad, "gravship flight without the borrower releases it", GravshipFlightLeftBehind);
-            // Flights that leave the borrower and the stand on two maps, the second a pocket map
-            // (HarnessFixtures.SecondMap).
-            Case(map, pad, "a stand that flies without its borrower keeps the shift, and ends it normally when they meet again",
-                 StandFliesWithoutItsBorrower);
-            Case(map, pad, "a borrower who flies without their stand keeps the shift, and ends it normally on coming back",
-                 BorrowerFliesWithoutTheirStand);
-            // The next two build on the second map, so the fixture's Map is the pocket one and the
-            // body is handed the harness's map and pad.
-            Case(map, pad, "a stand lost with the map it was left on stops pinning its borrower's uniform",
-                 BuildOnSecondMap, fix => StandLostWithItsMap(fix, map, pad));
-            Case(map, pad, "a boxed stand lost with its map releases its ledger too",
-                 BuildOnSecondMap, fix => BoxedStandLostWithItsMap(fix, map, pad));
-            // The vacuum gate's ground: the second map is a vacuum map; the first case checks it.
-            Case("a room on the second map, a vacuum map, holds air while the open floor past its door does not",
-                 () => HarnessVacuum.VacuumMapStages(map));
-            Case(map, pad, "a bill fetching through vacuum keeps a crafter in their vacsuit, where one inside dresses them",
-                 HarnessVacuum.StageShip, HarnessVacuum.IngredientInVacuumKeepsTheirGear);
-            Case(map, pad, "a bill fetching from a safe room only vacuum leads to keeps them in their vacsuit too",
-                 HarnessVacuum.StageShip, HarnessVacuum.SafeRoomAcrossVacuumKeepsTheirGear);
-            Case(map, pad, "on a ship whose rooms all connect through air, the same bill dresses them",
-                 HarnessVacuum.StageConnectedShip, HarnessVacuum.ConnectedShipChangesNothing);
-            Case(map, pad, "a crafter in uniform changes back before a bill through vacuum, and not before one inside",
-                 HarnessVacuum.StageShip, HarnessVacuum.OnShiftChangesBackBeforeVacuum);
-            Case(map, pad, "a crafter with no vacuum protection to lose is dressed as before",
-                 HarnessVacuum.StageShip, HarnessVacuum.UnprotectedCrafterIsUnaffected);
-            Case(map, pad, "an order through vacuum runs as given, and only a warning says so",
-                 HarnessVacuum.StageShip, HarnessVacuum.OrderIntoVacuumRunsAsGiven);
-            Case(map, pad, "an emergency through vacuum sends a colonist in uniform to change first",
-                 HarnessVacuum.StageShip, HarnessVacuum.EmergencyIntoVacuumChangesBackFirst);
-            Case(map, pad, "off a vacuum map, a crafter in a vacsuit is dressed for a bill fetching from outside, as before",
-                 HarnessVacuum.StageEnclosedCrafter, HarnessVacuum.PlanetMapChangesNothing);
-            Case(map, pad, "a stand holding a vacsuit dresses an unsuited crafter for a bill through vacuum",
-                 HarnessVacuum.StageShip, HarnessVacuum.VacsuitStandStillDresses);
-            Case(map, pad, "a vacsuit stand across the room wins over a nearer one that would take the suit off",
-                 HarnessVacuum.StageShip, HarnessVacuum.ProtectiveStandWinsOverANearerOne);
-            Case(map, pad, "an area stand painted over open floor does not dress for a delivery from out there",
-                 HarnessVacuum.StageShip, HarnessVacuum.AreaDeliveryAcrossVacuumKeepsTheirGear);
-            Case(map, pad, "a freed stand does not catch up a crafter on a job fetching through vacuum",
-                 HarnessVacuum.StageShip, HarnessVacuum.FreedStandSkipsAJobThroughVacuum);
-            Case(map, pad, "an errand ahead of the stand's work rides along in uniform, but not into vacuum",
-                 HarnessVacuum.StageConnectedShip, HarnessVacuum.ErrandAheadOfWorkChangesBackBeforeVacuum);
-            Case(map, pad, "the air walk does not pass a door forbidden to the colonist",
-                 HarnessVacuum.StageConnectedShip, HarnessVacuum.ForbiddenDoorIsNoWayThrough);
-            Case(map, pad, "a colonist cut off from their stand by vacuum is not sent across it to change",
-                 HarnessVacuum.StageShip, HarnessVacuum.StrandedColonistIsNotSentAcrossToChange);
-            Case(map, pad, "a cooldown does not wave a colonist in uniform into vacuum",
-                 HarnessVacuum.StageShip, HarnessVacuum.CooldownDoesNotWaveThemIntoVacuum);
-            Case(map, pad, "an urgent patient goes straight to a bed across vacuum",
-                 HarnessVacuum.StageShip, HarnessVacuum.UrgentPatientGoesStraightToBedAcrossVacuum);
-            Case(map, pad, "a colonist whose stand is on another map is warned before vacuum",
-                 HarnessVacuum.StageCrafterAtHome, HarnessVacuum.StandOnAnotherMapStillWarns);
-            Case("every stand def asks to hear when its map is removed", StandDefsHearMapRemoval);
-            Case(map, pad, "teardown (deconstruct, burn) releases the ledger", TeardownReleases);
-            Case(map, pad, "reinstalling mid-shift keeps the ledger and the return trip",
-                 ReinstallKeepsTheLedger);
-            Case(map, pad, "reinstalling a stand keeps its owner, mode and flag",
-                 ReinstallKeepsConfiguration);
-            Case(map, pad, "an owner who dies while their stand is boxed does not own it again",
-                 DeadOwnerNotRestoredOnReinstall);
-            Case(map, pad, "an owner kidnapped while their stand is boxed neither owns it nor "
-                           + "keeps their shift there",
-                 KidnappedOwnerNotRestoredOnReinstall);
-            Case(map, pad, "borrower death reaps the ledger", DeathReaps);
-            Case(map, pad, "borrower banishment reaps the ledger", BanishmentReaps);
-            Case(map, pad, "repeated faults disable interception, a load re-arms it", FaultLatchRecovers);
-            Case(map, pad, "a stand that displaces nothing still hands the uniform back",
-                 (m, p) => Stage(m, p, StageKit.NonDisplacing), NonDisplacingReturns);
-            Case(map, pad, "the driver returns own clothes and their forced flags",
-                 (m, p) => Stage(m, p, StageKit.Displacing), DriverRoundTrip);
-            Case(map, pad, "work and recreation are mutually exclusive on a stand",
-                 (m, p) => Stage(m, p, StageKit.Displacing), WorkAndRecreationAreExclusive);
-            Case(map, pad, "the removal flag is held off while a stand is in service",
-                 RemovalFlagHeldOffInService);
-            Case(map, pad, "the change-back gate hands the chain back untouched",
-                 ChangeBackGateHandsTheChainBack);
-            Case(map, pad, "and still appends the button for a pawn in uniform",
-                 ChangeBackGateStillAppends);
-            Case(map, pad, "the removal-toggle gate leaves a stand it does not govern alone",
-                 RemovalToggleGateLeavesForeignStandsAlone);
-            Case(map, pad, "an owner list restricts the stand to its owners",
-                 (m, p) => Stage(m, p, StageKit.Displacing), OwnerListRestricts);
-            Case(map, pad, "the owner dialog's gender filter offers the right candidates",
-                 (m, p) => Stage(m, p, StageKit.Displacing), OwnerFilterOffersTheRightPawns);
-            Case(map, pad, "one owner is copied into another mod's owner list, a shared stand is not",
-                 StageWithForeignAssignable, ForeignOwnersCopyOurs);
-            Case(map, pad, "an older save's two owner lists reconcile to the one the player could see",
-                 StageWithForeignAssignable, ReconcileKeepsTheVisibleList);
-            Case(map, pad, "a group stand keeps its owners out of shift use, however it gets there",
-                 (m, p) => Stage(m, p, StageKit.Displacing), GroupSurvivesLeavingShiftUse);
-            Case(map, pad, "out of shift use one pick replaces a kept group and reaches the other mod's list",
-                 StageWithForeignAssignable, PickReplacesAKeptGroup);
-            Case(map, pad, "a kept group reaches nobody through the copy and survives a move",
-                 StageWithForeignAssignable, KeptGroupSurvivesAMove);
-            // A known gap unless Outfit Stands Plus is loaded (--with=).
-            Case(map, pad, "Outfit Stands Plus' stand button offers what its own walk would, in order",
-                 (m, p) => Stage(m, p, StageKit.Displacing), OutfitStandsPlusButtonMatchesTheirs);
-            Case(map, pad, "a joy job in the stand's room dresses",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 JoyJobInTheRoomDresses);
-            Case(map, pad, "going to bed in the stand's room dresses, medical bed rest does not",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 SleepJobInTheRoomDresses);
-            Case(map, pad, "a stand ticked for bed rest dresses a patient, but never an urgent one",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 MedicalBedRestDressesAtAGownStand);
-            Case(map, pad, "the medical emergency setting covers doctors and patients, never fires",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 MedicalEmergencySettingCoversTheRightWork);
-            Case(map, pad, "the new-stand setting decides what a stand made from then on starts as",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 NewStandSettingDecidesOnlyNewStands);
-            Case(map, pad, "the job classifier sorts every job shape in the arms' order",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 HarnessJobKinds.ClassifierSortsEveryJobShape);
-            Case(map, pad, "a deposit-only stand parks what its filter accepts and hands it back",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 DepositOnlyParksAndReturns);
-            Case(map, pad, "and haulers leave it alone, while an ordinary stand still takes deliveries",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 DepositOnlyStandIsNoHaulTarget);
-            Case(map, pad, "full change swaps the whole outfit and gives it all back",
-                 (m, p) => Stage(m, p, StageKit.Displacing), FullChangeSwapsEverything);
-            Case(map, pad, "full change refuses to strip a colonist bare",
-                 (m, p) => Stage(m, p, StageKit.Displacing),
-                 FullChangeRefusesToStripThemBare);
-            Case(map, pad, "a legs-only stand leaves a man decent (control for the pair)",
-                 (m, p) => Stage(m, p, StageKit.Displacing, gender: Gender.Male),
-                 LegsOnlyStandLeavesAManDecent);
-            Case(map, pad, "and the same stand keeps a woman's shirt on, because her rule wants it",
-                 (m, p) => Stage(m, p, StageKit.Displacing, gender: Gender.Female),
-                 LegsOnlyStandStripsAWoman);
-            Case(map, pad, "a nudist is left undressed, because that is the point",
-                 (m, p) => Stage(m, p, StageKit.Displacing), NudistIsExemptFromDecency);
-            Case(map, pad, "the decency guard ships off, and turning it on takes effect",
-                 (m, p) => Stage(m, p, StageKit.Displacing), DecencyGuardIsOptIn);
-            Case(map, pad, "the rules the description promises hold",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 PromisesHold);
-            Case(map, pad, "a meal break gets them out of uniform first",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), MealBreakChangesOut);
-            Case(map, pad, "and a sleepwear meal break does too, even with the meal in inventory",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 SleepwearMealBreakChangesOut);
-            Case(map, pad, "under threat they may not change in, but may change back",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 DangerGateIsOneDirectional);
-            Case(map, pad, "a pawn under a lord duty is left alone, and released when it ends",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 DutyGateShutsBothArms);
-            Case(map, pad, "a job handed to a pawn mid-swap is not deferred on top of it",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 MidSwapJobIsNotDeferredAgain);
-            Case(map, pad, "a freed stand catches up a colonist working bare",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 FreedStandCatchesUp);
-            Case(map, pad, "Change back holds the room until they leave it, and drafting drops it",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 ChangeBackLatchHoldsUntilTheyLeave);
-            Case(map, pad, "a radius covers its ring, inclusive, and room mode its room",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), RadiusCoversItsRing);
-            Case(map, pad, "a stand leaves room mode only with something ticked, and comes back with nothing",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), CatchmentNeedsSomethingTicked);
-            Case(map, pad, "a freed radius stand interrupts nobody, a room stand still does",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 FreedRadiusStandCatchesNobody);
-            Case(map, pad, "a radius stand dresses within its ring, past its room, and not beyond the ring",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 RadiusStandDressesWithinItsRing);
-            Case(map, pad, "a room stand in the open serves no outdoor recreation, a radius stand does",
-                 StageWithDoorway, RadiusServesOutdoorRecreation);
-            Case(map, pad, "a room stand in the open serves no work either, and the alert lists it",
-                 (m, p) => Stage(m, p, StageKit.Displacing,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 RoomStandInTheOpenServesNothing);
-            Case(map, pad, "an owned radius stand beats a nearer shared room stand",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 OwnedRadiusStandBeatsANearerSharedOne);
-            Case(map, pad, "a radius work stand keeps the uniform on for its work, pass-through work and idling, and nothing else",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 RadiusWorkStandKeepsTheUniformInItsRing);
-            Case(map, pad, "pass-through work is judged at both ends, and an errand ahead of the stand's work rides along",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 PassThroughWorkIsJudgedAtBothEnds);
-            WorkTypeDef crafting = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Crafting");
-            Case(map, pad, "a bill's product hauled to a stockpile in the area keeps the uniform on",
-                 (m, p) => StageWithDoorway(m, p, crafting),
-                 f => BillProductHaul(f, CatchmentKind.Area, true, true, true));
-            Case(map, pad, "a bill's product hauled to a stockpile in the ring keeps the uniform on",
-                 (m, p) => StageWithDoorway(m, p, crafting),
-                 f => BillProductHaul(f, CatchmentKind.Radius, true, true, true));
-            Case(map, pad, "the same with Hauling not ticked, because the bill's work is what the stand serves",
-                 (m, p) => StageWithDoorway(m, p, crafting),
-                 f => BillProductHaul(f, CatchmentKind.Area, false, true, true));
-            Case(map, pad, "a bill's product bound for a stockpile past the area changes them back first",
-                 (m, p) => StageWithDoorway(m, p, crafting),
-                 f => BillProductHaul(f, CatchmentKind.Area, true, false, false));
-            Case(map, pad, "a bill's product bound for a stockpile past the ring changes them back first",
-                 (m, p) => StageWithDoorway(m, p, crafting),
-                 f => BillProductHaul(f, CatchmentKind.Radius, true, false, false));
-            Case(map, pad, "the same with Hauling not ticked",
-                 (m, p) => StageWithDoorway(m, p, crafting),
-                 f => BillProductHaul(f, CatchmentKind.Area, false, false, false));
-            Case(map, pad, "a room stand keeps the uniform on for a bill's product bound for a stockpile in the room",
-                 (m, p) => StageWithDoorway(m, p, crafting),
-                 f => BillProductHaul(f, CatchmentKind.Room, true, true, true));
-            Case(map, pad, "and for one bound past its door, as it always has",
-                 (m, p) => StageWithDoorway(m, p, crafting),
-                 f => BillProductHaul(f, CatchmentKind.Room, true, false, true));
-            Case(map, pad, "a bill's product is judged at the stockpile, not the crafter's unpainted cell",
-                 (m, p) => StageWithDoorway(m, p, crafting),
-                 BillProductIsJudgedAtTheStockpile);
-            Case(map, pad, "a bill's product goes by the ordinary rule once the stand stops serving the bill",
-                 (m, p) => StageWithDoorway(m, p, crafting),
-                 BillProductOfUnservedWorkChangesThemBack);
-            Case(map, pad, "a haul that starts with the stack on the ground is no bill's product",
-                 (m, p) => StageWithDoorway(m, p, crafting),
-                 BillProductMustBeInHand);
-            Case(map, pad, "the same stack in hand after other served work is no bill's product",
-                 (m, p) => StageWithDoorway(m, p, crafting),
-                 BillProductMustComeFromABill);
-            Case(map, pad, "a crafter off shift is not dressed to store what they made",
-                 (m, p) => StageWithDoorway(m, p, crafting),
-                 BillProductDressesNobody);
-            Case(map, pad, "a radius sleep stand changes them back on the first job out of bed",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 RadiusSleepStandKeepsItOnlyForBed);
-            Case(map, pad, "a radius recreation stand keeps the outfit on for play and idling, not for hauling",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 RadiusRecreationStandKeepsItForPlay);
-            Case(map, pad, "the job a colonist was just dressed for never changes them back, though its target walks away",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 JustDressedForNeverSendsThemBack);
-            Case(map, pad, "the change-back latch holds its stand and trigger only, until they leave the ring",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 LatchHoldsItsStandAndTriggerOnly);
-            Case(map, pad, "at a sleep rack the latch holds through the night and lifts on waking",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 SleepRackLatchLiftsOnWaking);
-            Case(map, pad, "an area stand's latch holds beside the stand and for work in its area",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 AreaLatchHoldsBesideItsStand);
-            // A known gap unless Complex Jobs is loaded (--with=).
-            Case(map, pad, "a delivery dresses nobody at a room or radius stand, keeps its own work's uniform on, and the site does",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 DeliveriesKeepTheirOwnWorkOn);
-            Case(map, pad, "a delivery outside the stand's work changes pyjamas and whites back first",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Construction")),
-                 DeliveryOutsideTheStandsWorkChangesThemBack);
-            Case(map, pad, "a room stand beside a door serves its own room, and work in the doorway dresses nobody",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 RoomStandBesideADoorServesItsOwnRoom);
-            Case(map, pad, "an urgent patient on shift goes straight to bed, untagged and behind a haul too",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 UrgentPatientGoesStraightToBed);
-            Case(map, pad, "the catchment registry forgets a stand that is no longer spawned",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 RegistryForgetsAStandNoLongerSpawned);
-            Case(map, pad, "the Serves row, the inspect pane and the switch's tooltip follow the catchment",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 CatchmentWordsFollowTheMode);
-            Case(map, pad, "an area covers its painted cells while the stand stands in one, and nothing else",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), AreaCoversItsCells);
-            Case(map, pad, "an area stand dresses for work painted in, past its room, and not elsewhere",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 AreaStandDressesWithinItsArea);
-            Case(map, pad, "an area stand dresses for a delivery whose steel and every site are painted in, and for no other",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Construction")),
-                 AreaStandDressesForADeliveryItHolds);
-            Case(map, pad, "a bedroom stand moved to an area keeps its work list, and a work type replaces sleeping",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), BedroomStandMovedToAnAreaKeepsItsWorkList);
-            Case(map, pad, "a deleted area leaves its stand serving nothing, and a namesake is not adopted",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 DeletedAreaServesNobody);
-            Case(map, pad, "a gravship landing rebinds the area it carried, with nobody on shift, and no unrelated namesake",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 GravshipLandingRebindsTheArea);
-            Case(map, pad, "the alert lists a stand whose area is gone or that stands outside it",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 ServesNothingAlertListsTheStand);
-            Case(map, pad, "the Serves menu offers the allowed areas but Home, marks one leaving the stand out, and binds the one picked",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), ServesMenuOffersTheAllowedAreas);
-            Case(map, pad, "New allowed area copies the stand's room, is named for its work, and greys at vanilla's cap",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 NewAllowedAreaCopiesTheRoom);
-            Case(map, pad, "Paint and Manage areas close the settings window before vanilla's tools open",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), PaintAndManageAreasCloseTheWindowFirst);
-            Case(map, pad, "an area stand's row, inspect pane and switch name the area, and say when it serves nothing",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 AreaWordsNameTheArea);
-            Case(map, pad, "a solid target is judged at its own cell, then the floor beside it",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Mining")),
-                 SolidTargetIsJudgedAtItsOwnCellFirst);
-            Case(map, pad, "a stand outside the colonist's allowed area dresses nobody",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 StandOutsideTheAreaDressesNobody);
-            Case(map, pad, "nor do the recreation and sleep arms send anyone to it",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 StandOutsideTheAreaServesNoRecreationOrSleep);
-            Case(map, pad, "a colonist whose stand is outside their area keeps the outfit on, and the stand says why",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
-                                 capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 StandOutsideTheAreaKeepsTheOutfitOn);
-            Case(map, pad, "feeding a patient or a prisoner dresses nobody, and keeps a doctor's or a warden's uniform on",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), FeedingRidesAlong);
-            Case(map, pad, "a meal run keeps the uniform on only for a patient inside, and so does a haul slipped in ahead of it",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
-                 MealRunKeepsTheUniformForAPatientInside);
-            Case(map, pad, "an errand queued ahead of work the stand serves keeps the uniform on",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
-                 DetourAheadOfServedWorkKeepsTheUniform);
-            Case(map, pad, "and so does vanilla's own opportunistic haul on the way to a bill",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Hauling")),
-                 VanillaOpportunisticHaulKeepsTheUniform);
-            // Known gaps unless the mod is loaded (--with=).
-            Case(map, pad, "Common Sense's bill haul keeps a cook in uniform",
-                 StageWithDoorway, CommonSenseBillHaulKeepsTheUniform);
-            Case(map, pad, "Pick Up And Haul's follow-up jobs keep the uniform on",
-                 StageWithDoorway, PickUpAndHaulFollowUpsKeepTheUniform);
-            Case(map, pad, "the stand's switch names what it serves, recreation and sleep included",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), SwitchNamesWhatTheStandServes);
-            Case(map, pad, "selecting several stands shows each stand's own buttons",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), StandButtonsStaySeparate);
-            Case(map, pad, "hovering a stand's button marks that stand and no other",
-                 (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), HoveredButtonsMarkTheirOwnStand);
-            Case(map, pad, "fishing dresses at a stand ticked for it, and at a radius stand by the shore",
-                 (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Fishing")),
-                 FishingDressesAtAStandTickedForIt);
-            // A pair that only means anything together: the refusal that stops a checked-out pawn
-            // re-arming from the spare pile, and the release that lets them shop once their parked
-            // kit is worn out.
-            Case(map, pad, "a checked-out pawn refuses a spare that duplicates their parked kit",
-                 ParkedKitRefusesSpares);
-            Case(map, pad, "but takes one once the parked kit is worn through",
-                 WornOutParkedKitStillGoesShopping);
-            // A known gap unless Ideology is active.
-            Case(map, pad, "a recolor order goes through on shift, the optimizer's recolor does not, and none reaches a parked garment",
-                 RecolorOrderGoesThroughOnShift);
-            // These two need a live map and no fixture, so they sit after the fixture cases and
-            // before the game-replacing ones below.
-            Case("a work target with no room of its own still resolves one",
-                 () => SolidTargetResolvesARoom(map, pad));
-            Case("a work target in an exterior wall resolves the room from either side",
-                 () => ExteriorWallTargetResolvesTheRoom(map, pad));
-
-            // Last among the map cases: these replace Current.Game, so `map`, `pad` and every
-            // fixture above belong to a disposed game once they have run. They register through the
-            // fixture-less overload for the same reason, since Teardown would clear a pad on the
-            // disposed map. See DebugTools_SaveRoundTrip.
-            Case("a save/load round trip keeps the owner and the ledger, and sweeps the removal flag",
-                 () => DebugTools_SaveRoundTrip.RoundTrip(map, pad));
-            Case("a legacy-key save gets its owner back and re-saves it prefixed",
-                 DebugTools_SaveRoundTrip.LegacyMigration);
-            Case("an older save's foreign owner round-trips without contest and is adopted",
-                 DebugTools_SaveRoundTrip.ForeignAssignable);
-            Case("an area binding survives a save under a new name, and a deleted area's is dropped",
-                 DebugTools_SaveRoundTrip.AreaRoundTrip);
-
-            // These need no map, so the game replacement above does not touch them.
-            Case("the recreation job classifier holds", RecreationClassifierHolds);
-            Case("the sleep job classifier holds", RestClassifierHolds);
-            Case("the room-role table resolves", RoomRoleTableResolves);
-            Case("the job-target and ignored-giver tables hold", JobTablesHold);
-            Case("the pass-through tags and the incidental job list hold", PassThroughAndIncidentalTablesHold);
-            Case("the room-contents markers hold", ContentsMarkersHold);
-            Case("the work-type dialog never hands its listing a short rect",
-                 WorkTypeDialogBodyRectFitsTheBody);
-            // Last by convention: it restores the tallies, the gap flag and the transcript around
-            // its deliberate failures, so its position does not change the result.
-            Case("the harness counts its own results correctly", HarnessAccounting);
+            foreach (HarnessCase harnessCase in Cases())
+            {
+                harnessCase.Run(map, pad);
+            }
 
             Report.Append("result: ").Append(Passed).Append(" passed, ")
                   .Append(Failed).Append(" failed, ")
@@ -525,6 +141,523 @@ namespace ShiftChange
                     historical: false);
             }
             return Failed == 0;
+        }
+
+        /// <summary>
+        /// Every case, in the order <see cref="Run"/> runs them. Each names the group that is its
+        /// DevTools fixture (HarnessDevTools.cs); the auto-run ignores the groups.
+        /// </summary>
+        internal static CaseList Cases()
+        {
+            CaseList cases = new CaseList();
+            cases.Group = CaseGroup.Flights;
+            // First: every case below takes for granted what this checks.
+            cases.On("the fixture colonist is healthy and holds still under the stopped clock, and ground past the pad is ground open to the map edge",
+                     (map, pad, name) => Case(map, pad, name, fix => HarnessFixtureChecks.FixtureColonistHoldsStill(fix, pad)));
+            cases.On("gravship flight keeps the ledger, and the shift ends normally after landing",
+                     GravshipFlight);
+            cases.On("gravship flight without the borrower releases it", GravshipFlightLeftBehind);
+            // Flights that leave the borrower and the stand on two maps, the second a pocket map
+            // (HarnessFixtures.SecondMap).
+            cases.On("a stand that flies without its borrower keeps the shift, and ends it normally when they meet again",
+                     StandFliesWithoutItsBorrower);
+            cases.On("a borrower who flies without their stand keeps the shift, and ends it normally on coming back",
+                     BorrowerFliesWithoutTheirStand);
+            // The next two build on the second map, so the fixture's Map is the pocket one and the
+            // body is handed the harness's map and pad.
+            cases.On("a stand lost with the map it was left on stops pinning its borrower's uniform",
+                     (map, pad, name) => Case(map, pad, name, BuildOnSecondMap, fix => StandLostWithItsMap(fix, map, pad)));
+            cases.On("a boxed stand lost with its map releases its ledger too",
+                     (map, pad, name) => Case(map, pad, name, BuildOnSecondMap, fix => BoxedStandLostWithItsMap(fix, map, pad)));
+            cases.Group = CaseGroup.VacuumGate;
+            // The vacuum gate's ground: the second map is a vacuum map; the first case checks it.
+            cases.On("a room on the second map, a vacuum map, holds air while the open floor past its door does not",
+                     (map, pad, name) => Case(name, () => HarnessVacuum.VacuumMapStages(map)));
+            cases.On("a bill fetching through vacuum keeps a crafter in their vacsuit, where one inside dresses them",
+                     HarnessVacuum.StageShip, HarnessVacuum.IngredientInVacuumKeepsTheirGear);
+            cases.On("a bill fetching from a safe room only vacuum leads to keeps them in their vacsuit too",
+                     HarnessVacuum.StageShip, HarnessVacuum.SafeRoomAcrossVacuumKeepsTheirGear);
+            cases.On("on a ship whose rooms all connect through air, the same bill dresses them",
+                     HarnessVacuum.StageConnectedShip, HarnessVacuum.ConnectedShipChangesNothing);
+            cases.On("a crafter in uniform changes back before a bill through vacuum, and not before one inside",
+                     HarnessVacuum.StageShip, HarnessVacuum.OnShiftChangesBackBeforeVacuum);
+            cases.On("a crafter with no vacuum protection to lose is dressed as before",
+                     HarnessVacuum.StageShip, HarnessVacuum.UnprotectedCrafterIsUnaffected);
+            cases.On("an order through vacuum runs as given, and only a warning says so",
+                     HarnessVacuum.StageShip, HarnessVacuum.OrderIntoVacuumRunsAsGiven);
+            cases.On("an emergency through vacuum sends a colonist in uniform to change first",
+                     HarnessVacuum.StageShip, HarnessVacuum.EmergencyIntoVacuumChangesBackFirst);
+            cases.On("off a vacuum map, a crafter in a vacsuit is dressed for a bill fetching from outside, as before",
+                     HarnessVacuum.StageEnclosedCrafter, HarnessVacuum.PlanetMapChangesNothing);
+            cases.On("a stand holding a vacsuit dresses an unsuited crafter for a bill through vacuum",
+                     HarnessVacuum.StageShip, HarnessVacuum.VacsuitStandStillDresses);
+            cases.Group = CaseGroup.VacuumRoutes;
+            cases.On("a vacsuit stand across the room wins over a nearer one that would take the suit off",
+                     HarnessVacuum.StageShip, HarnessVacuum.ProtectiveStandWinsOverANearerOne);
+            cases.On("an area stand painted over open floor does not dress for a delivery from out there",
+                     HarnessVacuum.StageShip, HarnessVacuum.AreaDeliveryAcrossVacuumKeepsTheirGear);
+            cases.On("a freed stand does not catch up a crafter on a job fetching through vacuum",
+                     HarnessVacuum.StageShip, HarnessVacuum.FreedStandSkipsAJobThroughVacuum);
+            cases.On("an errand ahead of the stand's work rides along in uniform, but not into vacuum",
+                     HarnessVacuum.StageConnectedShip, HarnessVacuum.ErrandAheadOfWorkChangesBackBeforeVacuum);
+            cases.On("the air walk does not pass a door forbidden to the colonist",
+                     HarnessVacuum.StageConnectedShip, HarnessVacuum.ForbiddenDoorIsNoWayThrough);
+            cases.On("a colonist cut off from their stand by vacuum is not sent across it to change",
+                     HarnessVacuum.StageShip, HarnessVacuum.StrandedColonistIsNotSentAcrossToChange);
+            cases.On("a cooldown does not wave a colonist in uniform into vacuum",
+                     HarnessVacuum.StageShip, HarnessVacuum.CooldownDoesNotWaveThemIntoVacuum);
+            cases.On("an urgent patient goes straight to a bed across vacuum",
+                     HarnessVacuum.StageShip, HarnessVacuum.UrgentPatientGoesStraightToBedAcrossVacuum);
+            cases.On("a colonist whose stand is on another map is warned before vacuum",
+                     HarnessVacuum.StageCrafterAtHome, HarnessVacuum.StandOnAnotherMapStillWarns);
+            cases.Group = CaseGroup.Lifecycle;
+            cases.On("every stand def asks to hear when its map is removed", StandDefsHearMapRemoval);
+            cases.On("teardown (deconstruct, burn) releases the ledger", TeardownReleases);
+            cases.On("reinstalling mid-shift keeps the ledger and the return trip",
+                     ReinstallKeepsTheLedger);
+            cases.On("reinstalling a stand keeps its owner, mode and flag",
+                     ReinstallKeepsConfiguration);
+            cases.On("an owner who dies while their stand is boxed does not own it again",
+                     DeadOwnerNotRestoredOnReinstall);
+            cases.On("an owner kidnapped while their stand is boxed neither owns it nor "
+                     + "keeps their shift there",
+                     KidnappedOwnerNotRestoredOnReinstall);
+            cases.On("borrower death reaps the ledger", DeathReaps);
+            cases.On("borrower banishment reaps the ledger", BanishmentReaps);
+            cases.Group = CaseGroup.FaultLatch;
+            cases.On("repeated faults disable interception, a load re-arms it", FaultLatchRecovers);
+            cases.Group = CaseGroup.DriverAndOwners;
+            cases.On("a stand that displaces nothing still hands the uniform back",
+                     (m, p) => Stage(m, p, StageKit.NonDisplacing), NonDisplacingReturns);
+            cases.On("the driver returns own clothes and their forced flags",
+                     (m, p) => Stage(m, p, StageKit.Displacing), DriverRoundTrip);
+            cases.On("work and recreation are mutually exclusive on a stand",
+                     (m, p) => Stage(m, p, StageKit.Displacing), WorkAndRecreationAreExclusive);
+            cases.On("the removal flag is held off while a stand is in service",
+                     RemovalFlagHeldOffInService);
+            cases.On("the change-back gate hands the chain back untouched",
+                     ChangeBackGateHandsTheChainBack);
+            cases.On("and still appends the button for a pawn in uniform",
+                     ChangeBackGateStillAppends);
+            cases.On("the removal-toggle gate leaves a stand it does not govern alone",
+                     RemovalToggleGateLeavesForeignStandsAlone);
+            cases.On("an owner list restricts the stand to its owners",
+                     (m, p) => Stage(m, p, StageKit.Displacing), OwnerListRestricts);
+            cases.On("the owner dialog's gender filter offers the right candidates",
+                     (m, p) => Stage(m, p, StageKit.Displacing), OwnerFilterOffersTheRightPawns);
+            cases.On("one owner is copied into another mod's owner list, a shared stand is not",
+                     StageWithForeignAssignable, ForeignOwnersCopyOurs);
+            cases.On("an older save's two owner lists reconcile to the one the player could see",
+                     StageWithForeignAssignable, ReconcileKeepsTheVisibleList);
+            cases.On("a group stand keeps its owners out of shift use, however it gets there",
+                     (m, p) => Stage(m, p, StageKit.Displacing), GroupSurvivesLeavingShiftUse);
+            cases.On("out of shift use one pick replaces a kept group and reaches the other mod's list",
+                     StageWithForeignAssignable, PickReplacesAKeptGroup);
+            cases.On("a kept group reaches nobody through the copy and survives a move",
+                     StageWithForeignAssignable, KeptGroupSurvivesAMove);
+            // A known gap unless Outfit Stands Plus is loaded (--with=).
+            cases.On("Outfit Stands Plus' stand button offers what its own walk would, in order",
+                     (m, p) => Stage(m, p, StageKit.Displacing), OutfitStandsPlusButtonMatchesTheirs);
+            cases.Group = CaseGroup.Arms;
+            cases.On("a joy job in the stand's room dresses",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     JoyJobInTheRoomDresses);
+            cases.On("going to bed in the stand's room dresses, medical bed rest does not",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     SleepJobInTheRoomDresses);
+            cases.On("a stand ticked for bed rest dresses a patient, but never an urgent one",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     MedicalBedRestDressesAtAGownStand);
+            cases.On("the medical emergency setting covers doctors and patients, never fires",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     MedicalEmergencySettingCoversTheRightWork);
+            cases.On("the new-stand setting decides what a stand made from then on starts as",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     NewStandSettingDecidesOnlyNewStands);
+            cases.On("the job classifier sorts every job shape in the arms' order",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     HarnessJobKinds.ClassifierSortsEveryJobShape);
+            cases.On("a deposit-only stand parks what its filter accepts and hands it back",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     DepositOnlyParksAndReturns);
+            cases.On("and haulers leave it alone, while an ordinary stand still takes deliveries",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     DepositOnlyStandIsNoHaulTarget);
+            cases.On("full change swaps the whole outfit and gives it all back",
+                     (m, p) => Stage(m, p, StageKit.Displacing), FullChangeSwapsEverything);
+            cases.On("full change refuses to strip a colonist bare",
+                     (m, p) => Stage(m, p, StageKit.Displacing),
+                     FullChangeRefusesToStripThemBare);
+            cases.On("a legs-only stand leaves a man decent (control for the pair)",
+                     (m, p) => Stage(m, p, StageKit.Displacing, gender: Gender.Male),
+                     LegsOnlyStandLeavesAManDecent);
+            cases.On("and the same stand keeps a woman's shirt on, because her rule wants it",
+                     (m, p) => Stage(m, p, StageKit.Displacing, gender: Gender.Female),
+                     LegsOnlyStandStripsAWoman);
+            cases.On("a nudist is left undressed, because that is the point",
+                     (m, p) => Stage(m, p, StageKit.Displacing), NudistIsExemptFromDecency);
+            cases.On("the decency guard ships off, and turning it on takes effect",
+                     (m, p) => Stage(m, p, StageKit.Displacing), DecencyGuardIsOptIn);
+            cases.Group = CaseGroup.Gates;
+            cases.On("the rules the description promises hold",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     PromisesHold);
+            cases.On("a meal break gets them out of uniform first",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), MealBreakChangesOut);
+            cases.On("and a sleepwear meal break does too, even with the meal in inventory",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     SleepwearMealBreakChangesOut);
+            cases.On("under threat they may not change in, but may change back",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     DangerGateIsOneDirectional);
+            cases.On("a pawn under a lord duty is left alone, and released when it ends",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     DutyGateShutsBothArms);
+            cases.On("a job handed to a pawn mid-swap is not deferred on top of it",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     MidSwapJobIsNotDeferredAgain);
+            cases.On("a freed stand catches up a colonist working bare",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     FreedStandCatchesUp);
+            cases.On("Change back holds the room until they leave it, and drafting drops it",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     ChangeBackLatchHoldsUntilTheyLeave);
+            cases.Group = CaseGroup.Radius;
+            cases.On("a radius covers its ring, inclusive, and room mode its room",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), RadiusCoversItsRing);
+            cases.On("a stand leaves room mode only with something ticked, and comes back with nothing",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), CatchmentNeedsSomethingTicked);
+            cases.On("a freed radius stand interrupts nobody, a room stand still does",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     FreedRadiusStandCatchesNobody);
+            cases.On("a radius stand dresses within its ring, past its room, and not beyond the ring",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     RadiusStandDressesWithinItsRing);
+            cases.On("a room stand in the open serves no outdoor recreation, a radius stand does",
+                     StageWithDoorway, RadiusServesOutdoorRecreation);
+            cases.On("a room stand in the open serves no work either, and the alert lists it",
+                     (m, p) => Stage(m, p, StageKit.Displacing,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     RoomStandInTheOpenServesNothing);
+            cases.On("an owned radius stand beats a nearer shared room stand",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     OwnedRadiusStandBeatsANearerSharedOne);
+            cases.On("a radius work stand keeps the uniform on for its work, pass-through work and idling, and nothing else",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     RadiusWorkStandKeepsTheUniformInItsRing);
+            cases.On("pass-through work is judged at both ends, and an errand ahead of the stand's work rides along",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     PassThroughWorkIsJudgedAtBothEnds);
+            cases.Group = CaseGroup.BillProducts;
+            // The stonecutting bill's own work: Crafting, or Stone Cut with Complex Jobs.
+            WorkTypeDef billWork =
+                DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoBillsStonecut")?.workType;
+            cases.On("a bill's product hauled to a stockpile in the area keeps the uniform on",
+                     (m, p) => StageWithDoorway(m, p, billWork),
+                     f => BillProductHaul(f, CatchmentKind.Area, true, true, true));
+            cases.On("a bill's product hauled to a stockpile in the ring keeps the uniform on",
+                     (m, p) => StageWithDoorway(m, p, billWork),
+                     f => BillProductHaul(f, CatchmentKind.Radius, true, true, true));
+            cases.On("the same with Hauling not ticked, because the bill's work is what the stand serves",
+                     (m, p) => StageWithDoorway(m, p, billWork),
+                     f => BillProductHaul(f, CatchmentKind.Area, false, true, true));
+            cases.On("a bill's product bound for a stockpile past the area changes them back first",
+                     (m, p) => StageWithDoorway(m, p, billWork),
+                     f => BillProductHaul(f, CatchmentKind.Area, true, false, false));
+            cases.On("a bill's product bound for a stockpile past the ring changes them back first",
+                     (m, p) => StageWithDoorway(m, p, billWork),
+                     f => BillProductHaul(f, CatchmentKind.Radius, true, false, false));
+            cases.On("the same with Hauling not ticked",
+                     (m, p) => StageWithDoorway(m, p, billWork),
+                     f => BillProductHaul(f, CatchmentKind.Area, false, false, false));
+            cases.On("a room stand keeps the uniform on for a bill's product bound for a stockpile in the room",
+                     (m, p) => StageWithDoorway(m, p, billWork),
+                     f => BillProductHaul(f, CatchmentKind.Room, true, true, true));
+            cases.On("and for one bound past its door, as it always has",
+                     (m, p) => StageWithDoorway(m, p, billWork),
+                     f => BillProductHaul(f, CatchmentKind.Room, true, false, true));
+            cases.On("a bill's product is judged at the stockpile, not the crafter's unpainted cell",
+                     (m, p) => StageWithDoorway(m, p, billWork),
+                     BillProductIsJudgedAtTheStockpile);
+            cases.On("a bill's product goes by the ordinary rule once the stand stops serving the bill",
+                     (m, p) => StageWithDoorway(m, p, billWork),
+                     BillProductOfUnservedWorkChangesThemBack);
+            cases.On("a haul that starts with the stack on the ground is no bill's product",
+                     (m, p) => StageWithDoorway(m, p, billWork),
+                     BillProductMustBeInHand);
+            cases.On("the same stack in hand after other served work is no bill's product",
+                     (m, p) => StageWithDoorway(m, p, billWork),
+                     BillProductMustComeFromABill);
+            cases.On("a crafter off shift is not dressed to store what they made",
+                     (m, p) => StageWithDoorway(m, p, billWork),
+                     BillProductDressesNobody);
+            cases.Group = CaseGroup.Latches;
+            cases.On("a radius sleep stand changes them back on the first job out of bed",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     RadiusSleepStandKeepsItOnlyForBed);
+            cases.On("a radius recreation stand keeps the outfit on for play and idling, not for hauling",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     RadiusRecreationStandKeepsItForPlay);
+            cases.On("the job a colonist was just dressed for never changes them back, though its target walks away",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     JustDressedForNeverSendsThemBack);
+            cases.On("the change-back latch holds its stand and trigger only, until they leave the ring",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     LatchHoldsItsStandAndTriggerOnly);
+            cases.On("at a sleep rack the latch holds through the night and lifts on waking",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     SleepRackLatchLiftsOnWaking);
+            cases.On("an area stand's latch holds beside the stand and for work in its area",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     AreaLatchHoldsBesideItsStand);
+            // A known gap unless Complex Jobs is loaded (--with=).
+            cases.On("a delivery dresses nobody at a room or radius stand, keeps its own work's uniform on, and the site does",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     DeliveriesKeepTheirOwnWorkOn);
+            cases.On("a delivery outside the stand's work changes pyjamas and whites back first",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Construction")),
+                     DeliveryOutsideTheStandsWorkChangesThemBack);
+            cases.On("a room stand beside a door serves its own room, and work in the doorway dresses nobody",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     RoomStandBesideADoorServesItsOwnRoom);
+            cases.On("an urgent patient on shift goes straight to bed, untagged and behind a haul too",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     UrgentPatientGoesStraightToBed);
+            cases.On("the catchment registry forgets a stand that is no longer spawned",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     RegistryForgetsAStandNoLongerSpawned);
+            cases.On("the Serves row, the inspect pane and the switch's tooltip follow the catchment",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     CatchmentWordsFollowTheMode);
+            cases.Group = CaseGroup.Areas;
+            cases.On("an area covers its painted cells while the stand stands in one, and nothing else",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), AreaCoversItsCells);
+            cases.On("an area stand dresses for work painted in, past its room, and not elsewhere",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     AreaStandDressesWithinItsArea);
+            cases.On("an area stand dresses for a delivery whose steel and every site are painted in, and for no other",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Construction")),
+                     AreaStandDressesForADeliveryItHolds);
+            cases.On("a bedroom stand moved to an area keeps its work list, and a work type replaces sleeping",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), BedroomStandMovedToAnAreaKeepsItsWorkList);
+            cases.On("a deleted area leaves its stand serving nothing, and a namesake is not adopted",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     DeletedAreaServesNobody);
+            cases.On("a gravship landing rebinds the area it carried, with nobody on shift, and no unrelated namesake",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     GravshipLandingRebindsTheArea);
+            cases.On("the alert lists a stand whose area is gone or that stands outside it",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     ServesNothingAlertListsTheStand);
+            cases.On("the Serves menu offers the allowed areas but Home, marks one leaving the stand out, and binds the one picked",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), ServesMenuOffersTheAllowedAreas);
+            cases.On("New allowed area copies the stand's room, is named for its work, and greys at vanilla's cap",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     NewAllowedAreaCopiesTheRoom);
+            cases.On("Paint and Manage areas close the settings window before vanilla's tools open",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), PaintAndManageAreasCloseTheWindowFirst);
+            cases.On("an area stand's row, inspect pane and switch name the area, and say when it serves nothing",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     AreaWordsNameTheArea);
+            cases.On("a solid target is judged at its own cell, then the floor beside it",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Mining")),
+                     SolidTargetIsJudgedAtItsOwnCellFirst);
+            cases.On("a stand outside the colonist's allowed area dresses nobody",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     StandOutsideTheAreaDressesNobody);
+            cases.On("nor do the recreation and sleep arms send anyone to it",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     StandOutsideTheAreaServesNoRecreationOrSleep);
+            cases.On("a colonist whose stand is outside their area keeps the outfit on, and the stand says why",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                     capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     StandOutsideTheAreaKeepsTheOutfitOn);
+            cases.Group = CaseGroup.RideAlong;
+            cases.On("feeding a patient or a prisoner dresses nobody, and keeps a doctor's or a warden's uniform on",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), FeedingRidesAlong);
+            cases.On("a meal run keeps the uniform on only for a patient inside, and so does a haul slipped in ahead of it",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                     MealRunKeepsTheUniformForAPatientInside);
+            cases.On("an errand queued ahead of work the stand serves keeps the uniform on",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true),
+                     DetourAheadOfServedWorkKeepsTheUniform);
+            cases.On("and so does vanilla's own opportunistic haul on the way to a bill",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Hauling")),
+                     VanillaOpportunisticHaulKeepsTheUniform);
+            // Known gaps unless the mod is loaded (--with=).
+            cases.On("Common Sense's bill haul keeps a cook in uniform",
+                     StageWithDoorway, CommonSenseBillHaulKeepsTheUniform);
+            cases.On("Pick Up And Haul's follow-up jobs keep the uniform on",
+                     StageWithDoorway, PickUpAndHaulFollowUpsKeepTheUniform);
+            cases.Group = CaseGroup.Assorted;
+            cases.On("the stand's switch names what it serves, recreation and sleep included",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), SwitchNamesWhatTheStandServes);
+            cases.On("selecting several stands shows each stand's own buttons",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), StandButtonsStaySeparate);
+            cases.On("hovering a stand's button marks that stand and no other",
+                     (m, p) => Stage(m, p, StageKit.Displacing, enclose: true), HoveredButtonsMarkTheirOwnStand);
+            cases.On("fishing dresses at a stand ticked for it, and at a radius stand by the shore",
+                     (m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Fishing")),
+                     FishingDressesAtAStandTickedForIt);
+            // A pair that only means anything together: the refusal that stops a checked-out pawn
+            // re-arming from the spare pile, and the release that lets them shop once their parked
+            // kit is worn out.
+            cases.On("a checked-out pawn refuses a spare that duplicates their parked kit",
+                     ParkedKitRefusesSpares);
+            cases.On("but takes one once the parked kit is worn through",
+                     WornOutParkedKitStillGoesShopping);
+            // A known gap unless Ideology is active.
+            cases.On("a recolor order goes through on shift, the optimizer's recolor does not, and none reaches a parked garment",
+                     RecolorOrderGoesThroughOnShift);
+            // These two need a live map and no fixture, so they sit after the fixture cases and
+            // before the game-replacing ones below.
+            cases.On("a work target with no room of its own still resolves one",
+                     (map, pad, name) => Case(name, () => SolidTargetResolvesARoom(map, pad)));
+            cases.On("a work target in an exterior wall resolves the room from either side",
+                     (map, pad, name) => Case(name, () => ExteriorWallTargetResolvesTheRoom(map, pad)));
+
+            cases.Group = CaseGroup.SaveLoad;
+            // Last among the map cases: these replace Current.Game, so `map`, `pad` and every
+            // fixture above belong to a disposed game once they have run. They register through the
+            // fixture-less overload for the same reason, since Teardown would clear a pad on the
+            // disposed map. See DebugTools_SaveRoundTrip.
+            cases.On("a save/load round trip keeps the owner and the ledger, and sweeps the removal flag",
+                     (map, pad, name) => Case(name, () => DebugTools_SaveRoundTrip.RoundTrip(map, pad)));
+            cases.On("a legacy-key save gets its owner back and re-saves it prefixed",
+                     DebugTools_SaveRoundTrip.LegacyMigration);
+            cases.On("an older save's foreign owner round-trips without contest and is adopted",
+                     DebugTools_SaveRoundTrip.ForeignAssignable);
+            cases.On("an area binding survives a save under a new name, and a deleted area's is dropped",
+                     DebugTools_SaveRoundTrip.AreaRoundTrip);
+
+            cases.Group = CaseGroup.Tables;
+            // These need no map, so the game replacement above does not touch them.
+            cases.On("the recreation job classifier holds", RecreationClassifierHolds);
+            cases.On("the sleep job classifier holds", RestClassifierHolds);
+            cases.On("the room-role table resolves", RoomRoleTableResolves);
+            cases.On("each feeding giver's work is served where its patients lie",
+                     FeedingWorkIsServedWherePatientsLie);
+            cases.On("the job-target and ignored-giver tables hold", JobTablesHold);
+            cases.On("the pass-through tags and the incidental job list hold", PassThroughAndIncidentalTablesHold);
+            cases.On("the room-contents markers hold", ContentsMarkersHold);
+            cases.On("the work-type dialog never hands its listing a short rect",
+                     WorkTypeDialogBodyRectFitsTheBody);
+            // Last by convention: it restores the tallies, the gap flag and the transcript around
+            // its deliberate failures, so its position does not change the result.
+            cases.On("the harness counts its own results correctly", HarnessAccounting);
+            return cases;
+        }
+
+        /// <summary>The cases of one group, in run order.</summary>
+        internal static IEnumerable<HarnessCase> CasesIn(CaseGroup group)
+        {
+            return Cases().Where(harnessCase => harnessCase.Group == group);
+        }
+
+        /// <summary>
+        /// The groups <see cref="Cases"/> falls into, in run order; each is one DevTools fixture.
+        /// DevTools keeps a fixture's tests in the order given only up to 16 of them, so no group
+        /// holds more. A DevTools test, <c>HarnessCaseList</c>, fails when one does, or when
+        /// DevTools would not run a group's cases once each, in this order.
+        /// </summary>
+        internal enum CaseGroup
+        {
+            Flights,
+            VacuumGate,
+            VacuumRoutes,
+            Lifecycle,
+            FaultLatch,
+            DriverAndOwners,
+            Arms,
+            Gates,
+            Radius,
+            BillProducts,
+            Latches,
+            Areas,
+            RideAlong,
+            Assorted,
+            SaveLoad,
+            Tables,
+        }
+
+        /// <summary>
+        /// One case of <see cref="Cases"/>: its name, its group, and its <c>Case</c> call.
+        /// </summary>
+        internal sealed class HarnessCase
+        {
+            internal readonly CaseGroup Group;
+            internal readonly string Name;
+            internal readonly Action<Map, CellRect, string> Call;
+
+            /// <summary>
+            /// False for a case added by <c>On(name, Func&lt;bool&gt;)</c>, which is handed no map
+            /// or pad; two save/load legs find a pad of their own.
+            /// </summary>
+            internal readonly bool NeedsPad;
+
+            internal HarnessCase(CaseGroup group, string name, Action<Map, CellRect, string> run,
+                                 bool needsPad)
+            {
+                Group = group;
+                Name = name;
+                Call = run;
+                NeedsPad = needsPad;
+            }
+
+            internal void Run(Map map, CellRect pad)
+            {
+                Call(map, pad, Name);
+            }
+
+            /// <summary>The name, which DevTools puts in the test's own.</summary>
+            public override string ToString()
+            {
+                return Name;
+            }
+        }
+
+        /// <summary>
+        /// Builds <see cref="Cases"/>. Each <c>On</c> overload makes the <c>Case</c> call of the
+        /// same shape, and a case whose body needs the harness's map or pad is handed them with
+        /// its name.
+        /// </summary>
+        internal sealed class CaseList : List<HarnessCase>
+        {
+            /// <summary>The group of the cases added from here on.</summary>
+            internal CaseGroup Group;
+
+            internal void On(string name, Action<Map, CellRect, string> run)
+            {
+                Add(new HarnessCase(Group, name, run, true));
+            }
+
+            internal void On(string name, Func<Fixture, bool> body)
+            {
+                On(name, (map, pad, caseName) => Case(map, pad, caseName, body));
+            }
+
+            internal void On(string name, Func<Map, CellRect, Fixture> stage, Func<Fixture, bool> body)
+            {
+                On(name, (map, pad, caseName) => Case(map, pad, caseName, stage, body));
+            }
+
+            internal void On(string name, Func<bool> body)
+            {
+                Add(new HarnessCase(Group, name, (map, pad, caseName) => Case(caseName, body), false));
+            }
         }
 
         internal static void Complain(string what, bool toast)

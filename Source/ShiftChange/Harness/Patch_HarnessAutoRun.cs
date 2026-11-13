@@ -92,12 +92,20 @@ namespace ShiftChange
         /// Natural rock has no room, and a valley ringed by mountains, an island in deep water or a
         /// ruin's walls give the margin a room that does not reach the edge. The margin is a closed
         /// ring around the pad, so it still reaches the edge once the cases build walls on the pad.
-        /// On a map whose load aborted before its region grid was built this rejects every origin,
-        /// which <see cref="DebugTools_SaveRoundTrip.CannotStage"/> relies on. A pad picked by hand
+        /// A map whose region updater a failed load left off is refused without a search, which
+        /// <see cref="DebugTools_SaveRoundTrip.CannotStage"/> relies on. A pad picked by hand
         /// from the debug menu bypasses this finder.</para>
         /// </summary>
         internal static bool TryFindPad(Map map, out IntVec3 origin)
         {
+            // When a prefix on Map.FinalizeLoading throws, the body that turns the map's
+            // RegionAndRoomUpdater back on never runs, so its rooms are never built and every
+            // room lookup on it logs a warning.
+            if (!map.regionAndRoomUpdater.Enabled)
+            {
+                origin = IntVec3.Invalid;
+                return false;
+            }
             int size = DebugTools_LifecycleHarness.PadSize;
             Predicate<IntVec3> usable = c =>
             {

@@ -26,12 +26,69 @@ devtools/run-harness.sh --full       # your own mod list — the release gate
 devtools/run-harness.sh --alongside  # a second instance beside a live game
 devtools/run-harness.sh --with=khamenman.outfitstandsplus   # the four, plus one
 devtools/run-harness.sh --with-after=khamenman.outfitstandsplus   # loaded after us
+devtools/run-harness.sh --devtools   # every case as a DevTools test, on 1.7
 ```
 
 Builds Release with `-p:Harness=true`, launches with `-quicktest
 -shiftchange-harness`, waits for the game to run every case and quit itself,
-prints the report, exits non-zero on any failure. By hand, in a Debug or Media
-build: dev mode → **Shift Change** → **Dev tools…** → **Run lifecycle harness**,
+prints the report, exits non-zero on any failure. It runs on RimWorld 1.6 and
+1.7; `RIMWORLD_APP` names the app when it is not the Steam install's. On 1.7 the
+instance has no window (`-NoWindow`) and a `HOME` of its own under
+`dist/testhome`, which keeps its log and caches off the player's.
+
+`--devtools` runs the same cases under SmashPhil's DevTools test framework
+instead of the auto-run, one test each. It needs 1.7 and a DevTools build in
+`Mods/DevTools`, from DevTools' `develop` at `0eea1a1` or later, where a save of
+DevTools' own test map loads and the warnings the game logs by itself are allowed.
+The harness build compiles against that dll, DevTools joins the mod list just
+ahead of this mod, and DevTools' `Test.log` is the report. The verdict is the
+game's exit code read with the result line DevTools writes last in `Test.log`
+(0 passed, 1 a test failed, 2 nothing ran). A game stopped any other way can
+still exit 0, so an exit without that line is no verdict, and the script exits 3.
+On 1.7 an exception that escapes a coroutine is written to the game's stderr
+(`dist/testdata/stderr.log`) and never to `Player.log`, and it ends the
+coroutine. When that is DevTools' test runner, nothing is left to quit the game,
+so the script stops it as soon as stderr shows it and prints the exception.
+`--devtools` combines with `--full`, `--with` and `--with-after`.
+
+Both runners read one list, `DebugTools_LifecycleHarness.Cases()`, in which
+every case belongs to a `CaseGroup`. The auto-run walks the list in order.
+Under DevTools each group is one fixture (`Harness/HarnessDevTools.cs`), whose
+tests DevTools generates from the group's cases (`[ParametersSource]`) and names
+`Run(<case>)`. DevTools sorts a fixture's tests by priority with an unstable
+sort, which keeps equal tests in the order given only up to 16, so no group
+holds more than 16 cases; the fixtures take their order from
+`ExecutionPriority`, in the order the groups are declared (in an unfiltered
+run, which is what the script starts), except that the save/load fixture runs
+last. So a case listed after the save/load legs runs after them in the auto-run
+and before them under DevTools, and must need no map. A new case goes into
+`Cases()` under the group it belongs with, and a group that would pass 16 is
+split, which takes a new `CaseGroup` value and a fixture for it. One more
+DevTools test, `HarnessCaseList`, reads the tests DevTools registered (each
+fixture's sorted into run order) and fails unless each group runs in one
+fixture, at its group's priority, as exactly its cases in list order; it also
+fails when `Cases()` lists a group out of `CaseGroup` order, a case listed after
+the save/load legs needs a pad, a fixture's group is empty, a group passes 16 or
+two cases share a name. Another, `HarnessLoadNote`, checks how a save/load leg's
+load notes an abort: which log entries it counts as its own, on queues it builds
+itself, and that the note applies only to the game that load made.
+A case runs on a pad only if it needs one,
+as in the auto-run, and the pad is found once per map and named in Test.log, so
+a case that spoils it fails the cases after it rather than moving them
+elsewhere. One difference is left alone: the auto-run runs every case within
+one frame, while DevTools' game is unpaused and its clock runs between tests.
+Pausing it would change how the job tracker counts a pawn's jobs per tick,
+which it does only while unpaused or within one frame.
+A case with a mod of its own to test against is still a known gap without it,
+which DevTools reports as a skipped test.
+
+DevTools fails a test on any warning it does not allow, apart from the few the
+game logs by itself, which DevTools allows everywhere. The fault-latch fixture
+allows the errors its own injected faults log. The save/load fixture runs last,
+out of its group's place: it asks DevTools for a world of its own, and DevTools
+then generates one again for whichever fixture follows.
+
+By hand, in a Debug or Media build: dev mode → **Shift Change** → **Dev tools…** → **Run lifecycle harness**,
 then click ground you can lose. Cases clear a 7×7 pad, a cell of margin round
 it, a strip west of it and single cells further out, and reset some of that to
 soil.
@@ -46,6 +103,15 @@ have cases waiting for them: `khamenman.outfitstandsplus`,
 That is the order `loadAfter` in About.xml warns against, and a warning is all
 it is: the game loads whatever order the mod list says. So a case that depends
 on another mod runs both ways before it is trusted.
+
+The cases whose givers Complex Jobs moves tick each giver's own work type, not
+its vanilla name, so they test the same thing with that mod loaded: the bill
+products and the feeding cases. The hospital catchment ticks whatever its room
+reads. Complex Jobs files
+stonecutting under Stone Cut and most feeding under Nurse (prisoner feeding
+under Prison Care with XML Extensions), and Shift Change's compatibility rows
+arm a hospital for Nurse and Surgeon beside Doctor. A case that ticks a vanilla
+name still breaks under a mod that moves its giver.
 
 **The window does not need focus.** An unfocused instance used to stall on its
 loading screen: the log froze around line 49, the process sat near 0% CPU, and
@@ -68,8 +134,10 @@ cannot appear. It is also what surfaced the fixture flakiness described below.
 ## Isolation
 
 `-savedatafolder` moves the test instance's `ModsConfig.xml`, `Saves/` and prefs
-under `dist/testdata` (`GenFilePaths.cs:93-110, :179`); Unity's `-logfile` moves
-`Player.log` there too. Nothing under the live installation is read or written,
+under `dist/testdata` (`GenFilePaths.cs:93-110, :179`). On 1.6 Unity's
+`-logfile` moves `Player.log` there too; 1.7 has no `-logfile`, so there the
+`HOME` under `dist/testhome` moves `Player.log`, DevTools' `Test.log` and the
+caches. Nothing under the live installation is read or written,
 and `--full` *copies* the active mod list in rather than swapping it.
 
 An earlier version swapped the live `ModsConfig.xml` back and forth. It worked,
@@ -100,9 +168,9 @@ does.
 
 ## What the cases assert
 
-A hundred and thirty cases. This section is a map: the detail lives with each case, in
+About a hundred and fifty cases. This section is a map: the detail lives with each case, in
 the comment on its method under `Source/ShiftChange/Harness/`, and the report
-prints the cases in the order `DebugTools_LifecycleHarness.Run` registers them.
+prints the cases in the order `DebugTools_LifecycleHarness.Cases` lists them.
 
 Most guard a bug that happened, and fail without its fix. Some instead assert a
 rule the store description promises players. That kind exists because all
@@ -441,16 +509,22 @@ runner that names every expansion as known has only the ones it activates.
 The case does not check that the order finishes and dyes anything: the pawn
 never walks under the harness, so it stops the job once it has started.
 
-**Tables and rooms** (`HarnessTables`). Three cases need no map and check that
+**Tables and rooms** (`HarnessTables`). Four cases need no map and check that
 the static tables still match the def database, where every lookup is
 silent-fail and a renamed def empties its row with no error: the room-role
-table (`RoomRoleTableResolves`), the job-target, ignored-giver and ride-along
-tables, delivery givers by class, deliveries by job, and every official giver of
-a feeding class on the ignored list included (`JobTablesHold`), and the
-room-contents markers (`ContentsMarkersHold`). The last two check Rimatomics'
-names only when it is loaded, and count as known gaps without it. A fourth asserts the arithmetic that sizes the work-type
-dialog's body (`WorkTypeDialogBodyRectFitsTheBody`). Two need a map and resolve
-a work target's room: one with no room of its own
+table (`RoomRoleTableResolves`), each feeding giver's work against the place
+its patients lie, a hospital's or a barn's automatic stand or a stand ticked
+for Warden (`FeedingWorkIsServedWherePatientsLie`), the job-target,
+ignored-giver and ride-along tables, delivery givers by class, deliveries by
+job, and every official giver of a feeding class on the ignored list included
+(`JobTablesHold`), and the room-contents markers (`ContentsMarkersHold`). The
+feeding case counts the misses it knows of as one known gap: Complex Jobs moves
+animal feeding to Nurse, which no barn row names, and prisoner feeding to work
+a Warden tick does not serve. Any other miss fails. `JobTablesHold` and
+`ContentsMarkersHold` check Rimatomics' names only when it is loaded, and count
+as known gaps without it. A fifth asserts the arithmetic that sizes the
+work-type dialog's body (`WorkTypeDialogBodyRectFitsTheBody`). Two need a map
+and resolve a work target's room: one with no room of its own
 (`SolidTargetResolvesARoom`), and one in an exterior wall, from either side
 (`ExteriorWallTargetResolvesTheRoom`).
 
@@ -468,11 +542,12 @@ reconcile instead; no other case reaches the decline. These cases replace
 `Current.Game`, so they run last among the map cases; the class doc says what
 else follows from that.
 
-**The harness itself.** `HarnessAccounting`, registered last, asserts that
+**The harness itself.** `HarnessAccounting`, listed last, asserts that
 `Expect` reports and returns, that `Case` counts, and that a known gap is
-counted apart from a failure. Without it the runner can grep a green log out of
+counted apart from a failure (under DevTools the save/load fixture runs after
+it, being last). Without it the runner can grep a green log out of
 a suite that checks nothing. `FixtureColonistHoldsStill` (`HarnessFixtureChecks`),
-registered first, asserts what every other case takes for granted about its
+listed first, asserts what every other case takes for granted about its
 fixture. Forty colonists from the fixture in a row have no needs that tick
 under the stopped clock, and none needs tending. One of them keeps its food
 through 1,500 pumped ticks, while a colonist the fixture would reject loses
@@ -648,10 +723,15 @@ actually writes — the greps found none of seven.
 
 ## Adding a case
 
-Register it in `DebugTools_LifecycleHarness.Run`; its list is the order the
-cases run in. `Case(map, pad, name, body)` gives a fixture with a
-checked-out ledger; `Case(map, pad, name, stage, body)` stages its own;
-`Case(name, body)` needs no map.
+Add it to `DebugTools_LifecycleHarness.Cases` with `cases.On(...)`, under the
+`CaseGroup` it belongs with. The list is the order the auto-run runs the cases
+in, and DevTools runs them in the same order except the save/load legs, which
+it runs last, so a case after those legs must need no map. `On(name, body)`
+with a fixture body gives a fixture with a
+checked-out ledger; `On(name, stage, body)` stages its own; `On(name, body)`
+with a `Func<bool>` needs no map; and `On(name, (map, pad, caseName) => ...)`
+hands a body that needs the harness's map or pad both, to make its own `Case`
+call with.
 
 `Build()` hand-assembles a checked-out state for lifecycle cases. `Stage(map,
 pad, kit, enclose, capableOf, gender)` produces an undressed pawn for cases that

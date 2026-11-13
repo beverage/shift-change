@@ -14,8 +14,8 @@ namespace ShiftChange
 {
     /// <summary>
     /// Cases for catchments: a stand serving a radius around itself, or an allowed area, instead of
-    /// its room (docs/DESIGN.md, "Catchments"). <see cref="DebugTools_LifecycleHarness.Run"/>
-    /// registers every case and so decides their order.
+    /// its room (docs/DESIGN.md, "Catchments"). <see cref="DebugTools_LifecycleHarness.Cases"/>
+    /// lists every case and so decides their order.
     /// </summary>
     internal static partial class HarnessCatchments
     {
@@ -58,8 +58,15 @@ namespace ShiftChange
                 return Expect(false, "a bed spawns in the stand's room");
             }
             bed.Medical = true;
-            ok &= Expect(fix.Comp.IsAutomatic && fix.Comp.HandlesWork(doctor),
-                         "a medical bed makes it an automatic Doctor stand (control)")
+            // A room-contents mod such as Rimatomics turns on the stand's cache of its room's
+            // reading, which would hold the bedless answer above until it expires.
+            fix.Comp.automaticCache = null;
+            // Doctor alone in vanilla; the Complex Jobs compatibility rows add Nurse and Surgeon.
+            List<WorkTypeDef> hospital = new List<WorkTypeDef>(fix.Comp.WorkTypes);
+            ok &= Expect(fix.Comp.IsAutomatic && fix.Comp.HandlesWork(doctor)
+                         && hospital.All(w => w == doctor || HarnessTables.IsModWork(w)),
+                         "a medical bed makes it an automatic Doctor stand, plus mods' "
+                         + "hospital work (control)")
                 & Expect(fix.Comp.ServesSomething,
                          "so the window leaves its Serves row live");
 
@@ -67,8 +74,9 @@ namespace ShiftChange
             ok &= Expect(fix.Comp.serves == CatchmentKind.Radius,
                          "with something to tick, it serves a radius")
                 & Expect(!fix.Comp.IsAutomatic && fix.Comp.HasCustomSet
-                         && fix.Comp.HandlesWork(doctor) && fix.Comp.WorkTypes.Count == 1,
-                         "its automatic Doctor became a tick, so nothing visibly changed")
+                         && hospital.All(fix.Comp.HandlesWork)
+                         && fix.Comp.WorkTypes.Count == hospital.Count,
+                         "its automatic work became ticks, so nothing visibly changed")
                 & Expect(CompShiftStand.CatchmentStands.Contains(fix.Comp),
                          "and it is in the registry")
                 & Expect(fix.Comp.ServesSomething,
@@ -91,11 +99,12 @@ namespace ShiftChange
             }
             fix.Comp.SetServes(CatchmentKind.Radius);
             ok &= Expect(fix.Comp.serves == CatchmentKind.Radius && !fix.Comp.IsAutomatic
-                         && fix.Comp.WorkTypes.Count == 1,
-                         "and it serves a radius with Doctor ticked again, for the steps below (control)");
+                         && fix.Comp.WorkTypes.Count == hospital.Count,
+                         "and it serves a radius with the hospital's work ticked again, for the "
+                         + "steps below (control)");
 
             fix.Comp.SetServeRadius(7);
-            fix.Comp.ToggleWork(doctor);
+            ToggleEach(fix, hospital);
             ok &= Expect(fix.Comp.IsExcluded,
                          "unticking the last work type takes it out of shift use (control)")
                 & Expect(fix.Comp.serves == CatchmentKind.Room,

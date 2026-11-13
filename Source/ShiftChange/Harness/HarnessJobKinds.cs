@@ -53,9 +53,10 @@ namespace ShiftChange
 
         /// <summary>
         /// Sorts every job shape the other cases build, in the arms' order, which is the order of
-        /// <c>Classify</c>'s tests. VisitSickPawn is the row the order exists for: Doctor work that
-        /// carries a joyKind is Work, and the same job from the joy giver is Recreation. It runs in
-        /// a fixture because medical rest depends on the colonist's health and on a bed.
+        /// <c>Classify</c>'s tests. VisitSickPawn is the row the order exists for: from the
+        /// doctor's giver it is Work, charged to that giver's work (Doctor unless a mod moved it),
+        /// though it carries a joyKind; from the joy giver it is Recreation. It runs in a fixture
+        /// because medical rest depends on the colonist's health and on a bed.
         /// </summary>
         internal static bool ClassifierSortsEveryJobShape(Fixture fix)
         {
@@ -103,8 +104,11 @@ namespace ShiftChange
             JobClass visitAsWork = Of(fix, Stamped(visitSick, visitGiver));
             ok &= Sorts(fix, "a tend from its giver", HarnessCatchments.WorkAt(tend, cell), null,
                         JobKind.Work, doctor)
+                & Expect(visitGiver.workType == doctor
+                         || HarnessTables.IsModWork(visitGiver.workType),
+                         "the doctor's VisitSickPawn giver is Doctor work, or a mod's own")
                 & Sorts(fix, "VisitSickPawn from the doctor's giver", Stamped(visitSick, visitGiver), null,
-                        JobKind.Work, doctor)
+                        JobKind.Work, visitGiver.workType)
                 & Expect(visitAsWork.RecreationJob, "and it is still recreation class, so it is placed B-first")
                 & Sorts(fix, "VisitSickPawn from the joy giver, with no giver stamped", JobMaker.MakeJob(visitSick),
                         null, JobKind.Recreation, null)
@@ -206,7 +210,7 @@ namespace ShiftChange
                             JobKind.MealRun, giver.workType);
             }
             ok &= Sorts(fix, "a feeding giver's haul", HarnessCatchments.Haul(doctorFeed, steel, cell), null,
-                        JobKind.IgnoredGiver, doctor);
+                        JobKind.IgnoredGiver, doctorFeed.workType);
 
             // The gates: the jobs that ride along (the job tracker's pause, an unload), a direct
             // order, the emergencies, and the giver-less walks.

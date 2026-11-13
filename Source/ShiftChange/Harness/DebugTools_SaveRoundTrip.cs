@@ -23,7 +23,7 @@ namespace ShiftChange
     ///
     /// <para>A load replaces <c>Current.Game</c>, so the map the harness was handed and every
     /// reference held across the call belong to a disposed game. Hence these cases run last
-    /// among the map cases, as registered in <see cref="DebugTools_LifecycleHarness.Run"/>, and
+    /// among the map cases, as listed in <see cref="DebugTools_LifecycleHarness.Cases"/>, and
     /// through the fixture-less <c>Case</c> overload, since <c>Teardown</c> would clear a pad on
     /// the disposed map. The cases are numbered legs in run order: <c>RoundTrip</c> (1),
     /// <c>LegacyMigration</c> (2), <c>ForeignAssignable</c> (3), <c>AreaRoundTrip</c> (4). Each
@@ -217,7 +217,7 @@ namespace ShiftChange
             ShiftChangeMod.Settings.newStandsInService = false;
             try
             {
-                SavedGameLoaderNow.LoadGameFromSaveFileNow(SaveName);
+                Load(SaveName);
             }
             finally
             {
@@ -346,7 +346,7 @@ namespace ShiftChange
                 source.Contains("<" + CatchmentKeyPrefix) && !legacy.Contains("<" + CatchmentKeyPrefix),
                 "nor the catchment keys the round-trip save wrote, as no save that old does");
 
-            SavedGameLoaderNow.LoadGameFromSaveFileNow(LegacySaveName);
+            Load(LegacySaveName);
 
             ok &= DebugTools_LifecycleHarness.Expect(
                 !Logged(UnconsumedWarning),
@@ -581,7 +581,7 @@ namespace ShiftChange
                         !NodeContains(saved, OurKey, ownerLoadID),
                         "and never under " + OurKey);
 
-                SavedGameLoaderNow.LoadGameFromSaveFileNow(ForeignSaveName);
+                Load(ForeignSaveName);
 
                 ok &= DebugTools_LifecycleHarness.Expect(
                         !Logged(DuplicateRegistration),
@@ -740,7 +740,7 @@ namespace ShiftChange
                         && NodeBodies(saved, AreaKey).All(body => body.Contains(areaLoadID)),
                     "and only the bound stand and the boxed one write a reference node, both to the live area");
 
-            SavedGameLoaderNow.LoadGameFromSaveFileNow(AreaSaveName);
+            Load(AreaSaveName);
             ok &= DebugTools_LifecycleHarness.Expect(
                 !Logged(UnconsumedWarning),
                 "the load consumed every load-id it registered");
@@ -813,6 +813,55 @@ namespace ShiftChange
             DebugTools_LifecycleHarness.Report.AppendLine(
                 "      SaveGame wrote nothing to " + path);
             return false;
+        }
+
+        /// <summary>
+        /// The game the last <see cref="Load"/> made, held weakly so a replaced game is not kept
+        /// alive.
+        /// </summary>
+        internal static readonly System.WeakReference<Game> LoadedGame =
+            new System.WeakReference<Game>(null);
+
+        /// <summary>The last <see cref="Load"/>'s <see cref="FinalizeAbort"/> culprit.</summary>
+        internal static string loadAbortCulprit;
+
+        /// <summary>
+        /// Loads a save in-process and notes whether this load logged <see cref="FinalizeAbort"/>,
+        /// as it returns: the log queue keeps only its last 1000 entries.
+        /// </summary>
+        internal static void Load(string name)
+        {
+            NoteLoad(() => SavedGameLoaderNow.LoadGameFromSaveFileNow(name));
+        }
+
+        /// <summary>Runs a load and notes its abort culprit; returns the entries it read.</summary>
+        internal static List<LogMessage> NoteLoad(Action load)
+        {
+            // LoadGameFromSaveFileNow logs a line of its own first, so nothing the load logs
+            // folds into this entry's repeats.
+            LogMessage before = Log.Messages.LastOrDefault();
+            load();
+            List<LogMessage> own = LinesSince(Log.Messages.ToList(), before).ToList();
+            LoadedGame.SetTarget(Current.Game);
+            loadAbortCulprit = FinalizeAbortCulprit(own);
+            return own;
+        }
+
+        /// <summary>The entries after <paramref name="before"/>, or all once it has left.</summary>
+        internal static IEnumerable<LogMessage> LinesSince(List<LogMessage> messages,
+                                                           LogMessage before)
+        {
+            return messages.Skip(messages.FindLastIndex(m => ReferenceEquals(m, before)) + 1);
+        }
+
+        /// <summary>
+        /// The culprit <see cref="Load"/> noted, or null unless the current game is that load's.
+        /// </summary>
+        internal static string LoadAbortCulprit()
+        {
+            return LoadedGame.TryGetTarget(out Game game) && game == Current.Game
+                ? loadAbortCulprit
+                : null;
         }
 
         /// <summary>
@@ -909,17 +958,19 @@ namespace ShiftChange
 
         /// <summary>
         /// The stand is gone after a load: decides whether that is our failure or the
-        /// environment's. A known gap when <see cref="FinalizeAbort"/> is in the log, since the
-        /// load never reached the pass that spawns things and the case exercised nothing;
-        /// calling that a failure would blame our scribing for a third party's static cache.
+        /// environment's. A known gap when that load logged <see cref="FinalizeAbort"/>
+        /// (<see cref="LoadAbortCulprit"/>), since it never reached the pass that spawns things
+        /// and the case exercised nothing; calling that a failure would blame our scribing for a
+        /// third party's static cache.
         ///
         /// <para>It excuses nothing else. Every caller ands in its own running result, so
-        /// assertions that failed earlier in the case still fail it, and with no abort logged
-        /// the stand is missing for a reason nobody understands, which stays a failure.</para>
+        /// assertions that failed earlier in the case still fail it, and with no abort in that
+        /// load the stand is missing for a reason nobody understands, which stays a
+        /// failure.</para>
         /// </summary>
         internal static bool MissingStand(string where)
         {
-            string culprit = FinalizeAbortCulprit();
+            string culprit = LoadAbortCulprit();
             if (culprit == null)
             {
                 DebugTools_LifecycleHarness.Report.AppendLine(
@@ -935,19 +986,20 @@ namespace ShiftChange
 
         /// <summary>
         /// There is nowhere to stage: the same fork as <see cref="MissingStand"/>, one step
-        /// earlier. When the load before aborted in <c>Map.FinalizeLoading</c>, the region and
-        /// room grids were never built, <c>TryFindPad</c> requires a room on every cell of the
-        /// pad and its margin, and legs 3 and 4 find no origin anywhere on the map.
+        /// earlier. When a prefix on <c>Map.FinalizeLoading</c> threw in the load before, its map
+        /// has no rooms and <c>TryFindPad</c> refuses it, so legs 3 and 4 find no origin. An abort
+        /// later in that method leaves rooms that can still be built, and the leg stages as usual.
         ///
-        /// <para>That is a known gap only when <see cref="FinalizeAbort"/> is in the log. A map
-        /// that was never usable is a broken harness invocation and stays a failure, as it does
-        /// in <see cref="Patch_HarnessAutoRun"/> before the run starts. Nothing past staging is
+        /// <para>That is a known gap only when the load that made the current game logged
+        /// <see cref="FinalizeAbort"/> (<see cref="LoadAbortCulprit"/>). A map that was never
+        /// usable is a broken harness invocation and stays a failure, as it does in
+        /// <see cref="Patch_HarnessAutoRun"/> before the run starts. Nothing past staging is
         /// excused: no stand def, no fixture, an assignable missing off the staged stand all
         /// still fail.</para>
         /// </summary>
         internal static bool CannotStage(string where)
         {
-            string culprit = FinalizeAbortCulprit();
+            string culprit = LoadAbortCulprit();
             if (culprit == null)
             {
                 DebugTools_LifecycleHarness.Report.AppendLine(
@@ -963,13 +1015,14 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The first mod frame inside a FinalizeLoading abort, or null when no abort was logged.
-        /// It names whose cache broke the load, so the reader need not open Player.log.
+        /// The first mod frame inside a FinalizeLoading abort among <paramref name="messages"/>,
+        /// or null when none of them is one. It names whose cache broke the load, so the reader
+        /// need not open Player.log.
         /// </summary>
-        internal static string FinalizeAbortCulprit()
+        internal static string FinalizeAbortCulprit(IEnumerable<LogMessage> messages)
         {
             bool aborted = false;
-            foreach (LogMessage message in Log.Messages)
+            foreach (LogMessage message in messages)
             {
                 if (message.text == null || !message.text.Contains(FinalizeAbort))
                 {

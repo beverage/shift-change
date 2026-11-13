@@ -8,18 +8,36 @@
 #                                    # the four, plus one mod a case needs
 #   devtools/run-harness.sh --with-after=khamenman.outfitstandsplus
 #                                    # the same mod, loaded after this one
+#   devtools/run-harness.sh --devtools
+#                                    # every case as a DevTools test, on 1.7
 #
 # Builds Release, launches RimWorld with -quicktest -shiftchange-harness against
 # a throwaway save-data folder, waits for the game to run every case and quit
 # itself, prints the report. Exits non-zero if any case failed.
 #
+# --devtools runs the same cases under SmashPhil's DevTools test framework
+# instead, one test each. It needs RimWorld 1.7 and a DevTools build at
+# Mods/DevTools from develop at 0eea1a1 or later: the harness build compiles
+# against that same dll, DevTools joins the mod list, and the game runs
+# `--pid MrBeverage.ShiftChange --test -e`. The verdict is its exit
+# code read with the result line DevTools writes last in Test.log (0 passed, 1 a
+# test failed, 2 nothing ran); an exit without that line is no verdict and exits
+# 3. A test runner that dies on an exception stops the run at once. Test.log is
+# the report. It combines with --full, --with and --with-after.
+#
+# Both RimWorld layouts run. 1.6 keeps Mods/ inside RimWorldMac.app and 1.7
+# keeps it beside RimWorld.app. RIMWORLD_APP names either app; the default is the
+# Steam install's, RimWorld.app when it is there.
+#
 # ISOLATION — the point of this script, and why it is not simpler
 #
 # RimWorld takes `-savedatafolder=<dir>`, and ConfigFolderPath sits under it
 # (GenFilePaths.cs:93-110, :179) — so the test instance gets its own
-# ModsConfig.xml, its own Saves/, its own Prefs. Unity's own `-logfile` moves
-# Player.log too. Nothing under ~/Library/Application Support/RimWorld or
-# ~/Library/Logs is read or written.
+# ModsConfig.xml, its own Saves/, its own Prefs. On 1.6, Unity's own `-logfile`
+# moves Player.log too. 1.7 has no -logfile: it writes its log, its caches and
+# DevTools' Test.log under $HOME, so the game gets a HOME of its own at
+# dist/testhome. Nothing under ~/Library/Application Support/RimWorld or the
+# player's own logs is written.
 #
 # This replaced a version that swapped the real ModsConfig.xml back and forth.
 # That worked, but it edited the live installation to run a test, and the day
@@ -42,14 +60,24 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Derived from $HOME, never written out. These were absolute paths carrying a
 # home directory, in a public repository — and they made the scripts run on
 # exactly one machine. Override either for a non-default Steam library.
-APP="${RIMWORLD_APP:-$HOME/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app}"
+STEAM_GAME="$HOME/Library/Application Support/Steam/steamapps/common/RimWorld"
+if [ -n "${RIMWORLD_APP:-}" ]
+then
+  APP="$RIMWORLD_APP"
+elif [ -d "$STEAM_GAME/RimWorld.app" ]
+then
+  APP="$STEAM_GAME/RimWorld.app"
+else
+  APP="$STEAM_GAME/RimWorldMac.app"
+fi
 LIVE_CONFIG="${RIMWORLD_CONFIG:-$HOME/Library/Application Support/RimWorld/Config/ModsConfig.xml}"
 TESTDATA="$REPO/dist/testdata"
-LOG="$TESTDATA/Player.log"
+# Kept between runs, so 1.7's caches stay warm; the logs in it are cleared at
+# every start.
+TESTHOME="$REPO/dist/testhome"
 BUILD="$REPO/dist/build"
 CSPROJ="$REPO/Source/ShiftChange/ShiftChange.csproj"
 DLL="$REPO/Assemblies/ShiftChange.dll"
-PROC="RimWorld by Ludeon Studios"
 # Generous, because it has to cover the slow case: --alongside a live colony
 # has been measured at 300s, and once at more than 600s. A run that is going to
 # pass takes ~20s, so a high ceiling costs nothing except when something is
@@ -81,6 +109,11 @@ TIMEOUT=1200
 # exactly what a release gate runs against. A frozen log is the signal; a
 # growing one is a slow load and must be allowed to finish. STARTUP_GRACE is
 # now a floor before the question is asked at all, not a deadline.
+#
+# ON 1.7 A FROZEN LOG IS NOT ENOUGH EITHER. A large list's load writes nothing
+# between the key-binding warnings and `with mods:`, and a --full run was shot
+# 84s into that silence at 97% CPU (2026-11-07). So the process must also be
+# idle (idle() below): the stall sits near 1% CPU, a silent load near 100%.
 #
 # WHAT WE GREP FOR, AND TWO WRONG ANSWERS BEFORE THIS ONE.
 #
@@ -129,7 +162,9 @@ MINIMAL_MODS=(
 # that tests us against it and is a known gap without it. It goes in ahead of
 # this mod, which sorts after the mods it patches (About.xml's loadAfter). Not
 # with --full, whose list is yours as it stands. Its own dependencies are not
-# followed, so name those too.
+# followed, so name those too. Ids are written lowercase, as the game writes
+# them: ModsConfig.IsActive lowercases only its argument, so a mixed-case entry
+# in the file never matches.
 EXTRA_MODS=()
 
 # --with-after=<packageId>, repeatable: the same, but loaded after this mod,
@@ -139,21 +174,45 @@ EXTRA_AFTER=()
 
 FULL=0
 ALONGSIDE=0
+DEVTOOLS=0
 for arg in "$@"
 do
   case "$arg" in
     --full) FULL=1 ;;
     --alongside) ALONGSIDE=1 ;;
-    --with=?*) EXTRA_MODS+=("${arg#--with=}") ;;
-    --with-after=?*) EXTRA_AFTER+=("${arg#--with-after=}") ;;
-    *) printf 'unknown option: %s (--full | --alongside | --with=<packageId> | --with-after=<packageId>)\n' "$arg" >&2; exit 2 ;;
+    --devtools) DEVTOOLS=1 ;;
+    --with=?*) EXTRA_MODS+=("$(printf '%s' "${arg#--with=}" | tr '[:upper:]' '[:lower:]')") ;;
+    --with-after=?*) EXTRA_AFTER+=("$(printf '%s' "${arg#--with-after=}" | tr '[:upper:]' '[:lower:]')") ;;
+    *) printf 'unknown option: %s (--full | --alongside | --devtools | --with=<packageId> | --with-after=<packageId>)\n' "$arg" >&2; exit 2 ;;
   esac
 done
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
+realpath_of() { python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1"; }
 
 [ "$FULL" = "0" ] || [ "$(( ${#EXTRA_MODS[@]} + ${#EXTRA_AFTER[@]} ))" = "0" ] \
   || die "--with and --with-after add to the minimal list, and --full does not use it"
+
+# The layout is read from the binary, because an install updated from 1.6 to 1.7
+# keeps a RimWorldMac.app that holds nothing but Mods/.
+GAME_DIR="$(dirname "$APP")"
+if [ -x "$APP/Contents/MacOS/RimWorld" ]
+then
+  LAYOUT=1.7
+  BIN="$APP/Contents/MacOS/RimWorld"
+  MODS_DIR="$GAME_DIR/Mods"
+  LOG="$TESTHOME/Library/Application Support/Ludeon Studios/RimWorld by Ludeon Studios/Logs/Player.log"
+  TESTLOG="$TESTHOME/Library/Application Support/ludeon.rimworld/Test.log"
+elif [ -x "$APP/Contents/MacOS/RimWorld by Ludeon Studios" ]
+then
+  LAYOUT=1.6
+  BIN="$APP/Contents/MacOS/RimWorld by Ludeon Studios"
+  MODS_DIR="$APP/Mods"
+  LOG="$TESTDATA/Player.log"
+else
+  die "no RimWorld binary in $APP. Set RIMWORLD_APP to RimWorld.app (1.7) or RimWorldMac.app (1.6)."
+fi
+[ "$DEVTOOLS" = "0" ] || [ "$LAYOUT" = "1.7" ] || die "--devtools runs on RimWorld 1.7 only"
 
 # WHAT THE STALL LOOKED LIKE, PRINTED RATHER THAN ASSERTED.
 #
@@ -186,6 +245,39 @@ stall_evidence() {
   tail -n 5 "$LOG" 2>/dev/null | sed 's/^/         | /'
 }
 
+# kill -0 also succeeds on a child that has exited and not been waited for yet,
+# so a zombie counts as gone.
+alive() {
+  kill -0 "$1" 2>/dev/null || return 1
+  case "$(ps -o stat= -p "$1" 2>/dev/null)" in
+    Z*) return 1 ;;
+  esac
+  return 0
+}
+
+# Whether a process is using next to no CPU. The stall sits near 1%; a 1.7 load of
+# a large list writes nothing for over a minute while it works at ~100%. ps reports
+# a decaying average, so a process that has just gone idle reads high for a while,
+# which only delays the verdict. A process ps cannot see is not idle: alive() is
+# the check for that.
+idle() {
+  local cpu
+  cpu=$(ps -o %cpu= -p "$1" 2>/dev/null | tr -d ' ')
+  [ -n "$cpu" ] && [ "${cpu%%.*}" -lt 10 ]
+}
+
+# 1.7's coroutine scheduler catches an exception that escapes a coroutine, ends
+# that coroutine and writes the exception to stderr only, never to Player.log.
+# When the coroutine is DevTools' test runner, the game then idles with nothing
+# left to quit it. These print each such exception with its first frames.
+coroutine_errors() {
+  grep -A8 '^\[Coroutine\]' "$TESTDATA/stderr.log" 2>/dev/null | sed 's/^/  | /'
+}
+runner_coroutine_died() {
+  grep -A40 '^\[Coroutine\]' "$TESTDATA/stderr.log" 2>/dev/null \
+    | grep -q 'DevTools\.Testing\.TestRunner\.TestRoutine'
+}
+
 # The instance this script starts is tracked by PID and is the only one it ever
 # waits on or signals. Another instance already running is somebody's colony
 # with unsaved progress in it — the safe default is to stop, and `--alongside`
@@ -194,11 +286,32 @@ stall_evidence() {
 #
 # Whatever happens, this script never kills a game it did not start. If you are
 # about to reach for `pkill` to get past this message: don't. Ask.
-if pgrep -x "$PROC" >/dev/null && [ "$ALONGSIDE" = "0" ]
+#
+# 1.6's process is "RimWorld by Ludeon Studios" and 1.7's is "RimWorld"; either
+# one is somebody's game, whichever layout this run uses.
+if { pgrep -x "RimWorld by Ludeon Studios" >/dev/null || pgrep -x RimWorld >/dev/null; } \
+  && [ "$ALONGSIDE" = "0" ]
 then
   die "RimWorld is already running, and this script will not touch it.
        Confirm that instance is free and quit it by hand, or pass --alongside
        to start a second, fully isolated one beside it."
+fi
+
+pgrep -x steam_osx >/dev/null \
+  || die "Steam is not running, and without it no Workshop mod loads, Harmony included."
+
+# --devtools compiles against the DevTools dll the game will load, for the same
+# reason the load-path check below exists: what is tested is what the game reads.
+HARNESS_PROPS=()
+if [ "$DEVTOOLS" = "1" ]
+then
+  [ -e "$MODS_DIR/DevTools" ] \
+    || die "--devtools needs a DevTools build at $MODS_DIR/DevTools,
+       from develop at 0eea1a1 or later"
+  DEVTOOLS_DLL="$(realpath_of "$MODS_DIR/DevTools")/1.7/Assemblies/DevTools.dll"
+  [ -f "$DEVTOOLS_DLL" ] \
+    || die "no DevTools.dll at $DEVTOOLS_DLL; build DevTools from develop at 0eea1a1 or later"
+  HARNESS_PROPS=("-p:DevToolsDll=$DEVTOOLS_DLL")
 fi
 
 # The dll the game loads is the one on disk, not the one in your editor.
@@ -214,7 +327,8 @@ fi
 # anywhere beats OutputPath, and a build sent elsewhere that way still reports
 # success.
 rm -rf "$BUILD/harness"
-dotnet build "$CSPROJ" -c Release -p:Harness=true "-p:OutputPath=$BUILD/harness/" >/dev/null \
+dotnet build "$CSPROJ" -c Release -p:Harness=true ${HARNESS_PROPS[@]+"${HARNESS_PROPS[@]}"} \
+  "-p:OutputPath=$BUILD/harness/" >/dev/null \
   || die "harness build failed — fix that first"
 [ -f "$BUILD/harness/ShiftChange.dll" ] \
   || die "the harness build succeeded but left no dll in $BUILD/harness/.
@@ -232,9 +346,8 @@ dotnet build "$CSPROJ" -c Release -p:Harness=true "-p:OutputPath=$BUILD/harness/
 #
 # Without this check the failure is a PASS, which is the worst shape a test
 # result can take. Compare canonical paths and refuse.
-MODS_ENTRY="$APP/Mods/ShiftChange"
+MODS_ENTRY="$MODS_DIR/ShiftChange"
 [ -e "$MODS_ENTRY" ] || die "no Mods/ShiftChange entry — the game cannot load this mod at all"
-realpath_of() { python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1"; }
 ENTRY_REAL="$(realpath_of "$MODS_ENTRY")"
 REPO_REAL="$(realpath_of "$REPO")"
 if [ "$ENTRY_REAL" != "$REPO_REAL" ]
@@ -248,7 +361,9 @@ then
        entry is a real directory rather than a symlink, it is release-staging
        residue — park it, do not delete it, and restore the symlink."
 fi
+printf 'game: RimWorld %s, %s\n' "$LAYOUT" "$APP"
 printf 'load path: %s\n' "$ENTRY_REAL"
+[ "$DEVTOOLS" = "0" ] || printf 'devtools: %s\n' "$DEVTOOLS_DLL"
 
 # SWAP A BUILT DLL IN BY RENAME, NEVER BY WRITING INTO THE ONE A GAME LOADED.
 #
@@ -327,8 +442,36 @@ then
   # Read-only copy. The live file is never written.
   cp "$LIVE_CONFIG" "$TESTDATA/Config/ModsConfig.xml"
   printf 'mod list: yours, copied (not swapped)\n'
+  if [ "$DEVTOOLS" = "1" ]
+  then
+    # DevTools goes in just ahead of this mod, unless the list has it already.
+    python3 - "$TESTDATA/Config/ModsConfig.xml" <<'PY' || die "could not add DevTools to the copied mod list"
+import sys
+import xml.etree.ElementTree as ET
+
+path = sys.argv[1]
+tree = ET.parse(path)
+active = tree.getroot().find("activeMods")
+ids = [(li.text or "").strip().lower() for li in active]
+if "mrbeverage.shiftchange" not in ids:
+    sys.exit("Shift Change is not active in the copied mod list")
+if "smashphil.devtools" not in ids:
+    at = ids.index("mrbeverage.shiftchange")
+    li = ET.Element("li")
+    li.text = "smashphil.devtools"
+    li.tail = active[at - 1].tail if at > 0 else active.text
+    active.insert(at, li)
+    tree.write(path, encoding="utf-8", xml_declaration=True)
+PY
+    printf 'mod list: plus DevTools, ahead of this mod\n'
+  fi
 else
-  version="$(grep -m1 '<version>' "$LIVE_CONFIG" 2>/dev/null || printf '  <version>1.6.4871 rev595</version>')"
+  if [ -f "$GAME_DIR/Version.txt" ]
+  then
+    version="  <version>$(head -n 1 "$GAME_DIR/Version.txt" | tr -d '\r\n')</version>"
+  else
+    version="$(grep -m1 '<version>' "$LIVE_CONFIG" 2>/dev/null || printf '  <version>1.6.4871 rev595</version>')"
+  fi
   {
     printf '<?xml version="1.0" ?>\n<ModsConfigData>\n'
     printf '%s\n  <activeMods>\n' "$version"
@@ -336,6 +479,7 @@ else
     do
       if [ "$mod" = "mrbeverage.shiftchange" ]
       then
+        [ "$DEVTOOLS" = "0" ] || printf '    <li>smashphil.devtools</li>\n'
         for extra in ${EXTRA_MODS[@]+"${EXTRA_MODS[@]}"}
         do
           printf '    <li>%s</li>\n' "$extra"
@@ -353,7 +497,7 @@ else
   } > "$TESTDATA/Config/ModsConfig.xml"
   xmllint --noout "$TESTDATA/Config/ModsConfig.xml" || die "generated mod list is not well-formed"
   printf 'mod list: minimal (%s mods, isolated)\n' \
-    "$(( ${#MINIMAL_MODS[@]} + ${#EXTRA_MODS[@]} + ${#EXTRA_AFTER[@]} ))"
+    "$(( ${#MINIMAL_MODS[@]} + ${#EXTRA_MODS[@]} + ${#EXTRA_AFTER[@]} + DEVTOOLS ))"
 fi
 
 # SEED Prefs.xml, AND THE REASON IS THE STALL.
@@ -421,11 +565,37 @@ fi
   printf '  <screenHeight>720</screenHeight>\n'
   printf '  <fullscreen>False</fullscreen>\n'
   printf '  <runInBackground>%s</runInBackground>\n' "$RUN_IN_BACKGROUND"
+  # 1.7 runs with -NoWindow, and at the system's UI scale the game measures
+  # itself under its 1024x768 floor and logs "Resolution too small" once, which
+  # fails whichever DevTools test is running. Both scaling keys are needed for a
+  # UI scale of 1.
+  if [ "$LAYOUT" = "1.7" ]
+  then
+    printf '  <uiScale>1</uiScale>\n'
+    printf '  <scaleRelativeToSystem>True</scaleRelativeToSystem>\n'
+    printf '  <ignoreSystemScaling>True</ignoreSystemScaling>\n'
+  fi
   printf '  <volumeMaster>0</volumeMaster>\n'
   printf '</PrefsData>\n'
 } > "$TESTDATA/Config/Prefs.xml"
 xmllint --noout "$TESTDATA/Config/Prefs.xml" || die "generated Prefs.xml is not well-formed"
-printf 'display: windowed 1280x720, muted, runInBackground=%s\n' "$RUN_IN_BACKGROUND"
+if [ "$LAYOUT" = "1.7" ]
+then
+  printf 'display: none (-NoWindow), muted, runInBackground=%s\n' "$RUN_IN_BACKGROUND"
+else
+  printf 'display: windowed 1280x720, muted, runInBackground=%s\n' "$RUN_IN_BACKGROUND"
+fi
+
+# 1.7's HOME for the game. The folder must exist before the game asks for it,
+# DevTools' log folder too (without it the run never finishes), and the Steam
+# link keeps the Workshop reachable from it. The logs go, so every one read
+# below was written by this run.
+if [ "$LAYOUT" = "1.7" ]
+then
+  mkdir -p "$TESTHOME/Library/Application Support/ludeon.rimworld"
+  ln -sfn "$HOME/Library/Application Support/Steam" "$TESTHOME/Library/Application Support/Steam"
+  rm -f "$LOG" "$(dirname "$LOG")/Player-prev.log" "$TESTLOG"
+fi
 
 printf 'save data: %s\n' "$TESTDATA"
 printf 'launching…\n'
@@ -434,8 +604,25 @@ printf 'launching…\n'
 # gives no PID back, so the only way to wait would be "is ANY RimWorld running",
 # which is precisely the check that cannot tell this instance from someone's
 # colony. Launching it here makes $! ours, and ours alone.
-"$APP/Contents/MacOS/$PROC" -quicktest -shiftchange-harness \
-  "-savedatafolder=$TESTDATA" -logfile "$LOG" >/dev/null 2>&1 &
+#
+# On 1.7 the subshell execs the game, so $! is still the game. Started outside
+# Steam, it takes its app id from the environment, and it starts from the game
+# folder as Steam would start it. Steam's own lines go to stderr.
+if [ "$LAYOUT" = "1.7" ]
+then
+  if [ "$DEVTOOLS" = "1" ]
+  then
+    RUN_ARGS=(--pid MrBeverage.ShiftChange --test -e)
+  else
+    RUN_ARGS=(-quicktest -shiftchange-harness)
+  fi
+  ( cd "$GAME_DIR" && exec env HOME="$TESTHOME" SteamAppId=294100 SteamGameId=294100 \
+      "$BIN" "${RUN_ARGS[@]}" -NoWindow "-savedatafolder=$TESTDATA" ) \
+    >"$TESTDATA/stdout.log" 2>"$TESTDATA/stderr.log" &
+else
+  "$BIN" -quicktest -shiftchange-harness \
+    "-savedatafolder=$TESTDATA" -logfile "$LOG" >/dev/null 2>&1 &
+fi
 GAME_PID=$!
 printf 'pid: %s\n' "$GAME_PID"
 
@@ -469,8 +656,9 @@ do
 
   # Short-circuit the stall. Bail here rather than at TIMEOUT: a game whose log
   # has gone silent before its own startup is blocked, not slow, and no stalled
-  # run has ever recovered. Both conditions are required — see STARTUP_GRACE.
-  if [ "$started" -eq 0 ] && [ "$elapsed" -ge "$STARTUP_GRACE" ] && [ "$quiet" -ge "$STALL_QUIET" ]
+  # run has ever recovered. All three conditions are required — see STARTUP_GRACE.
+  if [ "$started" -eq 0 ] && [ "$elapsed" -ge "$STARTUP_GRACE" ] && [ "$quiet" -ge "$STALL_QUIET" ] \
+     && idle "$GAME_PID"
   then
     evidence="$(stall_evidence)"
     kill "$GAME_PID" 2>/dev/null || true
@@ -510,17 +698,40 @@ $evidence
        Log: $LOG"
   fi
 
-  kill -0 "$GAME_PID" 2>/dev/null || break
+  # A dead test runner never quits the game, so stop at once rather than at TIMEOUT.
+  if [ "$DEVTOOLS" = "1" ] && runner_coroutine_died
+  then
+    kill "$GAME_PID" 2>/dev/null || true
+    printf 'Test.log: %s\n' "$TESTLOG" >&2
+    die "DevTools' test runner died on an exception, ${elapsed}s in, and the game
+       would have idled until the ${TIMEOUT}s ceiling; stopped pid $GAME_PID.
+       The game wrote it to stderr only:
+$(coroutine_errors)
+       stderr: $TESTDATA/stderr.log"
+  fi
+
+  alive "$GAME_PID" || break
 done
 
-if kill -0 "$GAME_PID" 2>/dev/null
+if alive "$GAME_PID"
 then
   kill "$GAME_PID" 2>/dev/null || true
   die "timed out after ${TIMEOUT}s; stopped pid $GAME_PID — check $LOG"
 fi
+CODE=0
+wait "$GAME_PID" || CODE=$?
 printf 'game exited after ~%ss\n\n' "$elapsed"
 
-[ -f "$LOG" ] || die "no log at $LOG — did -logfile take?"
+[ -f "$LOG" ] || die "no log at $LOG — the game wrote none where this script looks"
+
+# 1.7 prints a stack trace under every log line; the copy this script prints
+# from leaves them out.
+READABLE="$LOG"
+if [ "$LAYOUT" = "1.7" ]
+then
+  READABLE="$TESTDATA/Player.readable.log"
+  grep -v '^    at ' "$LOG" > "$READABLE" || true
+fi
 
 # THREE FAILURES, THREE MESSAGES, and the crash is checked first. These were one
 # line until 2026-09-04, and it blamed mod wiring for a stall that happens
@@ -538,6 +749,47 @@ then
   printf '\n' >&2
   die "native crash: neither the stall nor a wiring problem. See $LOG"
 fi
+
+# DevTools' verdict, read before the startup check below, because a run with
+# nothing to run ends without starting a game. A pass or a fail needs DevTools'
+# own last line as well as the exit code: it writes that line just before it
+# quits, and a game stopped any other way can still exit 0.
+if [ "$DEVTOOLS" = "1" ]
+then
+  if [ -f "$TESTLOG" ]
+  then
+    cat "$TESTLOG"
+    printf '\nTest.log: %s\n' "$TESTLOG"
+  else
+    printf 'this run wrote no Test.log\n'
+  fi
+  printf 'Player.log: %s\n' "$LOG"
+  VERDICT=""
+  if grep -q "Test runner finished. Result: Passed" "$TESTLOG" 2>/dev/null
+  then
+    VERDICT=0
+  elif grep -q "Test runner finished. Result: Failed" "$TESTLOG" 2>/dev/null
+  then
+    VERDICT=1
+  fi
+  case "$CODE:$VERDICT" in
+    0:0) printf 'devtools run: PASSED\n' ;;
+    1:1) printf 'devtools run: FAILED (exit 1): a test failed\n' ;;
+    2:*) printf 'devtools run: NOTHING RAN (exit 2); Player.log says why\n' ;;
+    *)
+      printf 'last lines of the log:\n' >&2
+      tail -n 5 "$READABLE" | sed 's/^/  | /' >&2
+      if [ -n "$(coroutine_errors)" ]
+      then
+        printf 'exceptions the game wrote to stderr only:\n%s\n' "$(coroutine_errors)" >&2
+      fi
+      printf 'devtools run: no verdict (exit %s): the test runner never finished\n' "$CODE"
+      [ "$CODE" = "0" ] && CODE=3
+      ;;
+  esac
+  exit "$CODE"
+fi
+
 if ! grep -q "with mods:" "$LOG"
 then
   printf 'last lines of the log:\n' >&2
@@ -551,6 +803,6 @@ grep -q "harness auto-run" "$LOG" \
   || die "the game started but the harness never ran — is -shiftchange-harness
        still wired up? See $LOG"
 
-sed -n '/\[ShiftChange\] lifecycle harness/,/harness auto-run/p' "$LOG"
+sed -n '/\[ShiftChange\] lifecycle harness/,/harness auto-run/p' "$READABLE"
 
 grep -q "harness auto-run: PASSED" "$LOG"
