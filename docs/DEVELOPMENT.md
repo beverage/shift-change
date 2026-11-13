@@ -305,16 +305,18 @@ broke that way once; the rest block a failure that would land silently.
 
 The lifecycle harness runs in a second workflow,
 `.github/workflows/harness.yml`, on every push to any branch: a
-`-p:Harness=true` build, then the harness in RimWorld 1.7 on a Linux machine
-with Harmony, Core and this mod, once with every DLC and once with Odyssey
-alone. The game exits 0 whatever the verdict, so the job reads `Player.log` and
-passes only on `harness auto-run: PASSED`; its summary lists the run's `GAP`
-and `FAIL` lines and the totals. The Odyssey run has one gap more than the
-other, the recolor case, which needs Ideology. The workflow needs secrets, so
-unlike `ci.yml` it does not run on pull requests: a fork's change is tested
-once its branch is pushed here.
+`-p:Harness=true` build against a dll of the DevTools the test machine carries,
+then every case as a DevTools test in RimWorld 1.7 on a Linux machine with
+Harmony, Core, DevTools and this mod (and the machine's own shim for running
+without a window), once with every DLC and once with Odyssey alone.
+The job passes on DevTools' exit code together with the `Result: Passed` line
+it writes last in `Test.log`; its summary lists the failed and skipped tests
+and the totals. The Odyssey run skips one test more than the other, the
+recolor case, which needs Ideology. The workflow needs secrets, so unlike
+`ci.yml` it does not run on pull requests: a fork's change is tested once its
+branch is pushed here.
 
-That is the four-mod list only. `--full` on this machine, against a real mod
+That is the minimal list only. `--full` on this machine, against a real mod
 list, is still what a release is signed off on.
 
 Tagging a commit `v*` additionally packages the mod folder and publishes a

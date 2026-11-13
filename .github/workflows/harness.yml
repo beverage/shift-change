@@ -1,25 +1,28 @@
 # On every push, builds Shift Change with its lifecycle harness compiled in
-# and runs the harness in RimWorld 1.7 on a Fly machine, as
-# devtools/run-harness.sh runs it: Harmony, Core and this mod, booted with
-# -quicktest -shiftchange-harness. It runs twice, once with every DLC and
-# once with Odyssey alone, the one DLC this mod requires. The game exits 0
-# whatever the verdict, so a run passes only when Player.log holds the
-# harness's own "harness auto-run: PASSED". The build replaces the committed
-# Assemblies/ShiftChange.dll in this job's checkout only.
+# and runs every harness case as a DevTools test in RimWorld 1.7 on a Fly
+# machine, as devtools/run-harness.sh runs them: Harmony, Core, SmashPhil's
+# DevTools and this mod, started with `--pid MrBeverage.ShiftChange --test -e`.
+# It runs twice, once with every DLC and once with Odyssey alone, the one DLC
+# this mod requires. The job fails when the build or a test fails. The build
+# replaces the committed Assemblies/ShiftChange.dll in this job's checkout
+# only.
 #
 # The runner has no game, so the build compiles against Krafs.Rimworld.Ref,
-# as ci.yml's do. flybridge.py, the step that starts the machine, comes from
-# the lab's bucket by the hash below and is checked against it.
-# `flybridge.py upload-tool` puts a new version in the bucket and prints its
-# hash.
+# as ci.yml's do, and against a DevTools.dll built from the commit the Fly
+# image carries: SmashPhil/DevTools#17 at 8966779, whose stack-qualified
+# allowances the tests use. That dll and flybridge.py, the step that starts
+# the machine, come from the lab's bucket by the hashes below and are checked
+# against them.
+# `flybridge.py upload-tool [file]` puts a new version of either in the bucket
+# and prints its hash.
 #
 # Repository secrets: FLY_API_TOKEN (a deploy token for the lab's Fly app),
 # AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (the bucket's keys).
 # Repository variables: AWS_ENDPOINT_URL_S3, AWS_REGION, BUCKET_NAME.
 # Nothing runs on pull_request, so a fork never sees them; a fork's change is
 # tested once its branch is pushed here. This repository is public, and so is
-# the artifact each run leaves: the game's logs and the saves the harness
-# wrote, from a throwaway colony.
+# the artifact each run leaves: the game's logs, DevTools' Test.log and the
+# saves the harness wrote, from a throwaway colony.
 
 name: Harness on Fly
 
@@ -43,7 +46,7 @@ jobs:
       fail-fast: false
       matrix:
         # RW_DLCS on the Fly machine: every DLC the image has, then Odyssey
-        # alone. The second has one known gap more, the recolor case, which
+        # alone. The second skips one test more, the recolor case, which
         # needs Ideology.
         dlcs: [all, odyssey]
     # The run waits up to --queue-minutes below for a slot under flybridge's
@@ -52,7 +55,8 @@ jobs:
     # cancelled job, the timeout's included, stops the machine at once.
     timeout-minutes: 35
     env:
-      FLYBRIDGE_SHA256: 0a396c022352de98de6efc08ac1e73bd800a62643256c8d9d8f64565efa73ee3
+      FLYBRIDGE_SHA256: 17563f404320b3e8f0d150ead30e84ddd8185f91e43830e5f3bdad506e6aa5e1
+      DEVTOOLS_SHA256: 7d1ed105d1697423b82c1b593ff7f2b9c4b17d961861a481c0eb7240fc5711e1
       RUN_ID: gh-${{ github.event.repository.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.dlcs }}
       AWS_ENDPOINT_URL_S3: ${{ vars.AWS_ENDPOINT_URL_S3 }}
       AWS_REGION: ${{ vars.AWS_REGION }}
@@ -69,33 +73,39 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Fetch flybridge
+      - name: Fetch flybridge and DevTools
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           aws s3 cp "s3://$BUCKET_NAME/tools/flybridge/$FLYBRIDGE_SHA256.py" "$RUNNER_TEMP/flybridge.py" --only-show-errors
-          printf '%s  %s\n' "$FLYBRIDGE_SHA256" "$RUNNER_TEMP/flybridge.py" | sha256sum -c -
+          aws s3 cp "s3://$BUCKET_NAME/tools/DevTools/$DEVTOOLS_SHA256.dll" "$RUNNER_TEMP/devtools/DevTools.dll" --only-show-errors
+          printf '%s  %s\n' "$FLYBRIDGE_SHA256" "$RUNNER_TEMP/flybridge.py" "$DEVTOOLS_SHA256" "$RUNNER_TEMP/devtools/DevTools.dll" | sha256sum -c -
 
-      # Release codegen with the harness and its launch flag, the build
-      # run-harness.sh drives. DisableLocalGameRefs keeps it on Krafs whatever
-      # the machine has installed.
+      # Release codegen with the harness, and with the DevTools fixtures that
+      # DevToolsDll switches on: the build run-harness.sh drives.
+      # DisableLocalGameRefs keeps it on Krafs whatever the machine has
+      # installed.
       - name: Build with the harness
         run: |
-          dotnet build Source/ShiftChange/ShiftChange.csproj -c Release -p:Harness=true -p:DisableLocalGameRefs=true -nologo
+          dotnet build Source/ShiftChange/ShiftChange.csproj -c Release -p:Harness=true -p:DisableLocalGameRefs=true -p:DevToolsDll="$RUNNER_TEMP/devtools/DevTools.dll" -nologo
           sha256sum Assemblies/ShiftChange.dll
 
       # Uploads this checkout's mod folder for this run alone (Source/,
       # devtools/, docs/, media/ and .git/ stay behind), activates it after
-      # Harmony, waits for the machine to go, prints result.json and exits:
-      # 0 the harness passed, 1 it failed or never reported, 124 the time
-      # limit stopped the game, 130 or 143 the job was cancelled; or 2 when a
-      # mod or DLC was missing and 4 when no slot opened under the cap in
-      # time, and the game never started. `exec` makes flybridge the step's
-      # own process: a cancel signals only that process, and bash would not
-      # pass it on. --image pins the game, so a new image reaches this
-      # workflow in a commit of its own.
-      - name: Run the harness
+      # DevTools, waits for the machine to go, prints result.json and exits
+      # with the game's code: 0 every test passed, 1 one failed, 2 DevTools
+      # found nothing to run, 124 the time limit stopped the game, 130 or 143
+      # the job was cancelled. flybridge also exits 2 when a mod or DLC was
+      # missing and 4 when no slot opened under the cap in time, and then the
+      # game never started; its output says which. Something other than
+      # DevTools can quit the game with exit 0, so when the game exits 0,
+      # flybridge exits 1 unless the last result line DevTools wrote to
+      # Test.log, if any, reads Passed. `exec` makes flybridge the step's own
+      # process: a cancel signals only that process, and bash would not pass
+      # it on. --image pins the game and DevTools, so a new image reaches this
+      # workflow in a commit of its own, with DEVTOOLS_SHA256.
+      - name: Run the tests
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -103,14 +113,25 @@ jobs:
           DLCS: ${{ matrix.dlcs }}
         run: >-
           exec python3 "$RUNNER_TEMP/flybridge.py" run "$RUN_ID"
-          --image ready-1 --mod "$GITHUB_WORKSPACE" --env "RW_DLCS=$DLCS"
-          --queue-minutes 15 --max-minutes 10 --pull
-          --pass-line "harness auto-run: PASSED"
-          -- -quicktest -shiftchange-harness
+          --image ready-1 --mods smashphil.devtools --mod "$GITHUB_WORKSPACE"
+          --env "RW_DLCS=$DLCS" --queue-minutes 15 --max-minutes 10 --pull
+          -- --pid MrBeverage.ShiftChange --test -e
 
-      # result.json, then the harness's verdict: its GAP and FAIL lines and
-      # its totals. A GAP is a case that skips itself without a mod or DLC
-      # this list leaves out, and does not fail the run.
+      # --pull leaves the exit code alone when its download fails, and the
+      # summary and the artifact below then lack what they show, so a passing
+      # run whose result.json or Test.log did not download fails the job.
+      - name: Check the run folder downloaded
+        run: |
+          for file in result.json Test.log; do
+            if [ ! -f "$RUNNER_TEMP/flybridge-runs/$RUN_ID/$file" ]; then
+              echo "::error::$file did not download, so this job cannot show it"
+              exit 1
+            fi
+          done
+
+      # result.json, then DevTools' verdict: each failed or skipped fixture
+      # and test, and its totals. A skipped test is a case that skips itself
+      # without a mod or DLC this list leaves out, and does not fail the run.
       - name: Summary
         if: always()
         run: |
@@ -118,12 +139,12 @@ jobs:
           if [ -f "$dir/result.json" ]; then
             { echo '```json'; cat "$dir/result.json"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           fi
-          if [ -f "$dir/Player.log" ]; then
-            { echo '```'; grep -E '^ +(GAP|FAIL) |^result: |harness auto-run: ' "$dir/Player.log" || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          if [ -f "$dir/Test.log" ]; then
+            { echo '```'; grep -E '\[(Failed|Skipped)\] |^Tests finished|^Test runner finished' "$dir/Test.log" || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      # Player.log, result.json and the harness's saves, from the bucket's
-      # copy of the run.
+      # Player.log, Test.log, result.json and the harness's saves, from the
+      # bucket's copy of the run.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
