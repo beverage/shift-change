@@ -101,10 +101,9 @@ cmd_stage() {
   [ "$strays" = "0" ] || die "Assemblies/ holds $strays file(s) besides ShiftChange.dll"
 
   # What is about to go out, checked as the bytes about to go out — not as the
-  # copy in the repo. No debug scenes, no harness, no -shiftchange-harness
-  # launch flag, feature surface intact. The Release build above should make
-  # all of that true by construction; this is the assertion that it did, on
-  # the one file a subscriber actually receives.
+  # copy in the repo. No debug scenes, no harness, feature surface intact. The
+  # Release build above should make all of that true by construction; this is
+  # the assertion that it did, on the one file a subscriber actually receives.
   python3 "$REPO/devtools/check-shipped-dll.py" "$DIST/Assemblies/ShiftChange.dll" \
     || die "the staged dll is not shippable — see above, and do not upload it"
 

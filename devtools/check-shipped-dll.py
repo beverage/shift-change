@@ -11,9 +11,9 @@ Three properties:
      buildings and rewritten terrain behind. A Debug or Media dll staged by
      mistake puts that in a player's debug menu, one unconfirmed click away.
 
-  2. NO HARNESS, and no -shiftchange-harness launch flag. Dev tooling is not
-     a player's to carry: the flag clears a pad, spawns colonists, writes save
-     files and then quits the game. It is compiled out of Release entirely
+  2. NO HARNESS. Dev tooling is not a player's to carry: a harness run clears
+     a pad, spawns colonists and writes save files. It is compiled out of
+     Release entirely
      (ShiftChange.csproj's HARNESS switch), so this asserts an ABSENCE, and
      the absence is the whole point of the switch.
 
@@ -41,9 +41,9 @@ A .NET assembly keeps names in THREE places with DIFFERENT encodings:
 
 So `grep -a "DebugTools_DemoStage"` works (a type name, UTF-8) while
 `grep -a "shiftchange-harness"` finds NOTHING WHATEVER SHIPS — it is a
-literal, stored as UTF-16. Measured on the harness build: the launch flag is
-present 13 times and an ASCII grep reports zero. A guard written the obvious
-way would therefore have passed on a dll that carried the flag.
+literal, stored as UTF-16 (the harness's save names begin with it). Measured on
+a harness build: present 10 times, and an ASCII grep reports zero. A guard
+written the obvious way would therefore have passed on a dll that carried it.
 
 The third case is the sneaky one, because it splits strings that LOOK alike.
 Measured on the Media dll: the debug action's own label `"Dev tools"` is
@@ -75,7 +75,6 @@ FORBIDDEN_TYPES = [
     "DebugTools_RecRoomStage",
     "DebugTools_SleepStage",
     "DebugTools_ExportScene",
-    "Patch_HarnessAutoRun",
     "DebugTools_LifecycleHarness",
     "DebugTools_SaveRoundTrip",
     "DebugTools_Fixtures",
@@ -154,7 +153,7 @@ def main():
 
     for literal in FORBIDDEN_LITERALS:
         if utf16_count(blob, literal):
-            fail("the \"%s\" launch flag is present (found in UTF-16, which is "
+            fail("the harness literal \"%s\" is present (found in UTF-16, which is "
                  "where literals live) — dev tooling does not ship. Rebuild "
                  "with plain -c Release." % literal)
 

@@ -491,7 +491,7 @@ namespace ShiftChange
         internal static bool ForeignAssignable()
         {
             Map map = Find.CurrentMap;
-            if (map == null || !Patch_HarnessAutoRun.TryFindPad(map, out IntVec3 origin))
+            if (map == null || !DebugTools_LifecycleHarness.TryFindPad(map, out IntVec3 origin))
             {
                 return CannotStage("no usable pad on the current map");
             }
@@ -657,7 +657,7 @@ namespace ShiftChange
         internal static bool AreaRoundTrip()
         {
             Map map = Find.CurrentMap;
-            if (map == null || !Patch_HarnessAutoRun.TryFindPad(map, out IntVec3 origin))
+            if (map == null || !DebugTools_LifecycleHarness.TryFindPad(map, out IntVec3 origin))
             {
                 return CannotStage("no usable pad on the current map");
             }
@@ -992,8 +992,8 @@ namespace ShiftChange
         ///
         /// <para>That is a known gap only when the load that made the current game logged
         /// <see cref="FinalizeAbort"/> (<see cref="LoadAbortCulprit"/>). A map that was never
-        /// usable is a broken harness invocation and stays a failure, as it does in
-        /// <see cref="Patch_HarnessAutoRun"/> before the run starts. Nothing past staging is
+        /// usable is a broken harness invocation and stays a failure, as a test does when DevTools'
+        /// own map has no pad (<c>HarnessDevTools.RunOnPad</c>). Nothing past staging is
         /// excused: no stand def, no fixture, an assignable missing off the staged stand all
         /// still fail.</para>
         /// </summary>

@@ -907,7 +907,10 @@ staying dressed cannot disagree about where a stand's work is.
 - **The radius stops below the radial pattern's limit**, at 79 cells on 1.6's
   and 1.7's pattern (`MaxServeRadius`), past which the ring logs an error and
   draws nothing (`GenDraw.cs:455-462`). So the ring always shows what the stand
-  serves. The README and the changelog give the 79, and the harness asserts it.
+  serves. A mod that enlarges the pattern moves the limit with it: VE
+  Framework's ends at exactly 200 cells, which `NumCellsInRadius` already
+  refuses, so the slider stops at 199. The README gives the 79 and says such a
+  mod raises it, and the harness asserts both.
 - **An area covers its painted cells while the stand stands in one.** An area
   stand outside its own area covers nothing, so one on unpainted ground serves
   nothing, with the alert up. Nothing makes the painted cells connected: a stand

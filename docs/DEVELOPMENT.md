@@ -35,9 +35,9 @@ it finds there, including hot-reload leftovers.
 enough that a player reaching one is a colony-scale accident, and the reasoning
 is in [DESIGN.md](DESIGN.md#development-tooling).
 
-`HARNESS` compiles in the harness itself and the `-shiftchange-harness` launch
-flag, and **Release ships neither**. Dev tooling is not a player's to carry: the
-flag clears a pad, spawns colonists, writes save files and quits the game.
+`HARNESS` compiles in the harness itself, and **Release does not ship it**. Dev
+tooling is not a player's to carry: a run clears a pad, spawns colonists and
+writes save files.
 `run-harness.sh` passes `-p:Harness=true` itself and sweeps `Assemblies/` back
 to the shipping dll afterwards, so nothing in the loop changes for you.
 
@@ -200,19 +200,19 @@ engine traps it had to pay for are all in [TESTING.md](TESTING.md).
 devtools/run-harness.sh              # a four-mod list — the iteration loop
 devtools/run-harness.sh --full       # your own mod list — the release gate
 devtools/run-harness.sh --alongside  # a second instance beside a live game
-devtools/run-harness.sh --devtools   # every case as a DevTools test, on 1.7
 ```
 
-One command, no hands: builds Release, launches an isolated instance, waits for
-it to run every case and quit itself, prints the report, exits non-zero on
-failure. It runs on 1.6 and 1.7; on 1.7 the instance is windowless, with a
-`HOME` of its own under `dist/testhome`. TESTING.md covers `--devtools`. Measured 2026-08-14, launch to process exit:
+One command, no hands: builds Release with the harness, launches an isolated,
+windowless 1.7 instance with a `HOME` of its own under `dist/testhome`, where
+SmashPhil's DevTools runs every case as a test and quits the game, then prints
+DevTools' report and exits non-zero on failure. DevTools runs on 1.7 only; on
+1.6 the debug menu's run is the one there is. TESTING.md has the details.
+Measured 2026-11-12, launch to process exit:
 
 | Mod list | Wall clock |
 |---|---|
-| The four-mod list | ~20 s |
-| `--full`, on a 233-entry list | ~160 s |
-| Four-mod, alongside a live colony | ~25 s paused, several minutes if actively ticking |
+| The four-mod list, and DevTools | ~30 s |
+| `--full`, on a 233-entry list | ~220 s |
 
 Those are one machine's numbers; `--full` scales with whatever list is active,
 since almost all of it is RimWorld's own load time.
@@ -231,8 +231,8 @@ behind it are in the Prefs.xml block of `run-harness.sh`.
 A stall is still cut short rather than waited out. A run that has not reached
 RimWorld's own startup by `STARTUP_GRACE` (120 s), and whose log has then been
 silent for `STALL_QUIET` (60 s), is stopped with a message saying so, instead of
-the old behaviour — twenty minutes, then a message blaming `-shiftchange-harness`
-for something that happens before any mod is loaded. The grace is a floor, not a
+the old behaviour — twenty minutes, then a message blaming the harness's launch
+flag for something that happens before any mod is loaded. The grace is a floor, not a
 deadline: a large list takes minutes to reach startup and writes to its log the
 whole time. The startup probe greps for
 `with mods:`, which is Verse's own output from both "Initializing new game with
@@ -278,8 +278,9 @@ where the submenu holds three items and hunting is not the problem it was when
 they sat loose among vanilla's hundreds.
 
 A **Release** build has neither the menu entry nor the harness at all; drive it
-with `run-harness.sh`, which builds `-p:Harness=true` and uses the launch flag.
-That is not a lesser path — it is the release gate, and it is the only one.
+with `run-harness.sh`, which builds `-p:Harness=true` and runs the cases under
+DevTools. That is not a lesser path — it is the release gate, and it is the only
+one.
 
 For a fast interactive session without the headless run,
 `devtools/rimworld-profile.sh minimal` / `restore` swaps the live mod list. It
@@ -298,7 +299,7 @@ broke that way once; the rest block a failure that would land silently.
 | `devtools/check-invariants.py` | hot-reload hazards, translation keys in both directions, XML-to-C# type bindings, the `<Patch>` root walk, the Workshop preview size, Workshop comments over Steam's 1,000-character limit, and dates or line citations in source comments. Runs locally too — see [TESTING.md](TESTING.md). |
 | `devtools/bbcode-preview.py` | an unclosed tag in the store description, which makes Steam render the rest of the page as literal text |
 | Committed dll is uninstrumented, and alone | an instrumented Debug build reaching the mod's load path |
-| `devtools/check-shipped-dll.py` | a `SCENES` build shipping the destructive scene builders, a `-p:Harness=true` build shipping the harness and its launch flag, and the opposite failure — over-gating that leaves the feature surface out. Run against the committed dll and again against the fresh Release build. |
+| `devtools/check-shipped-dll.py` | a `SCENES` build shipping the destructive scene builders, a `-p:Harness=true` build shipping the harness, and the opposite failure — over-gating that leaves the feature surface out. Run against the committed dll and again against the fresh Release build. |
 | Media build | the filming config rotting between shoots, discovered on a shoot |
 | Release build | compile errors against Krafs |
 
@@ -524,8 +525,7 @@ Each file here is guarded whole, by `SCENES`, `DEBUG` or `SCENES || HARNESS`, an
 | `HarnessVacuum.cs` | `HARNESS` only. The vacuum cases, on the second map, which is a vacuum map: the ground they stand on, then a staged ship of a room, open floor and a second room, and the cases a review of the gate added (each dress path, doors, a stranded colonist, the cooldown, an urgent patient, a stand on another map). |
 | `HarnessJobKinds.cs` | `HARNESS` only. The job classifier as a table: every job shape the other cases build, and the kind and work type it must get. |
 | `HarnessFixtureChecks.cs` | `HARNESS` only. What every case takes for granted about its fixture: a colonist who needs no doctor and whose needs hold still under the stopped clock, and open ground past the pad. Listed first. |
-| `Patch_HarnessAutoRun.cs` | `HARNESS` only. Runs the harness and quits, when launched with `-shiftchange-harness`. Neither it nor the flag exists in a shipping build. |
-| `HarnessDevTools.cs` | `HARNESS` and `DEVTOOLS` only, so a build handed a DevTools dll (`run-harness.sh --devtools`). One DevTools fixture per `CaseGroup`, each generating a test per case of its group; the adapter that runs a case on a pad (found once per map) out of the camera's sight when it needs one, and turns its tally into the test's status; and `HarnessCaseList`, which checks DevTools registered every case once, in list order, at its group's priority. |
+| `HarnessDevTools.cs` | `HARNESS` and `DEVTOOLS` only, so a build handed a DevTools dll, as `run-harness.sh` builds. One DevTools fixture per `CaseGroup`, each generating a test per case of its group; the adapter that runs a case on a pad (found once per map) out of the camera's sight when it needs one, and turns its tally into the test's status; and `HarnessCaseList`, which checks DevTools registered every case once, in list order, at its group's priority. |
 
 ### Content
 
@@ -544,9 +544,9 @@ docs LICENSE README.md`.
 
 | Script | Does |
 |---|---|
-| `run-harness.sh` | Runs the test suite headless in an isolated instance. `--full`, `--alongside`, `--with`, `--with-after`, `--devtools`. |
+| `run-harness.sh` | Runs the test suite as DevTools tests, headless in an isolated 1.7 instance. `--full`, `--alongside`, `--with`, `--with-after`. |
 | `check-invariants.py` | The static checks CI runs. Run it before pushing. |
-| `check-shipped-dll.py` | Asserts the built assembly ships no debug scenes, no harness and no launch flag, and still carries the feature surface. Run it before pushing; `publish-workshop.sh` runs it against the staged copy too. |
+| `check-shipped-dll.py` | Asserts the built assembly ships no debug scenes and no harness, and still carries the feature surface. Run it before pushing; `publish-workshop.sh` runs it against the staged copy too. |
 | `rimworld-profile.sh` | Swaps the live mod list for a fast interactive session. |
 | `publish-workshop.sh` | Stages a Workshop upload out of the working tree, and swaps it into `Mods/`. |
 | `bbcode-preview.py` | Validates the store description and renders a local preview. |

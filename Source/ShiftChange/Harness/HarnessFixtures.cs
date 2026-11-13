@@ -397,9 +397,9 @@ namespace ShiftChange
         /// pass for that reason.
         ///
         /// <para>The strip is the pad's one-cell margin, which
-        /// <see cref="Patch_HarnessAutoRun.TryFindPad"/> keeps in bounds and in a room that touches
-        /// the map edge, so a stand put there is in the open; soil because a quicktest map can put
-        /// anything there, unfogged because a fogged item is never hauled.</para>
+        /// <see cref="DebugTools_LifecycleHarness.TryFindPad"/> keeps in bounds and in a room that
+        /// touches the map edge, so a stand put there is in the open; soil because a generated map
+        /// can put anything there, unfogged because a fogged item is never hauled.</para>
         /// </summary>
         internal static Fixture StageWithDoorway(Map map, CellRect pad)
         {
@@ -913,10 +913,10 @@ namespace ShiftChange
         /// outside the map is returned untouched, for the caller's bounds check.
         ///
         /// <para>The pad finder checks one cell of margin around the pad
-        /// (<c>Patch_HarnessAutoRun.TryFindPad</c>) and these cells lie further out, so on some
-        /// maps they hold natural rock. A meal spawned onto rock reads as being in the cell beside
-        /// it. And whatever a case left there would stay on the map for every later case, where
-        /// vanilla's opportunistic haul can pick it up.</para>
+        /// (<c>DebugTools_LifecycleHarness.TryFindPad</c>) and these cells lie further out, so on
+        /// some maps they hold natural rock. A meal spawned onto rock reads as being in the cell
+        /// beside it. And whatever a case left there would stay on the map for every later case,
+        /// where vanilla's opportunistic haul can pick it up.</para>
         /// </summary>
         internal static IntVec3 OpenGround(Fixture fix, IntVec3 cell)
         {

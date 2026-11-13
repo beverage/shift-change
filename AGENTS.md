@@ -40,12 +40,11 @@ must never reach a player. These are not harmless menu entries: each stage
 builder clears a 200–320 cell footprint, destroying every building, item and
 pawn inside it, then leaves permanent colonists and buildings behind.
 
-**The harness and `-shiftchange-harness` ship in NO configuration.** They sit
-behind `#if HARNESS`, which every configuration except a plain `-c Release`
-defines; `run-harness.sh` asks for them with `-p:Harness=true` on top of Release
-codegen and sweeps `Assemblies/` back to the shipping dll when it finishes. Dev
-tooling is not a player's to carry, and that flag clears a pad, spawns
-colonists, writes save files and quits the game.
+**The harness ships in NO configuration.** It sits behind `#if HARNESS`, which
+every configuration except a plain `-c Release` defines; `run-harness.sh` asks
+for it with `-p:Harness=true` on top of Release codegen and sweeps `Assemblies/`
+back to the shipping dll when it finishes. Dev tooling is not a player's to
+carry, and a harness run clears a pad, spawns colonists and writes save files.
 
 **`HARNESS` is a whole-file guard, always.** Never write `#if HARNESS` inside a
 file that ships. The point is that a harness build and a shipping build differ
@@ -68,27 +67,29 @@ checked.
 One exception, and it is narrow — the lifecycle harness:
 
 ```bash
-devtools/run-harness.sh          # ~20s, a four-mod list, no hands
+devtools/run-harness.sh          # ~30s, a four-mod list, no hands
 devtools/run-harness.sh --full   # whatever mod list is active; run before a release
 devtools/run-harness.sh --with=khamenman.outfitstandsplus   # the four, plus one mod a case needs
 devtools/run-harness.sh --with-after=khamenman.outfitstandsplus   # the same, loaded after us
-devtools/run-harness.sh --devtools   # DevTools tests; 1.7, DevTools develop 0eea1a1+ in Mods/
 ```
+
+Each case runs as a test under SmashPhil's DevTools, so 1.7 only, with a
+DevTools build that has SmashPhil/DevTools#17 (docs/TESTING.md).
 
 It asserts where the ledger lands after each despawn/death/banishment event, by
 firing the engine's real entry points at a throwaway fixture, and exits non-zero
 if a case fails. Touch `PostDeSpawn`, `PostSwapMap`, `Notify_MapRemoved`,
 `ReleaseBorrower`, `AbandonLedger` or `Patch_UnclaimStands` and run it.
 
-A harness pass is not a play observation, and a `GAP` line is a known failure
-being tracked, not a pass. **Six gaps are expected on the default list**: the
+A harness pass is not a play observation, and a skipped test (a `GAP` line in
+its transcript) is a known failure being tracked, not a pass. **Six gaps are expected on the default list**: the
 Rimatomics table and marker cases skip themselves when Rimatomics is not
 loaded, and the Outfit Stands Plus, Common Sense and Pick Up And Haul cases
 when their mod is not (`--with=` loads each). The sixth is Complex Jobs'
 two delivery givers, probed by the delivery case only when that mod is loaded
 (`--with=FrozenSnowFox.ComplexJobs`). So a clean default run reads
-`0 failed, 6 known gaps` and exits 0, or 5 under `--with=FrozenSnowFox.ComplexJobs`,
-where the delivery gap closes. Any other gap, or any failure, is real. It does now run
+`0 Failed` with 6 skipped and exits 0, or 5 skipped under
+`--with=FrozenSnowFox.ComplexJobs`, where the delivery gap closes. Any other gap, or any failure, is real. It does now run
 `JobDriver_SwapAtStand` for real, through the pawn's own tracker, so "the
 driver builds a correct ledger" is covered, and the player-facing rules have
 functional cases. Save/load round trips are covered by four cases that load

@@ -233,7 +233,8 @@ that many cells of the stand, walls or no walls. That suits a shed in the middle
 of the fields, a changing hut by the pool, a fishing hut on the shore, or a
 stand halfway down a corridor of workshops. The ring is drawn while the settings
 are open and whenever the stand is selected, and the slider runs from 3 cells to
-79. Fishing works now too: ticking it did nothing before v1.5.0, because the
+79, or further with a mod that enlarges the game's radial pattern, as VE Framework
+does. Fishing works now too: ticking it did nothing before v1.5.0, because the
 game hands out fishing differently from other work.
 
 The same menu lists your **allowed areas** in a section of their own, each with

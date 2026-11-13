@@ -57,11 +57,8 @@
     <Optimize>true</Optimize>
   </PropertyGroup>
 
-  <!-- HARNESS: the lifecycle harness and its -shiftchange-harness launch flag.
-       It does not ship. A player cannot realistically find the flag, but it is
-       ours to not leave lying in their install, and the harness it starts
-       clears a pad, spawns colonists, writes save files and then quits the
-       game.
+  <!-- HARNESS: the lifecycle harness. It does not ship: it is dev tooling,
+       and a run clears a pad, spawns colonists and writes save files.
 
        It used to ship in every configuration on the argument that a gate is
        only worth running if it asserts against the literal assembly players
@@ -78,7 +75,7 @@
     <DefineConstants>$(DefineConstants);HARNESS</DefineConstants>
   </PropertyGroup>
 
-  <!-- DEVTOOLS: harness cases run by SmashPhil's DevTools instead of the auto-run.
+  <!-- DEVTOOLS: the harness cases as tests for SmashPhil's DevTools.
        Only a build handed a DevTools dll (-p:DevToolsDll=<path>) defines it and
        references DevTools; every other build, CI's included, compiles those files
        away, since their guard is HARNESS && DEVTOOLS.

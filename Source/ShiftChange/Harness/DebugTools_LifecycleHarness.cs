@@ -77,41 +77,34 @@ namespace ShiftChange
         /// </summary>
         internal static void RunHarness()
         {
-            Run(Find.CurrentMap, UI.MouseCell(), toast: true);
+            Run(Find.CurrentMap, UI.MouseCell());
         }
 #endif
 
         /// <summary>
-        /// Runs every case and reports. The one body behind the debug action and the
-        /// <c>-shiftchange-harness</c> auto-run (<see cref="Patch_HarnessAutoRun"/>), so a headless
-        /// run exercises the path a human click does.
+        /// Runs every case in list order on one pad and reports, the debug action's body. A
+        /// refusal goes on screen; the report goes to the log and the tally to both.
         /// </summary>
         /// <param name="map">The map every case stages on.</param>
-        /// <param name="origin">The pad's south-west corner: the clicked cell, or the cell the
-        /// auto-run's finder chose.</param>
-        /// <param name="toast">
-        /// True for the interactive run: a refusal goes on screen rather than to the log, and the
-        /// tally to both. False for the headless one, where nobody watches the screen: the log
-        /// alone.
-        /// </param>
+        /// <param name="origin">The pad's south-west corner, the clicked cell.</param>
         /// <returns>true when nothing failed. Known gaps do not count as failures.</returns>
-        internal static bool Run(Map map, IntVec3 origin, bool toast)
+        internal static bool Run(Map map, IntVec3 origin)
         {
             if (map == null)
             {
-                Complain("no current map — cannot run the harness.", toast);
+                Complain("no current map — cannot run the harness.");
                 return false;
             }
             CellRect pad = new CellRect(origin.x, origin.z, PadSize, PadSize);
             if (!pad.InBounds(map))
             {
                 Complain("Lifecycle harness needs a clear " + PadSize + "×" + PadSize
-                    + " area — click further from the map edge.", toast);
+                    + " area — click further from the map edge.");
                 return false;
             }
             if (DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand") == null)
             {
-                Complain("Odyssey outfit stand def not found — cannot run the harness.", toast);
+                Complain("Odyssey outfit stand def not found — cannot run the harness.");
                 return false;
             }
 
@@ -133,19 +126,73 @@ namespace ShiftChange
                   .Append(Failed).Append(" failed, ")
                   .Append(KnownGaps).Append(" known gaps");
             Log.Message(Report.ToString());
-            if (toast)
-            {
-                Messages.Message("Lifecycle harness: " + Passed + " passed, " + Failed + " failed, "
-                    + KnownGaps + " known gaps — see the dev log.",
-                    Failed > 0 ? MessageTypeDefOf.NegativeEvent : MessageTypeDefOf.TaskCompletion,
-                    historical: false);
-            }
+            Messages.Message("Lifecycle harness: " + Passed + " passed, " + Failed + " failed, "
+                + KnownGaps + " known gaps — see the dev log.",
+                Failed > 0 ? MessageTypeDefOf.NegativeEvent : MessageTypeDefOf.TaskCompletion,
+                historical: false);
             return Failed == 0;
         }
 
         /// <summary>
+        /// Somewhere a case can stand, for a run that has no clicked cell: the map centre if
+        /// usable, so runs are comparable, and a random cell otherwise. The pad is cleared before
+        /// use, so the bar is a pad in bounds whose origin is standable and not water, not an
+        /// empty one.
+        ///
+        /// <para>Every cell of the pad and its one-cell margin must be in a room that touches the
+        /// map edge. Cases reach past their pad: the exterior-wall case counts the ring around a
+        /// wall on the pad's edge, and some cases need a stand in the open, which the mod tests
+        /// with <c>Room.TouchesMapEdge</c>, on the margin outside a door or on the pad left
+        /// unwalled.
+        /// Natural rock has no room, and a valley ringed by mountains, an island in deep water or a
+        /// ruin's walls give the margin a room that does not reach the edge. The margin is a closed
+        /// ring around the pad, so it still reaches the edge once the cases build walls on the pad.
+        /// A map whose region updater a failed load left off is refused without a search, which
+        /// <see cref="DebugTools_SaveRoundTrip.CannotStage"/> relies on. A pad picked by hand
+        /// from the debug menu bypasses this finder.</para>
+        /// </summary>
+        internal static bool TryFindPad(Map map, out IntVec3 origin)
+        {
+            // When a prefix on Map.FinalizeLoading throws, the body that turns the map's
+            // RegionAndRoomUpdater back on never runs, so its rooms are never built and every
+            // room lookup on it logs a warning.
+            if (!map.regionAndRoomUpdater.Enabled)
+            {
+                origin = IntVec3.Invalid;
+                return false;
+            }
+            Predicate<IntVec3> usable = c =>
+            {
+                CellRect pad = new CellRect(c.x, c.z, PadSize, PadSize);
+                if (!pad.ExpandedBy(1).InBounds(map)
+                    || !c.Standable(map)
+                    || c.GetTerrain(map).IsWater)
+                {
+                    return false;
+                }
+                foreach (IntVec3 cell in pad.ExpandedBy(1))
+                {
+                    Room room = cell.GetRoom(map);
+                    if (room == null || !room.TouchesMapEdge)
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            };
+
+            IntVec3 centre = map.Center - new IntVec3(PadSize / 2, 0, PadSize / 2);
+            if (usable(centre))
+            {
+                origin = centre;
+                return true;
+            }
+            return CellFinderLoose.TryGetRandomCellWith(usable, map, 500, out origin);
+        }
+
+        /// <summary>
         /// Every case, in the order <see cref="Run"/> runs them. Each names the group that is its
-        /// DevTools fixture (HarnessDevTools.cs); the auto-run ignores the groups.
+        /// DevTools fixture (HarnessDevTools.cs); the debug action's run ignores the groups.
         /// </summary>
         internal static CaseList Cases()
         {
@@ -663,16 +710,9 @@ namespace ShiftChange
             }
         }
 
-        internal static void Complain(string what, bool toast)
+        internal static void Complain(string what)
         {
-            if (toast)
-            {
-                Messages.Message(what, MessageTypeDefOf.RejectInput, historical: false);
-            }
-            else
-            {
-                Log.Error("[ShiftChange] " + what);
-            }
+            Messages.Message(what, MessageTypeDefOf.RejectInput, historical: false);
         }
 
         /// <summary>

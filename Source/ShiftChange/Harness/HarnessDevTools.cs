@@ -16,11 +16,10 @@ using static ShiftChange.DebugTools_LifecycleHarness;
 namespace ShiftChange
 {
     /// <summary>
-    /// Every harness case, run by SmashPhil's DevTools test runner instead of the
-    /// <c>-shiftchange-harness</c> auto-run. Each fixture below is one <see cref="CaseGroup"/>
-    /// and has one test per case, which DevTools generates from the group and names after the
-    /// case. A test runs its case's own <c>Case</c> call, so the fixture, its build retries and
-    /// its teardown are the auto-run's.
+    /// Every harness case, run by SmashPhil's DevTools test runner. Each fixture below is one
+    /// <see cref="CaseGroup"/> and has one test per case, which DevTools generates from the group
+    /// and names after the case. A test runs its case's own <c>Case</c> call, so the fixture, its
+    /// build retries and its teardown are those of the debug action's run.
     ///
     /// <para>DevTools runs a fixture with a higher <c>ExecutionPriority</c> first, so each takes
     /// its group's place in <see cref="CaseGroup"/> from <see cref="First"/>. That holds for the
@@ -45,7 +44,7 @@ namespace ShiftChange
             new System.WeakReference<Map>(null);
         internal static CellRect Pad;
 
-        /// <summary>Runs a case as the auto-run hands it: on the pad if it needs one.</summary>
+        /// <summary>Runs a case, on the pad only if it needs one.</summary>
         internal static IEnumerator Run(HarnessCase harnessCase)
         {
             return Run(harnessCase, harnessCase.Run);
@@ -62,8 +61,8 @@ namespace ShiftChange
 
         /// <summary>
         /// Runs a case on the current map's pad, unseen by the camera. The pad is found once per
-        /// map, as the auto-run finds one per run, so a case that leaves the pad unusable fails
-        /// the cases after it instead of moving them to another pad.
+        /// map, as the debug action's run takes one per run, so a case that leaves the pad
+        /// unusable fails the cases after it instead of moving them to another pad.
         /// </summary>
         internal static IEnumerator RunOnPad(Action<Map, CellRect> runCase)
         {
@@ -75,7 +74,7 @@ namespace ShiftChange
             }
             if (!PadMap.TryGetTarget(out Map padMap) || padMap != map)
             {
-                if (!Patch_HarnessAutoRun.TryFindPad(map, out IntVec3 origin))
+                if (!TryFindPad(map, out IntVec3 origin))
                 {
                     Test.Fail("no clear " + PadSize + "×" + PadSize + " pad on DevTools' map");
                     yield break;
@@ -107,9 +106,8 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// Runs a case that is handed no map or pad as the auto-run does: no pad search, no camera
-        /// move. Two save/load legs find a pad of their own, wherever the camera is, as they do in
-        /// the auto-run.
+        /// Runs a case that needs no map or pad: no pad search, no camera move. Two save/load legs
+        /// find a pad of their own, wherever the camera is, as they do in the debug action's run.
         /// </summary>
         internal static IEnumerator RunWithoutPad(Action runCase)
         {
@@ -145,8 +143,70 @@ namespace ShiftChange
         }
     }
 
+    /// <summary>
+    /// What every fixture allows: lines other mods log by themselves on a full list, which land in
+    /// whichever test is running. Each passes only with that mod's own code on its stack, so the
+    /// same text from this mod still fails.
+    /// </summary>
+    [WarningsAllowedFrom(HarnessFixture.MeleeAnimationFrame, HarnessFixture.MeleeAnimationLine)]
+    [WarningsAllowedFrom(HarnessFixture.MapPreviewFrame, HarnessFixture.MapPreviewRandomness)]
+    [WarningsAllowedFrom(HarnessFixture.ImmersiveFilterFrame, HarnessFixture.EngineStub)]
+    [ErrorsAllowedFrom(HarnessFixture.EngineCallFrame, HarnessFixture.ImmersiveFilterNoWorld)]
+    [WarningsAllowedFrom(HarnessFixture.MemeTraitFrame, HarnessFixture.TraitAlreadyHeld)]
+    internal abstract class HarnessFixture
+    {
+        /// <summary>
+        /// Melee Animation's late-load checks, which land in the first test: other mods' patches
+        /// on the methods it patches, and weapons with no tweak data of its own.
+        /// </summary>
+        internal const string MeleeAnimationFrame =
+            @"AM\.Core\.(LogPotentialConflicts|LoadAllTweakData)\(";
+
+        /// <summary>Any warning with Melee Animation's tag, which it puts in colour.</summary>
+        internal const string MeleeAnimationLine = @"^(<color=#\w+>)?\[MeleeAnim\]";
+
+        /// <summary>Map Preview's check of each map component as a test's map is built.</summary>
+        internal const string MapPreviewFrame =
+            @"MapPreview\.Patches\.Patch_Verse_Map\.FillComponents_CheckRand";
+
+        /// <summary>Its note that another mod's map component draws random numbers.</summary>
+        internal const string MapPreviewRandomness =
+            @"^\[Map Preview v[\d.]+\] Detected RNG usage in constructor of map component ";
+
+        /// <summary>Immersive Filter's set-up of its screen filter on the first map.</summary>
+        internal const string ImmersiveFilterFrame =
+            @"Og_ImmersiveFilter\.OgImmersiveFilter\.(Start|EnsureFilterBuffer)\(";
+
+        /// <summary>The engine's warning for a Unity call it leaves unimplemented.</summary>
+        internal const string EngineStub =
+            @"^\w+ \([^()]*\): Stub! You may not get expected results!";
+
+        /// <summary>
+        /// The engine running a component's frame method, which logs what that method throws under
+        /// the component's class name, its own trace in the message.
+        /// </summary>
+        internal const string EngineCallFrame =
+            @"Waylith\.UnityCompat\.UnityWorld\.InvokeMessage\(";
+
+        /// <summary>Immersive Filter's update reading the world view between games.</summary>
+        internal const string ImmersiveFilterNoWorld =
+            @"^\[Og_ImmersiveFilter\.OgImmersiveFilter\] LateUpdate threw: "
+            + @"System\.NullReferenceException[\s\S]*RimWorld\.Planet\.WorldRendererUtility\.";
+
+        /// <summary>
+        /// VE Framework giving a new colonist the traits its ideoligion's memes require, as a case
+        /// generates one, whatever traits the colonist already rolled.
+        /// </summary>
+        internal const string MemeTraitFrame =
+            @"VEF\.Memes\.VanillaExpandedFramework_Pawn_IdeoTracker_SetIdeo_Patch\."
+            + @"ForceTraitAndAbilities\(";
+
+        /// <summary>The game's warning when a pawn is given a trait it has.</summary>
+        internal const string TraitAlreadyHeld = @"^[^\n]* already has trait [\w-]+$";
+    }
+
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.Flights)]
-    internal class HarnessFlights
+    internal class HarnessFlights : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.Flights);
 
@@ -156,7 +216,7 @@ namespace ShiftChange
     }
 
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.VacuumGate)]
-    internal class HarnessVacuumGate
+    internal class HarnessVacuumGate : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.VacuumGate);
 
@@ -166,7 +226,7 @@ namespace ShiftChange
     }
 
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.VacuumRoutes)]
-    internal class HarnessVacuumRoutes
+    internal class HarnessVacuumRoutes : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.VacuumRoutes);
 
@@ -176,7 +236,7 @@ namespace ShiftChange
     }
 
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.Lifecycle)]
-    internal class HarnessLifecycleEvents
+    internal class HarnessLifecycleEvents : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.Lifecycle);
 
@@ -193,7 +253,7 @@ namespace ShiftChange
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.FaultLatch)]
     [ErrorsAllowed(@"\[ShiftChange\] injected test fault",
                    @"\[ShiftChange\] interception disabled for this game after \d+ faults")]
-    internal class HarnessFaultLatch
+    internal class HarnessFaultLatch : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.FaultLatch);
 
@@ -203,7 +263,7 @@ namespace ShiftChange
     }
 
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.DriverAndOwners)]
-    internal class HarnessDriverAndOwners
+    internal class HarnessDriverAndOwners : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.DriverAndOwners);
 
@@ -213,7 +273,7 @@ namespace ShiftChange
     }
 
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.Arms)]
-    internal class HarnessArms
+    internal class HarnessArms : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.Arms);
 
@@ -223,7 +283,7 @@ namespace ShiftChange
     }
 
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.Gates)]
-    internal class HarnessGateCases
+    internal class HarnessGateCases : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.Gates);
 
@@ -233,7 +293,7 @@ namespace ShiftChange
     }
 
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.Radius)]
-    internal class HarnessRadius
+    internal class HarnessRadius : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.Radius);
 
@@ -243,7 +303,7 @@ namespace ShiftChange
     }
 
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.BillProducts)]
-    internal class HarnessBillProducts
+    internal class HarnessBillProducts : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.BillProducts);
 
@@ -253,7 +313,7 @@ namespace ShiftChange
     }
 
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.Latches)]
-    internal class HarnessLatches
+    internal class HarnessLatches : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.Latches);
 
@@ -263,7 +323,7 @@ namespace ShiftChange
     }
 
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.Areas)]
-    internal class HarnessAreas
+    internal class HarnessAreas : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.Areas);
 
@@ -273,7 +333,7 @@ namespace ShiftChange
     }
 
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.RideAlong)]
-    internal class HarnessRideAlongCases
+    internal class HarnessRideAlongCases : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.RideAlong);
 
@@ -283,7 +343,7 @@ namespace ShiftChange
     }
 
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.Assorted)]
-    internal class HarnessAssorted
+    internal class HarnessAssorted : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.Assorted);
 
@@ -293,7 +353,7 @@ namespace ShiftChange
     }
 
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.Tables)]
-    internal class HarnessTableCases
+    internal class HarnessTableCases : HarnessFixture
     {
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.Tables);
 
@@ -312,7 +372,11 @@ namespace ShiftChange
     /// so none follows.</para>
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.SaveLoadPriority)]
-    internal class HarnessDevToolsSaveLoad : IWorldGeneration
+    [WarningsAllowedFrom(HarnessDevToolsSaveLoad.VarietyFrame, HarnessDevToolsSaveLoad.StaleReference)]
+    [ErrorsAllowedFrom(HarnessDevToolsSaveLoad.VarietyFrame, HarnessDevToolsSaveLoad.WrongReference)]
+    [ErrorsAllowedFrom(HarnessDevToolsSaveLoad.OwnLoadFrame,
+                       HarnessDevToolsSaveLoad.VehicleCacheAbort)]
+    internal class HarnessDevToolsSaveLoad : HarnessFixture, IWorldGeneration
     {
         WorldGenerationSettings IWorldGeneration.WorldGenerationSettings
         {
@@ -320,6 +384,41 @@ namespace ShiftChange
         }
 
         internal static IEnumerable<HarnessCase> Group() => CasesIn(CaseGroup.SaveLoad);
+
+        /// <summary>
+        /// The save code of Vanilla Food Variety Expanded's per-colonist diet record. The mod keeps
+        /// one for every colonist it has seen in a static table that no game end clears, and
+        /// DevTools plays several games in one run, so an earlier game's colonists reach this
+        /// fixture's saves. Their load logs a reference that resolves to nothing or to some other
+        /// thing. A stand owner saved wrongly logs the same lines from this mod's code, so they
+        /// pass only with this frame on their stack.
+        /// </summary>
+        internal const string VarietyFrame =
+            @"VanillaCookingExpandedVariety\.PawnDiet\.ExposeData";
+
+        /// <summary>
+        /// The warnings for a stale pawn or corpse id: it matches nothing, or falls back to
+        /// whatever thing now has its number.
+        /// </summary>
+        internal const string StaleReference =
+            @"^Could not resolve reference to (Thing|object) with loadID Thing_";
+
+        /// <summary>The error for a stale id whose number now belongs to a thing of another type.</summary>
+        internal const string WrongReference =
+            @"^Exception getting object with thing id \d+ of type Verse\.(Pawn|Corpse)\.";
+
+        /// <summary>
+        /// This mod's load call. Vehicle Framework keeps a static map-component cache keyed by map
+        /// index that no in-process load clears, so a leg's load can collide with an earlier
+        /// game's entry and abort FinalizeLoading; the leg already records that as a known gap.
+        /// The abort's stack holds only engine frames and this call, and its message names the
+        /// cache, which no code of this mod can.
+        /// </summary>
+        internal const string OwnLoadFrame = @"ShiftChange\.DebugTools_SaveRoundTrip\.NoteLoad\(";
+
+        /// <summary>The FinalizeLoading abort that names Vehicle Framework's cache.</summary>
+        internal const string VehicleCacheAbort =
+            @"^Error in Map\.FinalizeLoading\(\): [\s\S]*SmashTools\.DetachedMapComponentCache";
 
         /// <summary>
         /// Only the first leg reads the map and pad. The others run on the game the leg before
@@ -344,16 +443,16 @@ namespace ShiftChange
 
     /// <summary>
     /// Checks the tests DevTools registered against <see cref="Cases"/>: the list follows
-    /// <see cref="CaseGroup"/> order, so DevTools runs the groups in the auto-run's order apart
-    /// from save/load, which it runs last; nothing listed after save/load needs a pad, since the
-    /// auto-run would hand it the game those legs replaced; each group runs in one fixture, at its
-    /// group's priority, as exactly its cases in list order; a fixture whose test takes a case
-    /// has a group with cases; no two cases share a name; and no group passes the 16 cases
-    /// DevTools keeps in order. It reads DevTools' own registry, where each fixture's tests are
-    /// already sorted into run order, and runs no case, so it needs no game.
+    /// <see cref="CaseGroup"/> order, so DevTools runs the groups in the list's order apart from
+    /// save/load, which it runs last; nothing listed after save/load needs a pad, since the debug
+    /// action's run would hand it the game those legs replaced; each group runs in one fixture, at
+    /// its group's priority, as exactly its cases in list order; a fixture whose test takes a case
+    /// has a group with cases; no two cases share a name; and no group passes the 16 cases DevTools
+    /// keeps in order. It reads DevTools' own registry, where each fixture's tests are already
+    /// sorted into run order, and runs no case, so it needs no game.
     /// </summary>
     [TestFixture(TestType.MainMenu)]
-    internal class HarnessCaseList
+    internal class HarnessCaseList : HarnessFixture
     {
         internal const int MostInOrder = 16;
 
@@ -396,8 +495,8 @@ namespace ShiftChange
                 else if (pastSaveLoad && harnessCase.NeedsPad)
                 {
                     problems.Add("\"" + harnessCase.Name + "\" is listed after the save/load legs"
-                                 + " but needs a pad, which the auto-run would take from the game"
-                                 + " they replaced");
+                                 + " but needs a pad, which the debug action's run would take"
+                                 + " from the game they replaced");
                 }
             }
 
@@ -489,7 +588,7 @@ namespace ShiftChange
     /// It needs no game. The two tests that touch the note put it back as they found it.
     /// </summary>
     [TestFixture(TestType.MainMenu)]
-    internal class HarnessLoadNote
+    internal class HarnessLoadNote : HarnessFixture
     {
         internal const string FirstLine = "[ShiftChange] HarnessLoadNote: the load's first line";
         internal const string LastLine = "[ShiftChange] HarnessLoadNote: the load's last line";

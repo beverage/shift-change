@@ -405,15 +405,15 @@ def check_patch_roots():
 
 # -------------------------------------------------------------- harness gating
 
-# The regression harness and its launch flag are dev tooling and do not ship:
-# the csproj defines HARNESS in every configuration EXCEPT a plain Release
-# build, so `-c Release` compiles the whole thing away and a player's install
-# has no such flag in it. That switch is worth exactly as much as two
+# The regression harness is dev tooling and does not ship: the csproj defines
+# HARNESS in every configuration EXCEPT a plain Release build, so `-c Release`
+# compiles the whole thing away and a player's install has none of it. That switch is worth exactly as much as two
 # properties of the source, and neither is visible at a glance:
 #
 #   1. Harness code is actually behind the guard. A new harness file nobody
-#      wrapped compiles into the shipping dll and puts a launch flag in a
-#      player's install, which is the entire thing this prevents.
+#      wrapped compiles into the shipping dll and puts the harness in a
+#      player's install, which is the entire thing this prevents. So does a
+#      dev-only launch flag read anywhere else.
 #
 #   2. The guard is WHOLE-FILE, never inline. That is what makes a harness
 #      build and a shipping build differ by the presence of whole types and by

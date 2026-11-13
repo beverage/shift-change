@@ -14,6 +14,9 @@ namespace ShiftChange
 {
     internal static partial class HarnessCatchments
     {
+        /// <summary>The cells in the game's own radial pattern, before a mod enlarges it.</summary>
+        internal const int GameRadialCells = 20000;
+
         /// <summary>
         /// A radius covers its ring, inclusive: every cell <c>GenRadial.NumCellsInRadius</c>
         /// counts, which is what <c>DrawRadiusRing</c> outlines, and not the next cell of the
@@ -71,9 +74,16 @@ namespace ShiftChange
                          "a cell exactly " + radius + " away on an axis is in")
                 & Expect(!fix.Comp.Covers(at + new IntVec3(4, 0, 4), fix.Map),
                          "one 4 along and 4 up, past the ring, is out")
-                & Expect(!fix.Comp.Covers(at, null), "and nothing is covered on no map")
-                & Expect(CompShiftStand.MaxServeRadius == 79,
-                         "the slider stops at 79 cells, the number the README and the changelog give");
+                & Expect(!fix.Comp.Covers(at, null), "and nothing is covered on no map");
+
+            // NumCellsInRadius refuses the pattern's edge itself, which can be a whole number.
+            float edge = GenRadial.MaxRadialPatternRadius;
+            int top = CompShiftStand.MaxServeRadius;
+            ok &= Expect(top < edge && top + 1 >= edge,
+                         "the slider stops at the largest whole radius below the radial pattern's "
+                         + "edge at " + edge + ": " + top + " cells")
+                & Expect(GenRadial.RadialPattern.Length != GameRadialCells || top == 79,
+                         "which on the game's own pattern is 79, the number the README gives");
             return ok;
         }
 

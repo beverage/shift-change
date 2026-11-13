@@ -71,8 +71,9 @@ jobs:
       # The other half of the same question, and deliberately NOT a grep: the
       # debug stages and the harness must both be ABSENT, and .NET keeps type
       # names in #Strings (UTF-8) but string literals in #US (UTF-16), so a
-      # grep for "-shiftchange-harness" finds nothing whether or not it
-      # shipped. The script explains the trap and searches both encodings.
+      # grep for the harness's "shiftchange-harness" literal finds nothing
+      # whether or not it shipped. The script explains the trap and searches
+      # both encodings.
       #
       # run-harness.sh writes this same path with -p:Harness=true and sweeps
       # itself afterwards; this is what catches the run where the sweep did
@@ -130,7 +131,7 @@ jobs:
         run: dotnet build Source/ShiftChange/ShiftChange.csproj -c Release
 
       # The zip is a thing players install, so it gets the same gate the
-      # Workshop copy gets: no debug scenes, no harness, no launch flag.
+      # Workshop copy gets: no debug scenes, no harness.
       - name: Release zip ships no debug scenes or harness
         run: python3 devtools/check-shipped-dll.py
 
