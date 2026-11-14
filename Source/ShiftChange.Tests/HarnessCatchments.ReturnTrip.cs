@@ -402,6 +402,7 @@ namespace ShiftChange.Tests
             fix.Comp.ToggleWork(doctor);
             MakeCalm(fix.Map);
             Pawn patient = SpawnExtra(fix, Gender.Female, "Patient");
+            StayPut(patient);
             IntVec3 patientAt = patient.Position;
 
             fix.Comp.SetServes(CatchmentKind.Radius);

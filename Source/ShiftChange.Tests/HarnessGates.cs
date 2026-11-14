@@ -410,22 +410,15 @@ namespace ShiftChange.Tests
             WearOne(bare, "Apparel_BasicShirt");
             WearOne(bare, "Apparel_Pants");
 
-            // Working in the room, in their own clothes, on a job the catch-up may interrupt. A
-            // Goto, not a Wait: a Goto is suspendable and Core's Wait is not, so the catch-up's
-            // filter rejects it. Aimed at another cell, not the pawn's own: StartJob runs
-            // ReadyForNextToil synchronously, so a Goto to where the pawn already stands completes
-            // inside StartJob and the think tree hands them a Wait_Wander, which is not suspendable
-            // either. Aimed elsewhere the job stays open, since the path request is never served
-            // while nothing ticks this pawn.
-            Job working = JobMaker.MakeJob(JobDefOf.Goto,
-                                           fix.Stand.Position + new IntVec3(3, 0, 2));
-            working.workGiverDef = tend;
+            // Working in the room, in their own clothes, on a job the catch-up may interrupt and
+            // that stays open while the first colonist changes back (WorkingAt).
+            Job working = WorkingAt(tend, fix.Stand.Position + new IntVec3(3, 0, 2));
             bare.jobs.StartJob(working, JobCondition.InterruptForced, null,
                 resumeCurJobAfterwards: false, cancelBusyStances: true, null, null);
 
             ok &= Expect(SwapPlan.WouldDress(bare, fix.Stand),
                          "the second colonist could wear what the stand holds")
-                & Expect(bare.CurJobDef == JobDefOf.Goto,
+                & Expect(StillWorking(bare, tend),
                          "and is still on the interruptible job we gave them (control)");
 
             ok &= Expect(RunSwap(fix), "the first colonist changed back, freeing the stand");
@@ -466,7 +459,7 @@ namespace ShiftChange.Tests
             }
 
             // The button's own path: it orders a swap and sets the latch. The ordered swap is cut
-            // short and run through RunSwap, which pumps the driver to completion; a swap
+            // short and run through RunSwap, which steps the clock until it ends; a swap
             // interrupted before its transfer announces nothing, so the cut leaves no trace.
             Patch_ChangeBackGizmo.ChangeBack(fix.Pawn, fix.Comp);
             ok &= Expect(Patch_JobInterception.ChangedBackAt.ContainsKey(fix.Pawn),
@@ -531,17 +524,15 @@ namespace ShiftChange.Tests
             }
 
             // The catch-up honours it too, or a stand returning to the pool would re-dress the
-            // colonist the player just pulled out. The Goto is aimed at another cell, for the
-            // reason FreedStandCatchesUp gives.
+            // colonist the player just pulled out.
             Patch_JobInterception.ChangedBackAt[fix.Pawn] = new Patch_JobInterception.ChangeBackLatch(fix.Stand);
-            Job working = JobMaker.MakeJob(JobDefOf.Goto, fix.Stand.Position + new IntVec3(3, 0, 2));
-            working.workGiverDef = tend;
+            Job working = WorkingAt(tend, fix.Stand.Position + new IntVec3(3, 0, 2));
             fix.Pawn.jobs.StartJob(working, JobCondition.InterruptForced, null,
                 resumeCurJobAfterwards: false, cancelBusyStances: true, null, null);
-            ok &= Expect(fix.Pawn.CurJobDef == JobDefOf.Goto,
+            ok &= Expect(StillWorking(fix.Pawn, tend),
                          "latched, the colonist starts the work in their own clothes");
             Patch_JobInterception.Notify_StandFreed(fix.Comp, null);
-            ok &= Expect(fix.Pawn.CurJobDef == JobDefOf.Goto,
+            ok &= Expect(StillWorking(fix.Pawn, tend),
                          "and a freed stand does not interrupt them to dress");
             Patch_JobInterception.ChangedBackAt.Remove(fix.Pawn);
             Patch_JobInterception.Notify_StandFreed(fix.Comp, null);
@@ -642,8 +633,7 @@ namespace ShiftChange.Tests
                 WearOne(bare, "Apparel_BasicShirt");
                 WearOne(bare, "Apparel_Pants");
                 bare.playerSettings.AreaRestrictionInPawnCurrentMap = area;
-                Job working = JobMaker.MakeJob(JobDefOf.Goto, fix.Stand.Position + new IntVec3(3, 0, 2));
-                working.workGiverDef = tend;
+                Job working = WorkingAt(tend, fix.Stand.Position + new IntVec3(3, 0, 2));
                 // Staged with interception off: the stand is free, so starting this job with it on
                 // would already make the decision under test and leave the catch-up nothing to
                 // catch up.
@@ -659,7 +649,7 @@ namespace ShiftChange.Tests
                     Patch_JobInterception.Enabled = armed;
                 }
                 JobDriver before = bare.jobs.curDriver;
-                ok &= Expect(bare.CurJobDef == JobDefOf.Goto && SwapPlan.WouldDress(bare, fix.Stand),
+                ok &= Expect(StillWorking(bare, tend) && SwapPlan.WouldDress(bare, fix.Stand),
                              "a bare colonist is doctoring in the room and could wear the stand's outfit (control)");
 
                 Patch_JobInterception.TryDressMidJob(fix.Comp, null);

@@ -37,8 +37,8 @@ namespace ShiftChange.Tests
         Tables,
 
         /// <summary>
-        /// The tests on the game's clock (<see cref="ClockFixture"/>), after the pumped cases, so
-        /// the ticks they step cannot change what those see while both run.
+        /// The tests written for the game's clock (<see cref="ClockFixture"/>), after the harness
+        /// cases and before the save/load legs.
         /// </summary>
         ChangingAtAStand,
         KeepingThemDecent,
@@ -214,8 +214,8 @@ namespace ShiftChange.Tests
             CellRect pad = HarnessDevTools.Pad;
 
             // Thing.DoTick gives a pawn the camera can see its interval tick every one to five
-            // ticks instead of every fifteen (GenTicks.GetCameraUpdateRate), pumped or on the
-            // clock, which changes whose needs fire and how far a job gets. DevTools centres the
+            // ticks instead of every fifteen (GenTicks.GetCameraUpdateRate), on the game's clock
+            // as in play, which changes whose needs fire and how far a job gets. DevTools centres the
             // camera on the map, where the pad is, so look away first. The camera's view rect is
             // cached per frame, so the move shows only after one.
             Find.CameraDriver.JumpToCurrentMapLoc(new IntVec3(1, 0, 1));

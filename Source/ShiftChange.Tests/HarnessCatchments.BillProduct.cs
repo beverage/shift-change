@@ -364,8 +364,8 @@ namespace ShiftChange.Tests
 
         /// <summary>
         /// Starts a bill through the real driver from the crafter's own cell, with its chunk
-        /// already placed, so nothing walks: a pumped pawn's path requests go unanswered under the
-        /// stopped clock. Returns the driver, or null if the bill did not start.
+        /// already placed, so the bill goes straight to work with no fetch. Returns the driver,
+        /// or null if the bill did not start.
         /// </summary>
         internal static JobDriver_DoBill StartBill(Fixture fix, BillStage stage)
         {
@@ -394,8 +394,8 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// Starts a bill and pumps it until the driver changes, cutting the recipe's work short.
-        /// <paramref name="midBill"/> runs once with the bill under way.
+        /// Starts a bill and steps the game's clock until the driver changes, cutting the
+        /// recipe's work short. <paramref name="midBill"/> runs once with the bill under way.
         /// </summary>
         internal static bool FinishBill(Fixture fix, BillStage stage, System.Action midBill = null)
         {
@@ -407,19 +407,19 @@ namespace ShiftChange.Tests
                 return false;
             }
             midBill?.Invoke();
-            for (int i = 0; i < 2000; i++)
+            if (pawn.jobs.curDriver == bench)
             {
-                if (pawn.jobs.curDriver != bench)
+                GameClock.Step(() => pawn.jobs?.curDriver != bench, 2000, () =>
                 {
-                    return true;
-                }
-                if (bench.workLeft > 1f)
-                {
-                    bench.workLeft = 1f;
-                }
-                pawn.DoTick();
+                    fix.Hold?.Invoke();
+                    if (bench.workLeft > 1f)
+                    {
+                        bench.workLeft = 1f;
+                    }
+                });
             }
-            return Expect(false, "the bill finished within the pump");
+            return pawn.jobs?.curDriver != bench
+                   || Expect(false, "the bill finished within 2,000 ticks");
         }
 
         /// <summary>The crafter is hauling the stack in their hands, still on shift.</summary>

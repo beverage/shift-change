@@ -30,11 +30,11 @@ namespace ShiftChange.Tests
     /// through the pawn's own tracker (<see cref="RunSwap"/>), to test whether the driver builds
     /// that ledger.</para>
     ///
-    /// <para>Four engine traps shape the fixtures (docs/TESTING.md, "Four engine traps").
-    /// Pathfinding is asynchronous, so a pawn is staged on the stand's interaction cell. Jobs are
-    /// pooled, so the pump watches the driver, not the job. The clock stands still, so the fixture
-    /// hands out only colonists whose needs do not tick while it is stopped. A generated colonist
-    /// is not tended, so the fixture removes what it arrives needing tended.</para>
+    /// <para>Engine traps shape the fixtures (docs/TESTING.md, "Four engine traps"). Jobs are pooled,
+    /// so <see cref="RunSwap"/> watches the driver, not the job. A generated colonist is not
+    /// tended, so the fixture removes what it arrives needing tended. And the swap steps the
+    /// game's own clock, so everything on the map moves while it runs: a case holds still what it
+    /// arranged (<see cref="Fixture.Hold"/>, <see cref="HarnessFixtures.StayPut"/>).</para>
     /// </summary>
     internal static class DebugTools_LifecycleHarness
     {
@@ -134,6 +134,13 @@ namespace ShiftChange.Tests
             /// borrower and their stand apart.
             /// </summary>
             internal Map Pocket;
+
+            /// <summary>
+            /// What the case holds against the game's own simulation while the clock steps, such
+            /// as the air a room was set to: run before every tick and after the last
+            /// (<see cref="GameClock.Step"/>). Null when the case holds nothing.
+            /// </summary>
+            internal Action Hold;
         }
 
         /// <summary>

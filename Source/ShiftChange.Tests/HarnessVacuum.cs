@@ -15,11 +15,12 @@ namespace ShiftChange.Tests
     /// Odyssey's <c>SpacePocket</c>, whose biome is <c>Orbit</c>, so the game treats it as space: a
     /// room on it holds a vacuum value, and open floor reads 1.
     ///
-    /// <para>The clock stands still while the harness runs and the vacuum simulation exchanges only
-    /// on map ticks, so nothing moves a value a case sets. A case sets every room it reads, the
-    /// open ones too: a doorway averages its neighbours' stored values
-    /// (<c>Room.UnsanitizedVacuum</c>), and an open room's stored value is brought to 1 only when
-    /// something reads or exchanges it.</para>
+    /// <para>A case sets every room it reads, the open ones too: a doorway averages its
+    /// neighbours' stored values (<c>Room.UnsanitizedVacuum</c>), and an open room's stored value
+    /// is brought to 1 only when something reads or exchanges it. Odyssey's vacuum simulation
+    /// (<c>VacuumComponent</c>) exchanges air between neighbouring rooms every 250 ticks, so a
+    /// value a case sets would drift once a swap steps the clock. The ship has no oxygen pump to
+    /// keep its air in, so the case holds its values instead (<see cref="HoldVacuum"/>).</para>
     /// </summary>
     internal static class HarnessVacuum
     {
@@ -262,9 +263,9 @@ namespace ShiftChange.Tests
             }
             spot.BillStack.AddBill(new Bill_Production(recipe));
 
-            SetVacuum(away, ship.Bench, 0f);
-            SetVacuum(away, ship.InFarRoom, 0f);
-            SetVacuum(away, ship.OnFloor, connected ? 0f : 1f);
+            HoldVacuum(fix, away, ship.Bench, 0f);
+            HoldVacuum(fix, away, ship.InFarRoom, 0f);
+            HoldVacuum(fix, away, ship.OnFloor, connected ? 0f : 1f);
             return fix;
         }
 
@@ -281,6 +282,16 @@ namespace ShiftChange.Tests
             {
                 room.Vacuum = vacuum;
             }
+        }
+
+        /// <summary>
+        /// Sets the vacuum of the room at <paramref name="cell"/> and holds it there while the
+        /// case steps the clock (<see cref="Fixture.Hold"/>). A later hold on the same room wins.
+        /// </summary>
+        internal static void HoldVacuum(Fixture fix, Map map, IntVec3 cell, float vacuum)
+        {
+            SetVacuum(map, cell, vacuum);
+            fix.Hold += () => SetVacuum(map, cell, vacuum);
         }
 
         /// <summary>
@@ -787,7 +798,7 @@ namespace ShiftChange.Tests
             queue.EnqueueFirst(HarnessRideAlong.QueuedWork(giver, ship.Bench));
             bool ok = Expect(!Probe(fix, HarnessRideAlong.GiverlessHaul(steelFar, ship.InRoom)),
                              "connected: a haul from the far room, ahead of a bill the stand serves, keeps the duster on (control)");
-            SetVacuum(map, ship.OnFloor, 1f);
+            HoldVacuum(fix, map, ship.OnFloor, 1f);
             queue.EnqueueFirst(HarnessRideAlong.QueuedWork(giver, ship.Bench));
             return ok & Expect(Probe(fix, HarnessRideAlong.GiverlessHaul(steelFar, ship.InRoom)),
                                "with the corridor open to vacuum, the same errand sends them back to change first");

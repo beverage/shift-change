@@ -33,9 +33,9 @@ namespace ShiftChange.Tests
     {
         // First: every case below takes for granted what this checks.
         [Test]
-        [TestDescription("the fixture colonist is healthy and holds still under the stopped clock, and ground past the pad is ground open to the map edge")]
-        internal IEnumerator FixtureColonistHoldsStill()
-            => Run(fix => HarnessFixtureChecks.FixtureColonistHoldsStill(fix, Pad));
+        [TestDescription("the fixture colonist is healthy, and ground past the pad is ground open to the map edge")]
+        internal IEnumerator FixtureColonistIsHealthy()
+            => Run(fix => HarnessFixtureChecks.FixtureColonistIsHealthy(fix, Pad));
 
         [Test]
         [TestDescription("gravship flight keeps the ledger, and the shift ends normally after landing")]

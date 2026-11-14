@@ -12,7 +12,7 @@ using static ShiftChange.Tests.DebugTools_LifecycleHarness;
 
 namespace ShiftChange.Tests
 {
-    /// <summary>Staging, pumping and teardown shared by every harness case.</summary>
+    /// <summary>Staging, the swap and teardown shared by every harness case.</summary>
     internal static class HarnessFixtures
     {
         /// <summary>
@@ -132,10 +132,9 @@ namespace ShiftChange.Tests
 
         /// <summary>
         /// A live hostile on the map, which is all <c>StoryDanger</c> is: <c>DangerWatcher</c> sums
-        /// <c>kindDef.combatPower</c> over the attack-target cache. It is never ticked (the harness
-        /// ticks fixture pawns one at a time, never the map), so it stands inert, but a colonist
-        /// ticked while it is there reacts to it: clear it (<see cref="ClearThreat"/>) before
-        /// anything pumps the colonist.
+        /// <c>kindDef.combatPower</c> over the attack-target cache. It stands inert only while
+        /// nothing ticks: clear it (<see cref="ClearThreat"/>) before the case steps the clock,
+        /// or it moves and attacks, and the colonist reacts to it.
         ///
         /// <para>Unfogged, because <c>IsActiveThreatToPlayer</c> refuses a fogged target
         /// (<c>canBeFogged</c> defaults false), and map generation fogs every cell not connected
@@ -180,8 +179,8 @@ namespace ShiftChange.Tests
 
         /// <summary>
         /// Drops <c>DangerWatcher</c>'s cache stamp so the next read recomputes. The rating is
-        /// cached for 101 ticks and <c>TicksGame</c> never advances during a case, which runs
-        /// inside one frame, so a spawned hostile would sit behind a stale <c>None</c> and the
+        /// cached for 101 ticks, and a case arranges and reads the map between ticks, usually
+        /// with none in between, so a spawned hostile would sit behind a stale <c>None</c> and the
         /// case would assert nothing.
         /// </summary>
         internal static void ForceDangerRecheck(Map map)
@@ -362,12 +361,9 @@ namespace ShiftChange.Tests
             {
                 pawn.workSettings?.EnableAndInitialize();
             }
-            // On the interaction cell, so the driver's Goto toil arrives at once and no path is
-            // ever requested. Pathfinding is asynchronous: Pawn_PathFollower.PatherTick waits on a
-            // path request the map serves in Map.MapPreTick, which TickManager.DoSingleTick calls
-            // and Pawn.DoTick does not, so a pumped pawn stays moving forever, a cell short of the
-            // stand. The cost is that the pumped cases do not exercise the walk, which is
-            // vanilla's Toils_Goto; on the game's clock, ChangingAtAStand.WalksToTheStand does.
+            // On the interaction cell, so the swap starts without a walk and a case's checks are
+            // about the change alone. ChangingAtAStand.WalksToTheStand covers the walk, which is
+            // vanilla's Toils_Goto.
             GenSpawn.Spawn(pawn, stand.InteractionCell, map, Rot4.North);
             WearOne(pawn, "Apparel_BasicShirt");
             WearOne(pawn, "Apparel_Pants");
@@ -533,16 +529,48 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
+        /// A stand-in for <paramref name="giver"/>'s work at <paramref name="at"/> that a freed
+        /// stand's catch-up may interrupt: a posture wait stamped with the giver and aimed at the
+        /// cell, which is where the catch-up reads the work as happening. It is suspendable and
+        /// casually interruptible, as the catch-up asks, and stays open however long the clock
+        /// runs, as real work would. A Goto ends once the pawn gets there, and Core's Wait is not
+        /// suspendable.
+        /// </summary>
+        internal static Job WorkingAt(WorkGiverDef giver, IntVec3 at)
+        {
+            Job job = JobMaker.MakeJob(JobDefOf.Wait_MaintainPosture, at);
+            job.workGiverDef = giver;
+            return job;
+        }
+
+        /// <summary>
+        /// Keeps a patient where the case put them while the clock steps, as one in bed would
+        /// stay: a posture wait with no end, which only the case or an emergency replaces. A pawn
+        /// spawned for a case otherwise picks jobs of its own once the clock runs, and wanders off.
+        /// </summary>
+        internal static void StayPut(Pawn pawn)
+        {
+            pawn.jobs.StartJob(JobMaker.MakeJob(JobDefOf.Wait_MaintainPosture), JobCondition.InterruptForced,
+                null, resumeCurJobAfterwards: false, cancelBusyStances: true, null, null);
+        }
+
+        /// <summary>Whether <paramref name="pawn"/> is still on a <see cref="WorkingAt"/> job from <paramref name="giver"/>.</summary>
+        internal static bool StillWorking(Pawn pawn, WorkGiverDef giver)
+        {
+            return pawn.CurJobDef == JobDefOf.Wait_MaintainPosture && pawn.CurJob.workGiverDef == giver;
+        }
+
+        /// <summary>
         /// Runs one swap through the real driver: starts the job on the pawn's own tracker, then
-        /// ticks that pawn until the job ends. Returns false, after printing why, when the swap
-        /// gets no driver, ends with anything but <c>Succeeded</c>, or outlasts
-        /// <paramref name="maxTicks"/>. Every caller asserts on it, so a pump that gave up fails
-        /// loudly instead of falling through to assertions that pass for the wrong reason.
+        /// steps the game's clock (<see cref="GameClock.Step"/>), within this frame, until the job
+        /// ends. Returns false, after printing why, when the swap gets no driver, ends with
+        /// anything but <c>Succeeded</c>, or outlasts <paramref name="maxTicks"/>. Every caller
+        /// asserts on it, so a swap that gave up fails loudly instead of falling through to
+        /// assertions that pass for the wrong reason.
         ///
-        /// <para>One pawn is a complete pump: ticking it drives its pather and job tracker, the
-        /// toil delay counts down in <c>JobDriver.DriverTick</c>, and nothing in this driver reads
-        /// <c>TicksGame</c>, so no <c>TickManager</c>, world tick or other pawn's AI is
-        /// involved.</para>
+        /// <para>The whole game ticks, as in play: the map, every pawn on it, the case's other
+        /// colonists included, and the clock that needs and cooldowns read, none of which ticking
+        /// the one pawn alone would do (docs/TESTING.md, "Four engine traps").</para>
         /// </summary>
         internal static bool RunSwap(Fixture fix, int maxTicks = 5000)
         {
@@ -567,60 +595,54 @@ namespace ShiftChange.Tests
             JobCondition ended = JobCondition.None;
             started.AddFinishAction(c => ended = c);
 
-            for (int i = 0; i < maxTicks; i++)
+            // A job can end as it starts, on a failed reservation, before any tick.
+            if (fix.Pawn.jobs.curDriver == started)
             {
-                if (fix.Pawn.jobs.curDriver != started)
+                GameClock.Step(() => fix.Pawn.jobs?.curDriver != started, maxTicks, fix.Hold);
+            }
+            if (fix.Pawn.jobs?.curDriver != started)
+            {
+                if (ended == JobCondition.Succeeded)
                 {
-                    if (ended == JobCondition.Succeeded)
-                    {
-                        return true;
-                    }
-                    Report.Append("      the swap ended with ").Append(ended)
-                          .Append(", not Succeeded — toil ").Append(started.CurToilIndex)
-                          .Append(", pawn at ").Append(fix.Pawn.Position)
-                          .Append(" vs cell ").Append(fix.Stand.InteractionCell)
-                          .AppendLine();
-                    // Report what took the pawn: an end condition names the verb and leaves the
-                    // actor unnamed.
-                    Job replacement = fix.Pawn.CurJob;
-                    Report.Append("        taken by ")
-                          .Append(replacement == null ? "nothing" : replacement.def.defName)
-                          .Append(", driver ")
-                          .Append(fix.Pawn.jobs.curDriver == null
-                                  ? "null" : fix.Pawn.jobs.curDriver.GetType().Name)
-                          .Append(", giver ")
-                          .Append(replacement == null || replacement.jobGiver == null
-                                  ? "none" : replacement.jobGiver.GetType().Name)
-                          .Append(", lastTag ")
-                          .Append(fix.Pawn.mindState == null
-                                  ? "none" : fix.Pawn.mindState.lastJobTag.ToString())
-                          .Append(", playerForced ")
-                          .Append(replacement != null && replacement.playerForced)
-                          .Append(", queued ")
-                          .Append(fix.Pawn.jobs.jobQueue == null ? -1 : fix.Pawn.jobs.jobQueue.Count)
-                          .Append(", duty ")
-                          .Append(fix.Pawn.mindState == null || fix.Pawn.mindState.duty == null
-                                  ? "none" : fix.Pawn.mindState.duty.def.defName)
-                          .Append(", lord ")
-                          .Append(fix.Pawn.GetLord() == null
-                                  ? "none" : fix.Pawn.GetLord().LordJob.GetType().Name)
-                          .Append(", onShift ").Append(fix.Comp.OnShift)
-                          .Append(", rest ")
-                          .Append(fix.Pawn.needs?.rest == null
-                                  ? "none" : fix.Pawn.needs.rest.CurLevelPercentage.ToStringPercent())
-                          .Append(", ticks at zero rest ")
-                          .Append(fix.Pawn.needs?.rest == null ? -1 : fix.Pawn.needs.rest.TicksAtZero)
-                          .AppendLine();
-                    return false;
+                    return true;
                 }
-                // The game clock stands still while the harness runs, inside one frame, and the
-                // pawn's needs are gated on it. The fixture only hands out colonists whose needs do
-                // not tick under a stopped clock (DebugTools_Fixtures.NeedsTickWhilePumped), so
-                // rest, food and mood hold still here without being topped up.
-                //
-                // This ticks the whole pawn, so a third-party Pawn.Tick postfix can throw here; the
-                // case-level catch reports that as `FAIL threw:` rather than swallowing it.
-                fix.Pawn.DoTick();
+                Report.Append("      the swap ended with ").Append(ended)
+                      .Append(", not Succeeded — toil ").Append(started.CurToilIndex)
+                      .Append(", pawn at ").Append(fix.Pawn.Position)
+                      .Append(" vs cell ").Append(fix.Stand.InteractionCell)
+                      .AppendLine();
+                // Report what took the pawn: an end condition names the verb and leaves the
+                // actor unnamed.
+                Job replacement = fix.Pawn.CurJob;
+                Report.Append("        taken by ")
+                      .Append(replacement == null ? "nothing" : replacement.def.defName)
+                      .Append(", driver ")
+                      .Append(fix.Pawn.jobs?.curDriver == null
+                              ? "null" : fix.Pawn.jobs.curDriver.GetType().Name)
+                      .Append(", giver ")
+                      .Append(replacement == null || replacement.jobGiver == null
+                              ? "none" : replacement.jobGiver.GetType().Name)
+                      .Append(", lastTag ")
+                      .Append(fix.Pawn.mindState == null
+                              ? "none" : fix.Pawn.mindState.lastJobTag.ToString())
+                      .Append(", playerForced ")
+                      .Append(replacement != null && replacement.playerForced)
+                      .Append(", queued ")
+                      .Append(fix.Pawn.jobs?.jobQueue == null ? -1 : fix.Pawn.jobs.jobQueue.Count)
+                      .Append(", duty ")
+                      .Append(fix.Pawn.mindState == null || fix.Pawn.mindState.duty == null
+                              ? "none" : fix.Pawn.mindState.duty.def.defName)
+                      .Append(", lord ")
+                      .Append(fix.Pawn.GetLord() == null
+                              ? "none" : fix.Pawn.GetLord().LordJob.GetType().Name)
+                      .Append(", onShift ").Append(fix.Comp.OnShift)
+                      .Append(", rest ")
+                      .Append(fix.Pawn.needs?.rest == null
+                              ? "none" : fix.Pawn.needs.rest.CurLevelPercentage.ToStringPercent())
+                      .Append(", ticks at zero rest ")
+                      .Append(fix.Pawn.needs?.rest == null ? -1 : fix.Pawn.needs.rest.TicksAtZero)
+                      .AppendLine();
+                return false;
             }
 
             // A bare timeout costs a debugging cycle: say where it got stuck.
@@ -630,7 +652,7 @@ namespace ShiftChange.Tests
                   .Append(driver == null ? "null" : driver.GetType().Name)
                   .Append(", toil ").Append(driver == null ? -1 : driver.CurToilIndex)
                   .Append(", ticksLeft ").Append(driver == null ? -1 : driver.ticksLeftThisToil)
-                  .Append(", sameDriver ").Append(fix.Pawn.jobs.curDriver == started)
+                  .Append(", sameDriver ").Append(fix.Pawn.jobs?.curDriver == started)
                   .Append(", undressing ").Append(ours != null && ours.undressing)
                   .Append(", toWear ").Append(ours == null ? -1 : ours.toWear.Count)
                   .Append(", toStore ").Append(ours == null ? -1 : ours.toStore.Count)

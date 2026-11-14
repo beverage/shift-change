@@ -283,8 +283,8 @@ namespace ShiftChange.Tests
         /// </summary>
         internal static bool ShiftEndsNormally(Fixture fix, Apparel uniform, List<Apparel> parked)
         {
-            // On the interaction cell: pathing is asynchronous, so a ticked pawn never finishes a
-            // walk (docs/TESTING.md, "Four engine traps").
+            // On the interaction cell, so the return leg starts without a walk, as every staged
+            // swap does (HarnessFixtures.Stage).
             fix.Pawn.Position = fix.Stand.InteractionCell;
             if (!RunSwap(fix))
             {
@@ -460,8 +460,8 @@ namespace ShiftChange.Tests
             }
 
             // The return trip actually runs and the pawn gets their own clothes back: the
-            // behaviour, where everything above is state. The pawn stands on the interaction cell
-            // because pathing is asynchronous (docs/TESTING.md, "Four engine traps").
+            // behaviour, where everything above is state. The pawn stands on the interaction cell,
+            // so the leg starts without a walk, as every staged swap does (HarnessFixtures.Stage).
             fix.Pawn.Position = fix.Stand.InteractionCell;
             if (!RunSwap(fix))
             {

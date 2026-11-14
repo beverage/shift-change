@@ -248,15 +248,11 @@ namespace ShiftChange.Tests
             fix.Extras.Add(bare);
             WearOne(bare, "Apparel_BasicShirt");
             WearOne(bare, "Apparel_Pants");
-            // Goto aimed at another cell: one to the pawn's own cell completes inside StartJob and
-            // the think tree then hands them a Wait_Wander, which is not suspendable, so the
-            // catch-up would pass it over. Aimed elsewhere it stays open, since nothing ticks
-            // this pawn to serve the path request.
-            Job working = JobMaker.MakeJob(JobDefOf.Goto, fix.Stand.Position + new IntVec3(3, 0, 2));
-            working.workGiverDef = tend;
+            // A job the catch-up may interrupt, open across every swap below (WorkingAt).
+            Job working = WorkingAt(tend, fix.Stand.Position + new IntVec3(3, 0, 2));
             bare.jobs.StartJob(working, JobCondition.InterruptForced, null,
                 resumeCurJobAfterwards: false, cancelBusyStances: true, null, null);
-            ok &= Expect(bare.CurJobDef == JobDefOf.Goto,
+            ok &= Expect(StillWorking(bare, tend),
                          "the second colonist is working bare in the room (control)");
 
             fix.Comp.SetServes(CatchmentKind.Radius);
@@ -264,7 +260,7 @@ namespace ShiftChange.Tests
             ok &= Expect(fix.Comp.Covers(fix.Stand.Position + new IntVec3(3, 0, 2), fix.Map),
                          "the radius covers their work")
                 & Expect(RunSwap(fix), "the first colonist changed back, freeing the stand")
-                & Expect(bare.CurJobDef == JobDefOf.Goto,
+                & Expect(StillWorking(bare, tend),
                          "and the freed radius stand did NOT interrupt them");
 
             fix.Comp.SetServes(CatchmentKind.Room);

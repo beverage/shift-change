@@ -113,15 +113,15 @@ the written file as well as the loaded state. They run last, since they replace
 
 **Four engine traps live in the driver cases**, all invisible from the API and
 all already paid for once. Pathfinding is asynchronous, so ticking a
-single pawn never completes a walk — fixtures stage the pawn on the stand's
-interaction cell. Jobs are pooled, so a `Job` reference held across its own
+single pawn never completes a walk — step the game's clock (`GameClock`), never
+`Pawn.DoTick`. Jobs are pooled, so a `Job` reference held across its own
 completion silently becomes the pawn's *next* job — watch `jobs.curDriver`,
-never the job. The clock stands still while the harness runs, so a pumped
-pawn's needs either never tick or tick far too often, and a colonist can sleep,
-starve or die mid-case — the fixture hands out only colonists whose needs do not
-tick under a stopped clock. And a generated colonist is not tended, so one with
-asthma is an urgent patient — the fixture removes what it arrives needing
-tended. docs/TESTING.md, "Four engine traps".
+never the job. The whole map ticks on the clock, so what a case arranged moves
+while a swap runs — Odyssey's air drifts between rooms, a spawned colonist
+wanders off, a Goto ends — and the case holds it (`Fixture.Hold`, `StayPut`,
+`WorkingAt`). And a generated colonist is not tended, so one with asthma is an
+urgent patient — the fixture removes what it arrives needing tended.
+docs/TESTING.md, "Four engine traps".
 
 **Every colony exit must reach the reaper.** Vanilla routes death, trade,
 kidnap and map exit through `Pawn_Ownership.UnclaimAll`, which

@@ -85,18 +85,22 @@ DevTools' game is unpaused and its clock runs between tests. Pausing it would
 change how the job tracker counts a pawn's jobs per tick, which it does only
 while unpaused or within one frame.
 
-The cases are moving onto the game's own clock, a group at a time. The swap
-cases have moved: `ChangingAtAStand` and `KeepingThemDecent`, after the case
-fixtures and before the save/load legs, on a base of their own
-(`ClockFixture`). `GameClock` steps `TickManager.DoSingleTick` itself, a frame
-every 250 ticks, so every map, pawn and comp ticks as in play, and a colonist
-can walk ("Four engine traps"). It pauses the game's own speed while it steps,
-turns the storyteller and random mental breaks off and holds the autosave
-counter, and puts all of them back after. A group moves when its tests on the
-clock have run beside the pumped cases they replace, every DLC and Odyssey
-alone, and agreed check for check; then the pumped cases go. `WalksToTheStand`
-has no pumped twin: it starts the colonist five cells off and walks them to the
-stand and back. A change at the stand takes its garments' equip delays to the
+Every case that ticks runs on the game's own clock. `GameClock` steps
+`TickManager.DoSingleTick` itself, so every map, pawn and comp ticks as in
+play, and a colonist can walk ("Four engine traps"). It pauses the game's own
+speed while it steps, turns the storyteller and random mental breaks off and
+holds the autosave counter, and puts all of them back after. The swap cases
+were rewritten for it: `ChangingAtAStand` and `KeepingThemDecent`, after the
+case fixtures and before the save/load legs, on a base of their own
+(`ClockFixture`) that lets a frame pass every 250 ticks. They ran beside the
+cases they replaced, every DLC and Odyssey alone, and agreed check for check
+before those went. `WalksToTheStand` had no twin: it starts the colonist five
+cells off and walks them to the stand and back. Every other case that ticks
+does so through `RunSwap` or `FinishBill`, which step the clock within the
+case's frame (`GameClock.Step`); those kept their checks, and moved when each
+transcript on the clock matched its earlier one line for line, every DLC and
+Odyssey alone. Three kinds of case needed what they arranged held in place
+first ("Four engine traps"). A change at the stand takes its garments' equip delays to the
 tick, 180 to 570 in these tests, the same in every run; with the walk, 429 or
 436 so far. These tests are written for a player to
 read (`Story`): each check is a line in the game's words, and the first that
@@ -598,12 +602,10 @@ else follows from that.
 **The harness itself.** `HarnessTestOrder` and `HarnessLoadNote`, above, run at
 the main menu before any case. Each assertion signals DevTools as it is made, so
 the counts are DevTools' own and no case checks them.
-`FixtureColonistHoldsStill` (`HarnessFixtureChecks`), listed first, asserts what
+`FixtureColonistIsHealthy` (`HarnessFixtureChecks`), listed first, asserts what
 every other case takes for granted about its fixture. Forty colonists from the
-fixture in a row have no needs that tick under the stopped clock, and none needs
-tending. One of them keeps its food through 1,500 pumped ticks, while a colonist
-the fixture would reject loses food under the same pump. Asthma makes a colonist
-an urgent patient until the fixture removes it. A cell of natural rock past the
+fixture in a row need no tending. Asthma makes a colonist an urgent patient
+until the fixture removes it. A cell of natural rock past the
 pad becomes ground with a room under `OpenGround`. "Four engine traps" says why
 each is there. It also checks that the margin around the pad is in rooms that
 touch the map edge. Six cases put a stand in the open, on the pad left unwalled
@@ -689,7 +691,7 @@ the baseline fires. This is not hypothetical caution: three assertions passed
 against broken code in draft, including one that checked a job was "not a swap"
 when any job at all satisfied it.
 
-**Make a timeout say where it stopped.** The pump prints the toil index, tick
+**Make a timeout say where it stopped.** `RunSwap` prints the toil index, tick
 budget, driver type and pawn position when it gives up. The first two traps
 below were diagnosed in one run each because of it; a bare "timed out" would have cost
 several ten-minute cycles apiece.
@@ -711,34 +713,45 @@ None is visible from the API surface. All are recorded at their call sites.
 request, which the map's pathfinder serves a tick later in `Map.MapPreTick`,
 called from `TickManager.DoSingleTick`, never from `Pawn.DoTick()`. Ticking a
 single pawn therefore leaves it flagged `moving` forever, one cell short of the
-stand. Fixtures stage the pawn *on* the interaction cell so no path is ever
-requested — at the cost of not exercising the walk, which is vanilla's
-`Toils_Goto` rather than ours. On the game's clock (`GameClock`) the request is
-served and the colonist walks (`ChangingAtAStand.WalksToTheStand`).
+stand. The cases once ticked their colonist that way and staged it *on* the
+interaction cell so no path was ever requested. They now step the game's clock
+(`GameClock`), which serves the request, so never tick a pawn alone. Fixtures
+still stage the colonist on the interaction cell, so a case's checks are about
+the change alone; `ChangingAtAStand.WalksToTheStand` covers the walk, which is
+vanilla's `Toils_Goto` rather than ours.
 
 **Jobs are pooled.** When a job ends it returns to `JobMaker`'s pool and is
 handed straight back out for the pawn's next job, so a `Job` reference held
-across its own completion silently becomes a different job. The pump watches
+across its own completion silently becomes a different job. `RunSwap` watches
 `jobs.curDriver`, which is built per job and never pooled — and it checks the
 `JobCondition` the job ended with, because "the driver changed" is equally true
 of a job that failed its reservations and died before its transfer toil.
 
-**The clock stands still.** A case runs inside one frame, so `TicksGame`
-never moves while the pump ticks a pawn. A pawn's needs and its random
-mental-break check are gated on `IsHashIntervalTick(150, delta)`
-(`Pawn_NeedsTracker.cs:112`, `MentalBreaker.cs:253`), which reads that clock
-and the pawn's id, with a delta of at most 15 (`Thing.cs:727-732`). With the
-clock stopped the answer never changes. Most pawns' needs never move. About one
-in ten gets 150 ticks of need every 15 pumped ticks, and about one in 150 on
-every pumped tick. That cut swaps short at random in a different case each run,
-first through vanilla's involuntary sleep as rest drained (two of three 1.7
-runs on 2026-10-13), and, once the pump held rest full, through hunger. Measured
-on 1.7.4979, 2026-10-15: a colonist of the last kind went from 80% food to none
-inside 500 pumped ticks, was downed by malnutrition, and died at 1,114 and 1,334
-in two runs, after which the next swap threw on its missing job tracker. The
-fixture now hands out only colonists whose needs do not tick under a stopped
-clock (`DebugTools_Fixtures.NeedsTickWhilePumped`), about one roll in ten
-rerolled, and the rest top-up is gone.
+**The whole map ticks.** Stepping the clock ticks everything on the map, not
+only the colonist a case is about, so what a case arranged moves while a swap
+runs. Three kinds of case broke when they moved onto the clock on 2026-11-14,
+all for this reason. Odyssey's vacuum simulation (`VacuumComponent`)
+exchanges air between neighbouring rooms every 250 ticks, so the ship cases'
+rooms drifted from the values the case set, and seven vacuum cases failed. The
+ship has no oxygen pump, so the fixture holds its values instead: a fixture's
+`Hold` runs before every tick and after the last (`HoldVacuum`). A colonist
+spawned for a case picks jobs of its own, and the meal-run case's patient
+walked out of the room mid-swap; a stand-in patient now stays where it is put
+on a posture wait (`StayPut`). And a Goto ends when the pawn gets there, so
+the catch-up cases' second colonist finished the job a freed stand was meant
+to interrupt; their work is now a posture wait stamped with the work's giver
+(`WorkingAt`), which the catch-up may interrupt and which stays open.
+
+Before the clock, the opposite trap held: a case ran inside one frame, so
+`TicksGame` never moved while the colonist was ticked alone. A pawn's needs and
+its random mental-break check are gated on `IsHashIntervalTick(150, delta)`,
+which reads that clock and the pawn's id, so for a given pawn the answer never
+changed. About one pawn in ten got 150 ticks of need every 15 ticks, and about
+one in 150 on every tick, which cut swaps short at random: through vanilla's
+involuntary sleep (two of three 1.7 runs on 2026-10-13), then hunger, then
+death (1.7.4979, 2026-10-15). The fixture still rerolls such colonists
+(`DebugTools_Fixtures.NeedsTickWhilePumped`, in the mod's dll), which nothing
+needs now that no case ticks a pawn alone.
 
 **A new colonist is not tended.** Vanilla tends a generated pawn's conditions
 only when it is not joining the player (`PawnGenerator.cs:1297`). A fixture

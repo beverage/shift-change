@@ -16,9 +16,9 @@ namespace ShiftChange.Tests
     /// copy of the rule (<see cref="SwapPlan.WouldBeNude"/>) is checked beside it, so if the two
     /// disagree, ours is wrong.
     ///
-    /// <para>Each test replaced a pumped case, after both ran side by side and agreed check for
-    /// check, with one change: <see cref="GuardIsOffUntilTurnedOn"/> checks the shipped default,
-    /// not the running game's setting, which a player may have turned on.</para>
+    /// <para>Each test replaced a case that ticked its colonist alone, after both ran side by side
+    /// and agreed check for check, with one change: <see cref="GuardIsOffUntilTurnedOn"/> checks
+    /// the shipped default, not the running game's setting, which a player may have turned on.</para>
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.KeepingThemDecent)]
     internal class KeepingThemDecent : ClockFixture

@@ -66,7 +66,7 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// Stages a stand and a colonist on the pad, retrying a build that throws as the pumped
+        /// Stages a stand and a colonist on the pad, retrying a build that throws as the harness
         /// cases do (<see cref="BuildAttempts"/>), each retry noted. Null, the test failed, when
         /// none could be built.
         /// </summary>

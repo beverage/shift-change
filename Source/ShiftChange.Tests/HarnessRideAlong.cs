@@ -94,6 +94,7 @@ namespace ShiftChange.Tests
             Map map = fix.Map;
             Room room = fix.Stand.GetRoom();
             Pawn patient = SpawnExtra(fix, Gender.Female, "Patient");
+            StayPut(patient);
             Thing mealHere = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef),
                                             fix.Stand.Position + new IntVec3(3, 0, 3), map);
             IntVec3 outside = OpenGround(fix, fix.Stand.Position + new IntVec3(8, 0, 0));
@@ -211,6 +212,8 @@ namespace ShiftChange.Tests
             int top = fix.Outside.maxZ;
             Pawn patientIn = SpawnExtra(fix, Gender.Female, "Patient");
             Pawn patientOut = SpawnExtra(fix, Gender.Male, "Outpatient", new IntVec3(x, 0, top));
+            StayPut(patientIn);
+            StayPut(patientOut);
             Thing mealOut = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), new IntVec3(x, 0, top - 1), map);
             Thing mealIn = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), at + new IntVec3(3, 0, 3), map);
             Thing steel = HarnessCatchments.Steel(map, new IntVec3(x, 0, top - 2));
