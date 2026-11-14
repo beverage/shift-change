@@ -37,10 +37,11 @@ namespace ShiftChange.Tests
         Tables,
 
         /// <summary>
-        /// The first tests on the game's clock (<see cref="ChangingAtAStand"/>), last, so the
-        /// ticks they step cannot change what the pumped cases before them see.
+        /// The tests on the game's clock (<see cref="ClockFixture"/>), after the pumped cases, so
+        /// the ticks they step cannot change what those see while both run.
         /// </summary>
         ChangingAtAStand,
+        KeepingThemDecent,
     }
 
     /// <summary>

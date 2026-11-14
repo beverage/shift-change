@@ -94,7 +94,8 @@ namespace ShiftChange
             // any gender (IdeoUtility.IdeoPrefersNudityForGender), and a quicktest colony rolls
             // its ideoligion at random. Left in, such a precept would sometimes make the decency
             // cases stage a colonist that SwapPlan.PrefersNudity exempts. Removing the precept
-            // keeps the ideoligion; NudistIsExemptFromDecency arranges its own nudity by trait.
+            // keeps the ideoligion; KeepingThemDecent.NudistIsLeftUndressed arranges its own
+            // nudity by trait.
             if (ModsConfig.IdeologyActive && pawn.Ideo != null)
             {
                 List<Precept> nudity = new List<Precept>();

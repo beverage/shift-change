@@ -1,53 +1,39 @@
-using System;
 using System.Collections;
+using System.Collections.Generic;
 using DevTools.Testing;
 using RimWorld;
 using Verse;
-using Verse.AI;
 using static ShiftChange.Tests.DebugTools_LifecycleHarness;
 using static ShiftChange.Tests.HarnessFixtures;
 
 namespace ShiftChange.Tests
 {
     /// <summary>
-    /// A colonist changing at a stand, on the game's own clock (<see cref="GameClock"/>): the
-    /// first tests that tick the whole game instead of one pawn, and the first written to be read
-    /// by a player (<see cref="Story"/>).
+    /// A colonist changing at a stand and back, on the game's own clock (<see cref="GameClock"/>),
+    /// through the real driver on the colonist's own job tracker.
     ///
-    /// <para><see cref="IntoUniformAndBack"/> repeats the pumped
-    /// <see cref="HarnessDriverAndOwners.DriverRoundTrip"/> check for check, so one run gives
-    /// both verdicts side by side. <see cref="WalksToTheStand"/> is what the pump cannot do: a
-    /// pawn ticked alone never gets a path, so the pumped cases stage their colonist on the
-    /// stand's interaction cell.</para>
+    /// <para>Each test replaced a pumped case, after both ran side by side and agreed check for
+    /// check, except <see cref="WalksToTheStand"/>, which the pump cannot do: a pawn ticked alone
+    /// never gets a path, so the pumped cases stage their colonist on the stand's interaction
+    /// cell.</para>
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.ChangingAtAStand)]
-    internal class ChangingAtAStand : HarnessFixture
+    internal class ChangingAtAStand : ClockFixture
     {
         /// <summary>
-        /// The most ticks one change may take: a walk across the pad, the garments' equip
-        /// delays, and room to spare. A change that outlasts it fails with where it got stuck.
+        /// The driver builds a correct ledger and gives everything back, forced flags included:
+        /// <c>Pawn_ApparelTracker.Notify_ApparelRemoved</c> clears the forced flag on every
+        /// removal, so the driver captures it before and restores it on the way back.
         /// </summary>
-        internal const int MostTicks = 2500;
-
         [Test]
-        [TestDescription("on the game's clock, a colonist changes into a stand's duster and back, "
+        [TestDescription("a colonist changes into a stand's duster and back, "
                          + "and their forced parka comes back still forced")]
         internal IEnumerator IntoUniformAndBack()
         {
-            Story story = new Story(Sentence(nameof(IntoUniformAndBack)));
-            Fixture fix = null;
-            try
+            return Staged(Body);
+
+            IEnumerator Body(Fixture fix, Story story)
             {
-                yield return ReadyPad();
-                if (Map == null)
-                {
-                    yield break;
-                }
-                fix = StageFor(story, StageKit.Displacing);
-                if (fix == null)
-                {
-                    yield break;
-                }
                 string name = fix.Pawn.LabelShort;
                 Apparel parka = Worn(fix.Pawn, "Apparel_Parka");
                 if (!story.Check(parka != null, name + " wears a parka the duster displaces"))
@@ -58,9 +44,7 @@ namespace ShiftChange.Tests
                 fix.Pawn.outfits.forcedHandler.SetForced(parka, forced: true);
                 story.Note(name + "'s parka is forced, as a player sets it in the gear tab");
 
-                SwapLeg on = new SwapLeg();
-                yield return Swap(fix, on);
-                story.Check(on.Succeeded, on.Told(name + " changes into the duster"));
+                yield return Swap(fix, story, name + " changes into the duster");
                 story.Check(fix.Comp.Borrower == fix.Pawn, "the stand lends its duster to " + name);
                 story.Check(CompShiftStand.OnShiftStandFor(fix.Pawn) == fix.Comp,
                             name + " is on shift at this stand");
@@ -69,41 +53,23 @@ namespace ShiftChange.Tests
                             "which keeps it for " + name);
                 story.Check(fix.Comp.WasForcedWhenStored(parka), "and remembers it was forced");
 
-                SwapLeg off = new SwapLeg();
-                yield return Swap(fix, off);
-                story.Check(off.Succeeded, off.Told(name + " changes back"));
+                yield return Swap(fix, story, name + " changes back");
                 story.Check(fix.Pawn.apparel.WornApparel.Contains(parka), "the parka is back on");
                 story.Check(fix.Pawn.outfits.forcedHandler.IsForced(parka),
                             "still forced, as the player left it");
                 story.Check(!fix.Comp.OnShift, "the stand is free again");
                 story.Check(CompShiftStand.OnShiftStandFor(fix.Pawn) == null, name + " is off shift");
             }
-            finally
-            {
-                Teardown(fix, Map, Pad);
-                story.Tell();
-            }
         }
 
         [Test]
-        [TestDescription("on the game's clock, a colonist walks over to a stand to change, "
-                         + "and walks back to it to change back")]
+        [TestDescription("a colonist walks over to a stand to change, and walks back to it to change back")]
         internal IEnumerator WalksToTheStand()
         {
-            Story story = new Story(Sentence(nameof(WalksToTheStand)));
-            Fixture fix = null;
-            try
+            return Staged(Body);
+
+            IEnumerator Body(Fixture fix, Story story)
             {
-                yield return ReadyPad();
-                if (Map == null)
-                {
-                    yield break;
-                }
-                fix = StageFor(story, StageKit.Displacing);
-                if (fix == null)
-                {
-                    yield break;
-                }
                 string name = fix.Pawn.LabelShort;
                 Apparel parka = Worn(fix.Pawn, "Apparel_Parka");
                 IntVec3 across = new IntVec3(Pad.maxX - 1, 0, Pad.maxZ - 1);
@@ -115,158 +81,109 @@ namespace ShiftChange.Tests
 
                 MoveTo(fix.Pawn, across);
                 story.Note(name + " stands " + Distance(fix, across) + " cells from the stand");
-                SwapLeg on = new SwapLeg();
-                yield return Swap(fix, on);
-                story.Check(on.Succeeded, on.Told(name + " walks over and changes into the duster"));
+                yield return Swap(fix, story, name + " walks over and changes into the duster");
                 story.Check(fix.Pawn.Position == fix.Stand.InteractionCell, name + " is at the stand");
                 story.Check(parka.ParentHolder == fix.Stand, "the parka hangs on the stand");
 
                 MoveTo(fix.Pawn, across);
-                SwapLeg off = new SwapLeg();
-                yield return Swap(fix, off);
-                story.Check(off.Succeeded, off.Told(name + " walks back and changes out of it"));
+                yield return Swap(fix, story, name + " walks back and changes out of it");
                 story.Check(fix.Pawn.apparel.WornApparel.Contains(parka), "the parka is back on");
                 story.Check(fix.Stand.HeldItems.Count == 1 && fix.Stand.HeldItems[0].def.defName == "Apparel_Duster",
                             "and the duster is back on the stand");
             }
-            finally
+        }
+
+        /// <summary>
+        /// A stand whose duster shares no layer with the colonist's shirt and trousers still takes
+        /// it back. Guards a past bug: such a duster was given to the colonist for good, and the
+        /// stand emptied itself, silently.
+        ///
+        /// <para>That the stand is free proves nothing alone: the driver's fallback for a change
+        /// with nothing to wear frees it too. The duster coming off and back onto the stand, the
+        /// colonist's own clothes and the stand dressing again are the checks that fail without
+        /// the fix.</para>
+        /// </summary>
+        [Test]
+        [TestDescription("a stand whose duster goes on over a colonist's own clothes, "
+                         + "displacing nothing, still takes it back")]
+        internal IEnumerator UniformOverOwnClothesGoesBack()
+        {
+            return Staged(Body, StageKit.NonDisplacing);
+
+            IEnumerator Body(Fixture fix, Story story)
             {
-                Teardown(fix, Map, Pad);
-                story.Tell();
+                string name = fix.Pawn.LabelShort;
+                yield return Swap(fix, story, name + " changes into the duster");
+                Apparel duster = fix.Comp.IssuedUniformForReading.Count > 0
+                    ? fix.Comp.IssuedUniformForReading[0]
+                    : null;
+                story.Check(duster != null, "the stand lends the duster to " + name);
+                story.Check(fix.Comp.StoredOwnerApparelForReading.Count == 0,
+                            "and keeps none of " + name + "'s clothes: the duster covers neither "
+                            + "shirt nor trousers");
+                if (duster == null)
+                {
+                    yield break;
+                }
+
+                yield return Swap(fix, story, name + " changes back");
+                story.Check(!fix.Pawn.apparel.WornApparel.Contains(duster), "the duster came off");
+                story.Check(duster.ParentHolder == fix.Stand, "and is back on the stand");
+                story.Check(fix.Pawn.apparel.WornApparel.Count == 2,
+                            name + " still has their own shirt and trousers on");
+                story.Check(!fix.Comp.OnShift, "the stand is free again");
+                story.Check(SwapPlan.WouldDress(fix.Pawn, fix.Stand), "and would dress someone again");
             }
         }
 
         /// <summary>
-        /// Stages a stand and a colonist on the pad (<see cref="Stage"/>), retrying a build that
-        /// throws as the pumped cases do (<see cref="BuildAttempts"/>), each retry noted. Null,
-        /// the test failed, when none could be built.
+        /// Change the whole outfit: the colonist ends up in the stand's duster alone, and gets
+        /// every garment back. The colonist wears a shirt and trousers under a parka, and only the
+        /// parka shares the duster's layer, so whatever happens to the shirt and trousers is the
+        /// setting's doing. An empty stand must still dress nobody, which fails if the whole-outfit
+        /// pass runs before the stand's check that it has something to hand out
+        /// (<see cref="SwapPlan.BuildDress"/>).
         /// </summary>
-        internal Fixture StageFor(Story story, StageKit kit)
+        [Test]
+        [TestDescription("with Change the whole outfit ticked, a colonist changes every garment "
+                         + "at the stand and gets them all back")]
+        internal IEnumerator WholeOutfitChangesAndComesBack()
         {
-            Exception last = null;
-            for (int attempt = 1; attempt <= BuildAttempts; attempt++)
+            return Staged(Body);
+
+            IEnumerator Body(Fixture fix, Story story)
             {
-                try
+                string name = fix.Pawn.LabelShort;
+                List<Apparel> before = new List<Apparel>(fix.Pawn.apparel.WornApparel);
+                if (!story.Check(before.Count >= 3, name + " wears a shirt, trousers and a parka"))
                 {
-                    Fixture fix = Stage(Map, Pad, kit);
-                    if (fix != null)
-                    {
-                        story.Check(true, "a stand holding a duster, and " + fix.Pawn.LabelShort
-                                          + " beside it in a shirt, trousers"
-                                          + (kit == StageKit.Displacing ? " and a parka" : ""));
-                        return fix;
-                    }
+                    yield break;
                 }
-                catch (Exception e)
-                {
-                    last = e;
-                    story.Note("setting the stand up threw on try " + attempt + ": "
-                               + e.GetType().Name + ": " + e.Message);
-                    Teardown(null, Map, Pad);
-                }
+                fix.Comp.SetFullChange(true);
+                story.Note("Change the whole outfit is ticked on the stand");
+
+                yield return Swap(fix, story, name + " changes into the duster");
+                story.Check(fix.Comp.OnShift, name + " is on shift at this stand");
+                List<Apparel> worn = fix.Pawn.apparel.WornApparel;
+                story.Check(before.TrueForAll(a => !worn.Contains(a)),
+                            "every garment " + name + " arrived in came off");
+                story.Check(fix.Comp.StoredOwnerApparelForReading.Count == before.Count,
+                            "and the stand keeps all " + before.Count + " for " + name);
+                story.Check(worn.Count > 0, name + " is wearing the duster, not nothing");
+
+                // The way back follows what the stand keeps, not the setting.
+                fix.Comp.SetFullChange(false);
+                story.Note("Change the whole outfit is unticked again");
+                yield return Swap(fix, story, name + " changes back");
+                story.Check(before.TrueForAll(fix.Pawn.apparel.WornApparel.Contains),
+                            "all " + before.Count + " came back on");
+                story.Check(!fix.Comp.OnShift, "the stand is free again");
+
+                fix.Comp.SetFullChange(true);
+                ClearStand(fix.Stand);
+                story.Check(!SwapPlan.WouldDress(fix.Pawn, fix.Stand),
+                            "emptied, with the setting ticked, the stand dresses nobody");
             }
-            story.Check(false, last == null
-                ? "a stand and a colonist could be set up"
-                : "a stand and a colonist could be set up in " + BuildAttempts + " tries, last: " + last);
-            return null;
-        }
-
-        internal static Apparel Worn(Pawn pawn, string defName)
-        {
-            foreach (Apparel apparel in pawn.apparel.WornApparel)
-            {
-                if (apparel.def.defName == defName)
-                {
-                    return apparel;
-                }
-            }
-            return null;
-        }
-
-        internal static void MoveTo(Pawn pawn, IntVec3 cell)
-        {
-            pawn.pather.StopDead();
-            pawn.Position = cell;
-            pawn.Notify_Teleported();
-        }
-
-        internal static int Distance(Fixture fix, IntVec3 from)
-        {
-            return (int)Math.Round(from.DistanceTo(fix.Stand.InteractionCell));
-        }
-
-        /// <summary>
-        /// One change at the stand, through the real driver on the colonist's own job tracker,
-        /// with the game's clock stepped until that driver ends. Watches the driver, not the job,
-        /// since jobs are pooled, and records how it ended, since a driver also ends when its job
-        /// fails (docs/TESTING.md, "Four engine traps").
-        /// </summary>
-        internal static IEnumerator Swap(Fixture fix, SwapLeg leg)
-        {
-            Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, fix.Stand);
-            fix.Pawn.jobs.StartJob(swap, JobCondition.InterruptForced, null,
-                resumeCurJobAfterwards: false, cancelBusyStances: true, null,
-                JobTag.ChangingApparel);
-            JobDriver started = fix.Pawn.jobs.curDriver;
-            if (started == null)
-            {
-                leg.Why = "the change never started";
-                yield break;
-            }
-            started.AddFinishAction(c => leg.Ended = c);
-
-            yield return GameClock.Run(() => fix.Pawn.jobs?.curDriver != started, MostTicks, leg.Clock);
-
-            if (!leg.Clock.Done)
-            {
-                leg.Why = "still at it after " + MostTicks + " ticks, at step " + (started.CurToilIndex + 1)
-                          + (fix.Pawn.pather.Moving ? ", walking" : "")
-                          + ", " + Distance(fix, fix.Pawn.Position) + " cells from the stand";
-            }
-            else if (leg.Ended != JobCondition.Succeeded)
-            {
-                // What the colonist did instead, in the words the game shows under their portrait.
-                JobDriver next = fix.Pawn.jobs?.curDriver;
-                leg.Why = "it " + Said(leg.Ended) + " at step " + (started.CurToilIndex + 1) + ", "
-                          + Distance(fix, fix.Pawn.Position) + " cells from the stand; then "
-                          + (next == null ? "nothing" : next.GetReport().TrimEnd('.').UncapitalizeFirst())
-                          + (next?.job?.jobGiver == null ? "" : " (" + next.job.jobGiver.GetType().Name + ")");
-            }
-        }
-
-        internal static string Said(JobCondition ended)
-        {
-            switch (ended)
-            {
-                case JobCondition.Incompletable:
-                    return "could not be finished (" + ended + ")";
-                case JobCondition.InterruptForced:
-                case JobCondition.InterruptOptional:
-                    return "was interrupted (" + ended + ")";
-                case JobCondition.Errored:
-                case JobCondition.ErroredPather:
-                    return "hit an error (" + ended + ")";
-                default:
-                    return "ended " + ended;
-            }
-        }
-    }
-
-    /// <summary>How one change went: the ticks it took, how its driver ended, and why not, if not.</summary>
-    internal sealed class SwapLeg
-    {
-        internal readonly ClockRun Clock = new ClockRun();
-        internal JobCondition Ended = JobCondition.None;
-        internal string Why;
-
-        internal bool Succeeded => Why == null && Clock.Done && Ended == JobCondition.Succeeded;
-
-        /// <summary><paramref name="what"/>, with the ticks it took, or why it did not happen.</summary>
-        internal string Told(string what)
-        {
-            return Succeeded
-                ? what + " (" + Clock.Ticks + " ticks)"
-                : what + ": " + Why;
         }
     }
 }

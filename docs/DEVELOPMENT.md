@@ -546,7 +546,9 @@ committed `Tests/Assemblies/ShiftChange.Tests.dll`.
 | `HarnessVacuum.cs` | The vacuum cases, on the second map, which is a vacuum map: the ground they stand on, then a staged ship of a room, open floor and a second room, and the cases a review of the gate added (each dress path, doors, a stranded colonist, the cooldown, an urgent patient, a stand on another map). |
 | `HarnessJobKinds.cs` | The job classifier as a table: every job shape the other cases build, and the kind and work type it must get. |
 | `HarnessFixtureChecks.cs` | What every case takes for granted about its fixture: a colonist who needs no doctor and whose needs hold still under the stopped clock, and open ground past the pad. Runs first. |
-| `ChangingAtAStand.cs` | The first tests on the game's clock: the forced-flag round trip again, check for check beside the pumped case, and a colonist who walks to the stand. Runs after the case fixtures. |
+| `ClockFixture.cs` | The base of the tests on the game's clock: `Staged`, which sets a stand and a colonist up on the pad, runs a test's body and always tears down, puts Keep colonists decent back and writes the story; `Swap`, one change with the clock stepped until its driver ends. |
+| `ChangingAtAStand.cs` | The swap on the game's clock: the forced-flag round trip, a stand that displaces nothing, the whole outfit, and a colonist who walks to the stand. Runs after the case fixtures. |
+| `KeepingThemDecent.cs` | Keep colonists decent on the game's clock: the belt stand, the trousers pair for a man and a woman, the nudist, and the shipped default. |
 | `GameClock.cs` | Steps the game's whole clock for a test, with the storyteller, random mental breaks and autosave held off, and puts them back. |
 | `Story.cs` | A test's checks as lines in the game's words; the first failure fails the test with the lines so far, its own marked. |
 

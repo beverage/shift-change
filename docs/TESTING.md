@@ -85,21 +85,24 @@ DevTools' game is unpaused and its clock runs between tests. Pausing it would
 change how the job tracker counts a pawn's jobs per tick, which it does only
 while unpaused or within one frame.
 
-Two tests run on the game's own clock instead, the start of moving every case
-onto it: `ChangingAtAStand` (`Source/ShiftChange.Tests/ChangingAtAStand.cs`),
-after the case fixtures and before the save/load legs. `GameClock` steps
-`TickManager.DoSingleTick` itself, a frame every 250 ticks, so every map, pawn
-and comp ticks as in play, and a colonist can walk ("Four engine traps"). It
-pauses the game's own speed while it steps, turns the storyteller and random
-mental breaks off and holds the autosave counter, and puts all of them back
-after. `IntoUniformAndBack` repeats `DriverRoundTrip` check for check, so a run
-gives both verdicts side by side; `WalksToTheStand` starts the colonist five
-cells off and walks them to the stand and back, which no pumped case can.
-Each leg takes 360 ticks on the stand, 429 with the walk, the same in every
-run so far. These tests are written for a player to read (`Story`): each check
-is a line in the game's words, and the first that fails fails the test with
-every line so far and its own marked `>>  FAIL`, which DevTools shows in the
-Test Explorer's summary and under the test's row in Test.log.
+The cases are moving onto the game's own clock, a group at a time. The swap
+cases have moved: `ChangingAtAStand` and `KeepingThemDecent`, after the case
+fixtures and before the save/load legs, on a base of their own
+(`ClockFixture`). `GameClock` steps `TickManager.DoSingleTick` itself, a frame
+every 250 ticks, so every map, pawn and comp ticks as in play, and a colonist
+can walk ("Four engine traps"). It pauses the game's own speed while it steps,
+turns the storyteller and random mental breaks off and holds the autosave
+counter, and puts all of them back after. A group moves when its tests on the
+clock have run beside the pumped cases they replace, every DLC and Odyssey
+alone, and agreed check for check; then the pumped cases go. `WalksToTheStand`
+has no pumped twin: it starts the colonist five cells off and walks them to the
+stand and back. A change at the stand takes its garments' equip delays to the
+tick, 180 to 570 in these tests, the same in every run; with the walk, 429 or
+436 so far. These tests are written for a player to
+read (`Story`): each check is a line in the game's words, and the first that
+fails fails the test with every line so far and its own marked `>>  FAIL`,
+which DevTools shows in the Test Explorer's summary and under the test's row in
+Test.log.
 
 An assertion (`Expect`) writes its line to the case's transcript and signals
 DevTools, which fails the test without stopping it, so the transcript shows
@@ -288,20 +291,22 @@ An urgent patient goes straight to a bed across vacuum
 map without their stand is warned before vacuum, by job or by order
 (`StandOnAnotherMapStillWarns`).
 
-**The swap** (`HarnessSwap`). These stage an undressed pawn, and every one but
-`DecencyGuardIsOptIn` runs `JobDriver_SwapAtStand` for real, through the pawn's
-own tracker. `DriverRoundTrip` checks that the driver builds a correct ledger
-and gives everything back, and it is the one case that drives the driver's
-capture and restore of forced flags; `ChangingAtAStand.IntoUniformAndBack`
-checks it again on the game's clock. `NonDisplacingReturns` checks the same for
-a stand whose stock displaces nothing. Full change has a pair: the swap, and
-the refusal to strip a colonist bare (`FullChangeSwapsEverything`,
-`FullChangeRefusesToStripThemBare`). Four cases decide what a stand may take
-for decency. Trousers alone leave a man decent and a woman not, so
-`LegsOnlyStandLeavesAManDecent` is the control for
-`LegsOnlyStandStripsAWoman`; a nudist is exempt (`NudistIsExemptFromDecency`);
-and the guard ships off, and turning it on takes effect
-(`DecencyGuardIsOptIn`).
+**The swap** (`ChangingAtAStand`, on the game's clock). These stage an
+undressed pawn and run `JobDriver_SwapAtStand` for real, through the pawn's own
+tracker. `IntoUniformAndBack` checks that the driver builds a correct ledger
+and gives everything back, and it is the one test that drives the driver's
+capture and restore of forced flags. `UniformOverOwnClothesGoesBack` checks the
+same for a stand whose stock displaces nothing, `WalksToTheStand` with the walk,
+and `WholeOutfitChangesAndComesBack` with Change the whole outfit ticked.
+
+**Keep colonists decent** (`KeepingThemDecent`, on the game's clock). With the
+whole outfit ticked, a stand holding only a belt keeps the shirt and trousers
+on and takes only the parka (`WholeOutfitKeepsThemDressed`). Trousers alone
+leave a man decent and a woman not, so `LegsOnlyStandLeavesAManDressed` is the
+control for `LegsOnlyStandKeepsAWomansShirtOn`; a nudist is exempt
+(`NudistIsLeftUndressed`); and the setting ships off, read from fresh settings
+rather than the running game's, and turning it on takes effect
+(`GuardIsOffUntilTurnedOn`).
 
 **Recreation and sleep** (`HarnessTriggers`). Both classifiers are asserted as
 tables against the def database, with no map (`RecreationClassifierHolds`,

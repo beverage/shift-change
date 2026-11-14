@@ -17,7 +17,6 @@ using static ShiftChange.Tests.HarnessOwnership;
 using static ShiftChange.Tests.HarnessRecolor;
 using static ShiftChange.Tests.HarnessRideAlong;
 using static ShiftChange.Tests.HarnessScoring;
-using static ShiftChange.Tests.HarnessSwap;
 using static ShiftChange.Tests.HarnessTables;
 using static ShiftChange.Tests.HarnessTriggers;
 
@@ -236,16 +235,6 @@ namespace ShiftChange.Tests
     internal class HarnessDriverAndOwners : HarnessFixture
     {
         [Test]
-        [TestDescription("a stand that displaces nothing still hands the uniform back")]
-        internal IEnumerator NonDisplacingReturns()
-            => Run((m, p) => Stage(m, p, StageKit.NonDisplacing), HarnessSwap.NonDisplacingReturns);
-
-        [Test]
-        [TestDescription("the driver returns own clothes and their forced flags")]
-        internal IEnumerator DriverRoundTrip()
-            => Run((m, p) => Stage(m, p, StageKit.Displacing), HarnessSwap.DriverRoundTrip);
-
-        [Test]
         [TestDescription("work and recreation are mutually exclusive on a stand")]
         internal IEnumerator WorkAndRecreationAreExclusive()
             => Run((m, p) => Stage(m, p, StageKit.Displacing), HarnessTriggers.WorkAndRecreationAreExclusive);
@@ -354,36 +343,6 @@ namespace ShiftChange.Tests
         [TestDescription("and haulers leave it alone, while an ordinary stand still takes deliveries")]
         internal IEnumerator DepositOnlyStandIsNoHaulTarget()
             => Run((m, p) => Stage(m, p, StageKit.Displacing, enclose: true), HarnessTriggers.DepositOnlyStandIsNoHaulTarget);
-
-        [Test]
-        [TestDescription("full change swaps the whole outfit and gives it all back")]
-        internal IEnumerator FullChangeSwapsEverything()
-            => Run((m, p) => Stage(m, p, StageKit.Displacing), HarnessSwap.FullChangeSwapsEverything);
-
-        [Test]
-        [TestDescription("full change refuses to strip a colonist bare")]
-        internal IEnumerator FullChangeRefusesToStripThemBare()
-            => Run((m, p) => Stage(m, p, StageKit.Displacing), HarnessSwap.FullChangeRefusesToStripThemBare);
-
-        [Test]
-        [TestDescription("a legs-only stand leaves a man decent (control for the pair)")]
-        internal IEnumerator LegsOnlyStandLeavesAManDecent()
-            => Run((m, p) => Stage(m, p, StageKit.Displacing, gender: Gender.Male), HarnessSwap.LegsOnlyStandLeavesAManDecent);
-
-        [Test]
-        [TestDescription("and the same stand keeps a woman's shirt on, because her rule wants it")]
-        internal IEnumerator LegsOnlyStandStripsAWoman()
-            => Run((m, p) => Stage(m, p, StageKit.Displacing, gender: Gender.Female), HarnessSwap.LegsOnlyStandStripsAWoman);
-
-        [Test]
-        [TestDescription("a nudist is left undressed, because that is the point")]
-        internal IEnumerator NudistIsExemptFromDecency()
-            => Run((m, p) => Stage(m, p, StageKit.Displacing), HarnessSwap.NudistIsExemptFromDecency);
-
-        [Test]
-        [TestDescription("the decency guard ships off, and turning it on takes effect")]
-        internal IEnumerator DecencyGuardIsOptIn()
-            => Run((m, p) => Stage(m, p, StageKit.Displacing), HarnessSwap.DecencyGuardIsOptIn);
     }
 
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.Gates)]
