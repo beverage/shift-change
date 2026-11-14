@@ -85,6 +85,22 @@ DevTools' game is unpaused and its clock runs between tests. Pausing it would
 change how the job tracker counts a pawn's jobs per tick, which it does only
 while unpaused or within one frame.
 
+Two tests run on the game's own clock instead, the start of moving every case
+onto it: `ChangingAtAStand` (`Source/ShiftChange.Tests/ChangingAtAStand.cs`),
+after the case fixtures and before the save/load legs. `GameClock` steps
+`TickManager.DoSingleTick` itself, a frame every 250 ticks, so every map, pawn
+and comp ticks as in play, and a colonist can walk ("Four engine traps"). It
+pauses the game's own speed while it steps, turns the storyteller and random
+mental breaks off and holds the autosave counter, and puts all of them back
+after. `IntoUniformAndBack` repeats `DriverRoundTrip` check for check, so a run
+gives both verdicts side by side; `WalksToTheStand` starts the colonist five
+cells off and walks them to the stand and back, which no pumped case can.
+Each leg takes 360 ticks on the stand, 429 with the walk, the same in every
+run so far. These tests are written for a player to read (`Story`): each check
+is a line in the game's words, and the first that fails fails the test with
+every line so far and its own marked `>>  FAIL`, which DevTools shows in the
+Test Explorer's summary and under the test's row in Test.log.
+
 An assertion (`Expect`) writes its line to the case's transcript and signals
 DevTools, which fails the test without stopping it, so the transcript shows
 every assertion and the first that failed labels the test in Test.log. A case
@@ -276,7 +292,8 @@ map without their stand is warned before vacuum, by job or by order
 `DecencyGuardIsOptIn` runs `JobDriver_SwapAtStand` for real, through the pawn's
 own tracker. `DriverRoundTrip` checks that the driver builds a correct ledger
 and gives everything back, and it is the one case that drives the driver's
-capture and restore of forced flags. `NonDisplacingReturns` checks the same for
+capture and restore of forced flags; `ChangingAtAStand.IntoUniformAndBack`
+checks it again on the game's clock. `NonDisplacingReturns` checks the same for
 a stand whose stock displaces nothing. Full change has a pair: the swap, and
 the refusal to strip a colonist bare (`FullChangeSwapsEverything`,
 `FullChangeRefusesToStripThemBare`). Four cases decide what a stand may take
@@ -686,11 +703,13 @@ is ignored within a week.
 None is visible from the API surface. All are recorded at their call sites.
 
 **Pathfinding is asynchronous.** `Pawn_PathFollower.PatherTick` waits on a path
-request served by a job system that the game's own update loop drives, not by
-`Pawn.DoTick()`. Ticking a single pawn therefore leaves it flagged `moving`
-forever, one cell short of the stand. Fixtures stage the pawn *on* the
-interaction cell so no path is ever requested — at the cost of not exercising
-the walk, which is vanilla's `Toils_Goto` rather than ours.
+request, which the map's pathfinder serves a tick later in `Map.MapPreTick`,
+called from `TickManager.DoSingleTick`, never from `Pawn.DoTick()`. Ticking a
+single pawn therefore leaves it flagged `moving` forever, one cell short of the
+stand. Fixtures stage the pawn *on* the interaction cell so no path is ever
+requested — at the cost of not exercising the walk, which is vanilla's
+`Toils_Goto` rather than ours. On the game's clock (`GameClock`) the request is
+served and the colonist walks (`ChangingAtAStand.WalksToTheStand`).
 
 **Jobs are pooled.** When a job ends it returns to `JobMaker`'s pool and is
 handed straight back out for the pawn's next job, so a `Job` reference held

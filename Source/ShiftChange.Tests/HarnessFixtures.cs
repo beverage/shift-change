@@ -364,10 +364,10 @@ namespace ShiftChange.Tests
             }
             // On the interaction cell, so the driver's Goto toil arrives at once and no path is
             // ever requested. Pathfinding is asynchronous: Pawn_PathFollower.PatherTick waits on a
-            // path request served by a job system that the game's own update loop drives, not
-            // Pawn.DoTick, so ticking one pawn leaves it moving forever, a cell short of the stand.
-            // The cost is that these cases do not exercise the walk, which is vanilla's Toils_Goto;
-            // they exist to prove the transfer.
+            // path request the map serves in Map.MapPreTick, which TickManager.DoSingleTick calls
+            // and Pawn.DoTick does not, so a pumped pawn stays moving forever, a cell short of the
+            // stand. The cost is that the pumped cases do not exercise the walk, which is
+            // vanilla's Toils_Goto; on the game's clock, ChangingAtAStand.WalksToTheStand does.
             GenSpawn.Spawn(pawn, stand.InteractionCell, map, Rot4.North);
             WearOne(pawn, "Apparel_BasicShirt");
             WearOne(pawn, "Apparel_Pants");

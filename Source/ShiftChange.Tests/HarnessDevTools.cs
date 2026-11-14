@@ -35,6 +35,12 @@ namespace ShiftChange.Tests
         RideAlong,
         Assorted,
         Tables,
+
+        /// <summary>
+        /// The first tests on the game's clock (<see cref="ChangingAtAStand"/>), last, so the
+        /// ticks they step cannot change what the pumped cases before them see.
+        /// </summary>
+        ChangingAtAStand,
     }
 
     /// <summary>
@@ -169,6 +175,22 @@ namespace ShiftChange.Tests
         /// </summary>
         internal IEnumerator OnPad(string test, Action<string> runCase)
         {
+            yield return ReadyPad();
+            if (Map != null)
+            {
+                Judge(test, runCase);
+            }
+        }
+
+        /// <summary>
+        /// Finds the current map's pad and looks the camera away from it, then sets
+        /// <see cref="Map"/> and <see cref="Pad"/>; leaves <see cref="Map"/> null, the test
+        /// failed with the reason, when there is no map, no pad, or the camera still sees it.
+        /// </summary>
+        internal IEnumerator ReadyPad()
+        {
+            Map = null;
+            Pad = CellRect.Empty;
             Map map = Find.CurrentMap;
             if (map == null)
             {
@@ -190,9 +212,9 @@ namespace ShiftChange.Tests
             }
             CellRect pad = HarnessDevTools.Pad;
 
-            // Cases pump pawns by hand under a stopped clock, and Thing.DoTick gives a pawn the
-            // camera can see its interval tick every one to five pumps instead of every fifteen,
-            // which changes whose needs fire and how far a pumped job gets. DevTools centres the
+            // Thing.DoTick gives a pawn the camera can see its interval tick every one to five
+            // ticks instead of every fifteen (GenTicks.GetCameraUpdateRate), pumped or on the
+            // clock, which changes whose needs fire and how far a job gets. DevTools centres the
             // camera on the map, where the pad is, so look away first. The camera's view rect is
             // cached per frame, so the move shows only after one.
             Find.CameraDriver.JumpToCurrentMapLoc(new IntVec3(1, 0, 1));
@@ -207,7 +229,6 @@ namespace ShiftChange.Tests
 
             Map = map;
             Pad = pad;
-            Judge(test, runCase);
         }
 
         /// <summary>
