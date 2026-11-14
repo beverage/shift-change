@@ -13,32 +13,36 @@ using static ShiftChange.Tests.DebugTools_LifecycleHarness;
 namespace ShiftChange.Tests
 {
     /// <summary>
-    /// The case fixtures (HarnessCases.cs) in run order: DevTools runs a fixture with a higher
-    /// <c>ExecutionPriority</c> first, and each runs at <see cref="HarnessDevTools.First"/> less
-    /// its place here. The save/load legs run after all of them
-    /// (<see cref="HarnessDevTools.SaveLoadPriority"/>), so they have no place here.
+    /// The fixtures that play the game, in run order: DevTools runs a fixture with a higher
+    /// <c>ExecutionPriority</c> first, and each runs at <see cref="HarnessDevTools.First"/> less its
+    /// place here. <see cref="SavingAndLoading"/> runs after all of them
+    /// (<see cref="HarnessDevTools.SaveLoadPriority"/>), so it has no place here.
     /// </summary>
     internal enum CaseGroup
     {
-        Flights,
-        VacuumGate,
-        VacuumRoutes,
-        Lifecycle,
-        FaultLatch,
-        DriverAndOwners,
-        Arms,
-        Gates,
-        Radius,
-        BillProducts,
-        Latches,
-        Areas,
-        RideAlong,
-        Assorted,
-        Tables,
+        /// <summary>What every test takes for granted about the colony it runs in, so first.</summary>
+        TheTestColony,
+        ChangingAtAStand,
+        KeepingThemDecent,
+        WhatSendsThemToChange,
+        WhoUsesAStand,
+        ServingARoomOrARing,
+        ServingAnArea,
+        KeepingTheirVacsuitOn,
+        LosingAStandOrAColonist,
+        ButtonsAndOrders,
+        ReadingJobsAndRooms,
+        FlyingTheGravship,
+        HeadingIntoVacuum,
+        MealsDangerAndDuties,
+        AfterChangingBack,
+        StayingInUniform,
+        StoringWhatTheyMade,
+        RidingAlong,
     }
 
     /// <summary>
-    /// The priorities the case fixtures run at, and the pad the cases share.
+    /// The priorities the fixtures that play the game run at, and the pad their tests share.
     /// </summary>
     internal static class HarnessDevTools
     {
@@ -60,11 +64,11 @@ namespace ShiftChange.Tests
     }
 
     /// <summary>
-    /// What every fixture shares: the <c>Run</c> calls a case's test makes, which find the pad,
-    /// stage the case through <see cref="Case(Map, CellRect, string, Func{Fixture, bool})"/> and
-    /// its siblings, and report it; and what every fixture allows, lines other mods log by
-    /// themselves on a full list, which land in whichever test is running. Each passes only with
-    /// that mod's own code on its stack, so the same text from this mod still fails.
+    /// What every fixture shares: the pad its tests play on (<see cref="ReadyPad"/>), a test's
+    /// sentence, and what every fixture allows, lines other mods log by themselves on a full
+    /// list, which land in whichever test is running. Each passes only with that mod's own code
+    /// on its stack, so the same text from this mod still fails. How a story test runs:
+    /// <see cref="StoryFixture"/>.
     /// </summary>
     [WarningsAllowedFrom(HarnessFixture.MeleeAnimationFrame, HarnessFixture.MeleeAnimationLine)]
     [WarningsAllowedFrom(HarnessFixture.MapPreviewFrame, HarnessFixture.MapPreviewRandomness)]
@@ -112,7 +116,7 @@ namespace ShiftChange.Tests
             + @"System\.NullReferenceException[\s\S]*RimWorld\.Planet\.WorldRendererUtility\.";
 
         /// <summary>
-        /// VE Framework giving a new colonist the traits its ideoligion's memes require, as a case
+        /// VE Framework giving a new colonist the traits its ideoligion's memes require, as a test
         /// generates one, whatever traits the colonist already rolled.
         /// </summary>
         internal const string MemeTraitFrame =
@@ -123,52 +127,23 @@ namespace ShiftChange.Tests
         internal const string TraitAlreadyHeld = @"^[^\n]* already has trait [\w-]+$";
 
         /// <summary>
-        /// The map and pad the running case was handed: DevTools' map and the pad on it, or, for a
-        /// case that needs neither, the current map and an empty pad. Case bodies read them in
-        /// their lambdas, which run once they are set.
+        /// The map and pad the running test was handed: DevTools' map and the pad on it, or, for a
+        /// test that needs neither, the current map and an empty pad. Test bodies read them once
+        /// they are set.
         /// </summary>
         internal Map Map;
 
         internal CellRect Pad;
 
-        /// <summary>A case on a checked-out fixture (<see cref="Build"/>) on the pad.</summary>
-        internal IEnumerator Run(Func<Fixture, bool> body, [CallerMemberName] string test = null)
-        {
-            return OnPad(test, sentence => Case(Map, Pad, sentence, body));
-        }
-
-        /// <summary>A case that stages its own fixture on the pad.</summary>
-        internal IEnumerator Run(Func<Map, CellRect, Fixture> stage, Func<Fixture, bool> body,
-                                 [CallerMemberName] string test = null)
-        {
-            return OnPad(test, sentence => Case(Map, Pad, sentence, stage, body));
-        }
-
-        /// <summary>A case on DevTools' map that reads the pad but stages no fixture.</summary>
-        internal IEnumerator RunOnPad(Func<bool> body, [CallerMemberName] string test = null)
-        {
-            return OnPad(test, sentence => Case(sentence, body));
-        }
-
         /// <summary>
-        /// A case that needs no map or pad: no pad search, no camera move. Two save/load legs find
-        /// a pad of their own, wherever the camera is.
+        /// Finds the current map's pad and looks the camera away from it, then sets
+        /// <see cref="Map"/> and <see cref="Pad"/>; leaves <see cref="Map"/> null, the test
+        /// failed with the reason, when there is no map, no pad, or the camera still sees it.
         /// </summary>
-        internal IEnumerator Run(Func<bool> body, [CallerMemberName] string test = null)
+        internal IEnumerator ReadyPad()
         {
-            Map = Find.CurrentMap;
+            Map = null;
             Pad = CellRect.Empty;
-            Judge(test, sentence => Case(sentence, body));
-            yield break;
-        }
-
-        /// <summary>
-        /// Runs a case on the current map's pad, unseen by the camera. The pad is found once per
-        /// map, so a case that leaves the pad unusable fails the cases after it instead of moving
-        /// them to another pad.
-        /// </summary>
-        internal IEnumerator OnPad(string test, Action<string> runCase)
-        {
             Map map = Find.CurrentMap;
             if (map == null)
             {
@@ -190,15 +165,15 @@ namespace ShiftChange.Tests
             }
             CellRect pad = HarnessDevTools.Pad;
 
-            // Cases pump pawns by hand under a stopped clock, and Thing.DoTick gives a pawn the
-            // camera can see its interval tick every one to five pumps instead of every fifteen,
-            // which changes whose needs fire and how far a pumped job gets. DevTools centres the
+            // Thing.DoTick gives a pawn the camera can see its interval tick every one to five
+            // ticks instead of every fifteen (GenTicks.GetCameraUpdateRate), on the game's clock
+            // as in play, which changes whose needs fire and how far a job gets. DevTools centres the
             // camera on the map, where the pad is, so look away first. The camera's view rect is
             // cached per frame, so the move shows only after one.
             Find.CameraDriver.JumpToCurrentMapLoc(new IntVec3(1, 0, 1));
             yield return null;
             yield return null;
-            // Cases reach past the pad (the fixture check eight cells out), so keep a margin.
+            // Tests reach past the pad (the fixture check eight cells out), so keep a margin.
             if (Find.CameraDriver.CurrentViewRect.ExpandedBy(1).Overlaps(pad.ExpandedBy(10)))
             {
                 Test.Fail("the camera still sees the pad at " + pad + " after looking away");
@@ -207,45 +182,15 @@ namespace ShiftChange.Tests
 
             Map = map;
             Pad = pad;
-            Judge(test, runCase);
         }
 
-        /// <summary>
-        /// Runs a case, handed its sentence, and writes its transcript to Test.log, one line per
-        /// assertion. A failed assertion has failed the test already; a known gap skips it, which
-        /// leaves a failed test failed.
-        /// </summary>
-        internal void Judge(string test, Action<string> runCase)
-        {
-            string sentence = Sentence(test);
-            if (sentence == null)
-            {
-                Test.Fail(test + " has no TestDescription, the sentence its transcript opens with");
-                return;
-            }
-            Report.Length = 0;
-            GapThisCase = false;
-            Wrap(() => runCase(sentence));
-            string transcript = Report.ToString().TrimEnd();
-            DevLog.Write(transcript);
-
-            if (transcript.Length == 0)
-            {
-                Test.Fail("the case never ran");
-            }
-            else if (GapThisCase)
-            {
-                Test.Skip("a known gap; its transcript is above");
-            }
-        }
-
-        /// <summary>Runs a case; the save/load fixture runs it as a load runs.</summary>
+        /// <summary>Runs a test's body; the save/load fixture runs it as a load runs.</summary>
         protected virtual void Wrap(Action runCase)
         {
             runCase();
         }
 
-        /// <summary>The sentence a test's <c>TestDescription</c> gives its case.</summary>
+        /// <summary>The sentence a test's <c>TestDescription</c> opens its story with.</summary>
         internal static string SentenceOf(MethodInfo test)
         {
             return test?.GetCustomAttribute<TestDescriptionAttribute>()?.Value as string;
@@ -263,9 +208,9 @@ namespace ShiftChange.Tests
     /// <summary>
     /// Checks the tests DevTools registered from this assembly, which it runs in registry order:
     /// each fixture runs exactly the tests it declares, in declaration order, which DevTools keeps
-    /// for up to 16 tests to a fixture; every case fixture runs at a priority of its own, the
-    /// save/load legs at the lowest; and every case has a sentence of its own. It reads DevTools'
-    /// registry and runs no case, so it needs no game.
+    /// for up to 16 tests to a fixture; every fixture that plays the game runs at a priority of
+    /// its own, <see cref="SavingAndLoading"/> at the lowest; and every test has a sentence of its
+    /// own. It reads DevTools' registry and runs no test of its own, so it needs no game.
     /// </summary>
     [TestFixture(TestType.MainMenu)]
     internal class HarnessTestOrder : HarnessFixture
@@ -283,7 +228,7 @@ namespace ShiftChange.Tests
             List<string> problems = new List<string>();
             Dictionary<int, string> priorities = new Dictionary<int, string>();
             Dictionary<string, string> sentences = new Dictionary<string, string>();
-            // Nullable, since the save/load legs' priority, DevTools' lowest, is int.MinValue.
+            // Nullable, since the save/load fixture's priority, DevTools' lowest, is int.MinValue.
             int? saveLoadPriority = null;
             int lowestOther = int.MaxValue;
             int caseFixtures = 0;
@@ -320,7 +265,7 @@ namespace ShiftChange.Tests
 
                 caseFixtures++;
                 int priority = fixture.MetaData.Get<int>("ExecutionPriority");
-                if (fixture.Type == typeof(HarnessDevToolsSaveLoad))
+                if (fixture.Type == typeof(SavingAndLoading))
                 {
                     saveLoadPriority = priority;
                 }
@@ -356,17 +301,17 @@ namespace ShiftChange.Tests
             }
             if (caseFixtures != Enum.GetValues(typeof(CaseGroup)).Length + 1)
             {
-                problems.Add(caseFixtures + " case fixtures registered, not one for each CaseGroup"
-                             + " and the save/load legs");
+                problems.Add(caseFixtures + " fixtures that play the game registered, not one for each"
+                             + " CaseGroup and SavingAndLoading");
             }
             if (saveLoadPriority == null)
             {
-                problems.Add("the save/load legs are not registered");
+                problems.Add("SavingAndLoading is not registered");
             }
             else if (saveLoadPriority >= lowestOther)
             {
-                problems.Add("the save/load legs run at priority " + saveLoadPriority
-                             + ", not below every other case fixture");
+                problems.Add("SavingAndLoading runs at priority " + saveLoadPriority
+                             + ", not below every other fixture that plays the game");
             }
 
             if (problems.Count > 0)

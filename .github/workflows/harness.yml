@@ -1,5 +1,5 @@
-# On every push, builds Shift Change and its tests and runs every harness case
-# as a DevTools test in RimWorld 1.7 on a Fly machine, as
+# On every push, builds Shift Change and its tests and runs every test
+# under DevTools in RimWorld 1.7 on a Fly machine, as
 # devtools/run-harness.sh runs them: Harmony, Core, SmashPhil's DevTools and
 # this mod, started with `--pid MrBeverage.ShiftChange --test -e`. It runs
 # twice, once with every DLC and once with Odyssey alone, the one DLC this mod

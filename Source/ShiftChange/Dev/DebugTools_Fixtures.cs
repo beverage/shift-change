@@ -57,9 +57,7 @@ namespace ShiftChange
         /// <paramref name="mustBeCapableOf"/>, when given, is enabled. Relations are off so the
         /// discarded rolls leave nothing behind.
         ///
-        /// The lifecycle harness also relies on two more rolls being removed: a pawn whose
-        /// needs tick under a stopped clock (<see cref="NeedsTickWhilePumped"/>) is rerolled,
-        /// and conditions it arrived needing tended are removed
+        /// The tests also rely on conditions it arrived needing tended being removed
         /// (<see cref="RemoveTendableConditions"/>).
         /// </summary>
         internal static Pawn AveragePawn(Gender gender, string nick, WorkTypeDef mustBeCapableOf = null)
@@ -77,9 +75,7 @@ namespace ShiftChange
             }
             Pawn pawn = PawnGenerator.GeneratePawn(request);
             for (int tries = 0;
-                 (NeedsTickWhilePumped(pawn)
-                  || (mustBeCapableOf != null && pawn.WorkTypeIsDisabled(mustBeCapableOf)))
-                 && tries < 30;
+                 mustBeCapableOf != null && pawn.WorkTypeIsDisabled(mustBeCapableOf) && tries < 30;
                  tries++)
             {
                 pawn.Destroy();
@@ -94,7 +90,8 @@ namespace ShiftChange
             // any gender (IdeoUtility.IdeoPrefersNudityForGender), and a quicktest colony rolls
             // its ideoligion at random. Left in, such a precept would sometimes make the decency
             // cases stage a colonist that SwapPlan.PrefersNudity exempts. Removing the precept
-            // keeps the ideoligion; NudistIsExemptFromDecency arranges its own nudity by trait.
+            // keeps the ideoligion; KeepingThemDecent.NudistIsLeftUndressed arranges its own
+            // nudity by trait.
             if (ModsConfig.IdeologyActive && pawn.Ideo != null)
             {
                 List<Precept> nudity = new List<Precept>();
@@ -121,27 +118,6 @@ namespace ShiftChange
             }
             pawn.Drawer?.renderer?.SetAllGraphicsDirty();
             return pawn;
-        }
-
-        /// <summary>Copy of the protected <c>Thing.MaxTickIntervalRate</c>.</summary>
-        internal const int MaxTickIntervalDelta = 15;
-
-        /// <summary>
-        /// Whether this pawn's needs, or its random mental-break check, would fire while the
-        /// lifecycle harness pumps it. The harness runs every case inside one frame, so the
-        /// game clock stands still while <c>RunSwap</c> and the other pumps call
-        /// <c>Pawn.DoTick</c> by hand. The needs tracker and the mental breaker run on
-        /// <c>IsHashIntervalTick(150, delta)</c>, which reads that clock and the pawn's id with
-        /// a delta of at most <see cref="MaxTickIntervalDelta"/>, so for a given pawn the
-        /// answer never changes. Most pawns' needs never move, about one in ten gets 150 ticks
-        /// of need every 15 pumped ticks, and about one in 150 gets them every pumped tick; a
-        /// colonist of the last kind is out of food within 500 pumped ticks and dies, which
-        /// cuts a case short. With the clock running, as in the stage builders, this costs a
-        /// reroll now and then and nothing else.
-        /// </summary>
-        internal static bool NeedsTickWhilePumped(Pawn pawn)
-        {
-            return pawn.IsHashIntervalTick(150, MaxTickIntervalDelta);
         }
 
         /// <summary>

@@ -217,8 +217,8 @@ namespace ShiftChange
         /// The rect the body listing draws into, and whether it scrolls. The listing is never
         /// handed a rect shorter than the body it has to draw.
         ///
-        /// <para>Static and free of GUI calls so the harness can assert it: the harness runs from
-        /// <c>Game.FinalizeInit</c>, where there is no GUI context to draw in.</para>
+        /// <para>Static and free of GUI calls so a test can assert it: DevTools runs a test in a
+        /// coroutine, outside the GUI pass, where there is no GUI context to draw in.</para>
         /// </summary>
         internal static Rect BodyRect(float measuredBody, Rect content, out bool scrolling)
         {

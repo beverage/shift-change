@@ -203,9 +203,9 @@ Behaviour is verified in game, on a clean Release restart. Two tools help.
 **The demo stage** is the general fixture — a colony in one click, where a swap
 can be watched end to end.
 
-**The lifecycle harness** covers what the demo stage cannot: a hundred and six
-cases that drive the engine's own entry points and assert where the ledger
-landed.
+**The lifecycle harness** covers what the demo stage cannot: DevTools tests, each
+told as a story, that drive the engine's own entry points and check where the
+ledger landed.
 What it covers, what it deliberately does not, the rules it follows and the four
 engine traps it had to pay for are all in [TESTING.md](TESTING.md).
 
@@ -275,9 +275,10 @@ list is precisely the environment in which a conflict cannot appear.
 
 ### Watching a case
 
-The cases run only under DevTools. A failing case's transcript in `Test.log`
-prints every assertion it made, pass or fail, and the pad's position; DevTools'
-test explorer, in dev mode, lists each case with its sentence as the tooltip.
+The tests run only under DevTools. A test's story in `Test.log` prints every
+check it made, pass or fail, and the pad's position; DevTools' test explorer, in
+dev mode, lists each test with its sentence as the tooltip, and a failed test's
+story so far under its row.
 
 The debug menu keeps the scene builders, on a Debug or Media build.
 **Search only filters the level you are looking at.** `DebugTabMenu.VisibleActions`
@@ -507,7 +508,7 @@ Folders by concern. Everything outside `Dev/` ships, and `check-invariants.py` h
 | File | Role |
 |---|---|
 | `Interop_OutfitStandsPlus.cs` | Reflection bridge to Outfit Stands Plus. Silent-fail; absent mod means an inert file. |
-| `Patch_OutfitStandsPlusUseButton.cs` | Transpiler that swaps the walk over every colony building, in Outfit Stands Plus' per-colonist stand button, for a per-map list of the colony's stands kept in the same order. Applied by hand from `HarmonyInit`, and only while their original IL still makes that call; otherwise it leaves the button alone and says why. Its case is in `ShiftChange.Tests/HarnessInterop.cs`. |
+| `Patch_OutfitStandsPlusUseButton.cs` | Transpiler that swaps the walk over every colony building, in Outfit Stands Plus' per-colonist stand button, for a per-map list of the colony's stands kept in the same order. Applied by hand from `HarmonyInit`, and only while their original IL still makes that call; otherwise it leaves the button alone and says why. Its test is in `ShiftChange.Tests/WhoUsesAStand.cs`. |
 | `Patch_ForeignOwnerGizmos.cs` | Hides the other mod's Set owner control on every stand carrying ours, in both modes. Its list is a copy of ours, so an edit made through it would only be overwritten. |
 
 #### `Dev/`
@@ -538,14 +539,33 @@ committed `Tests/Assemblies/ShiftChange.Tests.dll`.
 
 | File | Role |
 |---|---|
-| `HarnessCases.cs` | Every case, one DevTools `[Test]` each, in run order, in one fixture per `CaseGroup` and the save/load fixture last. A test is named after its case's body, its `[TestDescription]` is the case's sentence, and its one line is a `Run` call. |
-| `HarnessDevTools.cs` | `CaseGroup`, the fixtures' order; `HarnessFixture`, which every fixture derives from: the `Run` calls, which find the pad (once per map) out of the camera's sight when a case needs one, stage the case and write its transcript to Test.log, and the log lines every fixture allows; `HarnessTestOrder`, which checks DevTools runs every fixture's tests once, in declaration order, at priorities of their own; and `HarnessLoadNote`. |
-| `DebugTools_LifecycleHarness.cs` | The case machinery: `Case`, which stages, runs and tears down one case, its assertions (`Expect`, `ExpectKnownGap`, `Fail`), which signal DevTools as they go, the fixture types and the pad finder. The cases' bodies, which drive real engine entry points, live in the files beside it — see [TESTING.md](TESTING.md). |
-| `DebugTools_SaveRoundTrip.cs` | The four save/load cases. Separate file because they replace `Current.Game` and must run last. |
-| `HarnessCatchments.cs` | The catchment cases, one `partial` class: `.Radius` for coverage and dressing in a ring, `.ReturnTrip`, `.BillProduct` for the haul that stores a finished bill's product, `.Deliveries`, `.Area`, `.AreaUi` for the alert and the Serves menu, and `.Latch`. The main file holds the cases true in every mode and the helpers several files share. |
-| `HarnessVacuum.cs` | The vacuum cases, on the second map, which is a vacuum map: the ground they stand on, then a staged ship of a room, open floor and a second room, and the cases a review of the gate added (each dress path, doors, a stranded colonist, the cooldown, an urgent patient, a stand on another map). |
-| `HarnessJobKinds.cs` | The job classifier as a table: every job shape the other cases build, and the kind and work type it must get. |
-| `HarnessFixtureChecks.cs` | What every case takes for granted about its fixture: a colonist who needs no doctor and whose needs hold still under the stopped clock, and open ground past the pad. Runs first. |
+| `HarnessDevTools.cs` | `CaseGroup`, the fixtures' order; `HarnessFixture`, which every fixture derives from: the pad, found once per map (`ReadyPad`) out of the camera's sight, a test's sentence, how a test's body is run (`Wrap`), and the log lines every fixture allows; `HarnessTestOrder`, which checks DevTools runs every fixture's tests once, in declaration order, at priorities of their own; and `HarnessLoadNote`. |
+| `DebugTools_LifecycleHarness.cs` | The fixture a test sets up (a stand, its colonist, and what the test adds; its `Hold` keeps what the test arranged in place while the clock steps), `Stage`'s kits, and the pad finder. The tests drive real engine entry points — see [TESTING.md](TESTING.md). |
+| `DebugTools_SaveRoundTrip.cs` | What the save/load tests share: the save files and keys, the synchronous load (`Load`, through `NoteLoad`), and readers of the written file. |
+| `HarnessFixtures.cs`, `HarnessCatchments.cs` and the other `Harness*` files | What the stories share: staging, a change at the stand within a frame (`RunSwap`) and teardown (`HarnessFixtures`); the jobs and areas the catchment tests share (`HarnessCatchments`, one `partial` class); the flights (`HarnessLifecycle`), ride-along jobs (`HarnessRideAlong`), gate jobs (`HarnessGates`), the game's tables (`HarnessTables`) and the stand's buttons (`HarnessGizmos`). |
+| `HarnessVacuum.cs` | The vacuum staging every vacuum test shares, on the second map, which is a vacuum map: a ship of a room, open floor and a second room, its doors and its held air. |
+| `StoryFixture.cs` | The base of every story fixture: the frames a test runs in (`Staged`, `OnThePad`, `Told`), which open its story with its sentence, run its body, always tear down and put Keep colonists decent back; `Swap`, one change with the game's clock stepped until its driver ends, a frame passing every 250 ticks, and `SwapNow`, one within the frame; and checks and set-up many tests share (`NotSentStraightBack`, `AnotherColonist`). |
+| `TheTestColony.cs` | What every test takes for granted about the colony it runs in: a colonist who needs no doctor, and open ground past the pad. Runs first. |
+| `ChangingAtAStand.cs` | The swap on the game's clock: the forced-flag round trip, a stand that displaces nothing, the whole outfit, and a colonist who walks to the stand. |
+| `KeepingThemDecent.cs` | Keep colonists decent on the game's clock: the belt stand, the trousers pair for a man and a woman, the nudist, and the shipped default. |
+| `WhatSendsThemToChange.cs` | Which jobs send a colonist to change, and the settings that decide it: recreation, going to bed and getting up, bed rest, fishing, medical emergencies, new stands, deposit only, the promises, and the job classifier as a table. |
+| `WhoUsesAStand.cs` | Owners, groups and the owner window, Allow removing items and Change back, and another mod's owner list and stand button. |
+| `ServingARoomOrARing.cs` | A stand serving its room or a radius: what the ring covers, whom it dresses, a stand in the open, Change back beside a stand, and the words for each. |
+| `ServingAnArea.cs` | A stand serving an allowed area: what it covers, whom it dresses, a deleted area, a gravship landing, the Serves menu and words, the serves-nothing alert, and a stand the colonist's own area leaves out. |
+| `KeepingTheirVacsuitOn.cs` | On a vacuum map: air in a room, and when a colonist in a vacsuit keeps it on. |
+| `LosingAStandOrAColonist.cs` | A stand torn down, reinstalled (mid-shift too) or lost with its map, a colonist dead, kidnapped, banished or left behind, and repeated errors. |
+| `FlyingTheGravship.cs` | A gravship flight with the stand and the colonist on shift at it, together or apart. |
+| `HeadingIntoVacuum.cs` | Work, orders and emergencies through vacuum: changing back first, a vacsuit stand, a colonist cut off, the retry wait, an urgent patient, a stand on another map. |
+| `MealsDangerAndDuties.cs` | A meal break, sleepwear at breakfast, a hostile on the map and a duty. |
+| `AfterChangingBack.cs` | A freed stand calling the next colonist over, and the hold Change back keeps on a stand, its work and its room. |
+| `StayingInUniform.cs` | Work that keeps the uniform on away from the stand, in a radius, at bed and play, for the job they dressed for, on a delivery and as an urgent patient, and what changes them back. |
+| `StoringWhatTheyMade.cs` | Carrying what a bill made to a stockpile: when the trip keeps a crafter in uniform. |
+| `RidingAlong.cs` | Errands that ride along with the stand's work: feeding a patient, a meal run, hauls ahead of a bill, Common Sense and Pick Up And Haul. |
+| `SavingAndLoading.cs` | Saving and loading a stand in use, older saves, another mod's owner list and an allowed area. Runs last, on a world of its own. Deletes the saves it wrote once all four have run, except those a failed test used (`RemoveSaves`). |
+| `ButtonsAndOrders.cs` | The stand's switch and buttons, spares of parked clothes, and a recolor order on shift. |
+| `ReadingJobsAndRooms.cs` | What counts as recreation and sleep, the tables of rooms, jobs and buildings, the Work types window's sizing, and the room a job at a wall belongs to. |
+| `GameClock.cs` | Steps the game's whole clock for a test, a frame at a time (`Run`) or within the caller's frame (`Step`, which `RunSwap` and a bill's own steps use), with the storyteller and random mental breaks off, and puts them back. Autosave is held by DevTools for the whole run. |
+| `Story.cs` | A test's checks as lines in the game's words; the first failure fails the test with the lines so far, its own marked. |
 
 ### Content
 

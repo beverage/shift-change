@@ -85,9 +85,9 @@ devtools/run-harness.sh --with-after=khamenman.outfitstandsplus   # the same, lo
 ```
 
 Each case runs as a test under SmashPhil's DevTools, so 1.7 only, with a
-DevTools build that has SmashPhil/DevTools#17. Each is a `[Test]` in
-`Source/ShiftChange.Tests/HarnessCases.cs`, in run order (docs/TESTING.md,
-"Adding a case").
+DevTools build that has SmashPhil/DevTools#17. Each is a `[Test]` told as a
+story, in a fixture under `Source/ShiftChange.Tests/` named for what a player
+sees (docs/TESTING.md, "Adding a case").
 
 It asserts where the ledger lands after each despawn/death/banishment event, by
 firing the engine's real entry points at a throwaway fixture, and exits non-zero
@@ -95,7 +95,7 @@ if a case fails. Touch `PostDeSpawn`, `PostSwapMap`, `Notify_MapRemoved`,
 `ReleaseBorrower`, `AbandonLedger` or `Patch_UnclaimStands` and run it.
 
 A harness pass is not a play observation, and a skipped test (a `GAP` line in
-its transcript) is a known failure being tracked, not a pass. **Six gaps are expected on the default list**: the
+its story) is a known failure being tracked, not a pass. **Six gaps are expected on the default list**: the
 Rimatomics table and marker cases skip themselves when Rimatomics is not
 loaded, and the Outfit Stands Plus, Common Sense and Pick Up And Haul cases
 when their mod is not (`--with=` loads each). The sixth is Complex Jobs'
@@ -113,15 +113,15 @@ the written file as well as the loaded state. They run last, since they replace
 
 **Four engine traps live in the driver cases**, all invisible from the API and
 all already paid for once. Pathfinding is asynchronous, so ticking a
-single pawn never completes a walk — fixtures stage the pawn on the stand's
-interaction cell. Jobs are pooled, so a `Job` reference held across its own
+single pawn never completes a walk — step the game's clock (`GameClock`), never
+`Pawn.DoTick`. Jobs are pooled, so a `Job` reference held across its own
 completion silently becomes the pawn's *next* job — watch `jobs.curDriver`,
-never the job. The clock stands still while the harness runs, so a pumped
-pawn's needs either never tick or tick far too often, and a colonist can sleep,
-starve or die mid-case — the fixture hands out only colonists whose needs do not
-tick under a stopped clock. And a generated colonist is not tended, so one with
-asthma is an urgent patient — the fixture removes what it arrives needing
-tended. docs/TESTING.md, "Four engine traps".
+never the job. The whole map ticks on the clock, so what a case arranged moves
+while a swap runs — Odyssey's air drifts between rooms, a spawned colonist
+wanders off, a Goto ends — and the case holds it (`Fixture.Hold`, `StayPut`,
+`WorkingAt`). And a generated colonist is not tended, so one with asthma is an
+urgent patient — the fixture removes what it arrives needing tended.
+docs/TESTING.md, "Four engine traps".
 
 **Every colony exit must reach the reaper.** Vanilla routes death, trade,
 kidnap and map exit through `Pawn_Ownership.UnclaimAll`, which
@@ -256,7 +256,7 @@ decompiled game, and none of the history.
   inline comment explains a line that is not obvious, and nothing that is.
 - No history: no dates, no "used to" or "was once", no story of the bug or the
   review that produced the code, no capitals or bold for emphasis. History
-  belongs in git and CHANGELOG.md. A harness case may say in one sentence
+  belongs in git and CHANGELOG.md. A test may say in one sentence
   that it guards a past bug. `check-invariants.py` rejects a date or a
   `File.cs:123` citation in any comment under `Source/`.
 - The reason lives at the site. Point at `docs/DESIGN.md` only for an argument
