@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Run every harness case as a DevTools test, in an ISOLATED game instance.
+# Run every test under DevTools, in an ISOLATED game instance.
 #
 #   devtools/run-harness.sh          # a four-mod list — the iteration loop
 #   devtools/run-harness.sh --full   # your own mod list, copied — the release gate

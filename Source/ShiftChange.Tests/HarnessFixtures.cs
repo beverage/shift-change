@@ -12,55 +12,9 @@ using static ShiftChange.Tests.DebugTools_LifecycleHarness;
 
 namespace ShiftChange.Tests
 {
-    /// <summary>Staging, the swap and teardown shared by every harness case.</summary>
+    /// <summary>Staging, the swap and teardown shared by every test.</summary>
     internal static class HarnessFixtures
     {
-        /// <summary>
-        /// A spare colonist on the pad, registered for teardown. Spawning is retried like a fixture
-        /// build (<see cref="BuildAttempts"/>): on a large mod list it can throw
-        /// <c>Collection was modified</c> in <c>Pawn_HealthTracker.Notify_Spawned</c>, under
-        /// third-party postfixes on <c>Pawn.SpawnSetup</c>. Every retry is printed, and the last
-        /// attempt's exception fails the case.
-        /// </summary>
-        internal static Pawn SpawnExtra(Fixture fix, Gender gender, string nick)
-        {
-            return SpawnExtra(fix, gender, nick, fix.Stand.Position + new IntVec3(2, 0, fix.Extras.Count + 1));
-        }
-
-        /// <summary><see cref="SpawnExtra(Fixture, Gender, string)"/> on a given cell.</summary>
-        internal static Pawn SpawnExtra(Fixture fix, Gender gender, string nick, IntVec3 cell)
-        {
-            for (int attempt = 1; ; attempt++)
-            {
-                Pawn pawn = DebugTools_Fixtures.AveragePawn(gender, nick);
-                pawn.workSettings?.EnableAndInitialize();
-                try
-                {
-                    GenSpawn.Spawn(pawn, cell, fix.Map, Rot4.North);
-                    fix.Extras.Add(pawn);
-                    return pawn;
-                }
-                catch (Exception e) when (attempt < BuildAttempts)
-                {
-                    Report.Append("    RETRY extra pawn spawn threw on attempt ").Append(attempt)
-                          .Append(" — ").Append(e.GetType().Name).Append(": ")
-                          .AppendLine(e.Message);
-                    try
-                    {
-                        // Likely half spawned: clear it before the retry lands on the same cell.
-                        if (!pawn.Destroyed)
-                        {
-                            pawn.Destroy();
-                        }
-                    }
-                    catch (Exception)
-                    {
-                        // Teardown clears the pad whatever is left on it.
-                    }
-                }
-            }
-        }
-
         /// <summary>Stand-in gizmos: never drawn, only counted and compared by reference.</summary>
         internal static List<Gizmo> Sentinels()
         {
@@ -133,7 +87,7 @@ namespace ShiftChange.Tests
         /// <summary>
         /// A live hostile on the map, which is all <c>StoryDanger</c> is: <c>DangerWatcher</c> sums
         /// <c>kindDef.combatPower</c> over the attack-target cache. It stands inert only while
-        /// nothing ticks: clear it (<see cref="ClearThreat"/>) before the case steps the clock,
+        /// nothing ticks: clear it (<see cref="ClearThreat"/>) before the test steps the clock,
         /// or it moves and attacks, and the colonist reacts to it.
         ///
         /// <para>Unfogged, because <c>IsActiveThreatToPlayer</c> refuses a fogged target
@@ -171,7 +125,7 @@ namespace ShiftChange.Tests
             Pawn threat = PawnGenerator.GeneratePawn(kind, hostile);
             GenSpawn.Spawn(threat, cell, fix.Map, Rot4.North);
             fix.Map.fogGrid.Unfog(threat.Position);
-            // Registered so Teardown removes it if the case throws before ClearThreat.
+            // Registered so Teardown removes it if the test throws before ClearThreat.
             fix.Extras.Add(threat);
             ForceDangerRecheck(fix.Map);
             return threat;
@@ -179,9 +133,9 @@ namespace ShiftChange.Tests
 
         /// <summary>
         /// Drops <c>DangerWatcher</c>'s cache stamp so the next read recomputes. The rating is
-        /// cached for 101 ticks, and a case arranges and reads the map between ticks, usually
+        /// cached for 101 ticks, and a test arranges and reads the map between ticks, usually
         /// with none in between, so a spawned hostile would sit behind a stale <c>None</c> and the
-        /// case would assert nothing.
+        /// test would assert nothing.
         /// </summary>
         internal static void ForceDangerRecheck(Map map)
         {
@@ -222,7 +176,7 @@ namespace ShiftChange.Tests
         /// <summary>
         /// Asks the real decision function (<c>TryInsertSwap</c>) what it would do and leaves no
         /// trace: cancels a swap it started and clears the retry cooldown a refusal stamps, which
-        /// would otherwise make later probes in the case return false for the wrong reason.
+        /// would otherwise make later probes in the test return false for the wrong reason.
         /// </summary>
         internal static bool Diverts(Fixture fix, Job job, JobTag? tag = null)
         {
@@ -238,7 +192,7 @@ namespace ShiftChange.Tests
         /// <summary>
         /// <see cref="Diverts"/>, then drops whatever it queued. A divert enqueues the deferred job
         /// with its reservations held, so a meal or patient reserved by one probe would fail the
-        /// next probe's dry run, and the case would read a reservation clash as a refusal.
+        /// next probe's dry run, and the test would read a reservation clash as a refusal.
         /// </summary>
         internal static bool Probe(Fixture fix, Job job, JobTag? tag = null)
         {
@@ -249,7 +203,7 @@ namespace ShiftChange.Tests
 
         /// <summary>
         /// Puts a pawn back where a probe found them (no swap, nothing queued, no retry cooldown),
-        /// for cases that call <c>TryInsertSwap</c> directly to inspect what it left behind first.
+        /// for tests that call <c>TryInsertSwap</c> directly to inspect what it left behind first.
         /// </summary>
         internal static void Settle(Pawn pawn)
         {
@@ -298,9 +252,9 @@ namespace ShiftChange.Tests
 
         /// <summary>
         /// Walls the pad's edge and roofs and floors all of it, so the interior is a proper room.
-        /// The functional cases need one: <c>FindAvailableStand</c> walks
+        /// The functional tests need one: <c>FindAvailableStand</c> walks
         /// <c>room.ContainedThings</c>, and on the open pad that room is the whole outdoors. The
-        /// lifecycle cases act on a ledger directly and do not.
+        /// lifecycle tests act on a ledger directly and do not.
         /// </summary>
         internal static void EnclosePad(Map map, CellRect pad)
         {
@@ -324,7 +278,7 @@ namespace ShiftChange.Tests
 
         /// <summary>
         /// A stand stocked with a duster and a pawn dressed per <paramref name="kit"/> on its
-        /// interaction cell, with no ledger yet: cases that watch the driver build one start here
+        /// interaction cell, with no ledger yet: tests that watch the driver build one start here
         /// and call <see cref="RunSwap"/>. The stand sits one cell in from the pad's south-west
         /// corner. Null when the stand def, the duster or the comp cannot be had.
         /// </summary>
@@ -361,7 +315,7 @@ namespace ShiftChange.Tests
             {
                 pawn.workSettings?.EnableAndInitialize();
             }
-            // On the interaction cell, so the swap starts without a walk and a case's checks are
+            // On the interaction cell, so the swap starts without a walk and a test's checks are
             // about the change alone. ChangingAtAStand.WalksToTheStand covers the walk, which is
             // vanilla's Toils_Goto.
             GenSpawn.Spawn(pawn, stand.InteractionCell, map, Rot4.North);
@@ -383,10 +337,10 @@ namespace ShiftChange.Tests
         /// <summary>
         /// <see cref="Stage"/> in an enclosed room with a door in its west wall beside the stand,
         /// and the strip of ground outside that wall cleared, floored with soil and unfogged. For
-        /// cases that need a colonist inside to reach something outside: hauling asks
+        /// tests that need a colonist inside to reach something outside: hauling asks
         /// <c>CanReach</c> before it hands out a job
         /// (<c>HaulAIUtility.PawnCanAutomaticallyHaulFast</c>), and the return trip asks it of the
-        /// stand before it starts a swap, so in a sealed room neither can happen and a case would
+        /// stand before it starts a swap, so in a sealed room neither can happen and a test would
         /// pass for that reason.
         ///
         /// <para>The strip is the pad's one-cell margin, which
@@ -494,7 +448,7 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// Strips a fixture stand to empty, so a case can state what it holds instead of working
+        /// Strips a fixture stand to empty, so a test can state what it holds instead of working
         /// around the duster <see cref="Stage"/> stocks.
         /// </summary>
         internal static void ClearStand(Building_OutfitStand stand)
@@ -544,9 +498,9 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// Keeps a patient where the case put them while the clock steps, as one in bed would
-        /// stay: a posture wait with no end, which only the case or an emergency replaces. A pawn
-        /// spawned for a case otherwise picks jobs of its own once the clock runs, and wanders off.
+        /// Keeps a patient where the test put them while the clock steps, as one in bed would
+        /// stay: a posture wait with no end, which only the test or an emergency replaces. A pawn
+        /// spawned for a test otherwise picks jobs of its own once the clock runs, and wanders off.
         /// </summary>
         internal static void StayPut(Pawn pawn)
         {
@@ -563,16 +517,16 @@ namespace ShiftChange.Tests
         /// <summary>
         /// Runs one swap through the real driver: starts the job on the pawn's own tracker, then
         /// steps the game's clock (<see cref="GameClock.Step"/>), within this frame, until the job
-        /// ends. Returns false, after printing why, when the swap gets no driver, ends with
-        /// anything but <c>Succeeded</c>, or outlasts <paramref name="maxTicks"/>. Every caller
-        /// asserts on it, so a swap that gave up fails loudly instead of falling through to
-        /// assertions that pass for the wrong reason.
+        /// ends. Returns false, after saying why to <paramref name="why"/> a line at a time, when
+        /// the swap gets no driver, ends with anything but <c>Succeeded</c>, or outlasts
+        /// <paramref name="maxTicks"/>. Every caller checks it, so a swap that gave up fails
+        /// loudly instead of falling through to checks that pass for the wrong reason.
         ///
-        /// <para>The whole game ticks, as in play: the map, every pawn on it, the case's other
+        /// <para>The whole game ticks, as in play: the map, every pawn on it, the test's other
         /// colonists included, and the clock that needs and cooldowns read, none of which ticking
         /// the one pawn alone would do (docs/TESTING.md, "Four engine traps").</para>
         /// </summary>
-        internal static bool RunSwap(Fixture fix, int maxTicks = 5000)
+        internal static bool RunSwap(Fixture fix, Action<string> why, int maxTicks)
         {
             Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, fix.Stand);
             fix.Pawn.jobs.StartJob(swap, JobCondition.InterruptForced, null,
@@ -586,7 +540,7 @@ namespace ShiftChange.Tests
             JobDriver started = fix.Pawn.jobs.curDriver;
             if (started == null)
             {
-                Report.AppendLine("      the swap job never got a driver");
+                why("the swap job never got a driver");
                 return false;
             }
 
@@ -606,15 +560,12 @@ namespace ShiftChange.Tests
                 {
                     return true;
                 }
-                Report.Append("      the swap ended with ").Append(ended)
-                      .Append(", not Succeeded — toil ").Append(started.CurToilIndex)
-                      .Append(", pawn at ").Append(fix.Pawn.Position)
-                      .Append(" vs cell ").Append(fix.Stand.InteractionCell)
-                      .AppendLine();
-                // Report what took the pawn: an end condition names the verb and leaves the
+                why("the swap ended with " + ended + ", not Succeeded — toil " + started.CurToilIndex
+                    + ", pawn at " + fix.Pawn.Position + " vs cell " + fix.Stand.InteractionCell);
+                // Say what took the pawn: an end condition names the verb and leaves the
                 // actor unnamed.
                 Job replacement = fix.Pawn.CurJob;
-                Report.Append("        taken by ")
+                why(new StringBuilder("  taken by ")
                       .Append(replacement == null ? "nothing" : replacement.def.defName)
                       .Append(", driver ")
                       .Append(fix.Pawn.jobs?.curDriver == null
@@ -641,14 +592,14 @@ namespace ShiftChange.Tests
                               ? "none" : fix.Pawn.needs.rest.CurLevelPercentage.ToStringPercent())
                       .Append(", ticks at zero rest ")
                       .Append(fix.Pawn.needs?.rest == null ? -1 : fix.Pawn.needs.rest.TicksAtZero)
-                      .AppendLine();
+                      .ToString());
                 return false;
             }
 
             // A bare timeout costs a debugging cycle: say where it got stuck.
             JobDriver driver = fix.Pawn.jobs?.curDriver;
             JobDriver_SwapAtStand ours = driver as JobDriver_SwapAtStand;
-            Report.Append("      stuck after ").Append(maxTicks).Append(" ticks — driver ")
+            why(new StringBuilder("stuck after ").Append(maxTicks).Append(" ticks — driver ")
                   .Append(driver == null ? "null" : driver.GetType().Name)
                   .Append(", toil ").Append(driver == null ? -1 : driver.CurToilIndex)
                   .Append(", ticksLeft ").Append(driver == null ? -1 : driver.ticksLeftThisToil)
@@ -662,7 +613,7 @@ namespace ShiftChange.Tests
                   .Append(" vs cell ").Append(fix.Stand.InteractionCell)
                   .Append(", stanceBusy ")
                   .Append(fix.Pawn.stances != null && fix.Pawn.stances.FullBodyBusy)
-                  .AppendLine();
+                  .ToString());
             return false;
         }
 
@@ -746,9 +697,9 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// Removes what a case left: pawns and their registry entries, the stand, areas, zones,
+        /// Removes what a test left: pawns and their registry entries, the stand, areas, zones,
         /// claimed cells and the second map, then clears the pad's things and roofs. Terrain stays
-        /// as the case left it. Destroying the stand fires our own release path, which is fine
+        /// as the test left it. Destroying the stand fires our own release path, which is fine
         /// since the assertions have run.
         /// </summary>
         internal static void Teardown(Fixture fix, Map map, CellRect pad)
@@ -789,8 +740,8 @@ namespace ShiftChange.Tests
                     }
                 }
                 // The doorway fixture's strip lies outside the pad, so the pad clear below never
-                // reaches it. A stockpile a case left there would be a haul destination for every
-                // later case.
+                // reaches it. A stockpile a test left there would be a haul destination for every
+                // later test.
                 if (fix.Outside.Area > 0)
                 {
                     foreach (IntVec3 cell in fix.Outside)
@@ -806,7 +757,7 @@ namespace ShiftChange.Tests
                     GenDebug.ClearArea(CellRect.SingleCell(cell), map);
                 }
                 // After the pawn and the stand, which may be standing on it. Caught: this runs in
-                // the case's finally, and a throw would end the run for every case after this one.
+                // the test's finally, and a throw would end the run for every test after this one.
                 if (fix.Pocket != null && Find.Maps.Contains(fix.Pocket))
                 {
                     try
@@ -815,7 +766,10 @@ namespace ShiftChange.Tests
                     }
                     catch (Exception e)
                     {
-                        Fail("teardown could not remove the second map: " + e);
+                        // The whole exception in Test.log, its first line in the result.
+                        DevTools.DevLog.Write("teardown could not remove the second map: " + e);
+                        DevTools.Testing.Test.Fail("teardown could not remove the second map: "
+                                                   + e.GetType().Name + ": " + e.Message);
                     }
                 }
             }
@@ -863,14 +817,14 @@ namespace ShiftChange.Tests
         /// <summary>
         /// Removes a <see cref="SecondMap"/>, destroying any pawn still on it first: map removal
         /// passes the pawns it finds to the world (<c>MapDeiniter.PassPawnsToWorld</c>), which
-        /// would keep a fixture colonist in the game after the case.
+        /// would keep a fixture colonist in the game after the test.
         ///
         /// <para>It also drops the redraw the map queued for itself. A new map asks for its first
         /// full redraw once the long event it was made in is over (<c>Map.FinalizeInit</c>, through
-        /// <c>LongEventHandler.ExecuteWhenFinished</c>). A case running inside a long event would
+        /// <c>LongEventHandler.ExecuteWhenFinished</c>). A test running inside a long event would
         /// see the redraw run after it, on a map already gone, logging a failure for every layer
         /// of every section; <see cref="SecondMap"/> drew the map already. The queue is walked by
-        /// index and this map's entries sit after the running case's, so removing them is safe.
+        /// index and this map's entries sit after the running test's, so removing them is safe.
         /// With no long event running nothing is queued, since the redraw then runs at once.</para>
         /// </summary>
         internal static void RemoveSecondMap(Map away)
@@ -893,9 +847,9 @@ namespace ShiftChange.Tests
 
         /// <summary>
         /// <see cref="Build"/> on a <see cref="SecondMap"/>: the stand and its borrower, on shift,
-        /// both on the second map, for a case that flies the borrower to the harness's own map and
-        /// leaves the stand behind. The fixture's <c>Map</c> is the second map, so the case is
-        /// handed the harness's map and pad itself.
+        /// both on the second map, for a test that flies the borrower to DevTools' map and
+        /// leaves the stand behind. The fixture's <c>Map</c> is the second map, so the test is
+        /// handed DevTools' map and pad itself.
         /// </summary>
         internal static Fixture BuildOnSecondMap(Map map, CellRect pad)
         {
@@ -927,13 +881,13 @@ namespace ShiftChange.Tests
 
         /// <summary>
         /// Makes <paramref name="cell"/>, past the pad, bare soil with nothing on it and no roof,
-        /// for a case to put things on, and has <see cref="Teardown"/> clear it again. A cell
+        /// for a test to put things on, and has <see cref="Teardown"/> clear it again. A cell
         /// outside the map is returned untouched, for the caller's bounds check.
         ///
         /// <para>The pad finder checks one cell of margin around the pad
         /// (<c>DebugTools_LifecycleHarness.TryFindPad</c>) and these cells lie further out, so on
         /// some maps they hold natural rock. A meal spawned onto rock reads as being in the cell
-        /// beside it. And whatever a case left there would stay on the map for every later case,
+        /// beside it. And whatever a test left there would stay on the map for every later test,
         /// where vanilla's opportunistic haul can pick it up.</para>
         /// </summary>
         internal static IntVec3 OpenGround(Fixture fix, IntVec3 cell)

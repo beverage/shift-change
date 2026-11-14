@@ -14,8 +14,9 @@ namespace ShiftChange.Tests
     /// What the tests written as stories share: the frame each runs in (<see cref="Tell"/>), which
     /// opens its <see cref="Story"/> with the test's sentence and always cleans up after it; the
     /// ways to set a test up (<see cref="Staged(Action{Fixture, Story}, StageKit, Gender, string)"/>
-    /// and its siblings, <see cref="OnThePad"/>, <see cref="Told"/>); and <see cref="Swap"/>, one
-    /// change at the stand with the game's clock stepped until it ends (<see cref="GameClock"/>).
+    /// and its siblings, <see cref="OnThePad"/>, <see cref="Told"/>); <see cref="Swap"/>, one
+    /// change at the stand with the game's clock stepped until it ends (<see cref="GameClock"/>),
+    /// and <see cref="SwapNow"/>, one within a frame; and the checks and set-up many tests share.
     /// </summary>
     internal abstract class StoryFixture : HarnessFixture
     {
@@ -146,24 +147,35 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>A body that runs within one frame, as a step of the test's routine.</summary>
-        internal static Func<Fixture, Story, IEnumerator> Now(Action<Fixture, Story> body)
+        internal Func<Fixture, Story, IEnumerator> Now(Action<Fixture, Story> body)
         {
             return (fix, story) => Now(s => body(fix, s), story);
         }
 
         /// <summary>
-        /// Runs <paramref name="body"/> now. What it throws fails the test with the story so far,
-        /// the exception its last line.
+        /// Runs <paramref name="body"/> now, the way this fixture runs a test
+        /// (<see cref="HarnessFixture.Wrap"/>: the save/load fixture runs it as the game runs a
+        /// load). What it throws fails the test with the story so far, the exception its last
+        /// line. A body the wrap put off, which would run after the test had ended, fails it.
         /// </summary>
-        internal static IEnumerator Now(Action<Story> body, Story story)
+        internal IEnumerator Now(Action<Story> body, Story story)
         {
-            try
+            bool ran = false;
+            Wrap(() =>
             {
-                body(story);
-            }
-            catch (Exception e)
+                ran = true;
+                try
+                {
+                    body(story);
+                }
+                catch (Exception e)
+                {
+                    story.Threw(e);
+                }
+            });
+            if (!ran)
             {
-                story.Threw(e);
+                story.Check(false, "the test ran when it was started, not later");
             }
             yield break;
         }
@@ -202,9 +214,9 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// Stages a stand and a colonist on the pad, retrying a build that throws as the harness
-        /// cases do (<see cref="BuildAttempts"/>), each retry noted. Null, the test failed, when
-        /// none could be built.
+        /// Stages a stand and a colonist on the pad, retrying a build that throws
+        /// (<see cref="BuildAttempts"/>), each retry noted. Null, the test failed, when none could
+        /// be built.
         /// </summary>
         internal Fixture StageFor(Story story, StageKit kit, Gender gender)
         {
@@ -328,6 +340,89 @@ namespace ShiftChange.Tests
             leg = leg ?? new SwapLeg();
             yield return Swap(fix, leg);
             story.Check(leg.Succeeded, leg.Told(what));
+        }
+
+        /// <summary>
+        /// One change at the stand within this frame, the game's clock stepped until it ends
+        /// (<see cref="HarnessFixtures.RunSwap(Fixture, int)"/>), for a test whose checks follow
+        /// in the same frame. False when it gave up, with notes on where it got stuck or what took
+        /// the colonist instead; the caller's check says what failed.
+        /// </summary>
+        internal static bool SwapNow(Story story, Fixture fix, int maxTicks = 5000)
+        {
+            return RunSwap(fix, story.Note, maxTicks);
+        }
+
+        /// <summary>
+        /// Checks that the job a colonist takes after a change does not send them straight back
+        /// to the stand, then settles them. As a change succeeds the job tracker starts a one-tick
+        /// pause (<c>Wait_MaintainPosture</c>) before the queue gets a turn, so the pause falls
+        /// between every change and the job deferred behind it. Judged as a job of its own it
+        /// would send a radius sleep stand's colonist straight back to change, so it has to ride
+        /// along. Settling ends a change that did start, which would answer every later probe
+        /// with <c>MidSwap</c>.
+        /// </summary>
+        internal static bool NotSentStraightBack(Story story, Fixture fix)
+        {
+            JobDef next = fix.Pawn.CurJobDef;
+            bool ok = story.Check(next != ShiftChangeDefOf.ShiftChange_SwapAtStand,
+                                  fix.Pawn.LabelShort + "'s next job, " + (next == null ? "none" : next.label)
+                                  + ", does not send them straight back to the stand");
+            Settle(fix.Pawn);
+            return ok;
+        }
+
+        /// <summary>
+        /// Another colonist, beside the stand, cleared with the scene. Spawning is retried as a
+        /// scene's set-up is (<see cref="BuildAttempts"/>): on a large mod list it can throw
+        /// <c>Collection was modified</c> in <c>Pawn_HealthTracker.Notify_Spawned</c>, under
+        /// other mods' postfixes on <c>Pawn.SpawnSetup</c>. Each retry is noted, and the last
+        /// try's exception fails the test.
+        /// </summary>
+        internal static Pawn AnotherColonist(Story story, Fixture fix, Gender gender, string nick)
+        {
+            return AnotherColonist(story, fix, gender, nick,
+                                   fix.Stand.Position + new IntVec3(2, 0, fix.Extras.Count + 1),
+                                   "beside the stand");
+        }
+
+        /// <summary>
+        /// <see cref="AnotherColonist(Story, Fixture, Gender, string)"/> on a given cell, which
+        /// <paramref name="where"/> says in the game's words.
+        /// </summary>
+        internal static Pawn AnotherColonist(Story story, Fixture fix, Gender gender, string nick,
+                                             IntVec3 cell, string where)
+        {
+            for (int attempt = 1; ; attempt++)
+            {
+                Pawn pawn = DebugTools_Fixtures.AveragePawn(gender, nick);
+                pawn.workSettings?.EnableAndInitialize();
+                try
+                {
+                    GenSpawn.Spawn(pawn, cell, fix.Map, Rot4.North);
+                    fix.Extras.Add(pawn);
+                    story.Note(pawn.LabelShort + (gender == Gender.Female ? ", a woman," : ", a man,")
+                               + " joins the colony " + where);
+                    return pawn;
+                }
+                catch (Exception e) when (attempt < BuildAttempts)
+                {
+                    story.Note("spawning " + nick + " threw on try " + attempt + ": "
+                               + e.GetType().Name + ": " + e.Message);
+                    try
+                    {
+                        // Likely half spawned: clear it before the retry lands on the same cell.
+                        if (!pawn.Destroyed)
+                        {
+                            pawn.Destroy();
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // The scene's teardown clears the pad whatever is left on it.
+                    }
+                }
+            }
         }
 
         internal static string Said(JobCondition ended)

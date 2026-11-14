@@ -591,5 +591,89 @@ namespace ShiftChange.Tests
                 }
             }
         }
+
+        /// <summary>
+        /// Moving a stand with Reinstall while a colonist wears its outfit: they must still be
+        /// able to change back afterwards. Guards a past bug, in which a move ended the shift and
+        /// left the colonist stuck in the outfit.
+        ///
+        /// <para>An uninstall is a <c>Vanish</c> despawn and <c>Building_OutfitStand</c> keeps what
+        /// it holds through one, so the colonist's own clothes travel inside the box. The shift
+        /// has to travel with them, or the stand lands reading those clothes as its own outfit;
+        /// dropped on the floor instead, they leave the colonist just as stuck in the outfit. The
+        /// forced flag is the exception: it must not last while the stand is boxed, so the test
+        /// checks it off while boxed and on again once the stand is set down. Uninstalled and set
+        /// down as <see cref="ReinstalledStandKeepsItsSettings"/> does it.</para>
+        /// </summary>
+        [Test]
+        [TestDescription("a stand moved with Reinstall in the middle of a shift keeps the "
+                         + "colonist's own clothes, and changes them back as usual")]
+        internal IEnumerator ReinstallingMidShiftKeepsTheirClothes()
+        {
+            return Staged(Build, OnShift, Body);
+
+            void Body(Fixture fix, Story story)
+            {
+                string name = fix.Pawn.LabelShort;
+                Apparel uniform = FirstIssued(fix);
+                List<Apparel> parked = new List<Apparel>(fix.Comp.StoredOwnerApparelForReading);
+                if (uniform == null || parked.Count == 0)
+                {
+                    story.Check(false, name + " is on shift in the stand's outfit, "
+                                       + "their own clothes kept on the stand");
+                    return;
+                }
+
+                Map map = fix.Map;
+                IntVec3 to = new IntVec3(fix.Stand.Position.x, 0, fix.Stand.Position.z + 2);
+                Rot4 rot = fix.Stand.Rotation;
+
+                MinifiedThing box = fix.Stand.MakeMinified();
+                if (box == null)
+                {
+                    story.Check(false, "the stand can be uninstalled");
+                    return;
+                }
+                story.Note("the stand is uninstalled, " + name + " still in its outfit");
+                story.Check(fix.Comp.OnShift, "uninstalled, the stand keeps its shift");
+                story.Check(fix.Comp.Borrower == fix.Pawn, "and still lends its outfit to " + name);
+                for (int i = 0; i < parked.Count; i++)
+                {
+                    story.Check(fix.Stand.HeldItems.Contains(parked[i]),
+                                name + "'s " + parked[i].def.label
+                                + " travels in the box with the stand");
+                }
+                if (fix.Pawn.outfits != null)
+                {
+                    story.Check(!fix.Pawn.outfits.forcedHandler.IsForced(uniform),
+                                "while the stand is uninstalled, the " + uniform.def.label
+                                + " is not forced on " + name);
+                }
+
+                box.InnerThing = null;
+                box.Destroy();
+                GenSpawn.Spawn(fix.Stand, to, map, rot);
+                story.Note("it is set down again two cells north");
+
+                story.Check(fix.Stand.Spawned, "the stand is back on the map");
+                story.Check(fix.Comp.OnShift, "its shift goes on");
+                story.Check(fix.Comp.Borrower == fix.Pawn, "still lending its outfit to " + name);
+                story.Check(CompShiftStand.OnShiftStandFor(fix.Pawn) == fix.Comp,
+                            name + " is still on shift at it, so their Change back button "
+                            + "leads there");
+                story.Check(fix.Comp.StoredOwnerApparelForReading.Count == parked.Count,
+                            "and it still keeps all of " + name + "'s own clothes for them");
+                if (fix.Pawn.outfits != null)
+                {
+                    story.Check(fix.Pawn.outfits.forcedHandler.IsForced(uniform),
+                                "and the " + uniform.def.label + " is forced on " + name
+                                + " again");
+                }
+
+                // The change back really runs and gives the colonist their own clothes back: the
+                // behaviour, where everything above is state.
+                FlyingTheGravship.ShiftEndsNormally(story, fix, uniform, parked);
+            }
+        }
     }
 }

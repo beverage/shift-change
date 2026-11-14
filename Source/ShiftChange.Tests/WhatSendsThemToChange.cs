@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using DevTools.Testing;
 using RimWorld;
@@ -12,7 +13,8 @@ using JobKind = ShiftChange.Patch_JobInterception.JobKind;
 namespace ShiftChange.Tests
 {
     /// <summary>
-    /// Which jobs send a colonist to a stand to change, and the settings that decide it.
+    /// Which jobs send a colonist to a stand to change, going to bed and getting up again
+    /// included, what a deposit-only stand takes from them, and the settings that decide it.
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.WhatSendsThemToChange)]
     internal class WhatSendsThemToChange : StoryFixture
@@ -29,6 +31,15 @@ namespace ShiftChange.Tests
         /// <summary>What <see cref="Stage"/> sets up on the open pad.</summary>
         internal const string InTheOpen =
             "a stand holding a duster in the open, and a colonist beside it in a shirt, trousers and a parka";
+
+        /// <summary>
+        /// What <see cref="HarnessFixtures.StageWithDoorway(Map, CellRect, WorkTypeDef)"/> sets up
+        /// for fishing: the walled room with a door in its west wall, beside the stand, onto a strip
+        /// of open ground.
+        /// </summary>
+        internal const string InARoomWithADoorAFisher =
+            "a stand holding a duster in a walled room, a door beside it onto open ground, "
+            + "and a colonist able to fish beside it in a shirt, trousers and a parka";
 
         /// <summary>
         /// The recreation trigger through the mod's real decision as a job starts: a game of
@@ -859,6 +870,403 @@ namespace ShiftChange.Tests
                 story.Check(!fix.Comp.HandlesRecreation(), "recreation is off again");
                 story.Check(fix.Comp.IsExcluded,
                             "and the stand reads as Not used for shift changes, not Automatic");
+            }
+        }
+
+        /// <summary>
+        /// The sleep trigger through the mod's real decision as a job starts: going to bed in the
+        /// stand's room sends the colonist to change, and the lay-downs that must not do not. The
+        /// refusals carry the test: going to sleep and medical bed rest share one job and one
+        /// driver, held apart by two things nothing else in the mod would notice breaking, the
+        /// job's work giver and its tag. Break either and a pyjama stand dresses the wounded, and
+        /// the hospital gown's row goes dead without a word. It also covers the lay-down the game
+        /// hands out again in the night (it sends nobody to change), which jobs keep a colonist in
+        /// bed, and the wake-up: on shift and on the bed, a job that leaves the room has the change
+        /// back put first, while lying down again does not.
+        /// </summary>
+        [Test]
+        [TestDescription("a colonist turning in for the night changes at the bedroom's stand first, never for "
+                         + "bed rest or an order, and on waking changes back before leaving the room")]
+        internal IEnumerator GoingToBedInTheRoomSendsThemToChange()
+        {
+            return Staged((m, p) => Stage(m, p, StageKit.Displacing, enclose: true), InARoom, Body);
+
+            void Body(Fixture fix, Story story)
+            {
+                string name = fix.Pawn.LabelShort;
+                ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Bed");
+                JobDef laydown = DefDatabase<JobDef>.GetNamedSilentFail("LayDown");
+                JobDef groundSleep = DefDatabase<JobDef>.GetNamedSilentFail("Wait_Asleep");
+                WorkGiverDef recuperate =
+                    DefDatabase<WorkGiverDef>.GetNamedSilentFail("PatientGoToBedRecuperate");
+                if (bedDef == null || laydown == null || groundSleep == null)
+                {
+                    story.Check(false, "the game has its bed, its lay-down job and sleeping on the ground");
+                    return;
+                }
+
+                Building_Bed bed = DebugTools_Fixtures.Spawn(
+                    fix.Map, bedDef, ThingDefOf.WoodLog,
+                    new IntVec3(fix.Stand.Position.x + 2, 0, fix.Stand.Position.z + 2),
+                    Rot4.North) as Building_Bed;
+                if (bed == null)
+                {
+                    story.Check(false, "a bed is built in the stand's room");
+                    return;
+                }
+                story.Note("a bed is built in the stand's room");
+
+                // Sleeping is not ticked by hand, since a bed changes the room's role:
+                // RoomRoleWorker_Bedroom scores a room holding one unowned humanlike bed at 100000,
+                // beating every other worker, so the pad is a bedroom as the bed lands, the stand
+                // serves sleep from its role already, and a tick would turn it off. The automatic
+                // answer is the stronger claim anyway.
+                //
+                // An untagged lay-down by an urgent patient is medical bed rest (IsMedicalLayDown),
+                // which no sleep stand dresses, so going to bed needs a colonist who needs no doctor;
+                // the scene's colonist is generated without one
+                // (DebugTools_Fixtures.RemoveTendableConditions).
+                story.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(fix.Pawn),
+                            name + " needs no doctor to begin with");
+                story.Check(fix.Comp.HandlesRest(),
+                            "the bed makes the room a bedroom, so the stand serves sleep on its own");
+                story.Check(fix.Comp.IsAutomatic,
+                            "the stand is on Automatic: the room decides, not a tick in its settings");
+                story.Check(!fix.Comp.HandlesRecreation(),
+                            "and it does not serve recreation, which no room serves beside sleep");
+                if (!fix.Comp.HandlesRest())
+                {
+                    // A modded room role may outscore the bedroom here: then tick Sleeping instead.
+                    fix.Comp.ToggleRest();
+                    story.Check(fix.Comp.HandlesRest(), "Sleeping, ticked by hand instead, makes it serve sleep");
+                }
+
+                story.Check(Patch_JobInterception.IsRestJob(JobMaker.MakeJob(laydown, bed)),
+                            "lying down in the bed counts as going to sleep");
+                story.Check(Diverts(fix, JobMaker.MakeJob(laydown, bed)),
+                            "and going to bed in this room sends " + name + " to change at the stand first");
+
+                Job onTheFloor = JobMaker.MakeJob(groundSleep, fix.Pawn.Position);
+                story.Check(!Patch_JobInterception.IsRestJob(onTheFloor),
+                            "sleeping on the ground does not count as going to bed");
+                story.Check(!Diverts(fix, onTheFloor), "and sends nobody to change");
+
+                story.Check(!Diverts(fix, JobMaker.MakeJob(laydown, bed), JobTag.RestingForMedicalReasons),
+                            "going to bed to rest for medical reasons does not send " + name + " to change");
+
+                if (recuperate != null)
+                {
+                    Job viaWorkGiver = JobMaker.MakeJob(laydown, bed);
+                    viaWorkGiver.workGiverDef = recuperate;
+                    story.Check(!Diverts(fix, viaWorkGiver),
+                                "nor does going to bed to recuperate, the bed rest work's own job");
+                }
+
+                Job forced = JobMaker.MakeJob(laydown, bed);
+                forced.playerForced = true;
+                story.Check(!Diverts(fix, forced), "and going to bed on the player's order never stops at the stand");
+
+                // The lay-down handed out again in the night, the reason OnABed exists:
+                // JobInBedUtility.KeepLyingDown queues a bare LayDown when a job in bed ends, and it
+                // reaches StartJob after Pawn_JobTracker has cleared the current job. pawn.InBed()
+                // needs a current job, so it is false for a colonist lying in their own bed (true only
+                // at the wake-up, when a job starts while the lay-down is current). OnABed reads the
+                // colonist's cell instead.
+                story.Check(!Patch_JobInterception.OnABed(fix.Pawn), name + ", by the stand, is not on a bed");
+                IntVec3 wasAt = fix.Pawn.Position;
+                fix.Pawn.pather?.StopDead();
+                fix.Pawn.Position = bed.Position;
+                story.Note(name + " is moved onto the bed");
+                story.Check(Patch_JobInterception.OnABed(fix.Pawn), name + " now counts as on the bed");
+                story.Check(!Diverts(fix, JobMaker.MakeJob(laydown, bed)),
+                            "and told again to lie down, is not walked to the stand");
+
+                // The two readings disagree about this colonist, yet no check fails if OnABed is
+                // swapped back for InBed(): the test puts the colonist on the bed by setting their
+                // cell, never by running a lay-down, so their posture stays standing and InBed() is
+                // false here for a second reason, and the wake-up below would still pass. Catching
+                // that needs a lay-down ticked with a live driver. The check sets the two answers
+                // side by side, as a tripwire for a reader.
+                story.Check(!fix.Pawn.InBed(),
+                            "though the game itself says " + name + " is not in bed: that is why Shift Change "
+                            + "reads the cell, and why this test alone cannot catch a return to the game's reading");
+
+                // Delete StaysInBed's CanBeginNowWhileLyingDown half and every check above still
+                // passes: so both directions, from the same place on the bed.
+                story.Check(Patch_JobInterception.StaysInBed(fix.Pawn, JobMaker.MakeJob(laydown, bed)),
+                            "lying down keeps " + name + " in bed, so nothing changes them back");
+                story.Check(!Patch_JobInterception.StaysInBed(fix.Pawn,
+                                JobMaker.MakeJob(JobDefOf.Wait, fix.Pawn.Position)),
+                            "a job that cannot be done lying down does not: this is the wake-up, "
+                            + "and it must change them back while they are still by the stand");
+
+                // The bed as a target, for jobs done in bed whose driver does not say so (meditating,
+                // eating), built as JobGiver_MeditateInBed builds one: the colonist's cell first, the
+                // bed second, so only the second half of TargetsBedUnder can catch it.
+                Job inBedByTarget = JobMaker.MakeJob(JobDefOf.Wait, fix.Pawn.Position, bed);
+                story.Check(Patch_JobInterception.TargetsBedUnder(fix.Pawn, inBedByTarget),
+                            "a job aimed at this very bed counts as staying in it");
+                story.Check(Patch_JobInterception.StaysInBed(fix.Pawn, inBedByTarget),
+                            "so it keeps " + name + " in bed, though the job does not say it is done lying down");
+
+                fix.Pawn.pather?.StopDead();
+                fix.Pawn.Position = wasAt;
+                story.Check(!Patch_JobInterception.OnABed(fix.Pawn), name + " is back by the stand, off the bed");
+
+                // The wake-up, end to end: the checks above test the rules, not that the change back
+                // is put first. This runs the decision with the colonist on shift and on the bed,
+                // since the failure it guards is a colonist doing the day's first job in sleepwear,
+                // then walking back to change. pawn.InBed() reads true at exactly the wake-up, so a
+                // guard built on it would hold the change back there.
+                //
+                // Nothing may be left queued by the jobs above: a job at the head of the queue is
+                // one vanilla put back behind a haul, and an errand ahead of the job they dressed for
+                // keeps the outfit on (QueuedAheadOfServedWork), which would answer the wake-up.
+                Settle(fix.Pawn);
+                if (!SwapNow(story, fix))
+                {
+                    story.Check(false, name + " changes into the stand's duster for the wake-up");
+                    return;
+                }
+                story.Note(name + " changes into the stand's duster");
+                story.Check(fix.Comp.OnShift, name + " is on shift, so there is a way back to change");
+
+                IntVec3 outside = new IntVec3(fix.Stand.Position.x + 8, 0, fix.Stand.Position.z);
+                if (!outside.InBounds(fix.Map) || outside.GetRoom(fix.Map) == fix.Stand.GetRoom())
+                {
+                    story.Check(false, "there is ground outside the stand's room, eight cells along");
+                    return;
+                }
+
+                fix.Pawn.pather?.StopDead();
+                fix.Pawn.Position = bed.Position;
+                story.Note(name + " is moved onto the bed, in the duster");
+                story.Check(Diverts(fix, JobMaker.MakeJob(JobDefOf.Wait, outside)),
+                            "waking, a job that takes " + name + " out of the room changes them back first, "
+                            + "before they do it");
+                story.Check(!Diverts(fix, JobMaker.MakeJob(laydown, bed)),
+                            "while lying down again still does not");
+
+                fix.Pawn.pather?.StopDead();
+                fix.Pawn.Position = wasAt;
+            }
+        }
+
+        /// <summary>
+        /// Deposit only: a colonist leaves what the stand's storage filter accepts, keeps the rest
+        /// of their clothes on, and gets it all back on the way out. The stand must count as in use
+        /// all the same: being on shift counts a garment taken in as well as one handed out, or the
+        /// parka sits in a rack with no borrower and no way back, gone from the player's side. And a
+        /// filter wide enough to take everything they wear must make the stand decline, not send a
+        /// colonist to bed naked.
+        /// </summary>
+        [Test]
+        [TestDescription("at a stand set to Deposit only, a colonist leaves just the parka its storage filter "
+                         + "takes, keeps the rest on and gets it back, and is never left with nothing on")]
+        internal IEnumerator DepositOnlyTakesTheParkaAndGivesItBack()
+        {
+            return Staged((m, p) => Stage(m, p, StageKit.Displacing, enclose: true), InARoom, Body);
+
+            void Body(Fixture fix, Story story)
+            {
+                string name = fix.Pawn.LabelShort;
+                ThingDef parkaDef = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_Parka");
+                ThingDef shirtDef = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_BasicShirt");
+                ThingDef pantsDef = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_Pants");
+                if (parkaDef == null || shirtDef == null || pantsDef == null)
+                {
+                    story.Check(false, "the game has its parka, shirt and trousers");
+                    return;
+                }
+                Apparel parka = null;
+                List<Apparel> worn = fix.Pawn.apparel.WornApparel;
+                for (int i = 0; i < worn.Count; i++)
+                {
+                    if (worn[i].def == parkaDef)
+                    {
+                        parka = worn[i];
+                    }
+                }
+                if (parka == null)
+                {
+                    story.Check(false, name + " wears a parka to leave at the stand");
+                    return;
+                }
+
+                fix.Comp.ToggleRest();
+                fix.Comp.SetDepositOnly(true);
+                story.Note("the stand is ticked for sleeping, with Deposit only, issue no outfit");
+                story.Check(fix.Comp.DepositOnly, "the stand is set to Deposit only");
+
+                // The storage filter decides, and its default is generous: OutfitStandBase ships
+                // defaultStorageSettings (apparel, less utility items and weapons) and PostMake
+                // copies it onto every stand. That default is what gives the never-naked rule work.
+                StorageSettings settings = fix.Stand.GetStoreSettings();
+                story.Check(settings.filter.Allows(parkaDef),
+                            "a newly built stand's storage filter takes ordinary clothes such as the parka");
+
+                settings.filter.SetDisallowAll();
+                story.Note("everything is unticked in the stand's storage filter");
+                story.Check(!SwapPlan.WouldDress(fix.Pawn, fix.Stand),
+                            "and with nothing allowed, the stand is not one to change at");
+
+                settings.filter.SetAllow(parkaDef, allow: true);
+                story.Note("the parka is allowed in the filter");
+                List<Apparel> wear = new List<Apparel>();
+                List<Apparel> store = new List<Apparel>();
+                story.Check(SwapPlan.BuildDress(fix.Pawn, fix.Stand, wear, store),
+                            "with the parka allowed, the stand plans a change for " + name);
+                story.Check(wear.Count == 0, "which hands out nothing");
+                story.Check(store.Count == 1 && store.Contains(parka),
+                            "and takes in exactly what the filter allows, the parka, and nothing else");
+
+                // Never bare: widen the filter to everything they have on and the stand must decline.
+                settings.filter.SetAllow(shirtDef, allow: true);
+                settings.filter.SetAllow(pantsDef, allow: true);
+                story.Check(!SwapPlan.WouldDress(fix.Pawn, fix.Stand),
+                            "with the shirt and trousers allowed too, the stand would take everything, so it declines");
+                settings.filter.SetAllow(shirtDef, allow: false);
+                settings.filter.SetAllow(pantsDef, allow: false);
+                story.Note("the shirt and trousers are disallowed again");
+
+                story.Check(SwapNow(story, fix), name + " leaves their things at the stand");
+                story.Check(parka.ParentHolder == fix.Stand, "the parka is on the stand");
+                story.Check(!fix.Pawn.apparel.WornApparel.Contains(parka), "and off " + name);
+                story.Check(fix.Pawn.apparel.WornApparel.Count == 2, "who keeps their own shirt and trousers on");
+                story.Check(fix.Comp.OnShift, "the stand counts as in use");
+                story.Check(fix.Comp.Borrower == fix.Pawn, "by " + name);
+                story.Check(CompShiftStand.OnShiftStandFor(fix.Pawn) == fix.Comp,
+                            "and " + name + " is on shift at it, so there is a way back");
+                story.Check(fix.Comp.IssuedUniformForReading.Count == 0,
+                            "though it handed out nothing, which is the point");
+
+                story.Check(SwapNow(story, fix), name + " collects their things");
+                story.Check(fix.Pawn.apparel.WornApparel.Contains(parka), "the parka is back on");
+                story.Check(!fix.Comp.OnShift, "and the stand is free again");
+
+                // The utility layer, last because it changes what the colonist wears. A shield belt
+                // covers neither torso nor legs, and utility items are what a stand's default filter
+                // leaves out, so the belt stays on through a deposit. A rule asking "is any garment
+                // left on?" would be satisfied by it and strip everything that covers the colonist;
+                // the question is coverage, as the game's own Pawn_ApparelTracker.PsychologicallyNude
+                // asks it.
+                if (!WearOne(fix.Pawn, "Apparel_ShieldBelt"))
+                {
+                    story.Check(false, name + " can put on a shield belt");
+                    return;
+                }
+                settings.filter.SetAllow(shirtDef, allow: true);
+                settings.filter.SetAllow(pantsDef, allow: true);
+                story.Note(name + " puts on a shield belt, and the shirt and trousers are allowed again");
+                List<Apparel> beltWear = new List<Apparel>();
+                List<Apparel> beltStore = new List<Apparel>();
+                story.Check(!SwapPlan.BuildDress(fix.Pawn, fix.Stand, beltWear, beltStore),
+                            "the stand plans no change that would leave " + name + " in just the shield belt");
+                story.Check(beltStore.Count == 0, "and leaves no half-made plan behind");
+                story.Check(SwapPlan.WouldBeNude(fix.Pawn, fix.Pawn.apparel.WornApparel),
+                            "since taking off everything " + name + " wears would leave them naked");
+                story.Check(!SwapPlan.WouldBeNude(fix.Pawn, beltWear), "while taking off nothing would not");
+            }
+        }
+
+        /// <summary>
+        /// Fishing sends a colonist to change at a stand ticked for it.
+        ///
+        /// <para>Odyssey's fishing work giver hands its jobs out from <c>WorkGiver_Fish.NonScanJob</c>
+        /// only, and <c>JobGiver_Work</c> stamps <c>workGiverDef</c> on its scanner paths alone, so
+        /// a fishing job arrives with no giver, tagged with the giver's own <c>Fieldwork</c>;
+        /// <c>JobRoomTargets.NonScanGivers</c> hands it its giver back. Built as Odyssey builds it,
+        /// it sends the colonist to change in the stand's room, as the same job stamped with its
+        /// giver does. With the tag a player's order carries it does not, since the row keys on the
+        /// tag too.</para>
+        ///
+        /// <para>Fishing water is outdoors on nearly every map, so the set-up that matters is a hut
+        /// by the shore whose stand serves a radius: fishing out past the door sends nobody to
+        /// change while the stand serves its room, does once the ring reaches it, and not past the
+        /// ring. Vanilla's opportunistic haul can put the fishing job back in the queue untagged and
+        /// start a haul first; untagged it still reads as fishing, and on shift that haul keeps the
+        /// uniform on, where the same haul with nothing queued changes them back.</para>
+        /// </summary>
+        [Test]
+        [TestDescription("a colonist going fishing changes first at a stand ticked for fishing, and at a hut "
+                         + "by the shore whose stand's radius takes in the water")]
+        internal IEnumerator FishingSendsThemToChange()
+        {
+            return Staged((m, p) => StageWithDoorway(m, p, DefDatabase<WorkTypeDef>.GetNamedSilentFail("Fishing")),
+                          InARoomWithADoorAFisher, Body);
+
+            void Body(Fixture fix, Story story)
+            {
+                string name = fix.Pawn.LabelShort;
+                WorkTypeDef fishing = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Fishing");
+                WorkGiverDef fishGiver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("Fish");
+                JobDef fish = JobDefOf.Fish;
+                if (fishing == null || fishGiver == null || fish == null)
+                {
+                    story.Check(false, "the game has Odyssey's fishing work, its work giver and its fishing job");
+                    return;
+                }
+                if (fix.Outside.Area == 0)
+                {
+                    story.Check(false, "the room has a door and open ground outside it");
+                    return;
+                }
+                fix.Comp.ToggleWork(fishing);
+                int swept = MakeCalm(fix.Map);
+                story.Note("the stand is ticked for fishing, and the map is calm ("
+                           + swept + " hostile things cleared)");
+
+                // The shape WorkGiver_Fish.NonScanJob builds: the fishing cell first, the cell to
+                // stand on second. Both inside the room to begin with, so the room does not decide it.
+                IntVec3 at = fix.Stand.Position;
+                IntVec3 spot = at + new IntVec3(3, 0, 3);
+                IntVec3 standOn = at + new IntVec3(3, 0, 2);
+                Job stamped = JobMaker.MakeJob(fish, spot, standOn);
+                stamped.workGiverDef = fishGiver;
+                IntVec3 shore = new IntVec3(fix.Outside.minX, 0, at.z);
+                IntVec3 farShore = new IntVec3(fix.Outside.minX, 0, fix.Outside.maxZ);
+
+                story.Check(fix.Comp.HandlesWork(fishing), "the stand serves fishing");
+                story.Check(Probe(fix, stamped, JobTag.Fieldwork),
+                            "fishing in the room, with the job naming its work giver, sends " + name + " to change");
+                story.Check(Probe(fix, JobMaker.MakeJob(fish, spot, standOn), JobTag.Fieldwork),
+                            "and so does the same job as Odyssey hands it out, naming none");
+                story.Check(!Probe(fix, JobMaker.MakeJob(fish, spot, standOn), JobTag.Misc),
+                            "but not with the tag a player's order carries: fishing is known by its work giver's tag");
+                story.Check(!Probe(fix, JobMaker.MakeJob(fish, shore, shore), JobTag.Fieldwork),
+                            "while the stand serves its room, fishing out past the door sends nobody to change");
+
+                fix.Comp.SetServes(CatchmentKind.Radius);
+                fix.Comp.SetServeRadius(5);
+                story.Note("the stand is set to serve Within a radius, of 5 cells: a hut by the shore");
+                Job forced = JobMaker.MakeJob(fish, shore, shore);
+                forced.playerForced = true;
+                story.Check(Probe(fix, JobMaker.MakeJob(fish, shore, shore), JobTag.Fieldwork),
+                            "now fishing out past the door, inside the ring, sends " + name + " to change");
+                story.Check(!Probe(fix, JobMaker.MakeJob(fish, farShore, farShore), JobTag.Fieldwork),
+                            "fishing past the ring does not");
+                story.Check(Probe(fix, JobMaker.MakeJob(fish, shore, shore)),
+                            "the job with no tag, as the game puts it back in the queue behind a haul, still does");
+                story.Check(JobRoomTargets.NonScanGiver(forced, null) == null,
+                            "while one the player ordered, with no tag, is not read as fishing");
+
+                // On shift, the shape vanilla's opportunistic haul leaves
+                // (Pawn_JobTracker.TryOpportunisticJob): the fishing job back at the head of the
+                // queue, untagged, and a haul started first.
+                story.Check(SwapNow(story, fix), name + " changes into the duster to go fishing");
+                story.Check(fix.Comp.OnShift, "and is on shift");
+                if (!fix.Comp.OnShift)
+                {
+                    return;
+                }
+                NotSentStraightBack(story, fix);
+                story.Check(Probe(fix, JobMaker.MakeJob(JobDefOf.HaulToCell, farShore, shore)),
+                            "hauling something in from past the ring changes them back first");
+                fix.Pawn.jobs.jobQueue.EnqueueFirst(JobMaker.MakeJob(fish, shore, shore));
+                story.Note("fishing inside the ring is put back at the head of " + name + "'s queue, untagged, "
+                           + "as the game leaves it behind a haul");
+                story.Check(!Probe(fix, JobMaker.MakeJob(JobDefOf.HaulToCell, farShore, shore)),
+                            "and the same haul keeps the duster on, with that fishing queued behind it");
             }
         }
 

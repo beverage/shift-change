@@ -12,7 +12,7 @@ namespace ShiftChange.Tests
     /// A colonist changing at a stand and back, on the game's own clock (<see cref="GameClock"/>),
     /// through the real driver on the colonist's own job tracker.
     ///
-    /// <para>Each test replaced a case that ticked its colonist alone, after both ran side by side
+    /// <para>Each test replaced a harness case that ticked its colonist alone, after both ran side by side
     /// and agreed check for check, except <see cref="WalksToTheStand"/>, which had no such twin: a
     /// pawn ticked alone never gets a path.</para>
     /// </summary>

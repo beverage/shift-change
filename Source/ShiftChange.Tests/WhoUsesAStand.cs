@@ -928,47 +928,6 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// Another colonist beside the stand, where
-        /// <see cref="HarnessFixtures.SpawnExtra(Fixture, Gender, string)"/> puts one, and cleared
-        /// with the scene. A spawn that throws is retried as there, each retry noted in the story,
-        /// and the last try's exception fails the test.
-        /// </summary>
-        internal static Pawn AnotherColonist(Story story, Fixture fix, Gender gender, string nick)
-        {
-            IntVec3 cell = fix.Stand.Position + new IntVec3(2, 0, fix.Extras.Count + 1);
-            for (int attempt = 1; ; attempt++)
-            {
-                Pawn pawn = DebugTools_Fixtures.AveragePawn(gender, nick);
-                pawn.workSettings?.EnableAndInitialize();
-                try
-                {
-                    GenSpawn.Spawn(pawn, cell, fix.Map, Rot4.North);
-                    fix.Extras.Add(pawn);
-                    story.Note(pawn.LabelShort + (gender == Gender.Female ? ", a woman," : ", a man,")
-                               + " joins the colony beside the stand");
-                    return pawn;
-                }
-                catch (Exception e) when (attempt < BuildAttempts)
-                {
-                    story.Note("spawning " + nick + " threw on try " + attempt + ": "
-                               + e.GetType().Name + ": " + e.Message);
-                    try
-                    {
-                        // Likely half spawned: clear it before the retry lands on the same cell.
-                        if (!pawn.Destroyed)
-                        {
-                            pawn.Destroy();
-                        }
-                    }
-                    catch (Exception)
-                    {
-                        // The scene's teardown clears the pad whatever is left on it.
-                    }
-                }
-            }
-        }
-
-        /// <summary>
         /// Gathers both colonists' Outfit Stands Plus buttons with Shift Change's list off, then
         /// on, and checks the walk gives what the world says and the list gives exactly the same.
         /// </summary>

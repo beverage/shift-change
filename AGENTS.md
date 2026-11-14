@@ -85,10 +85,9 @@ devtools/run-harness.sh --with-after=khamenman.outfitstandsplus   # the same, lo
 ```
 
 Each case runs as a test under SmashPhil's DevTools, so 1.7 only, with a
-DevTools build that has SmashPhil/DevTools#17. Each is a `[Test]` in a fixture
-under `Source/ShiftChange.Tests/`: the story fixtures, named for what a player
-sees, and the cases not yet rewritten as stories, in `HarnessCases.cs`
-(docs/TESTING.md, "Adding a case").
+DevTools build that has SmashPhil/DevTools#17. Each is a `[Test]` told as a
+story, in a fixture under `Source/ShiftChange.Tests/` named for what a player
+sees (docs/TESTING.md, "Adding a case").
 
 It asserts where the ledger lands after each despawn/death/banishment event, by
 firing the engine's real entry points at a throwaway fixture, and exits non-zero
@@ -96,7 +95,7 @@ if a case fails. Touch `PostDeSpawn`, `PostSwapMap`, `Notify_MapRemoved`,
 `ReleaseBorrower`, `AbandonLedger` or `Patch_UnclaimStands` and run it.
 
 A harness pass is not a play observation, and a skipped test (a `GAP` line in
-its transcript) is a known failure being tracked, not a pass. **Six gaps are expected on the default list**: the
+its story) is a known failure being tracked, not a pass. **Six gaps are expected on the default list**: the
 Rimatomics table and marker cases skip themselves when Rimatomics is not
 loaded, and the Outfit Stands Plus, Common Sense and Pick Up And Haul cases
 when their mod is not (`--with=` loads each). The sixth is Complex Jobs'
@@ -257,7 +256,7 @@ decompiled game, and none of the history.
   inline comment explains a line that is not obvious, and nothing that is.
 - No history: no dates, no "used to" or "was once", no story of the bug or the
   review that produced the code, no capitals or bold for emphasis. History
-  belongs in git and CHANGELOG.md. A harness case may say in one sentence
+  belongs in git and CHANGELOG.md. A test may say in one sentence
   that it guards a past bug. `check-invariants.py` rejects a date or a
   `File.cs:123` citation in any comment under `Source/`.
 - The reason lives at the site. Point at `docs/DESIGN.md` only for an argument

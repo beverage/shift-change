@@ -18,7 +18,7 @@ namespace ShiftChange.Tests
     /// adds ticks of its own, and put back after. <see cref="Run"/> lets a frame pass every
     /// <see cref="TicksPerFrame"/> ticks, so the window and DevTools stay alive;
     /// <see cref="Step"/> runs within the caller's frame, as the game itself runs many ticks in
-    /// one frame at its higher speeds, for the cases that run inside one frame.</para>
+    /// one frame at its higher speeds, for the tests that run inside one frame.</para>
     ///
     /// <para>While it steps, the storyteller and random mental breaks are off, so no raid or
     /// tantrum lands in a test, and the autosave counter is held at zero, so no autosave is

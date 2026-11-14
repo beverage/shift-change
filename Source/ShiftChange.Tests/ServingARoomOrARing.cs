@@ -37,6 +37,14 @@ namespace ShiftChange.Tests
             + "and a colonist able to doctor beside the stand in a shirt, trousers and a parka";
 
         /// <summary>
+        /// What <see cref="HarnessFixtures.Stage"/> sets up on the open pad, with a colonist who can
+        /// do Doctor work.
+        /// </summary>
+        internal const string DoctorInTheOpen =
+            "a stand holding a duster out in the open, and a colonist able to doctor beside it "
+            + "in a shirt, trousers and a parka";
+
+        /// <summary>
         /// A radius covers its ring, inclusive: every cell <c>GenRadial.NumCellsInRadius</c>
         /// counts, which is what <c>DrawRadiusRing</c> outlines, and not the next cell of the
         /// pattern. Checked against the ring's own cell list rather than a distance formula,
@@ -772,6 +780,82 @@ namespace ShiftChange.Tests
                 story.Check(open.ServesLabel() == (string)"ShiftChange.ServesRadius".Translate(open.serveRadius)
                             && !open.CompInspectStringExtra().Contains(nothingLine),
                             "until it serves a radius, which its row and inspect pane then say");
+            }
+        }
+
+        /// <summary>
+        /// A stand serving its room serves nothing in the open. On open ground its room is all the
+        /// open ground on the map, so serving it takes in no cell, not even the stand's own: Doctor
+        /// work beside it dresses nobody, and the Shift stand serves nothing alert lists the stand.
+        /// Given a radius, the same work dresses and the alert drops it. A colonist already in its
+        /// uniform, as an older save can hold, changes back at their next job once the stand
+        /// serves its room again.
+        /// </summary>
+        [Test]
+        [TestDescription("a stand out in the open, serving its room, dresses nobody for doctoring beside it "
+                         + "and shows in the alert, until it serves a radius")]
+        internal IEnumerator AStandInTheOpenServesNoWork()
+        {
+            return Staged((m, p) => Stage(m, p, StageKit.Displacing,
+                                          capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                          DoctorInTheOpen, Body);
+
+            void Body(Fixture fix, Story story)
+            {
+                string name = fix.Pawn.LabelShort;
+                WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+                WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+                if (doctor == null || tend == null)
+                {
+                    story.Check(false, "the game has Doctor work and its tending of colonists");
+                    return;
+                }
+                Alert alert = HarnessCatchments.VanillaAlert(typeof(Alert_ShiftStandServesNothing));
+                if (alert == null)
+                {
+                    story.Check(false, "the game's alerts include Shift stand serves nothing");
+                    return;
+                }
+                fix.Comp.ToggleWork(doctor);
+                MakeCalm(fix.Map);
+                story.Note("Doctor is ticked on the stand, and the map holds no enemies");
+
+                IntVec3 near = fix.Stand.Position + new IntVec3(2, 0, 2);
+                story.Check(fix.Comp.StandsInTheOpen && fix.Comp.serves == CatchmentKind.Room,
+                            "the stand stands in the open, serving its room");
+                story.Check(!fix.Comp.Covers(near, fix.Map) && !fix.Comp.Covers(fix.Stand.Position, fix.Map),
+                            "which takes in no cell, not even its own");
+                story.Check(!Probe(fix, HarnessCatchments.WorkAt(tend, near)),
+                            "so doctoring right beside it dresses nobody");
+                story.Check(HarnessCatchments.Lists(alert, fix.Stand),
+                            "and the Shift stand serves nothing alert lists it");
+
+                fix.Comp.SetServes(CatchmentKind.Radius);
+                fix.Comp.SetServeRadius(5);
+                story.Note("Within a radius is chosen under Serves, and the radius set to 5 cells");
+                story.Check(Probe(fix, HarnessCatchments.WorkAt(tend, near)),
+                            "within 5 cells, the same doctoring dresses " + name);
+                story.Check(!HarnessCatchments.Lists(alert, fix.Stand), "and the alert drops the stand");
+
+                // A colonist in the uniform of a stand in the open serving its room, as an older
+                // save can hold: dressed while the stand serves a radius, then the stand put back
+                // on its room. The doctoring asked about above was recorded as the job just dressed
+                // for, which on shift would keep the uniform on whatever the stand takes in, so
+                // that record goes first.
+                Patch_JobInterception.DressedFor.Remove(fix.Pawn);
+                story.Check(SwapNow(story, fix), name + " changes into the duster while the stand serves a radius");
+                if (!story.Check(fix.Comp.OnShift, "and is on shift at it"))
+                {
+                    return;
+                }
+                NotSentStraightBack(story, fix);
+                story.Check(!Probe(fix, HarnessCatchments.WorkAt(tend, near)),
+                            "in uniform, doctoring inside the ring keeps it on");
+                fix.Comp.SetServes(CatchmentKind.Room);
+                story.Note("the stand is set back to serve its room");
+                story.Check(Probe(fix, HarnessCatchments.WorkAt(tend, near)),
+                            "serving its room again, the same doctoring sends " + name
+                            + " to change back: the stand takes in nothing");
             }
         }
     }

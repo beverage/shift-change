@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using DevTools.Testing;
+using HarmonyLib;
 using RimWorld;
 using Verse;
 using Verse.AI;
@@ -11,7 +12,8 @@ using static ShiftChange.Tests.HarnessFixtures;
 namespace ShiftChange.Tests
 {
     /// <summary>
-    /// A stand serving an allowed area: what it covers, whom it dresses, and the menus and words for it.
+    /// A stand serving an allowed area: what it covers, whom it dresses and keeps dressed, the alert
+    /// for a stand that serves nothing, and the menus and words for it.
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.ServingAnArea)]
     internal class ServingAnArea : StoryFixture
@@ -25,6 +27,11 @@ namespace ShiftChange.Tests
         internal const string InARoomWithADoctor =
             "a stand holding a duster in the corner of a walled room, "
             + "and a colonist who can doctor beside it in a shirt, trousers and a parka";
+
+        /// <summary>The same, with a colonist able to mine.</summary>
+        internal const string InARoomWithAMiner =
+            "a stand holding a duster in the corner of a walled room, "
+            + "and a colonist who can mine beside it in a shirt, trousers and a parka";
 
         /// <summary>What <see cref="HarnessFixtures.StageWithDoorway(Map, CellRect, WorkTypeDef)"/> sets up.</summary>
         internal const string InARoomWithADoor =
@@ -451,11 +458,11 @@ namespace ShiftChange.Tests
                             "every row sits in its section: where, the areas, then making and managing");
                 story.Check(pickWith != null && pickWith.mouseoverGuiAction != null,
                             "the area painted over the stand goes by its name, and hovering over it draws it on the map");
-                story.Check(pickWith != null && ReferenceEquals(HarnessCatchments.Swatch(pickWith), with.ColorTexture)
+                story.Check(pickWith != null && ReferenceEquals(Swatch(pickWith), with.ColorTexture)
                             && pickWith.iconColor.a == 1f,
                             "with its own colour beside it");
                 story.Check(pickWithout != null
-                            && ReferenceEquals(HarnessCatchments.Swatch(pickWithout), without.ColorTexture)
+                            && ReferenceEquals(Swatch(pickWithout), without.ColorTexture)
                             && pickWithout.iconColor.a < 1f,
                             "the one leaving the stand out has its colour faded");
                 story.Check(withoutLabel.StartsWith(redTag)
@@ -523,7 +530,7 @@ namespace ShiftChange.Tests
                 string doctoring = WorkTypeLabels.Of(doctor).CapitalizeFirst();
                 Room room = fix.Stand.GetRoom();
 
-                Area_Allowed first = HarnessCatchments.MakeFromMenu(fix, fix.Comp);
+                Area_Allowed first = MakeFromMenu(fix, fix.Comp);
                 if (first == null || room == null)
                 {
                     story.Check(false, "New allowed area made an area for a stand in a room");
@@ -539,7 +546,7 @@ namespace ShiftChange.Tests
                             && fix.Comp.ServeFault == CatchmentFault.None,
                             "and the stand serves it at once");
 
-                Area_Allowed second = HarnessCatchments.MakeFromMenu(fix, fix.Comp);
+                Area_Allowed second = MakeFromMenu(fix, fix.Comp);
                 story.Check(second != null
                             && second.Label == (string)"ShiftChange.NewAreaLabelNumbered".Translate(doctoring, 2)
                             && fix.Comp.serveArea == second,
@@ -553,7 +560,7 @@ namespace ShiftChange.Tests
                 }
                 open.ToggleWork(doctor);
                 story.Note("a second stand out in the open past the door, with Doctoring ticked");
-                Area_Allowed outdoors = HarnessCatchments.MakeFromMenu(fix, open);
+                Area_Allowed outdoors = MakeFromMenu(fix, open);
                 story.Check(open.StandsInTheOpen && outdoors != null && outdoors.TrueCount == 1
                             && outdoors[open.parent.Position] && open.ServeFault == CatchmentFault.None,
                             "in the open, the new area holds the stand's own cell alone, and the stand serves it");
@@ -980,6 +987,306 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
+        /// The Shift stand serves nothing alert lists a stand that serves nothing. The game makes
+        /// its alerts from their types alone. The alert leaves out an area stand that serves, lists
+        /// the stand while it stands outside its area and once the area is deleted, naming the area
+        /// each time, and drops it when the stand serves its room again. A colonist in the stand's
+        /// uniform, kept in it by work inside the area, changes back for the same work once the
+        /// area is deleted.
+        /// </summary>
+        [Test]
+        [TestDescription("the \"Shift stand serves nothing\" alert lists a stand outside its allowed area or "
+                         + "whose area was deleted, naming the area, and a colonist in its outfit then changes back")]
+        internal IEnumerator ServesNothingAlertNamesTheArea()
+        {
+            return Staged((m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                          capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                          InARoomWithADoctor, Body);
+
+            void Body(Fixture fix, Story story)
+            {
+                string name = fix.Pawn.LabelShort;
+                WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+                WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+                if (doctor == null || tend == null)
+                {
+                    story.Check(false, "the game has the Doctor work type and its tend to patients work");
+                    return;
+                }
+                Alert alert = HarnessCatchments.VanillaAlert(typeof(Alert_ShiftStandServesNothing));
+                if (!story.Check(alert != null,
+                                 "the game made the \"Shift stand serves nothing\" alert from its type alone"))
+                {
+                    return;
+                }
+                fix.Comp.ToggleWork(doctor);
+                MakeCalm(fix.Map);
+                story.Note("Doctoring is ticked on the stand, and the map is calm");
+
+                IntVec3 at = fix.Stand.Position;
+                IntVec3 inRoom = at + new IntVec3(2, 0, 2);
+                Area_Allowed area = HarnessCatchments.NewArea(fix, "Shift harness area", at, inRoom);
+                if (area == null)
+                {
+                    story.Check(false, "the map has room for another allowed area");
+                    return;
+                }
+                fix.Comp.SetServeArea(area);
+                story.Note("the stand is set to serve an allowed area painted on its own cell and a cell of its room");
+                story.Check(fix.Comp.serves == CatchmentKind.Area && !HarnessCatchments.Lists(alert, fix.Stand),
+                            "serving the area, the stand is not on the alert");
+
+                area[at] = false;
+                story.Check(HarnessCatchments.Lists(alert, fix.Stand)
+                            && Explains(alert, "Shift harness area"),
+                            "with its own cell cleared from the area, the alert lists it, naming the area");
+                area[at] = true;
+                story.Check(!HarnessCatchments.Lists(alert, fix.Stand), "painted back in, it is off the alert");
+
+                story.Check(SwapNow(story, fix), name + " changes into the area stand's outfit");
+                if (!story.Check(fix.Comp.OnShift, "and is on shift"))
+                {
+                    return;
+                }
+                NotSentStraightBack(story, fix);
+                story.Check(!Probe(fix, HarnessCatchments.WorkAt(tend, inRoom)),
+                            "doctoring in the area keeps the uniform on");
+
+                area.Delete();
+                story.Check(HarnessCatchments.Lists(alert, fix.Stand)
+                            && Explains(alert, "Shift harness area"),
+                            "with the area deleted, the alert lists the stand, still naming the area");
+                story.Check(Probe(fix, HarnessCatchments.WorkAt(tend, inRoom)),
+                            "and " + name + " changes back for the same doctoring");
+
+                fix.Comp.SetServes(CatchmentKind.Room);
+                story.Check(!HarnessCatchments.Lists(alert, fix.Stand),
+                            "set to serve its room again, the stand is off the alert");
+            }
+        }
+
+        /// <summary>
+        /// Mining a rock is judged at the rock first, then the floor beside it. A rock has no room
+        /// on its own cell, so a mining job's room cell is the floor beside it, which room mode
+        /// dresses by. An area dresses a miner for the rock painted, or for only the floor around
+        /// it, and not for neither; a miner in uniform keeps it for the rock alone. A wall's
+        /// repair, judged as pass-through work at every place it names, keeps the uniform on with
+        /// only the floor around the wall painted, and changes them back with none.
+        /// </summary>
+        [Test]
+        [TestDescription("mining a rock in an allowed area counts where the rock is painted, then where the "
+                         + "floor beside it is, and repairing a wall counts the floor around it")]
+        internal IEnumerator MiningARockCountsTheRockThenTheFloor()
+        {
+            return Staged((m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                          capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Mining")),
+                          InARoomWithAMiner, Body);
+
+            void Body(Fixture fix, Story story)
+            {
+                string name = fix.Pawn.LabelShort;
+                WorkTypeDef mining = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Mining");
+                WorkGiverDef mine = DefDatabase<WorkGiverDef>.GetNamedSilentFail("Mine");
+                WorkGiverDef repair = DefDatabase<WorkGiverDef>.GetNamedSilentFail("Repair");
+                ThingDef granite = DefDatabase<ThingDef>.GetNamedSilentFail("Granite");
+                if (mining == null || mine == null || repair == null || granite == null)
+                {
+                    story.Check(false, "the game has mining, repairing and granite");
+                    return;
+                }
+                fix.Comp.ToggleWork(mining);
+                MakeCalm(fix.Map);
+                story.Note("Mining is ticked on the stand, and the map is calm");
+
+                IntVec3 at = fix.Stand.Position;
+                Thing rock = GenSpawn.Spawn(ThingMaker.MakeThing(granite), at + new IntVec3(3, 0, 3), fix.Map);
+                if (rock == null || !rock.Spawned)
+                {
+                    story.Check(false, "a granite rock could be put in the stand's room");
+                    return;
+                }
+                story.Note("a granite rock stands in the room");
+                Job mineRock = HarnessCatchments.JobOn(JobDefOf.Mine, mine, rock);
+                JobPlace place = Patch_JobInterception.SharedTargetPlace(
+                    mineRock, Patch_JobInterception.Classify(fix.Pawn, mineRock, null), fix.Map);
+                story.Check(rock.Position.GetRoom(fix.Map) == null && place.Cell == rock.Position
+                            && place.RoomCell != rock.Position && place.RoomCell.GetRoom(fix.Map) != null,
+                            "the rock's own cell is in no room, so mining it counts as work in the room "
+                            + "by a floor cell beside it");
+                story.Check(Probe(fix, HarnessCatchments.JobOn(JobDefOf.Mine, mine, rock)),
+                            "serving its room, the stand sends " + name + " to change to mine it, by that floor cell");
+
+                Area_Allowed area = HarnessCatchments.NewArea(fix, "Shift harness quarry", at, rock.Position);
+                if (area == null)
+                {
+                    story.Check(false, "the map has room for another allowed area");
+                    return;
+                }
+                fix.Comp.SetServeArea(area);
+                story.Check(fix.Comp.serves == CatchmentKind.Area && !area[place.RoomCell],
+                            "the stand serves an allowed area painted on the rock and not on that floor cell");
+                story.Check(Probe(fix, HarnessCatchments.JobOn(JobDefOf.Mine, mine, rock)),
+                            "which sends " + name + " to change to mine the rock face");
+
+                area[rock.Position] = false;
+                story.Check(!Probe(fix, HarnessCatchments.JobOn(JobDefOf.Mine, mine, rock)),
+                            "with the rock cleared from the area too, it does not");
+
+                List<IntVec3> aroundRock = new List<IntVec3>(GenAdj.CellsAdjacent8Way(rock));
+                HarnessCatchments.SetCells(area, aroundRock, true);
+                story.Check(Probe(fix, HarnessCatchments.JobOn(JobDefOf.Mine, mine, rock)),
+                            "with only the floor around the rock painted, it does");
+
+                HarnessCatchments.SetCells(area, aroundRock, false);
+                area[rock.Position] = true;
+                story.Note("the floor around the rock is cleared and the rock painted back in");
+                // A dressing probe records its job as the one just dressed for, and on shift that
+                // record keeps the uniform on for the same job whatever the catchment says, so the
+                // probe below would pass for the wrong reason. Clear it.
+                Patch_JobInterception.DressedFor.Remove(fix.Pawn);
+                story.Check(SwapNow(story, fix), name + " changes into the stand's outfit to mine");
+                if (!story.Check(fix.Comp.OnShift, "and is on shift"))
+                {
+                    return;
+                }
+                NotSentStraightBack(story, fix);
+                story.Check(!Probe(fix, HarnessCatchments.JobOn(JobDefOf.Mine, mine, rock)),
+                            "in uniform, " + name + " keeps it on to mine the rock, painted alone");
+
+                // Clear of the rock's ring, so the two sets of painted cells never meet. One wall
+                // inside a room does not split it.
+                Thing wall = GenSpawn.Spawn(ThingMaker.MakeThing(ThingDefOf.Wall, ThingDefOf.Steel),
+                                            at + new IntVec3(0, 0, 3), fix.Map);
+                if (wall == null || !wall.Spawned)
+                {
+                    story.Check(false, "a steel wall could be built in the stand's room");
+                    return;
+                }
+                List<IntVec3> aroundWall = new List<IntVec3>(GenAdj.CellsAdjacent8Way(wall));
+                HarnessCatchments.SetCells(area, aroundWall, true);
+                story.Note("a steel wall stands in the room, and the floor around it is painted into the area");
+                story.Check(!area[wall.Position] && !Probe(fix, HarnessCatchments.JobOn(JobDefOf.Repair, repair, wall)),
+                            "with only the floor around it painted, repairing the wall keeps the uniform on: "
+                            + "work on a wall counts by the same rule");
+                HarnessCatchments.SetCells(area, aroundWall, false);
+                story.Check(Probe(fix, HarnessCatchments.JobOn(JobDefOf.Repair, repair, wall)),
+                            "with nothing around it painted, repairing it changes " + name + " back");
+            }
+        }
+
+        /// <summary>
+        /// A colonist whose stand is outside their allowed area keeps the outfit on, and the stand
+        /// says why. This is changing back: an area painted after dressing, or switched by Better
+        /// Pawn Control's alerts, leaves a colonist in uniform whose stand they may no longer walk
+        /// to. The uniform rides along, Shift Change waits before trying again, and the inspect
+        /// pane names the cause. The Change back button is unaffected: it is an order, and orders
+        /// ignore allowed areas in the game too.
+        ///
+        /// <para>Beside it, the same out-of-room job with the stand inside their area, asked before
+        /// the area is set and again once the stand is back in it, changes them back as usual and
+        /// the inspect line is absent.</para>
+        /// </summary>
+        [Test]
+        [TestDescription("a colonist in uniform whose allowed area comes to leave their stand out keeps the "
+                         + "outfit on, and the stand's inspect pane tells why")]
+        internal IEnumerator OutfitStaysOnWhenTheirAreaLeavesTheStandOut()
+        {
+            return Staged((m, p) => Stage(m, p, StageKit.Displacing, enclose: true,
+                                          capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor")),
+                          InARoomWithADoctor, Body);
+
+            void Body(Fixture fix, Story story)
+            {
+                WorkTypeDef doctor = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Doctor");
+                WorkGiverDef tend = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoctorTendToHumanlikes");
+                ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
+                if (doctor == null || tend == null || mealDef == null)
+                {
+                    story.Check(false, "the game has the Doctor work type, its tend to patients work "
+                                       + "and the simple meal");
+                    return;
+                }
+                fix.Comp.ToggleWork(doctor);
+                MakeCalm(fix.Map);
+                story.Note("Doctoring is ticked on the stand, and the map is calm");
+
+                Pawn pawn = fix.Pawn;
+                string name = pawn.LabelShort;
+                Map map = fix.Map;
+                IntVec3 outside = OpenGround(fix, fix.Stand.Position + new IntVec3(8, 0, 0));
+                IntVec3 mealCell = OpenGround(fix, outside + new IntVec3(0, 0, 1));
+                if (!outside.InBounds(map) || outside.GetRoom(map) == fix.Stand.GetRoom())
+                {
+                    story.Check(false, "there is open ground outside the stand's room for doctoring and a meal");
+                    return;
+                }
+                Thing meal = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), mealCell, map);
+                string line = "ShiftChange.InspectOutsideArea".Translate(pawn.LabelShort);
+                story.Note("a simple meal lies outside the room");
+
+                story.Check(SwapNow(story, fix), name + " changes into the stand's outfit");
+                if (!story.Check(fix.Comp.OnShift, "and is on shift"))
+                {
+                    return;
+                }
+                story.Check(Probe(fix, HarnessGates.DoctoringAt(tend, outside)),
+                            "with no allowed area set, doctoring outside the room changes " + name + " back");
+                story.Check(!fix.Comp.CompInspectStringExtra().Contains(line),
+                            "and the stand's inspect pane says nothing about areas");
+
+                Area_Allowed area = HarnessGates.AreaWithoutTheStand(fix);
+                if (area == null)
+                {
+                    story.Check(false, "an allowed area could be made");
+                    return;
+                }
+                try
+                {
+                    area[outside] = true;
+                    area[meal.Position] = true;
+                    pawn.playerSettings.AreaRestrictionInPawnCurrentMap = area;
+                    story.Note(name + " is restricted to an allowed area holding the whole room but the stand's "
+                               + "own cell, and the cells outside where the doctoring and the meal are");
+                    story.Check(fix.Stand.IsForbidden(pawn),
+                                "the area leaves the stand out, so it is forbidden to " + name);
+
+                    int now = Find.TickManager.TicksGame;
+                    bool inserted = Patch_JobInterception.TryInsertSwap(HarnessGates.DoctoringAt(tend, outside), null,
+                                                                        pawn, pawn.jobs);
+                    int blocked;
+                    bool cooled = Patch_JobInterception.LastBlockedTick.TryGetValue(pawn.thingIDNumber, out blocked)
+                                  && blocked == now;
+                    story.Check(!inserted, "with the stand outside their allowed area, " + name
+                                           + " keeps the outfit on to doctor outside the room");
+                    story.Check(cooled, "and Shift Change holds off, so their next job does not try again at once");
+                    story.Check(CompShiftStand.OnShiftStandFor(pawn) == fix.Comp, name + " is still on shift");
+                    if (inserted)
+                    {
+                        story.Note("a change back was started anyway: still under way "
+                                   + (pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand ? "yes" : "no"));
+                    }
+                    string inspect = fix.Comp.CompInspectStringExtra() ?? "";
+                    story.Check(inspect.Contains(line), "the stand's inspect pane says why: \"" + line + "\"");
+                    Settle(pawn);
+
+                    story.Check(!Probe(fix, IngestJob(meal)),
+                                "a meal break does not walk " + name + " out of their area to change either");
+
+                    area[fix.Stand.Position] = true;
+                    story.Check(!fix.Stand.IsForbidden(pawn), "with the stand painted into the area, it is allowed again");
+                    story.Check(Probe(fix, HarnessGates.DoctoringAt(tend, outside)),
+                                "so doctoring outside the room changes " + name + " back as usual");
+                    story.Check(!fix.Comp.CompInspectStringExtra().Contains(line), "and the inspect line is gone");
+                }
+                finally
+                {
+                    pawn.playerSettings.AreaRestrictionInPawnCurrentMap = null;
+                    area.Delete();
+                }
+            }
+        }
+
+        /// <summary>
         /// A gravship landing staged on the fixture's own map, in the order the game lands one:
         /// the stand alone is despawned for replacement, set down on the same cell, then
         /// <c>PostSwapMap</c> runs. A real flight also runs <c>PreSwapMap</c> first and copies the
@@ -993,6 +1300,46 @@ namespace ShiftChange.Tests
             fix.Stand.DeSpawn(DestroyMode.WillReplace);
             GenSpawn.Spawn(fix.Stand, cell, fix.Map, rot);
             fix.Stand.PostSwapMap();
+        }
+
+        /// <summary>The icon texture of a float menu row, which vanilla keeps private.</summary>
+        internal static object Swatch(FloatMenuOption option)
+        {
+            return AccessTools.Field(typeof(FloatMenuOption), "iconTex")?.GetValue(option);
+        }
+
+        /// <summary>The Serves menu's New allowed area option for the stand, or null.</summary>
+        internal static FloatMenuOption NewAreaOption(CompShiftStand comp)
+        {
+            string label = "ShiftChange.ServesOptionNewArea".Translate();
+            return new Dialog_SetStandWorkTypes(comp).ServesMenuOptions().Find(o => o.Label == label);
+        }
+
+        /// <summary>
+        /// Picks New allowed area from <paramref name="comp"/>'s Serves menu and returns the area
+        /// it made, or null. Recorded on the fixture, whose teardown deletes it.
+        /// </summary>
+        internal static Area_Allowed MakeFromMenu(Fixture fix, CompShiftStand comp)
+        {
+            List<Area> before = new List<Area>(fix.Map.areaManager.AllAreas);
+            NewAreaOption(comp)?.action?.Invoke();
+            Area_Allowed made = fix.Map.areaManager.AllAreas.Find(a => !before.Contains(a)) as Area_Allowed;
+            if (made != null)
+            {
+                fix.Areas.Add(made);
+            }
+            return made;
+        }
+
+        /// <summary>
+        /// The explanation <paramref name="alert"/> gives with a fresh report contains
+        /// <paramref name="text"/>. Vanilla asks for the report first too: the explanation is built
+        /// from what the report found.
+        /// </summary>
+        internal static bool Explains(Alert alert, string text)
+        {
+            alert.GetReport();
+            return alert.GetExplanation().Resolve().Contains(text);
         }
     }
 }
