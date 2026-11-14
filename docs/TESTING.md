@@ -114,14 +114,6 @@ scene cannot be set up. A test with a mod of its own to test against is a known
 gap without it (`story.KnownGap`, a line marked `GAP`), which DevTools reports
 as a skipped test unless a check failed too.
 
-They began as harness cases: a body asserting into a transcript, one `Run` call
-per test. Each was rewritten as a story and ran beside the case it replaced,
-every DLC and Odyssey alone, agreeing check for check, one check for each old
-assertion in the same order, before the case went: first the swap cases, then
-the cases that never tick, then the rest with the save/load tests.
-`WalksToTheStand` had no twin: it starts the colonist five cells off and walks
-them to the stand and back.
-
 DevTools fails a test on any warning it does not allow, apart from the few the
 game logs by itself, which DevTools allows everywhere. The repeated-errors test
 (`RepeatedErrorsStopShiftChangeUntilTheNextGame`) allows, by text alone, the
@@ -758,17 +750,6 @@ on a posture wait (`StayPut`). And a Goto ends when the pawn gets there, so
 the catch-up cases' second colonist finished the job a freed stand was meant
 to interrupt; their work is now a posture wait stamped with the work's giver
 (`WorkingAt`), which the catch-up may interrupt and which stays open.
-
-Before the clock, the opposite trap held: a case ran inside one frame, so
-`TicksGame` never moved while the colonist was ticked alone. A pawn's needs and
-its random mental-break check are gated on `IsHashIntervalTick(150, delta)`,
-which reads that clock and the pawn's id, so for a given pawn the answer never
-changed. About one pawn in ten got 150 ticks of need every 15 ticks, and about
-one in 150 on every tick, which cut swaps short at random: through vanilla's
-involuntary sleep (two of three 1.7 runs on 2026-10-13), then hunger, then
-death (1.7.4979, 2026-10-15). The fixture still rerolls such colonists
-(`DebugTools_Fixtures.NeedsTickWhilePumped`, in the mod's dll), which nothing
-needs now that no case ticks a pawn alone.
 
 **A new colonist is not tended.** Vanilla tends a generated pawn's conditions
 only when it is not joining the player (`PawnGenerator.cs:1297`). A fixture

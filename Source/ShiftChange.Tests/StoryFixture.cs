@@ -344,7 +344,7 @@ namespace ShiftChange.Tests
 
         /// <summary>
         /// One change at the stand within this frame, the game's clock stepped until it ends
-        /// (<see cref="HarnessFixtures.RunSwap(Fixture, int)"/>), for a test whose checks follow
+        /// (<see cref="HarnessFixtures.RunSwap"/>), for a test whose checks follow
         /// in the same frame. False when it gave up, with notes on where it got stuck or what took
         /// the colonist instead; the caller's check says what failed.
         /// </summary>
