@@ -21,7 +21,7 @@ namespace ShiftChange.Tests
     /// the shipped default, not the running game's setting, which a player may have turned on.</para>
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.KeepingThemDecent)]
-    internal class KeepingThemDecent : ClockFixture
+    internal class KeepingThemDecent : StoryFixture
     {
         /// <summary>
         /// A stand holding only a shield belt, which covers the waist and neither torso nor legs,

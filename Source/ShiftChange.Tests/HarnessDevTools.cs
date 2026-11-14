@@ -13,19 +13,19 @@ using static ShiftChange.Tests.DebugTools_LifecycleHarness;
 namespace ShiftChange.Tests
 {
     /// <summary>
-    /// The case fixtures (HarnessCases.cs) in run order: DevTools runs a fixture with a higher
-    /// <c>ExecutionPriority</c> first, and each runs at <see cref="HarnessDevTools.First"/> less
-    /// its place here. The save/load legs run after all of them
-    /// (<see cref="HarnessDevTools.SaveLoadPriority"/>), so they have no place here.
+    /// The fixtures in run order, the story fixtures and the cases still in HarnessCases.cs:
+    /// DevTools runs a fixture with a higher <c>ExecutionPriority</c> first, and each runs at
+    /// <see cref="HarnessDevTools.First"/> less its place here. The save/load legs run after all
+    /// of them (<see cref="HarnessDevTools.SaveLoadPriority"/>), so they have no place here.
     /// </summary>
     internal enum CaseGroup
     {
+        /// <summary>What every test takes for granted about the colony it runs in, so first.</summary>
+        TheTestColony,
         Flights,
         VacuumGate,
         VacuumRoutes,
         Lifecycle,
-        FaultLatch,
-        DriverAndOwners,
         Arms,
         Gates,
         Radius,
@@ -34,14 +34,21 @@ namespace ShiftChange.Tests
         Areas,
         RideAlong,
         Assorted,
-        Tables,
 
         /// <summary>
-        /// The tests written for the game's clock (<see cref="ClockFixture"/>), after the harness
-        /// cases and before the save/load legs.
+        /// The tests written as stories (<see cref="StoryFixture"/>), after the harness cases and
+        /// before the save/load legs.
         /// </summary>
         ChangingAtAStand,
         KeepingThemDecent,
+        WhatSendsThemToChange,
+        WhoUsesAStand,
+        ServingARoomOrARing,
+        ServingAnArea,
+        KeepingTheirVacsuitOn,
+        LosingAStandOrAColonist,
+        ButtonsAndOrders,
+        ReadingJobsAndRooms,
     }
 
     /// <summary>

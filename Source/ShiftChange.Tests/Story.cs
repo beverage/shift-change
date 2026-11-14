@@ -28,6 +28,13 @@ namespace ShiftChange.Tests
             Lines.AppendLine(sentence);
         }
 
+        internal const string Gapped = "    GAP   ";
+
+        internal const string Fixed = "    FIXED ";
+
+        /// <summary>True once a known gap has been noted (<see cref="KnownGap"/>).</summary>
+        internal bool Gap;
+
         /// <summary>True once a check has failed.</summary>
         internal bool Failing;
 
@@ -55,6 +62,37 @@ namespace ShiftChange.Tests
                 Test.Fail(what, Lines.ToString().TrimEnd());
             }
             return condition;
+        }
+
+        /// <summary>
+        /// What a test checks but the mod does not do yet, with the reason: a line marked GAP,
+        /// and the test is skipped rather than failed when it ends, unless a check failed, so a
+        /// green run stays meaningful. Should it start to hold, the line is marked FIXED, a sign
+        /// to make it a check.
+        /// </summary>
+        internal void KnownGap(bool condition, string what, string why)
+        {
+            if (condition)
+            {
+                Lines.Append(Fixed).Append(what).AppendLine(" (a known gap that now holds: make it a check)");
+                return;
+            }
+            Lines.Append(Gapped).Append(what).Append(": ").AppendLine(why);
+            Gap = true;
+        }
+
+        /// <summary>
+        /// What a test threw, as its last line, failing it with the story so far if nothing has
+        /// yet.
+        /// </summary>
+        internal void Threw(System.Exception e)
+        {
+            Lines.Append(Failed).Append("the test threw ").AppendLine(e.ToString());
+            if (!Failing)
+            {
+                Failing = true;
+                Test.Fail("the test threw " + e.GetType().Name + ": " + e.Message, Lines.ToString().TrimEnd());
+            }
         }
 
         /// <summary>Writes the whole story to Test.log.</summary>

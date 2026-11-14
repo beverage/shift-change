@@ -319,64 +319,6 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// The tables a radius stand stays dressed by. Pass-through work is read from work tags,
-        /// so a modded work type carrying the Hauling tag under a name of its own passes through,
-        /// and one named Hauling without the tag does not. The incidental list's six rows all
-        /// resolve, so none is a typo that can never match, and each counts only without a giver.
-        /// </summary>
-        internal static bool PassThroughAndIncidentalTablesHold()
-        {
-            bool ok = true;
-            foreach (string name in new[] { "Hauling", "Cleaning", "Construction", "Firefighter" })
-            {
-                WorkTypeDef work = DefDatabase<WorkTypeDef>.GetNamedSilentFail(name);
-                ok &= Expect(work != null && JobRoomTargets.PassesThrough(work),
-                             name + " is pass-through work");
-            }
-            foreach (string name in new[] { "Doctor", "Cooking", "BasicWorker", "PlantCutting", "Growing", "Mining" })
-            {
-                WorkTypeDef work = DefDatabase<WorkTypeDef>.GetNamedSilentFail(name);
-                ok &= Expect(work != null && !JobRoomTargets.PassesThrough(work),
-                             name + " is not");
-            }
-            WorkTypeDef tagged = new WorkTypeDef
-            {
-                defName = "Harness_FSFHauling",
-                workTags = WorkTags.ManualDumb | WorkTags.Hauling,
-            };
-            WorkTypeDef untagged = new WorkTypeDef { defName = "Hauling", workTags = WorkTags.ManualDumb };
-            ok &= Expect(JobRoomTargets.PassesThrough(tagged),
-                         "a modded work type carrying the Hauling tag passes through, whatever its name")
-                & Expect(!JobRoomTargets.PassesThrough(untagged),
-                         "and one named Hauling without the tag does not: the tag is the test")
-                & Expect(!JobRoomTargets.PassesThrough(null), "nor does no work type");
-
-            WorkGiverDef giver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("HaulGeneral");
-            ok &= Expect(JobRoomTargets.IncidentalJobs.Count == 6, "the incidental list has its six rows")
-                & Expect(giver != null, "the hauling giver resolves");
-            foreach (string name in JobRoomTargets.IncidentalJobs)
-            {
-                JobDef def = DefDatabase<JobDef>.GetNamedSilentFail(name);
-                if (!Expect(def != null, name + " resolves, so the row can match"))
-                {
-                    ok = false;
-                    continue;
-                }
-                Job job = JobMaker.MakeJob(def);
-                ok &= Expect(JobRoomTargets.IsIncidental(job), name + " with no giver is incidental");
-                job.workGiverDef = giver;
-                ok &= Expect(!JobRoomTargets.IsIncidental(job), "and with a giver is not");
-            }
-            foreach (JobDef def in new[] { JobDefOf.LayDown, JobDefOf.Ingest, JobDefOf.HaulToCell,
-                                           JobDefOf.Wait_Combat })
-            {
-                ok &= Expect(!JobRoomTargets.IsIncidental(JobMaker.MakeJob(def)),
-                             def.defName + " is not incidental");
-            }
-            return ok;
-        }
-
-        /// <summary>
         /// The job a colonist was just dressed for never changes them back, though its target
         /// leaves the catchment while they change: a patient here, standing in for an animal
         /// walking out of an unwalled ring or a cow out of the barn. Dressed through the work

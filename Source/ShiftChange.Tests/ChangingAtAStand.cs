@@ -17,7 +17,7 @@ namespace ShiftChange.Tests
     /// pawn ticked alone never gets a path.</para>
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(HarnessDevTools.First - (int)CaseGroup.ChangingAtAStand)]
-    internal class ChangingAtAStand : ClockFixture
+    internal class ChangingAtAStand : StoryFixture
     {
         /// <summary>
         /// The driver builds a correct ledger and gives everything back, forced flags included:

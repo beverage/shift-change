@@ -76,52 +76,6 @@ namespace ShiftChange.Tests
             return scene;
         }
 
-        /// <summary>
-        /// The ground every vacuum case stands on, checked before any of them relies on it: the
-        /// second map is a vacuum map; the staged room is a room of its own and holds air; the
-        /// strip and the doorway read at or over the harm line; and a region walk that may only
-        /// step into air stays in the room, where an unrestricted walk from the same start reaches
-        /// the strip (the control, so the negative means something).
-        /// </summary>
-        internal static bool VacuumMapStages(Map home)
-        {
-            Map away = SecondMap(home);
-            if (away == null)
-            {
-                return Expect(false, "a second map was made");
-            }
-            try
-            {
-                VacuumScene scene = StageVacuumScene(away);
-                float harm = VacuumUtility.MinVacuumForDamage;
-                bool ok = Expect(away.Biome.inVacuum,
-                                 "the second map's biome (" + away.Biome.defName + ") is in vacuum")
-                        & Expect(scene.Inside != null && !scene.Inside.TouchesMapEdge
-                                 && !scene.Inside.ExposedToSpace,
-                                 "the walled, roofed room is a room of its own, closed to space")
-                        & Expect(scene.Outside != null && scene.Outside.ExposedToSpace,
-                                 "the open strip beyond its door is open to space")
-                        & Expect(scene.InsideCell.GetVacuum(away) < harm, "the room reads as air")
-                        & Expect(scene.OutsideCell.GetVacuum(away) >= harm, "the strip reads as vacuum")
-                        & Expect(scene.DoorCell.GetRoom(away)?.Vacuum >= harm,
-                                 "and the doorway between them reads at the harm line");
-
-                Region start = scene.InsideCell.GetRegion(away);
-                Region strip = scene.OutsideCell.GetRegion(away);
-                HashSet<Region> anywhere = Walk(start, to => true);
-                HashSet<Region> airOnly = Walk(start, to => to.Room != null && to.Room.Vacuum < harm);
-                ok &= Expect(strip != null && anywhere.Contains(strip),
-                             "a walk from the room that may step anywhere reaches the strip (the control)")
-                    & Expect(start != null && airOnly.Contains(start) && !airOnly.Contains(strip),
-                             "and one that may only step into air stays in the room");
-                return ok;
-            }
-            finally
-            {
-                RemoveSecondMap(away);
-            }
-        }
-
         /// <summary>Every region a walk from <paramref name="start"/> reaches.</summary>
         internal static HashSet<Region> Walk(Region start, Predicate<Region> mayEnter)
         {
@@ -320,95 +274,6 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// A crafter in a vacsuit, at a stand whose duster would take it off, is not dressed for a
-        /// bill fetching from open floor outside: the fetch goes through vacuum, so they keep their
-        /// own gear. The same bill fetching from the room dresses them (the control).
-        /// </summary>
-        internal static bool IngredientInVacuumKeepsTheirGear(Fixture fix)
-        {
-            Ship ship = ShipOn(fix.Map);
-            Job outside = BillFetching(fix, ship.OnFloor);
-            Job inside = BillFetching(fix, ship.InRoom);
-            if (outside == null || inside == null)
-            {
-                return Expect(false, "the bills were staged");
-            }
-            return Expect(!Probe(fix, outside), "a bill fetching from open floor does not dress the crafter")
-                   & Expect(Probe(fix, inside), "the same bill fetching from inside the room does (the control)");
-        }
-
-        /// <summary>
-        /// The fetch fails just the same when the ingredient is safe but only vacuum leads to it: a
-        /// second room past the open floor. The control is
-        /// <see cref="ConnectedShipChangesNothing"/>.
-        /// </summary>
-        internal static bool SafeRoomAcrossVacuumKeepsTheirGear(Fixture fix)
-        {
-            Job across = BillFetching(fix, ShipOn(fix.Map).InFarRoom);
-            if (across == null)
-            {
-                return Expect(false, "the bill was staged");
-            }
-            return Expect(!Probe(fix, across),
-                          "a bill fetching from a room only vacuum leads to does not dress the crafter");
-        }
-
-        /// <summary>
-        /// The control for <see cref="SafeRoomAcrossVacuumKeepsTheirGear"/>, on the connected ship:
-        /// its floor is a roofed corridor holding air, so the same bill dresses them. Where
-        /// everything connects through air nothing changes, as the README promises.
-        /// </summary>
-        internal static bool ConnectedShipChangesNothing(Fixture fix)
-        {
-            Ship ship = ShipOn(fix.Map);
-            Job across = BillFetching(fix, ship.InFarRoom);
-            if (across == null)
-            {
-                return Expect(false, "the bill was staged");
-            }
-            bool through = Patch_JobInterception.AirRouteFor(across, fix.Pawn, fix.Map,
-                Patch_JobInterception.StandCell(fix.Comp)) != Patch_JobInterception.AirRoute.Air;
-            bool ok = Expect(!through, "the trip from the stand to the far room reads as all air")
-                      & Expect(Probe(fix, across),
-                               "on a ship whose rooms all connect through air, the same bill dresses them");
-            if (through)
-            {
-                ReportRow(fix.Map, ship.Room.maxX - 1, ship.FarRoom.minX + 1, ship.OnFloor.z);
-            }
-            return ok;
-        }
-
-        /// <summary>
-        /// What each cell of a row reads, for a case that failed on it. For a cell in a room open
-        /// to space, its district is also told the roof changed, and the report says whether the
-        /// room still reads open after that.
-        /// </summary>
-        internal static void ReportRow(Map map, int fromX, int toX, int z)
-        {
-            for (int x = fromX; x <= toX; x++)
-            {
-                IntVec3 cell = new IntVec3(x, 0, z);
-                Region region = cell.GetRegion(map);
-                Room room = region?.Room;
-                Report.Append("      ").Append(cell).Append(": ")
-                      .Append(region == null ? "no region" : "region " + region.id)
-                      .Append(room == null ? "" : ", room " + room.ID + " vacuum " + room.Vacuum.ToString("F2")
-                                                  + (room.ExposedToSpace ? " open" : " closed")
-                                                  + (room.TouchesMapEdge ? " edge" : "")
-                                                  + (room.IsDoorway ? " doorway" : "")
-                                                  + ", " + room.CellCount + " cells")
-                      .Append(map.roofGrid.Roofed(cell) ? ", roofed" : "")
-                      .Append(", ").Append(cell.GetTerrain(map)?.defName ?? "no terrain");
-                if (room != null && room.ExposedToSpace)
-                {
-                    cell.GetDistrict(map)?.Notify_RoofChanged();
-                    Report.Append(room.ExposedToSpace ? ", still open after a reset" : ", closed after a reset");
-                }
-                Report.AppendLine();
-            }
-        }
-
-        /// <summary>
         /// A crafter already in the duster, their vacsuit parked, changes back before a bill whose
         /// fetch goes through vacuum and keeps the duster on for one that stays inside (the
         /// control). Dressing asked the same question, so the two directions agree.
@@ -428,23 +293,6 @@ namespace ShiftChange.Tests
             }
             return Expect(Probe(fix, outside), "a bill fetching from open floor sends them back to change first")
                    & Expect(!Probe(fix, inside), "one fetching from inside keeps the duster on (the control)");
-        }
-
-        /// <summary>
-        /// A crafter with no vacuum protection to lose is dressed as before, even for a bill whose
-        /// fetch goes through vacuum: the swap takes nothing away, so the gate does not apply.
-        /// </summary>
-        internal static bool UnprotectedCrafterIsUnaffected(Fixture fix)
-        {
-            StripVacsuit(fix.Pawn);
-            Job outside = BillFetching(fix, ShipOn(fix.Map).OnFloor);
-            if (outside == null)
-            {
-                return Expect(false, "the bill was staged");
-            }
-            return Expect(SwapPlan.UnclampedVacuumResistance(fix.Pawn) < 0.01f,
-                          "the crafter has no vacuum resistance")
-                   & Expect(Probe(fix, outside), "and is dressed for the bill all the same");
         }
 
         /// <summary>Take the vacsuit and its helmet off a pawn, and destroy them.</summary>
@@ -559,51 +407,6 @@ namespace ShiftChange.Tests
                          capableOf: DefDatabase<WorkTypeDef>.GetNamedSilentFail("Crafting"));
         }
 
-        /// <summary>
-        /// Off a vacuum map nothing changes, since the README scopes the vacuum rule to a ship in
-        /// space: on the harness's own map, the crafter in the same vacsuit is dressed for a bill
-        /// whose ingredient lies outside the room.
-        /// </summary>
-        internal static bool PlanetMapChangesNothing(Fixture fix)
-        {
-            WorkTypeDef crafting = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Crafting");
-            ThingDef spotDef = DefDatabase<ThingDef>.GetNamedSilentFail("CraftingSpot");
-            WorkGiverDef giver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoBillsUseCraftingSpot");
-            RecipeDef recipe = spotDef?.AllRecipes?.FirstOrDefault();
-            if (crafting == null || spotDef == null || giver == null || recipe == null)
-            {
-                return Expect(false, "the crafting defs resolve");
-            }
-            if (!Expect(!fix.Map.Biome.inVacuum, "the harness's own map is not a vacuum map")
-                || !Expect(WearOne(fix.Pawn, "Apparel_Vacsuit") && WearOne(fix.Pawn, "Apparel_VacsuitHelmet"),
-                           "the colonist wears a vacsuit and its helmet"))
-            {
-                return false;
-            }
-            fix.Comp.ToggleWork(crafting);
-            // Where the ship puts its bench: Stage puts the stand one cell in from the pad's
-            // south-west corner.
-            IntVec3 benchAt = fix.Stand.Position + new IntVec3(3, 0, 2);
-            Building_WorkTable spot = DebugTools_Fixtures.Spawn(fix.Map, spotDef, null, benchAt, Rot4.South)
-                as Building_WorkTable;
-            if (spot == null)
-            {
-                return Expect(false, "a crafting spot was staged");
-            }
-            spot.BillStack.AddBill(new Bill_Production(recipe));
-            IntVec3 outsideAt = OpenGround(fix, new IntVec3(fix.Stand.Position.x - 3, 0, fix.Stand.Position.z));
-            Thing steel = ThingMaker.MakeThing(ThingDefOf.Steel);
-            steel.stackCount = 10;
-            GenSpawn.Spawn(steel, outsideAt, fix.Map);
-            Job job = JobMaker.MakeJob(JobDefOf.DoBill, spot);
-            job.bill = spot.BillStack[0];
-            job.workGiverDef = giver;
-            job.targetQueueB = new List<LocalTargetInfo> { steel };
-            job.countQueue = new List<int> { 10 };
-            return Expect(steel.GetRoom() != spot.GetRoom(), "the ingredient lies outside the bench's room")
-                   & Expect(Probe(fix, job), "and the bill dresses them, as it always has");
-        }
-
         // ------------------------------------------------- the other arms of the gate
 
         /// <summary>
@@ -643,138 +446,6 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// The stand search passes over a stand whose outfit would take the suit off and goes on to
-        /// the next: for a bill fetching through vacuum, the nearer duster stand loses to a vacsuit
-        /// stand across the room. Without the job, the nearer one wins (the control).
-        /// </summary>
-        internal static bool ProtectiveStandWinsOverANearerOne(Fixture fix)
-        {
-            WorkTypeDef crafting = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Crafting");
-            ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
-            if (crafting == null || standDef == null)
-            {
-                return Expect(false, "the crafting and stand defs resolve");
-            }
-            Map map = fix.Map;
-            Ship ship = ShipOn(map);
-            Building_OutfitStand suits = DebugTools_Fixtures.Spawn(map, standDef, ThingDefOf.WoodLog,
-                new IntVec3(ship.Room.maxX - 2, 0, ship.Room.minZ + 1), Rot4.North) as Building_OutfitStand;
-            CompShiftStand suitsComp = suits?.TryGetComp<CompShiftStand>();
-            if (suitsComp == null || !StockOne(suits, "Apparel_Vacsuit") || !StockOne(suits, "Apparel_VacsuitHelmet"))
-            {
-                return Expect(false, "a second stand holding a vacsuit and its helmet was staged");
-            }
-            suitsComp.ToggleWork(crafting);
-            Job outside = BillFetching(fix, ship.OnFloor);
-            if (outside == null)
-            {
-                return Expect(false, "the bill was staged");
-            }
-            JobPlace target = Patch_JobInterception.TargetPlace(outside, map);
-            bool ok = Expect(SwapPlan.WouldDress(fix.Pawn, suits), "the crafter could wear the vacsuit stand's kit")
-                      & Expect(Patch_JobInterception.FindAvailableStand(target, map, fix.Pawn, crafting) == fix.Comp,
-                               "without the job, the nearer duster stand wins (control)")
-                      & Expect(Patch_JobInterception.FindAvailableStand(target, map, fix.Pawn, crafting,
-                                   Patch_JobInterception.StandTrigger.Work, outside) == suitsComp,
-                               "with it, the vacsuit stand does: the duster would take the suit off");
-            bool inserted = Patch_JobInterception.TryInsertSwap(outside, null, fix.Pawn, fix.Pawn.jobs);
-            Thing sentTo = fix.Pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand
-                ? fix.Pawn.CurJob.targetA.Thing
-                : null;
-            Settle(fix.Pawn);
-            return ok & Expect(inserted && sentTo == suits, "and the crafter is sent to the vacsuit stand to dress");
-        }
-
-        /// <summary>
-        /// The delivery arm asks too: an area stand whose area is painted across the open floor
-        /// does not dress a builder in a vacsuit for a delivery whose steel lies out there, where
-        /// steel inside the room dresses them (the control).
-        /// </summary>
-        internal static bool AreaDeliveryAcrossVacuumKeepsTheirGear(Fixture fix)
-        {
-            WorkTypeDef construction = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Construction");
-            WorkGiverDef deliver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("ConstructDeliverResourcesToBlueprints");
-            if (construction == null || deliver == null)
-            {
-                return Expect(false, "the construction defs resolve");
-            }
-            Map map = fix.Map;
-            Ship ship = ShipOn(map);
-            fix.Comp.ToggleWork(construction);
-            MakeCalm(map);
-            Thing steelOut = HarnessCatchments.Steel(map, ship.OnFloor);
-            Thing steelIn = HarnessCatchments.Steel(map, ship.InRoom);
-            Thing site = HarnessCatchments.WallBlueprint(map, new IntVec3(ship.Room.minX + 2, 0, ship.Room.maxZ - 1));
-            if (site == null)
-            {
-                return Expect(false, "the wall blueprint places");
-            }
-            Area_Allowed area = HarnessCatchments.NewArea(fix, "Shift harness deck",
-                ship.Room.Cells.Concat(new[] { ship.OnFloor }).ToArray());
-            if (area == null)
-            {
-                return Expect(false, "the map has room for another allowed area");
-            }
-            fix.Comp.SetServeArea(area);
-            return Expect(fix.Comp.serves == CatchmentKind.Area && fix.Comp.Covers(ship.OnFloor, map),
-                          "the stand serves an area painted over the room and the open floor (control)")
-                   & Expect(Probe(fix, HarnessCatchments.Delivery(deliver, steelIn, site)),
-                            "a delivery from steel in the room dresses the builder (control)")
-                   & Expect(!Probe(fix, HarnessCatchments.Delivery(deliver, steelOut, site)),
-                            "one from steel on the open floor keeps them in their vacsuit");
-        }
-
-        /// <summary>
-        /// The mid-job catch-up asks too: a stand freed while a crafter in a vacsuit is already on
-        /// a bill fetching through vacuum does not pull them in to change, where the same job
-        /// fetching from the room does (the control). The stand serves nothing while the job
-        /// starts, so the job's own start does not dress them first.
-        /// </summary>
-        internal static bool FreedStandSkipsAJobThroughVacuum(Fixture fix)
-        {
-            WorkTypeDef crafting = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Crafting");
-            WorkGiverDef giver = DefDatabase<WorkGiverDef>.GetNamedSilentFail("DoBillsUseCraftingSpot");
-            if (crafting == null || giver == null)
-            {
-                return Expect(false, "the crafting defs resolve");
-            }
-            Map map = fix.Map;
-            Ship ship = ShipOn(map);
-            MakeCalm(map);
-            Thing steelOut = HarnessCatchments.Steel(map, ship.OnFloor);
-            Thing steelIn = HarnessCatchments.Steel(map, ship.InRoom);
-
-            fix.Comp.ToggleWork(crafting);
-            // A Goto, because the catch-up may interrupt it (Core's Wait is not suspendable), aimed
-            // at another cell so it stays open (a Goto to the cell the pawn stands on completes
-            // inside StartJob), and carrying the bill's ingredient queue.
-            Job working = JobMaker.MakeJob(JobDefOf.Goto, ship.InRoom);
-            working.workGiverDef = giver;
-            working.targetQueueB = new List<LocalTargetInfo> { steelOut };
-            fix.Pawn.jobs.StartJob(working, JobCondition.InterruptForced, null,
-                resumeCurJobAfterwards: false, cancelBusyStances: true, null, null);
-            fix.Comp.ToggleWork(crafting);
-            bool ok = Expect(fix.Pawn.CurJobDef == JobDefOf.Goto && fix.Comp.HandlesWork(crafting),
-                             "the crafter is on the job in their vacsuit, and the stand serves crafting again (control)");
-            if (!ok)
-            {
-                return false;
-            }
-            Patch_JobInterception.TryDressMidJob(fix.Comp, null);
-            ok &= Expect(fix.Pawn.CurJobDef == JobDefOf.Goto,
-                         "a freed stand does not catch them up for a job fetching through vacuum");
-            if (fix.Pawn.CurJobDef == JobDefOf.Goto)
-            {
-                fix.Pawn.CurJob.targetQueueB = new List<LocalTargetInfo> { steelIn };
-                Patch_JobInterception.TryDressMidJob(fix.Comp, null);
-                ok &= Expect(fix.Pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
-                             "the same job fetching from the room, it does (control)");
-            }
-            Settle(fix.Pawn);
-            return ok;
-        }
-
-        /// <summary>
         /// An errand queued ahead of the stand's own work rides along in uniform, but not into
         /// vacuum: on the connected ship, a haul from the far room with a bill queued behind it
         /// keeps the duster on (the control), and with the corridor open to vacuum it sends them
@@ -802,33 +473,6 @@ namespace ShiftChange.Tests
             queue.EnqueueFirst(HarnessRideAlong.QueuedWork(giver, ship.Bench));
             return ok & Expect(Probe(fix, HarnessRideAlong.GiverlessHaul(steelFar, ship.InRoom)),
                                "with the corridor open to vacuum, the same errand sends them back to change first");
-        }
-
-        /// <summary>
-        /// The air walk goes only where the colonist may pass. On the connected ship a bill
-        /// fetching from the far room dresses them (the control); with the far room's door
-        /// forbidden the walk finds no way there through air and the bill keeps them in their
-        /// vacsuit. That door is the only way in, so vanilla would hand out no such bill; the case
-        /// tests that the walk obeys the door, which matters where another way in crosses vacuum.
-        /// </summary>
-        internal static bool ForbiddenDoorIsNoWayThrough(Fixture fix)
-        {
-            Map map = fix.Map;
-            Ship ship = ShipOn(map);
-            Job across = BillFetching(fix, ship.InFarRoom);
-            Building_Door door = new IntVec3(ship.FarRoom.minX, 0, ship.OnFloor.z).GetDoor(map);
-            if (across == null || door == null)
-            {
-                return Expect(false, "the bill and the far room's door were staged");
-            }
-            bool ok = Expect(Probe(fix, across), "connected: a bill fetching from the far room dresses them (control)");
-            door.SetForbidden(true, warnOnFail: false);
-            Job again = BillFetching(fix, ship.InFarRoom + IntVec3.North);
-            return ok
-                   & Expect(Patch_JobInterception.AirRouteFor(again, fix.Pawn, map, Patch_JobInterception.StandCell(fix.Comp))
-                            == Patch_JobInterception.AirRoute.Vacuum,
-                            "with the far room's door forbidden, the walk finds no way there through air")
-                   & Expect(!Probe(fix, again), "and the bill keeps them in their vacsuit");
         }
 
         /// <summary>

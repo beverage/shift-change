@@ -62,28 +62,29 @@ and never to `Player.log`, and it ends the coroutine. When that is DevTools'
 test runner, nothing is left to quit the game, so the script stops it as soon as
 stderr shows it and prints the exception.
 
-Each case is a test of its own, in `Source/ShiftChange.Tests/HarnessCases.cs`:
-a `[Test]` named after the case's body, whose `[TestDescription]` is the
-sentence its transcript in `Test.log` opens with, and whose one line is a `Run`
-call ([Adding a case](#adding-a-case)). The file lists the cases in run order,
-in sixteen fixtures. DevTools runs the fixtures by `ExecutionPriority`, each at
-its place in `CaseGroup`, except the save/load fixture, which runs last, and a
-fixture's tests in declaration order. It sorts a fixture's tests by priority
-with an unstable sort, which keeps equal tests in declaration order only up to
-16, so no fixture holds more than 16; one that would is split, which takes a
-new `CaseGroup` value and a fixture for it. One more DevTools test,
-`HarnessTestOrder`, reads the tests DevTools registered and fails unless every
-fixture runs exactly the tests it declares, in declaration order, every case
-fixture runs at a priority of its own and the save/load legs at the lowest, and
-every case has a sentence of its own. Another, `HarnessLoadNote`, checks how a
-save/load leg's load notes an abort: which log entries it counts as its own, on
-queues it builds itself, and that the note applies only to the game that load
-made. A case runs on a pad only if it needs one, and the pad is found once per
-map and named in Test.log, so a case that spoils it fails the cases after it
-rather than moving them elsewhere. Each case runs within one frame, but
-DevTools' game is unpaused and its clock runs between tests. Pausing it would
-change how the job tracker counts a pawn's jobs per tick, which it does only
-while unpaused or within one frame.
+Each case is a test of its own, in a fixture under `Source/ShiftChange.Tests/`.
+A story fixture, named for what a player sees, holds its tests' bodies too
+([Adding a case](#adding-a-case)). The cases not yet rewritten are in
+`HarnessCases.cs`: a `[Test]` named after the case's body, whose
+`[TestDescription]` is the sentence its transcript in `Test.log` opens with, and
+whose one line is a `Run` call. DevTools runs the fixtures by
+`ExecutionPriority`, each at its place in `CaseGroup`, except the save/load
+fixture, which runs last, and a fixture's tests in declaration order. It sorts a
+fixture's tests by priority with an unstable sort, which keeps equal tests in
+declaration order only up to 16, so no fixture holds more than 16; one that
+would is split, which takes a new `CaseGroup` value and a fixture for it. One
+more DevTools test, `HarnessTestOrder`, reads the tests DevTools registered and
+fails unless every fixture runs exactly the tests it declares, in declaration
+order, every case fixture runs at a priority of its own and the save/load legs
+at the lowest, and every case has a sentence of its own. Another,
+`HarnessLoadNote`, checks how a save/load leg's load notes an abort: which log
+entries it counts as its own, on queues it builds itself, and that the note
+applies only to the game that load made. A case runs on a pad only if it needs
+one, and the pad is found once per map and named in Test.log, so a case that
+spoils it fails the cases after it rather than moving them elsewhere. Each case
+runs within one frame, but DevTools' game is unpaused and its clock runs between
+tests. Pausing it would change how the job tracker counts a pawn's jobs per
+tick, which it does only while unpaused or within one frame.
 
 Every case that ticks runs on the game's own clock. `GameClock` steps
 `TickManager.DoSingleTick` itself, so every map, pawn and comp ticks as in
@@ -92,7 +93,7 @@ speed while it steps, turns the storyteller and random mental breaks off and
 holds the autosave counter, and puts all of them back after. The swap cases
 were rewritten for it: `ChangingAtAStand` and `KeepingThemDecent`, after the
 case fixtures and before the save/load legs, on a base of their own
-(`ClockFixture`) that lets a frame pass every 250 ticks. They ran beside the
+(`StoryFixture`) that lets a frame pass every 250 ticks. They ran beside the
 cases they replaced, every DLC and Odyssey alone, and agreed check for check
 before those went. `WalksToTheStand` had no twin: it starts the colonist five
 cells off and walks them to the stand and back. Every other case that ticks
@@ -106,19 +107,24 @@ tick, 180 to 570 in these tests, the same in every run; with the walk, 429 or
 read (`Story`): each check is a line in the game's words, and the first that
 fails fails the test with every line so far and its own marked `>>  FAIL`,
 which DevTools shows in the Test Explorer's summary and under the test's row in
-Test.log.
+Test.log. The cases that never tick were then rewritten the same way, into the
+fixtures from `TheTestColony` to `ReadingJobsAndRooms` in `CaseGroup`: one check
+for each old assertion, in the same order, with a first line saying what was set
+up where a test stages one. They too ran beside the cases they replaced, every
+DLC and Odyssey alone, and agreed check for check before those went.
 
-An assertion (`Expect`) writes its line to the case's transcript and signals
-DevTools, which fails the test without stopping it, so the transcript shows
-every assertion and the first that failed labels the test in Test.log. A case
-also fails when its body returns false, throws, or cannot build its fixture. A
-case with a mod of its own to test against is still a known gap without it
-(`ExpectKnownGap`), which DevTools reports as a skipped test unless the case
-failed too.
+In a case not yet rewritten, an assertion (`Expect`) writes its line to the
+case's transcript and signals DevTools, which fails the test without stopping
+it, so the transcript shows every assertion and the first that failed labels the
+test in Test.log. A case also fails when its body returns false, throws, or
+cannot build its fixture. A case with a mod of its own to test against is still
+a known gap without it (`ExpectKnownGap`), which DevTools reports as a skipped
+test unless the case failed too.
 
 DevTools fails a test on any warning it does not allow, apart from the few the
-game logs by itself, which DevTools allows everywhere. The fault-latch fixture
-allows, by text alone, the errors its own injected faults log. Every other
+game logs by itself, which DevTools allows everywhere. The repeated-errors test
+(`RepeatedErrorsStopShiftChangeUntilTheNextGame`) allows, by text alone, the
+errors its own injected faults log. Every other
 allowance also needs a frame on the line's stack, so the same text from anywhere
 else still fails. Every fixture derives from `HarnessFixture`, which allows
 lines other mods log by themselves on a full list, in whichever test is running,
@@ -217,7 +223,10 @@ does.
 
 About a hundred and fifty cases. This section is a map: the detail lives with each case, in
 the comment on its method under `Source/ShiftChange.Tests/`, and Test.log
-prints the cases in the order `HarnessCases.cs` declares them.
+prints the cases in the order they run: the fixtures in `CaseGroup`'s order, and
+each fixture's tests in the order its file declares them. The fixtures named for
+what a player sees (`WhoUsesAStand`, `ServingAnArea`, ...) are written as stories;
+the `Harness*` ones are the cases still to be rewritten.
 
 Most guard a bug that happened, and fail without its fix. Some instead assert a
 rule the store description promises players. That kind exists because all
@@ -227,28 +236,29 @@ had always done the opposite on purpose, and nothing caught it until
 kind: facts about the def database, most likely to fail on a game update rather
 than on an edit.
 
-**Lifecycle** (`HarnessLifecycle`). Engine events fired at a hand-assembled,
+**Lifecycle** (`LosingAStandOrAColonist`, and the flights and reinstall in
+`HarnessLifecycle`). Engine events fired at a hand-assembled,
 checked-out stand, asserting where the ledger lands: a gravship flight with the
 borrower aboard, after which the return leg must end the shift normally
-(`GravshipFlight`), and without them (`GravshipFlightLeftBehind`). Three more
+(`GravshipFlight`), and without them (`LeftBehindByTheGravship`). Three more
 flights leave the borrower and the stand on different maps: the stand flies
 alone and comes back (`StandFliesWithoutItsBorrower`), the borrower flies alone
 and comes back (`BorrowerFliesWithoutTheirStand`), and the borrower flies while
 the stand is lost with the map it stayed on, standing or boxed
-(`StandLostWithItsMap`, `BoxedStandLostWithItsMap`). `StandDefsHearMapRemoval`
+(`StandLeftOnAnAbandonedMap`, `UninstalledStandLostWithItsMap`). `EveryStandHearsItsMapGo`
 checks that every stand def asks for the map-removed hook that last pair relies
-on. Then teardown (`TeardownReleases`), a reinstall, which must keep the ledger
+on. Then teardown (`DeconstructedStandLetsTheColonistGo`), a reinstall, which must keep the ledger
 and the return trip (`ReinstallKeepsTheLedger`) and the stand's owner, mode and
-flag (`ReinstallKeepsConfiguration`), but not an owner who died while it was boxed
-(`DeadOwnerNotRestoredOnReinstall`), nor one kidnapped while it was boxed, whose
-shift there ends too (`KidnappedOwnerNotRestoredOnReinstall`), and the borrower's
+flag (`ReinstalledStandKeepsItsSettings`), but not an owner who died while it was boxed
+(`DeadOwnerDoesNotGetTheStandBack`), nor one kidnapped while it was boxed, whose
+shift there ends too (`KidnappedOwnerDoesNotGetTheStandBack`), and the borrower's
 death and banishment
-(`DeathReaps`, `BanishmentReaps`). `FaultLatchRecovers` drives real throws
+(`DeathEndsTheShift`, `BanishmentEndsTheShift`). `RepeatedErrorsStopShiftChangeUntilTheNextGame` drives real throws
 through the interception prefix until the fault latch trips, then re-arms it
 the way a load does.
 
-**Vacuum** (`HarnessVacuum`). The second map the flights use is Odyssey's
-`SpacePocket`, an `Orbit` map, so the game treats it as space. `VacuumMapStages`
+**Vacuum** (`KeepingTheirVacsuitOn` and `HarnessVacuum`). The second map the flights use is Odyssey's
+`SpacePocket`, an `Orbit` map, so the game treats it as space. `ARoomInSpaceHoldsAir`
 checks the ground every vacuum case stands on: a walled, roofed room there holds
 air, while the open floor past its door, and the doorway itself, read as vacuum.
 A region walk that may only step into air stays in the room. Its control is a
@@ -259,34 +269,34 @@ The rest stage a ship there (`StageShip`): the room with a stand holding a
 duster, a crafter in a vacsuit and its helmet, a crafting spot, and a door onto
 three cells of open floor leading to a second room. A bill fetching from the open
 floor leaves the crafter in their own gear, and the same bill fetching from the
-room dresses them (`IngredientInVacuumKeepsTheirGear`). So does a bill fetching
+room dresses them (`SteelOutInVacuumKeepsTheVacsuitOn`). So does a bill fetching
 from the second room, safe but only reached through vacuum
-(`SafeRoomAcrossVacuumKeepsTheirGear`). On a ship whose floor is a walled, roofed
+(`ARoomOnlyVacuumLeadsToKeepsItOnToo`). On a ship whose floor is a walled, roofed
 corridor holding air, that bill dresses them, which is the promise that a
-connected ship changes nothing (`ConnectedShipChangesNothing`). Once dressed, a
+connected ship changes nothing (`ACorridorWithAirChangesNothing`). Once dressed, a
 crafter changes back before a bill through vacuum and keeps the duster on for one
 inside (`OnShiftChangesBackBeforeVacuum`). A crafter with no protection to lose
-is dressed as before (`UnprotectedCrafterIsUnaffected`). An order through vacuum
+is dressed as before (`WithoutAVacsuitTheyChangeAsUsual`). An order through vacuum
 runs as given, and its message goes up on screen once: a second order within the
 hour says nothing more, and a drafted move is warned about too
 (`OrderIntoVacuumRunsAsGiven`). An emergency through vacuum sends a colonist in
 uniform back to change, and the same emergency inside does not
 (`EmergencyIntoVacuumChangesBackFirst`). On the harness's own map, the crafter in
 a vacsuit is dressed for a bill fetching from outside the room, as before
-(`PlanetMapChangesNothing`).
+(`OnAPlanetNothingChanges`).
 
 The rest came out of a review of the gate. A stand holding a vacsuit dresses an
 unsuited crafter for a bill through vacuum, and the gate then leaves them be in
 it (`VacsuitStandStillDresses`). The stand search passes over the nearer duster
 stand for a vacsuit stand across the room, where without the job the nearer one
-wins (`ProtectiveStandWinsOverANearerOne`). An area stand painted over the open
+wins (`TheVacsuitStandWinsOverANearerOne`). An area stand painted over the open
 floor does not dress for a delivery from out there
-(`AreaDeliveryAcrossVacuumKeepsTheirGear`), and a freed stand does not catch up
+(`AnAreaOverOpenFloorLeavesTheVacsuitOn`), and a freed stand does not catch up
 a crafter already on a job fetching through vacuum
-(`FreedStandSkipsAJobThroughVacuum`). On the connected ship, an errand ahead of
+(`AStandComingFreeLeavesThemBe`). On the connected ship, an errand ahead of
 the stand's work rides along until the corridor is opened to vacuum
 (`ErrandAheadOfWorkChangesBackBeforeVacuum`), and a forbidden door is no way
-through for the walk (`ForbiddenDoorIsNoWayThrough`). A colonist cut off from
+through for the walk (`AForbiddenDoorIsNoWayThrough`). A colonist cut off from
 their stand by vacuum is not sent across it to change, and is warned instead
 (`StrandedColonistIsNotSentAcrossToChange`). A cooldown holds a meal break's
 change back but not the one before vacuum (`CooldownDoesNotWaveThemIntoVacuum`).
@@ -312,24 +322,26 @@ control for `LegsOnlyStandKeepsAWomansShirtOn`; a nudist is exempt
 rather than the running game's, and turning it on takes effect
 (`GuardIsOffUntilTurnedOn`).
 
-**Recreation and sleep** (`HarnessTriggers`). Both classifiers are asserted as
-tables against the def database, with no map (`RecreationClassifierHolds`,
-`RestClassifierHolds`). A real joy job in the stand's room dresses
-(`JoyJobInTheRoomDresses`), and work and recreation clear each other on one
-stand (`WorkAndRecreationAreExclusive`). `SleepJobInTheRoomDresses` puts a bed
+**Recreation and sleep** (`ReadingJobsAndRooms`, `WhatSendsThemToChange` and
+`HarnessTriggers`). Both classifiers are asserted as
+tables against the def database, with no map (`WhatCountsAsRecreation`,
+`WhatCountsAsSleep`). A real joy job in the stand's room dresses
+(`ChessInTheRoomSendsThemToChange`), and work and recreation clear each other on one
+stand (`AStandServesWorkOrRecreationNotBoth`). `SleepJobInTheRoomDresses` puts a bed
 in the stand's room and covers going to bed there, every refusal, the mid-sleep
 re-trigger and the wake-up. Its precondition is a colonist who needs no doctor,
 which the fixture arranges ("Four engine traps"): an untagged lay-down by a
 colonist who needs a doctor is medical bed rest, which no sleep stand dresses.
 
-**Bed rest, deposit only and fishing** (`HarnessTriggers` too). A stand ticked
+**Bed rest, deposit only and fishing** (`WhatSendsThemToChange` and
+`HarnessTriggers`). A stand ticked
 for vanilla's bed-rest work type dresses a patient going to recuperate, never
-one who needs a doctor first (`MedicalBedRestDressesAtAGownStand`), and the
+one who needs a doctor first (`BedRestSendsAPatientToChange`), and the
 medical emergency setting covers doctors and patients but never firefighting
-(`MedicalEmergencySettingCoversTheRightWork`). A deposit-only stand parks what
+(`MedicalEmergenciesChangeFirstButFiresDoNot`). A deposit-only stand parks what
 its filter accepts and hands it back (`DepositOnlyParksAndReturns`), and
 `StoreUtility`'s own search walks haulers past it while an ordinary stand still
-takes deliveries (`DepositOnlyStandIsNoHaulTarget`). Fishing, which Odyssey
+takes deliveries (`HaulersLeaveADepositOnlyStandAlone`). Fishing, which Odyssey
 hands out with no giver, dresses as it is handed out, as the same job carrying
 its giver does (control), but not with a player order's tag; a radius stand by
 the door dresses for fishing out past it, which room mode does not, and not
@@ -337,9 +349,9 @@ past its ring. Untagged, as vanilla puts it back in the queue behind a haul, it
 still dresses, and on shift that haul keeps the uniform on, where the same haul
 with nothing queued changes them back (`FishingDressesAtAStandTickedForIt`).
 
-**The job classifier** (`HarnessJobKinds`). One table, in a fixture because
-medical rest depends on the colonist's health and on a bed:
-`ClassifierSortsEveryJobShape` gives each job shape the other cases build, and
+**The job classifier** (`WhatSendsThemToChange`). One table, staged on the pad
+because medical rest depends on the colonist's health and on a bed:
+`WhatEachJobCountsAs` gives each job shape the other cases build, and
 the kind and work type `Classify` must return for it. Rows cover work from a
 giver, VisitSickPawn from its work giver (Work) and from its joy giver
 (Recreation), reading and eating, ordinary and ground sleep, medical lay-downs
@@ -351,7 +363,8 @@ stamped and unstamped by tag. The cases that drive jobs through the prefix test
 what each reader does with the answer, while this one tests the answer, so a
 change to the order of the classifier's tests fails here with the row named.
 
-**Gates** (`HarnessGates`). `PromisesHold` is the decision table for the
+**Gates** (`HarnessGates`, and `WhatSendsThemToChange` for the promises and a job
+mid-change). `OrdersEmergenciesAndDraftsAreNeverHeldUp` is the decision table for the
 promises: automatic work only, emergencies never delayed, drafted pawns left
 alone, work the stand does not serve ignored. The meal-break policy has a case
 on a work stand and one on a sleep stand, where a meal already in the pawn's
@@ -359,7 +372,7 @@ inventory gets the opposite answer (`MealBreakChangesOut`,
 `SleepwearMealBreakChangesOut`). Under threat a colonist may change back but
 not in (`DangerGateIsOneDirectional`); a lord duty shuts both arms until it
 ends (`DutyGateShutsBothArms`); a job handed to a pawn mid-swap is not deferred
-on top of it (`MidSwapJobIsNotDeferredAgain`); and a freed stand catches up a
+on top of it (`AJobMidChangeIsNotPutOffAgain`); and a freed stand catches up a
 colonist already working bare in its room (`FreedStandCatchesUp`). Change back
 keeps a colonist out of their stand's room until they leave it, drafting drops
 that, and the catch-up honours it (`ChangeBackLatchHoldsUntilTheyLeave`). That
@@ -368,37 +381,37 @@ reworked it, and it still passes on the per-stand latch. Its second stand, out
 past the door, serves the smallest radius, since a room stand in the open
 serves nothing.
 
-**Allowed areas** (`HarnessGates` too). A stand outside the colonist's allowed
+**Allowed areas** (`ServingAnArea` and `HarnessGates`). A stand outside the colonist's allowed
 area dresses nobody by any of the three paths that dress, and an allowed shared
-stand beats their own stand outside it (`StandOutsideTheAreaDressesNobody`).
+stand beats their own stand outside it (`StandOutsideTheirAreaDressesNobody`).
 The recreation and sleep arms pass it over through the same search
-(`StandOutsideTheAreaServesNoRecreationOrSleep`). A colonist already in its
+(`StandOutsideTheirAreaServesNoRecreationOrSleep`). A colonist already in its
 outfit keeps it on, with the retry cooldown set and an inspect line saying why
 (`StandOutsideTheAreaKeepsTheOutfitOn`). Every refusal sits beside the same
 setup with the stand inside the area.
 
-**Ownership** (`HarnessOwnership`). The owner list is a set:
-`OwnerListRestricts` walks a stand from pool to one owner, two and back.
-`OwnerFilterOffersTheRightPawns` drives the owner dialog's candidate list,
+**Ownership** (`WhoUsesAStand`). The owner list is a set:
+`OnlyItsOwnersMayUseAStand` walks a stand from pool to one owner, two and back.
+`OwnerWindowFiltersByGender` drives the owner dialog's candidate list,
 which must never hide a current owner. Two cases stage a foreign assignable
 beside ours, the shape Outfit Stands Plus gives its stands: the copy follows
-every change to our list (`ForeignOwnersCopyOurs`), and the one-time reconcile
+every change to our list (`AnotherModsOwnerListFollowsOurs`), and the one-time reconcile
 for older saves keeps the list the player could see
-(`ReconcileKeepsTheVisibleList`). Three cover a stand not used for shift
+(`OlderSavesKeepTheOwnersYouSaw`). Three cover a stand not used for shift
 changes: a group stand keeps its owners whichever of four ways it leaves shift
-use (`GroupSurvivesLeavingShiftUse`), one pick there replaces a kept group
-(`PickReplacesAKeptGroup`), and a kept group reaches nobody through the copy
-and survives a move (`KeptGroupSurvivesAMove`).
+use (`AGroupKeepsItsStandOutOfService`), one pick there replaces a kept group
+(`OnePickReplacesAKeptGroup`), and a kept group reaches nobody through the copy
+and survives a move (`AKeptGroupSurvivesAMove`).
 
-**The removal flag and the gizmo gates** (`HarnessOwnership` too).
-`RemovalFlagHeldOffInService` holds vanilla's removal flag off through every
+**The removal flag and the gizmo gates** (`WhoUsesAStand` too).
+`AllowRemovingStaysOffInService` holds vanilla's removal flag off through every
 entry into service, the invariant the contents protection rests on, and pins
 the engine fact that the optimizer's gate is that same field. Three cases cover
 the gizmo postfixes, which must hand the upstream sequence back untouched when
-they have nothing to add (`ChangeBackGateHandsTheChainBack`,
-`RemovalToggleGateLeavesForeignStandsAlone`), and still add the change-back
+they have nothing to add (`NoChangeBackOffShift`,
+`AllowRemovingButtonOnlyInService`), and still add the change-back
 button for a pawn in uniform, with interception switched off and again with it
-latched off by its faults (`ChangeBackGateStillAppends`).
+latched off by its faults (`ChangeBackOfferedOnShift`).
 
 **Riding along** (`HarnessRideAlong`). Jobs a uniform stays on for, each one a
 change-out the return trip used to make for nothing: feeding a patient or a
@@ -414,37 +427,37 @@ and are known gaps without it: Common Sense's bill haul
 (`CommonSenseBillHaulKeepsTheUniform`) and Pick Up And Haul's follow-up jobs
 (`PickUpAndHaulFollowUpsKeepTheUniform`).
 
-**Catchments** (`HarnessCatchments`). A stand serving a radius or an allowed
+**Catchments** (`ServingARoomOrARing`, `ServingAnArea` and `HarnessCatchments`). A stand serving a radius or an allowed
 area instead of its room. The ring is inclusive, exactly the cells it draws
-(`RadiusCoversItsRing`, which also holds the slider's top at the largest whole
+(`TheRingShowsWhatARadiusCovers`, which also holds the slider's top at the largest whole
 radius below the pattern's edge, 79 on the game's own pattern as the README
 gives); a stand leaves room mode only with something ticked and returns to it on
 leaving shift use, an automatic stand taken to a radius and back is automatic
 again unless its ticks changed meanwhile, and its Serves row greys exactly where
-the setter refuses (`CatchmentNeedsSomethingTicked`). With the room-contents
+the setter refuses (`ARadiusNeedsSomethingTicked`). With the room-contents
 scan on, which caches an automatic stand's reading, the stand still reads its
 room turning into a hospital on the same tick
-(`AutomaticReadingFollowsTheRoomsRole`, which swaps in a marker that matches
+(`AnAutomaticStandSeesItsRoomBecomeAHospital`, which swaps in a marker that matches
 nothing so it runs without Rimatomics); and a freed radius stand catches nobody
 up,
 where a room stand records the job it interrupts as the one they dressed for
 (`FreedRadiusStandCatchesNobody`). The registry forgets a stand that is no
-longer spawned at the next stand search (`RegistryForgetsAStandNoLongerSpawned`).
+longer spawned at the next stand search (`AStandGoneFromItsMapIsForgotten`).
 A room stand beside a door serves its own room only: the doorway's room lists
 both the stand inside and one outside, and work in the doorway dresses nobody
-(`RoomStandBesideADoorServesItsOwnRoom`). Dressing happens within
+(`AStandBesideADoorServesItsOwnRoom`). Dressing happens within
 the ring, past the stand's own room and never beyond the ring
-(`RadiusStandDressesWithinItsRing`), outdoors for recreation, which a room
-stand in the open may not serve (`RadiusServesOutdoorRecreation`), and at an
+(`TheRingReplacesTheRoom`), outdoors for recreation, which a room
+stand in the open may not serve (`ARadiusServesRecreationInTheOpen`), and at an
 owned radius stand before a nearer shared one
-(`OwnedRadiusStandBeatsANearerSharedOne`). A room stand in the open serves no
+(`TheirOwnRadiusStandBeatsANearerSharedOne`). A room stand in the open serves no
 work either: it covers no cell, the alert lists it, and a colonist already in
 its uniform changes back at their next job (`RoomStandInTheOpenServesNothing`).
 
 An allowed area covers its painted cells only while the stand stands in one:
 past the walls, and not on an unpainted cell of the stand's own room
-(`AreaCoversItsCells`). The dressing decision agrees
-(`AreaStandDressesWithinItsArea`). A construction delivery dresses a bare builder
+(`CoversWhatIsPaintedInTheArea`). The dressing decision agrees
+(`DressesForWorkInTheAreaOnly`). A construction delivery dresses a bare builder
 only at an area stand whose area holds the steel and every site the trip
 supplies; steel or a site outside it, and room and radius modes over the same
 cells, dress nobody, and so does the same fetch filed under Hauling at a stand
@@ -454,12 +467,12 @@ steel lies, filed under Hauling or not, where one to a site outside it changes
 them back (`AreaStandDressesForADeliveryItHolds`). A bedroom stand moved to an area has
 its Sleeping ticked for real and still shows its work list, where Growing then
 replaces Sleeping with the stand still on the area; once the bed is gone a ticked
-Sleeping hides the list (`BedroomStandMovedToAnAreaKeepsItsWorkList`). A deleted area leaves its stand in area mode,
+Sleeping hides the list (`BedroomStandKeepsItsWorkListOnAnArea`). A deleted area leaves its stand in area mode,
 serving nothing under the area's last name, and a new area under that name is
-not adopted (`DeletedAreaServesNobody`). A gravship landing does adopt one, the
+not adopted (`DeletedAreaLeavesTheStandServingNothing`). A gravship landing does adopt one, the
 area the landing carried under the stand's label, with nobody on shift so that
 `PostSwapMap`'s early return is in play, and still refuses a namesake that
-leaves out the stand's own cell (`GravshipLandingRebindsTheArea`; the same
+leaves out the stand's own cell (`GravshipLandingFindsTheAreaAgain`; the same
 re-creation without a flight is the control). The alert that vanilla made from its
 subclass lists a stand whose area is gone or that stands outside it, naming the
 area, and a colonist in that stand's uniform changes back once its area is
@@ -472,16 +485,16 @@ The area UI is asserted on what the window builds, since no case draws it. The
 Serves menu lists every allowed area but Home in a section of its own, each
 with its colour, fades and marks in red one that leaves the stand out, opens
 each section after the first with a gap the menu's layout really sees, and
-binds whichever area is picked (`ServesMenuOffersTheAllowedAreas`). New allowed
+binds whichever area is picked (`ServesMenuListsTheAllowedAreas`). New allowed
 area copies the stand's room, or its own cell in the open, names the area for
 the stand's work and numbers a second, and greys at vanilla's cap of ten with
 vanilla's reason, the gap then moving to Manage areas
-(`NewAllowedAreaCopiesTheRoom`). Paint and Manage areas close the settings
+(`NewAllowedAreaStartsAsTheRoom`). Paint and Manage areas close the settings
 window before vanilla's tool or dialog takes over, with both windows really
-opened on the stack (`PaintAndManageAreasCloseTheWindowFirst`). The row, the
+opened on the stack (`PaintAndManageAreasCloseTheSettingsFirst`). The row, the
 inspect pane and the switch name the area, and say when the stand serves
 nothing: outside its area, with the area gone, or as a room stand in the open
-(`AreaWordsNameTheArea`).
+(`RowPaneAndButtonNameTheArea`).
 
 Staying dressed goes by what the stand is for, with a case per trigger
 (`RadiusWorkStandKeepsTheUniformInItsRing`,
@@ -497,7 +510,7 @@ stack in hand and a bill behind it (`BillProductMustBeInHand`,
 `BillProductMustComeFromABill`), and sends nobody to dress
 (`BillProductDressesNobody`). The two lists that
 decide it are checked as tables, with no map
-(`PassThroughAndIncidentalTablesHold`). Each case that dresses its colonist
+(`WhatPassesThroughAStandsRadius`). Each case that dresses its colonist
 then asserts that the job tracker's pause after the swap did not send them
 straight back, which is how that pause was found.
 `JustDressedForNeverSendsThemBack` dresses through the real `Insert`, moves the
@@ -511,7 +524,7 @@ sleep rack it lasts the night and lifts on waking, a haul ahead of a queued
 lay-down not counting as the waking (`SleepRackLatchLiftsOnWaking`); and at an
 area stand it holds on the unpainted cell beside the stand, for work in the
 area done from outside it, and through the job tracker's pause after that work
-(`AreaLatchHoldsBesideItsStand`). A delivery dresses nobody at a room or radius
+(`ChangeBackHoldsBesideAnAreaStand`). A delivery dresses nobody at a room or radius
 stand and keeps the uniform of its own work on to a site inside the ring,
 wherever the stack lies, each built with the job def its giver uses, a seed
 planting resumed with its seed stack in targetC included; to a site past the
@@ -533,23 +546,23 @@ shift goes straight to bed with the medical emergency setting off: in room mode
 to a bed past the door, tagged or as vanilla puts the lay-down back untagged,
 with a haul vanilla starts ahead of it, and at a radius stand
 (`UrgentPatientGoesStraightToBed`). The Serves row, the inspect pane and the
-switch's tooltip follow the mode (`CatchmentWordsFollowTheMode`).
+switch's tooltip follow the mode (`ItsWordsFollowWhatItServes`).
 
-**Interop** (`HarnessInterop`). `OutfitStandsPlusButtonMatchesTheirs` covers
+**Interop** (`WhoUsesAStand`). `OutfitStandsPlusButtonsMatchTheirOwn` covers
 code of ours that runs inside another mod: Outfit Stands Plus' stand button,
 reading our stand list, must offer what its own walk would, in the same order
 (see [DESIGN.md](DESIGN.md#outfit-stands-plus-stand-button)). It is a known
 gap until `--with=` loads that mod.
 
-**Buttons and spares.** `HarnessGizmos` reads the stand's buttons the way the
-gizmo bar gets them, without drawing: the switch names what the stand serves
-(`SwitchNamesWhatTheStandServes`), and stands selected together keep their own
-buttons (`StandButtonsStaySeparate`). `HarnessScoring` is a pair that only
-means anything as one: a checked-out pawn refuses a spare duplicating the kit
-parked in their stand (`ParkedKitRefusesSpares`), and takes one once that kit
-is worn through (`WornOutParkedKitStillGoesShopping`).
+**Buttons and spares** (`ButtonsAndOrders`). The stand's buttons are read the way
+the gizmo bar gets them, without drawing (`HarnessGizmos`): the switch names what
+the stand serves (`TheSwitchSaysWhatTheStandServes`), and stands selected
+together keep their own buttons (`EachSelectedStandKeepsItsOwnButtons`). The
+parked-clothes tests are a pair that only means anything as one: a checked-out pawn refuses a spare duplicating the kit
+parked in their stand (`OnShiftTheyLeaveSparesOfTheirParkedClothes`), and takes one once that kit
+is worn through (`WornOutParkedClothesCanBeReplaced`).
 
-**Recolor** (`HarnessRecolor`). `RecolorOrderGoesThroughOnShift` drives
+**Recolor** (`ButtonsAndOrders` too). `ARecolorOrderIsCarriedOutInUniform` drives
 Ideology's apparel recolor through the wardrobe optimizer, a job's own
 reservations, and `TryTakeOrderedJob` as the styling station calls it. On
 shift, the optimizer gives nothing and a recolor job the player did not order
@@ -565,25 +578,25 @@ runner that names every expansion as known has only the ones it activates.
 The case does not check that the order finishes and dyes anything: the pawn
 never walks under the harness, so it stops the job once it has started.
 
-**Tables and rooms** (`HarnessTables`). Four cases need no map and check that
+**Tables and rooms** (`ReadingJobsAndRooms`, the tables in `HarnessTables`). Four cases need no map and check that
 the static tables still match the def database, where every lookup is
 silent-fail and a renamed def empties its row with no error: the room-role
-table (`RoomRoleTableResolves`), the work of each giver that tends, feeds or
+table (`EveryKindOfRoomFindsItsWork`), the work of each giver that tends, feeds or
 operates on a patient in a hospital or barn bed against that room's automatic
 stand, and of each prisoner feeding giver against a stand ticked for Warden
-(`PatientWorkIsServedWherePatientsLie`), the job-target, ignored-giver and
+(`PatientsAreServedWhereTheyLie`), the job-target, ignored-giver and
 ride-along tables, delivery givers by class, deliveries by job, and every
 official giver of a feeding class on the ignored list included
-(`JobTablesHold`), and the room-contents markers (`ContentsMarkersHold`). The
+(`MealRunsDeliveriesAndFollowUpsAreToldApart`), and the room-contents markers (`BuildingsThatGiveARoomItsWork`). The
 patient case notes, and passes, a prisoner giver a mod moves to work of its
 own: a cell's stand serves what the player ticks, and the README says to tick
-that work beside Warden. `JobTablesHold` and `ContentsMarkersHold` check
+that work beside Warden. `MealRunsDeliveriesAndFollowUpsAreToldApart` and `BuildingsThatGiveARoomItsWork` check
 Rimatomics' names only when it is loaded, and count as known gaps without it. A
 fifth asserts the arithmetic that sizes the work-type dialog's body
-(`WorkTypeDialogBodyRectFitsTheBody`). Two need a map
+(`WorkTypesWindowFitsItsList`). Two need a map
 and resolve a work target's room: one with no room of its own
-(`SolidTargetResolvesARoom`), and one in an exterior wall, from either side
-(`ExteriorWallTargetResolvesTheRoom`).
+(`JobAtAWallFindsTheRoom`), and one in an exterior wall, from either side
+(`JobInAnOuterWallFindsTheRoomInside`).
 
 **Round trips** (`DebugTools_SaveRoundTrip`). Save, load back through the
 engine's own synchronous loader, and assert on the written file as well as on
@@ -602,7 +615,7 @@ else follows from that.
 **The harness itself.** `HarnessTestOrder` and `HarnessLoadNote`, above, run at
 the main menu before any case. Each assertion signals DevTools as it is made, so
 the counts are DevTools' own and no case checks them.
-`FixtureColonistIsHealthy` (`HarnessFixtureChecks`), listed first, asserts what
+`HealthyColonistsAndOpenGround` (`TheTestColony`), run first, asserts what
 every other case takes for granted about its fixture. Forty colonists from the
 fixture in a row need no tending. Asthma makes a colonist an urgent patient
 until the fixture removes it. A cell of natural rock past the
@@ -641,7 +654,7 @@ where the pad is.
   Common Sense and Pick Up And Haul each have one case that runs their code.
 - **UI.** No case draws a gizmo or a window. One case opens the settings
   window and vanilla's Manage areas on the window stack and asserts which are
-  open (`PaintAndManageAreasCloseTheWindowFirst`). The button cases read
+  open (`PaintAndManageAreasCloseTheSettingsFirst`). The button cases read
   gizmo labels and grouping, one allowed-area case reads an inspect string, and
   the catchment wording case reads the Serves row's label, the inspect line and
   the switch's tooltip, and the alert case its report and explanation, all
@@ -790,27 +803,36 @@ actually writes — the greps found none of seven.
 
 ## Adding a case
 
-Add a test to the fixture it belongs with in
-`Source/ShiftChange.Tests/HarnessCases.cs`, at the point it should run: a
-`[Test]` with the case's sentence as its `[TestDescription]`, named after its
-body, which goes in the body files beside it. The test's one line is a `Run`
-call (`HarnessFixture`, in `HarnessDevTools.cs`):
+Add a test to the story fixture it belongs with, at the point it should run: a
+`[Test]` named for what a player would recognise, with a sentence in the game's
+words as its `[TestDescription]`. Its body is a local function, and the test
+returns one of `StoryFixture`'s frames:
 
-| Call | The body gets |
+| Frame | The body gets |
 |---|---|
-| `Run(body)`, `body` a `Func<Fixture, bool>` | a fixture with a checked-out ledger (`Build`), on the pad |
-| `Run(stage, body)` | the fixture `stage`, a `(map, pad) => Fixture`, builds on the pad |
-| `RunOnPad(body)`, `body` a `Func<bool>` | DevTools' map and the pad, as `Map` and `Pad`, and no fixture |
-| `Run(body)`, `body` a `Func<bool>` | no map, no pad and no camera move |
+| `Staged(body, kit, gender)` | a stand holding a duster and a colonist beside it, from `Stage`; a body that changes at the stand (`Swap`) is an `IEnumerator` and steps the game's clock |
+| `Staged(build, scene, body)` | the fixture `build`, a `(map, pad) => Fixture`, sets up on the pad; `scene` says what that is, as the story's first line |
+| `OnThePad(body)` | DevTools' map and the pad, as `Map` and `Pad`, and no fixture |
+| `Told(body)` | no map, no pad and no camera move |
 
-Inside the fixture the test's own name hides a body of the same name, so the
-body is named with its class (`Run(HarnessTables.JobTablesHold)`). A fixture
-holds at most 16 tests ([Running it](#running-it) says why).
+Every frame clears the pad after the test, whatever it did. A fixture holds at
+most 16 tests ([Running it](#running-it) says why), and runs at its place in
+`CaseGroup`.
 
-`Build()` hand-assembles a checked-out state for lifecycle cases. `Stage(map,
-pad, kit, enclose, capableOf, gender)` produces an undressed pawn for cases that
+Each check is `story.Check(condition, text)`, its text what a player would see
+or understand: colonists by name, garments, rooms and settings by what the game
+or the stand's window calls them. The first check that fails names the test's
+failure; a failed check does not stop the test, so the story shows every check,
+and `Check` returns its condition for a test to stop where the rest would be
+moot. `story.Note(text)` adds a line that is not a check, such as a
+setting turned on or a job handed out. `story.KnownGap(condition, what, why)`
+marks something not yet true, which skips the test, and says so when it holds.
+Pair every negative with a line showing the same thing going the other way.
+
+`Build()` hand-assembles a checked-out state for lifecycle tests. `Stage(map,
+pad, kit, enclose, capableOf, gender)` produces an undressed pawn for tests that
 watch the driver work (the decency pair turns on its gender), and can wall the
-pad into a proper room — which functional cases need,
+pad into a proper room — which functional tests need,
 because `FindAvailableStand` walks `room.ContainedThings` and an open pad is the
 whole outdoors.
 
@@ -819,5 +841,3 @@ A case that puts something past the pad takes the cell with
 it again. The pad finder checks one cell of margin around the pad, for ground in
 a room that touches the map edge, and no more, so further out a map can have
 natural rock, and anything left there stays on the map for every case after.
-
-Assert with `Expect(condition, what)`, and pair every negative with a control.

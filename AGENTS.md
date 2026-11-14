@@ -85,9 +85,10 @@ devtools/run-harness.sh --with-after=khamenman.outfitstandsplus   # the same, lo
 ```
 
 Each case runs as a test under SmashPhil's DevTools, so 1.7 only, with a
-DevTools build that has SmashPhil/DevTools#17. Each is a `[Test]` in
-`Source/ShiftChange.Tests/HarnessCases.cs`, in run order (docs/TESTING.md,
-"Adding a case").
+DevTools build that has SmashPhil/DevTools#17. Each is a `[Test]` in a fixture
+under `Source/ShiftChange.Tests/`: the story fixtures, named for what a player
+sees, and the cases not yet rewritten as stories, in `HarnessCases.cs`
+(docs/TESTING.md, "Adding a case").
 
 It asserts where the ledger lands after each despawn/death/banishment event, by
 firing the engine's real entry points at a throwaway fixture, and exits non-zero
