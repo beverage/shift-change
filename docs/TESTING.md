@@ -88,8 +88,14 @@ only while unpaused or within one frame.
 Every test that ticks runs on the game's own clock. `GameClock` steps
 `TickManager.DoSingleTick` itself, so every map, pawn and comp ticks as in
 play, and a colonist can walk ("Four engine traps"). It pauses the game's own
-speed while it steps, turns the storyteller and random mental breaks off and
-holds the autosave counter, and puts all of them back after. The tests in
+speed while it steps, turns the storyteller and random mental breaks off, and
+puts them back after. The tests leave autosave alone: holding it is DevTools'
+job, for every mod's tests (SmashPhil/DevTools#18 skips the game's autosave tick
+while tests run), since an autosave of its world would go into the player's
+Saves folder and, once the game's Autosave names are all taken, replace the
+player's oldest. Until a DevTools with that change is in use, nothing holds it:
+at the default interval a full pass writes no autosave, but at a player's
+shortest setting it writes all five. The tests in
 `ChangingAtAStand` and `KeepingThemDecent` let a frame pass every 250 ticks
 (`StoryFixture.Swap`); every other test that ticks steps the clock within its
 frame, through `SwapNow` (`HarnessFixtures.RunSwap`) or a bill's own steps
@@ -604,7 +610,11 @@ and one boxed and carried off every map, which keeps its binding
 migration, and beside a foreign assignable it takes the decline and the
 reconcile instead; no other test reaches the decline. These tests replace
 `Current.Game`, so they run last of all; the summary of `DebugTools_SaveRoundTrip`,
-which holds what they share, says what else follows from that.
+which holds what they share, says what else follows from that. They write five
+saves (`shiftchange-harness-*`) into the Saves folder of the game they run in,
+which from the Test Explorer is the player's own, and delete them once all four
+have run, except those a failed test used: those stay for a bug report, and
+Test.log names them and their folder (`SavingAndLoading.RemoveSaves`).
 
 **The harness itself.** `HarnessTestOrder` and `HarnessLoadNote`, above, run at
 the main menu before any test that plays. Each check signals DevTools as it is made,

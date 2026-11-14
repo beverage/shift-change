@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using DevTools;
 using DevTools.Testing;
 using RimWorld;
 using Verse;
@@ -79,6 +80,82 @@ namespace ShiftChange.Tests
         protected override void Wrap(Action runCase)
         {
             LongEventHandler.ExecuteWhenFinished(runCase);
+        }
+
+        /// <summary>
+        /// The saves the running test has written or read. They go into the Saves folder of the
+        /// game the tests run in, which is the player's own unless the game was started with a
+        /// save folder of its own, as the lab's runs are.
+        /// </summary>
+        internal static readonly SortedSet<string> SavesInUse = new SortedSet<string>();
+
+        /// <summary>Each test this fixture has run, with the saves it used.</summary>
+        internal readonly List<KeyValuePair<ITestGroup, string[]>> SavesUsed =
+            new List<KeyValuePair<ITestGroup, string[]>>();
+
+        /// <summary>Starts the fixture's record of saves empty.</summary>
+        [OneTimeSetUp]
+        internal void ForgetSaves()
+        {
+            SavesInUse.Clear();
+            SavesUsed.Clear();
+        }
+
+        /// <summary>Notes the saves the test that just ran used, for <see cref="RemoveSaves"/>.</summary>
+        [TearDown]
+        internal void NoteSavesUsed()
+        {
+            SavesUsed.Add(new KeyValuePair<ITestGroup, string[]>(Test.Current, SavesInUse.ToArray()));
+            SavesInUse.Clear();
+        }
+
+        /// <summary>
+        /// Deletes the saves these tests wrote once they have all run, except those a failed test
+        /// used, which stay for a bug report; Test.log names them and their folder. It waits for
+        /// the end because a test's result is settled only after its own tear-down, when DevTools
+        /// checks the log for errors, and because a test reads the save the one before it wrote.
+        /// </summary>
+        [OneTimeTearDown]
+        internal void RemoveSaves()
+        {
+            SortedSet<string> used = new SortedSet<string>();
+            SortedSet<string> kept = new SortedSet<string>();
+            foreach (KeyValuePair<ITestGroup, string[]> test in SavesUsed)
+            {
+                used.UnionWith(test.Value);
+                if (test.Key?.Status == Status.Failed)
+                {
+                    kept.UnionWith(test.Value);
+                }
+            }
+            List<string> removed = new List<string>();
+            foreach (string name in used.Where(n => !kept.Contains(n)))
+            {
+                string path = GenFilePaths.FilePathForSavedGame(name);
+                try
+                {
+                    if (File.Exists(path))
+                    {
+                        File.Delete(path);
+                        removed.Add(name);
+                    }
+                }
+                catch (Exception e)
+                {
+                    DevLog.Write("[ShiftChange] could not delete the save " + name + ": " + e.Message);
+                }
+            }
+            if (removed.Count > 0)
+            {
+                DevLog.Write("[ShiftChange] deleted the saves the save/load tests wrote: "
+                             + string.Join(", ", removed));
+            }
+            if (kept.Count > 0)
+            {
+                DevLog.Write("[ShiftChange] kept for a bug report, since a test that used them failed: "
+                             + string.Join(", ", kept) + ", in " + GenFilePaths.SavedGamesFolderPath
+                             + ". Send them with this log, then delete them.");
+            }
         }
 
         // These replace Current.Game, so DevTools' map, the pad and every scene set up before
@@ -295,6 +372,7 @@ namespace ShiftChange.Tests
 
             void Body(Story story)
             {
+                SavesInUse.Add(SaveName);
                 string sourcePath = GenFilePaths.FilePathForSavedGame(SaveName);
                 if (!File.Exists(sourcePath))
                 {
@@ -322,6 +400,7 @@ namespace ShiftChange.Tests
                     story.Check(false, "rewritten, it names the owner under the game's key instead");
                     return;
                 }
+                SavesInUse.Add(LegacySaveName);
                 File.WriteAllText(GenFilePaths.FilePathForSavedGame(LegacySaveName), legacy);
                 story.Note(SaveName + " is rewritten as " + LegacySaveName + ", the way an older Shift "
                            + "Change saved: the stand's owners under the game's key, " + LegacyKey
@@ -788,6 +867,7 @@ namespace ShiftChange.Tests
         /// </summary>
         internal static bool TrySave(Story story, string name, out string path)
         {
+            SavesInUse.Add(name);
             path = GenFilePaths.FilePathForSavedGame(name);
             try
             {

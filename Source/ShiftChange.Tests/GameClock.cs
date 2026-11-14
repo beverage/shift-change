@@ -21,9 +21,9 @@ namespace ShiftChange.Tests
     /// one frame at its higher speeds, for the tests that run inside one frame.</para>
     ///
     /// <para>While it steps, the storyteller and random mental breaks are off, so no raid or
-    /// tantrum lands in a test, and the autosave counter is held at zero, so no autosave is
-    /// written into the player's Saves folder. All three are put back as they were, the autosave
-    /// counter too, so the player's next autosave comes when it would have.</para>
+    /// tantrum lands in a test; both are put back as they were. Autosave is DevTools' to hold
+    /// (SmashPhil/DevTools#18 skips the game's autosave tick while tests run), so that no test
+    /// world is written into the player's Saves folder.</para>
     /// </summary>
     internal static class GameClock
     {
@@ -33,9 +33,6 @@ namespace ShiftChange.Tests
         // game fades in, which DevTools' game may still do (Fine Wine's Clock, the same finding).
         internal static readonly AccessTools.FieldRef<TickManager, TimeSpeed> Speed =
             AccessTools.FieldRefAccess<TickManager, TimeSpeed>("curTimeSpeed");
-
-        internal static readonly AccessTools.FieldRef<Autosaver, int> TicksSinceSave =
-            AccessTools.FieldRefAccess<Autosaver, int>("ticksSinceSave");
 
         /// <summary>
         /// Steps the clock until <paramref name="done"/> holds after a tick, or
@@ -94,15 +91,13 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// The game paused, the storyteller and random mental breaks off, and the autosave
-        /// counter held while a test steps the clock, all put back as they were on
-        /// <see cref="Dispose"/>.
+        /// The game paused, and the storyteller and random mental breaks off, while a test steps
+        /// the clock, all put back as they were on <see cref="Dispose"/>.
         /// </summary>
         internal sealed class Held : IDisposable
         {
             internal readonly TickManager Clock = Find.TickManager;
             internal readonly TimeSpeed Speed = GameClock.Speed(Find.TickManager);
-            internal readonly int SinceSave = TicksSinceSave(Find.Autosaver);
             internal readonly bool Storyteller = DebugSettings.enableStoryteller;
             internal readonly bool MentalBreaks = DebugSettings.enableRandomMentalStates;
 
@@ -115,7 +110,6 @@ namespace ShiftChange.Tests
 
             internal void Tick()
             {
-                TicksSinceSave(Find.Autosaver) = 0;
                 Clock.DoSingleTick();
             }
 
@@ -126,7 +120,6 @@ namespace ShiftChange.Tests
                 if (Find.TickManager == Clock)
                 {
                     GameClock.Speed(Clock) = Speed;
-                    TicksSinceSave(Find.Autosaver) = SinceSave;
                 }
             }
         }

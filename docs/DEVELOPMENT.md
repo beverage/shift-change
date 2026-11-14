@@ -561,10 +561,10 @@ committed `Tests/Assemblies/ShiftChange.Tests.dll`.
 | `StayingInUniform.cs` | Work that keeps the uniform on away from the stand, in a radius, at bed and play, for the job they dressed for, on a delivery and as an urgent patient, and what changes them back. |
 | `StoringWhatTheyMade.cs` | Carrying what a bill made to a stockpile: when the trip keeps a crafter in uniform. |
 | `RidingAlong.cs` | Errands that ride along with the stand's work: feeding a patient, a meal run, hauls ahead of a bill, Common Sense and Pick Up And Haul. |
-| `SavingAndLoading.cs` | Saving and loading a stand in use, older saves, another mod's owner list and an allowed area. Runs last, on a world of its own. |
+| `SavingAndLoading.cs` | Saving and loading a stand in use, older saves, another mod's owner list and an allowed area. Runs last, on a world of its own. Deletes the saves it wrote once all four have run, except those a failed test used (`RemoveSaves`). |
 | `ButtonsAndOrders.cs` | The stand's switch and buttons, spares of parked clothes, and a recolor order on shift. |
 | `ReadingJobsAndRooms.cs` | What counts as recreation and sleep, the tables of rooms, jobs and buildings, the Work types window's sizing, and the room a job at a wall belongs to. |
-| `GameClock.cs` | Steps the game's whole clock for a test, a frame at a time (`Run`) or within the caller's frame (`Step`, which `RunSwap` and a bill's own steps use), with the storyteller, random mental breaks and autosave held off, and puts them back. |
+| `GameClock.cs` | Steps the game's whole clock for a test, a frame at a time (`Run`) or within the caller's frame (`Step`, which `RunSwap` and a bill's own steps use), with the storyteller and random mental breaks off, and puts them back. Autosave is held by DevTools for the whole run. |
 | `Story.cs` | A test's checks as lines in the game's words; the first failure fails the test with the lines so far, its own marked. |
 
 ### Content

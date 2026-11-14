@@ -33,9 +33,8 @@ namespace ShiftChange.Tests
     internal static class DebugTools_SaveRoundTrip
     {
         /// <summary>
-        /// The five save files, left in place so that a failed assertion about file contents
-        /// leaves the file to inspect. <c>run-harness.sh</c> wipes its isolated save folder at
-        /// the start of each run.
+        /// The five save files. They are deleted once the tests have all run, except those a
+        /// failed test used, which stay to inspect (<see cref="SavingAndLoading.RemoveSaves"/>).
         /// </summary>
         internal const string SaveName = "shiftchange-harness-roundtrip";
         internal const string LegacySaveName = "shiftchange-harness-legacy";
