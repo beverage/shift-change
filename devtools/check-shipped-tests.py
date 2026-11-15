@@ -33,7 +33,7 @@ checkout):
      that calls a member the mod no longer has.
 
 The sweep for the word "harness" (check-shipped-dll.py) covers the mod's dll
-only, so test names and the save legs' "shiftchange-harness-" files may keep it.
+only.
 """
 
 import hashlib

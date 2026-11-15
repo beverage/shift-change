@@ -58,7 +58,7 @@ namespace ShiftChange
         ///
         /// <para>The rows: Rimatomics' chemfuel run into the plutonium processor (its spent-rod
         /// run shares the job def, is not listed, and still dresses at the rod), and vanilla's
-        /// seven feeding givers, the only official rows (the harness fails on any other).
+        /// seven feeding givers, the only official rows (the tests fail on any other).
         /// Vanilla feeds animals under Doctor, and Biotech administers hemogen to patients under
         /// Doctor (<c>FeedHemogen</c>), so those rows sit beside the patient-feeding one; Handling
         /// feeds animals too, from the same giver class. <c>DeliverHemogenToPrisoner</c> is Warden

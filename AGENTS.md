@@ -118,9 +118,9 @@ single pawn never completes a walk — step the game's clock (`GameClock`), neve
 completion silently becomes the pawn's *next* job — watch `jobs.curDriver`,
 never the job. The whole map ticks on the clock, so what a case arranged moves
 while a swap runs — Odyssey's air drifts between rooms, a spawned colonist
-wanders off, a Goto ends — and the case holds it (`Fixture.Hold`, `StayPut`,
+wanders off, a Goto ends — and the case holds it (`Scene.Hold`, `StayPut`,
 `WorkingAt`). A generated colonist is not tended, so one with asthma is an
-urgent patient — the fixture removes what it arrives needing tended. And the
+urgent patient — staging removes what it arrives needing tended. And the
 game brings pawns of its own: a test that kills or kidnaps the colony's last
 colonist brings the stranger in black, who hauls a test's items first, and the
 map spawns wild animals, which eat them — `ReadyPad` sends away every pawn a
@@ -228,10 +228,9 @@ Since v1.0.0 (2026-08-14), **main is the shippable branch**: every commit on
 it must be releasable as-is, because the Workshop upload is staged from a
 local build of it. Long-running feature threads live on `feature/<thread>`
 branches (`feature/recreation`, `feature/enclosures`, …) and merge back via
-pull request when the thread is accepted — PRs are also what runs `ci.yml`,
-which does not fire on plain branch pushes. The lifecycle harness
-(`harness.yml`) runs on every push, branches included, and not on pull
-requests. Small fixes and docs may still land on
+pull request when the thread is accepted. CI (`ci.yml`) runs its checks on
+every push and pull request, and the tests on Fly on every push to a branch
+here, never on a pull request. Small fixes and docs may still land on
 main directly. Workshop publishing is manual and deliberately not automated
 (`.github/workflows/ci.yml` says so in as many words); a `v*` tag
 additionally produces a GitHub release zip.

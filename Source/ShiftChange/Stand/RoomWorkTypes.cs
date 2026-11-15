@@ -21,7 +21,7 @@ namespace ShiftChange
 
         /// <summary>
         /// Role defName to work type defNames, vanilla only. Every name must exist, and the
-        /// harness asserts it: a name that stops resolving narrows or empties a role's list with
+        /// tests assert it: a name that stops resolving narrows or empties a role's list with
         /// no log line, and an emptied Hospital or Kitchen row leaves automatic stands in those
         /// rooms with nothing to dress for. Names from other mods go in
         /// <see cref="CompatDefaults"/>, which is allowed to miss.
@@ -40,7 +40,7 @@ namespace ShiftChange
         /// Work types folded into <see cref="Defaults"/> when another mod supplies them:
         /// [FSF] Complex Jobs (<c>FrozenSnowFox.ComplexJobs</c>), which moves vanilla work
         /// onto finer types of its own. A separate table, because these names may be absent
-        /// and the vanilla ones may not, and the harness asserts only the vanilla ones. Why:
+        /// and the vanilla ones may not, and the tests assert only the vanilla ones. Why:
         /// docs/DESIGN.md, "Mod compatibility".
         ///
         /// <para>A row belongs only where the type inherits work from <see cref="Defaults"/>

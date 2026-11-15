@@ -215,7 +215,7 @@ namespace ShiftChange
         ///   researcher's stand holds no headgear, so theirs stays on.
         /// - Duster, tinted green, researcher only: the lab coat and a duster are both Shell, so
         ///   the coat displaces it. A swap that displaces nothing stores nothing, and
-        ///   <c>HarnessFixtures.Build</c> returns null for one.
+        ///   <c>SceneKit.Build</c> returns null for one.
         /// </summary>
         internal static void DressInStartingKit(Pawn pawn, bool researcher)
         {

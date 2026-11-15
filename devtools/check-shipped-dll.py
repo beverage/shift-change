@@ -66,7 +66,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_DLL = os.path.join(ROOT, "Assemblies", "ShiftChange.dll")
 
 # Type names, so UTF-8 — see the heap note above. The scene builders compile
-# out under Release because their files are wrapped in #if SCENES; the harness
+# out under Release because their files are wrapped in #if SCENES; the test
 # types live in the tests' assembly.
 FORBIDDEN_TYPES = [
     "DebugTools_DemoStage",
@@ -77,10 +77,10 @@ FORBIDDEN_TYPES = [
     "DebugTools_RecRoomStage",
     "DebugTools_SleepStage",
     "DebugTools_ExportScene",
-    "DebugTools_LifecycleHarness",
-    "DebugTools_SaveRoundTrip",
     "DebugTools_Fixtures",
-    "HarnessFixtures",
+    "StoryFixture",
+    "SceneKit",
+    "SaveRoundTrip",
 ]
 
 # A literal, so UTF-16 — the one place we cannot key on a type.
@@ -88,10 +88,10 @@ FORBIDDEN_LITERALS = [
     "shiftchange-harness",
 ]
 
-# The catch-all, and the only check here that covers code nobody has written
-# yet: whatever a future harness file is called, it will contain this word
-# somewhere. Measured on the shipping build, the word appears zero times in
-# either encoding, so the bar is exact rather than a threshold.
+# The old harness's word, which the shipping build holds zero times in either
+# encoding, so the bar is exact rather than a threshold. The tests' own code no
+# longer uses it, so test code that strays into the mod's project is caught by
+# check-invariants.py, which refuses any file there that uses DevTools.
 #
 # If a player-facing string ever legitimately contains "harness" — an apparel
 # name, a translation key — this fires, and the fix is to narrow THIS list,

@@ -38,9 +38,6 @@ namespace ShiftChange
         /// <summary>Throws counted this game.</summary>
         internal static int faultCount;
 
-        /// <summary>Harness test seam: while positive, TryInsertSwap throws.</summary>
-        internal static int injectFaults;
-
         /// <summary>
         /// Throws tolerated before <see cref="faulted"/> latches. Not one: the catches also see
         /// other mods' exceptions thrown through this frame.
@@ -128,11 +125,6 @@ namespace ShiftChange
         /// </summary>
         internal static bool TryInsertSwap(Job job, JobTag? tag, Pawn pawn, Pawn_JobTracker tracker)
         {
-            if (injectFaults > 0)
-            {
-                injectFaults--;
-                throw new Exception("[ShiftChange] injected test fault");
-            }
             SessionGuard.Ensure();
             Map map = MapToDecideOn(job, pawn);
             if (map == null)

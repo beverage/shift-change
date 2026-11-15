@@ -1,15 +1,26 @@
-# Build, lint, and the invariants this codebase actually broke once each.
-# Zero secrets. Tag a commit v* to additionally get a packaged mod zip on a
-# GitHub Release. Workshop publishing is deliberately not automated here.
-# Each check is explained in docs/DEVELOPMENT.md.
+# Shift Change's CI, in three jobs:
+#
+# - checks: build, lint, and the invariants this codebase actually broke once
+#   each, on every push and every pull request, with no secrets. Each check is
+#   explained in docs/DEVELOPMENT.md.
+# - tests: every test under DevTools in RimWorld 1.7 on a Fly machine, once
+#   with every DLC and once with Odyssey alone, on every push to a branch
+#   here. It needs the lab's secrets, so it never runs on a pull request: a
+#   fork's change is tested once its branch is pushed here.
+# - release: tag a commit v* to get a packaged mod zip on a GitHub Release.
+#   Workshop publishing is deliberately not automated here.
 
 name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
     tags: ['v*']
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   checks:
@@ -81,10 +92,11 @@ jobs:
         run: python3 devtools/check-shipped-dll.py
 
       # The DevTools tests ship too, in Tests/, which LoadFolders.xml loads only
-      # while DevTools is active. No job here can build them, since DevTools
-      # comes only from the lab's bucket, so the committed dll is what ships.
-      # This fails one built from other sources than this commit's, and a gate
-      # that would load the tests for every player.
+      # while DevTools is active. This job cannot build them, since DevTools
+      # comes only from the lab's bucket (the tests job builds them, for its
+      # run only), so the committed dll is what ships. This fails one built
+      # from other sources than this commit's, and a gate that would load the
+      # tests for every player.
       - name: Committed tests ship gated, built from this source
         run: python3 devtools/check-shipped-tests.py
 
@@ -105,8 +117,7 @@ jobs:
       # committed check catches a mis-staged config; this catches a new debug
       # action that nobody wrapped in #if SCENES, or a harness file put in the
       # mod's project instead of the tests' — the failures that would
-      # otherwise ship silently. The tests themselves build in harness.yml,
-      # on every push, since they need the DevTools dll from the lab's bucket.
+      # otherwise ship silently.
       - name: Release build ships no debug scenes or harness
         run: python3 devtools/check-shipped-dll.py
 
@@ -114,6 +125,179 @@ jobs:
         run: |
           ls -la Assemblies/
           test "$(ls Assemblies/ | wc -l)" = "1"
+
+  # Whether this push changed anything the game loads or the tests build from.
+  # A push of only Markdown, docs/ or media/ starts no Fly machine; the checks
+  # above still read those. A push with nothing to compare against (a new
+  # branch, a rewritten one, a manual run) runs the tests. Never on a pull
+  # request or a tag.
+  changes:
+    if: github.event_name != 'pull_request' && github.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    outputs:
+      game: ${{ steps.diff.outputs.game }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: diff
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          game=true
+          if [ -n "$BEFORE" ] && git fetch --quiet --no-tags --depth=1 origin "$BEFORE" 2>/dev/null; then
+            if ! git diff --name-only "$BEFORE" HEAD | grep -q -v -E '\.md$|^docs/|^media/'; then
+              game=false
+            fi
+          fi
+          echo "game=$game" | tee -a "$GITHUB_OUTPUT"
+
+  # Builds Shift Change and its tests and runs every test under DevTools in
+  # RimWorld 1.7 on a Fly machine, as devtools/run-harness.sh runs them:
+  # Harmony, Core, SmashPhil's DevTools and this mod, started with
+  # `--pid MrBeverage.ShiftChange --test -e`. It runs twice, once with every
+  # DLC and once with Odyssey alone, the one DLC this mod requires. The job
+  # fails when the build or a test fails. The build replaces the committed
+  # Assemblies/ShiftChange.dll in this job's checkout only.
+  #
+  # The runner has no game, so the builds compile against Krafs.Rimworld.Ref,
+  # as the checks job's do, and the tests against a DevTools.dll built from the
+  # commit the Fly image carries: SmashPhil/DevTools#17 at 8966779, whose
+  # stack-qualified allowances the tests use. That dll and flybridge.py, the
+  # step that starts the machine, come from the lab's bucket by the hashes below
+  # and are checked against them.
+  # `flybridge.py upload-tool [file]` puts a new version of either in the bucket
+  # and prints its hash.
+  #
+  # Repository secrets: FLY_API_TOKEN (a deploy token for the lab's Fly app),
+  # AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (the bucket's keys).
+  # Repository variables: AWS_ENDPOINT_URL_S3, AWS_REGION, BUCKET_NAME.
+  # Only this job reads them, and it never runs on a pull request, so a fork's
+  # code never runs with them. This repository is public, and so is the
+  # artifact each run leaves: the game's logs, DevTools' Test.log and the saves
+  # the tests wrote, from a throwaway colony.
+  tests:
+    needs: changes
+    if: needs.changes.outputs.game == 'true'
+    runs-on: ubuntu-latest
+    # One run per branch and DLC set at a time; a newer push waits for the
+    # older run rather than cancelling it.
+    concurrency:
+      group: tests-${{ github.ref }}-${{ matrix.dlcs }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        # RW_DLCS on the Fly machine: every DLC the image has, then Odyssey
+        # alone. The second skips one test more, the recolor case, which
+        # needs Ideology.
+        dlcs: [all, odyssey]
+    # The run waits up to --queue-minutes below for a slot under flybridge's
+    # machine cap, then the machine stops itself after --max-minutes. The
+    # timeout covers both, with room for the build and the uploads. A
+    # cancelled job, the timeout's included, stops the machine at once.
+    timeout-minutes: 35
+    env:
+      FLYBRIDGE_SHA256: 17563f404320b3e8f0d150ead30e84ddd8185f91e43830e5f3bdad506e6aa5e1
+      DEVTOOLS_SHA256: 7d1ed105d1697423b82c1b593ff7f2b9c4b17d961861a481c0eb7240fc5711e1
+      RUN_ID: gh-${{ github.event.repository.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.dlcs }}
+      AWS_ENDPOINT_URL_S3: ${{ vars.AWS_ENDPOINT_URL_S3 }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      BUCKET_NAME: ${{ vars.BUCKET_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # flybridge reads flyctl's output, so flyctl is pinned too.
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+        with:
+          version: 0.5.3
+
+      # The tests target .NET 10; the mod's net472 dll builds with the same SDK.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Fetch flybridge and DevTools
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          aws s3 cp "s3://$BUCKET_NAME/tools/flybridge/$FLYBRIDGE_SHA256.py" "$RUNNER_TEMP/flybridge.py" --only-show-errors
+          aws s3 cp "s3://$BUCKET_NAME/tools/DevTools/$DEVTOOLS_SHA256.dll" "$RUNNER_TEMP/devtools/DevTools.dll" --only-show-errors
+          printf '%s  %s\n' "$FLYBRIDGE_SHA256" "$RUNNER_TEMP/flybridge.py" "$DEVTOOLS_SHA256" "$RUNNER_TEMP/devtools/DevTools.dll" | sha256sum -c -
+
+      # The shipping dll, then the tests against it, into Tests/Assemblies/,
+      # which LoadFolders.xml loads with DevTools: the builds run-harness.sh
+      # drives. DisableLocalGameRefs keeps both on Krafs whatever the machine
+      # has installed. Both replace the committed dlls in this job's checkout
+      # only; the checks job makes sure the committed test dll matches these
+      # sources.
+      - name: Build the mod and its tests
+        run: |
+          dotnet build Source/ShiftChange/ShiftChange.csproj -c Release -p:DisableLocalGameRefs=true -nologo
+          dotnet build Source/ShiftChange.Tests/ShiftChange.Tests.csproj -c Release -p:DisableLocalGameRefs=true -p:DevToolsDll="$RUNNER_TEMP/devtools/DevTools.dll" -nologo
+          sha256sum Assemblies/ShiftChange.dll Tests/Assemblies/ShiftChange.Tests.dll
+
+      # Uploads this checkout's mod folder for this run alone (Source/,
+      # devtools/, docs/, media/ and .git/ stay behind), activates it after
+      # DevTools, waits for the machine to go, prints result.json and exits
+      # with the game's code: 0 every test passed, 1 one failed, 2 DevTools
+      # found nothing to run, 124 the time limit stopped the game, 130 or 143
+      # the job was cancelled. flybridge also exits 2 when a mod or DLC was
+      # missing and 4 when no slot opened under the cap in time, and then the
+      # game never started; its output says which. Something other than
+      # DevTools can quit the game with exit 0, so when the game exits 0,
+      # flybridge exits 1 unless the last result line DevTools wrote to
+      # Test.log, if any, reads Passed. `exec` makes flybridge the step's own
+      # process: a cancel signals only that process, and bash would not pass
+      # it on. --image pins the game and DevTools, so a new image reaches this
+      # workflow in a commit of its own, with DEVTOOLS_SHA256.
+      - name: Run the tests
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          DLCS: ${{ matrix.dlcs }}
+        run: >-
+          exec python3 "$RUNNER_TEMP/flybridge.py" run "$RUN_ID"
+          --image ready-1 --mods smashphil.devtools --mod "$GITHUB_WORKSPACE"
+          --env "RW_DLCS=$DLCS" --queue-minutes 15 --max-minutes 10 --pull
+          -- --pid MrBeverage.ShiftChange --test -e
+
+      # --pull leaves the exit code alone when its download fails, and the
+      # summary and the artifact below then lack what they show, so a passing
+      # run whose result.json or Test.log did not download fails the job.
+      - name: Check the run folder downloaded
+        run: |
+          for file in result.json Test.log; do
+            if [ ! -f "$RUNNER_TEMP/flybridge-runs/$RUN_ID/$file" ]; then
+              echo "::error::$file did not download, so this job cannot show it"
+              exit 1
+            fi
+          done
+
+      # result.json, then DevTools' verdict: each failed or skipped fixture
+      # and test, and its totals. A skipped test is a case that skips itself
+      # without a mod or DLC this list leaves out, and does not fail the run.
+      - name: Summary
+        if: always()
+        run: |
+          dir="$RUNNER_TEMP/flybridge-runs/$RUN_ID"
+          if [ -f "$dir/result.json" ]; then
+            { echo '```json'; cat "$dir/result.json"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f "$dir/Test.log" ]; then
+            { echo '```'; grep -E '\[(Failed|Skipped)\] |^Tests finished|^Test runner finished' "$dir/Test.log" || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Player.log, Test.log, result.json and the saves the tests wrote, from
+      # the bucket's copy of the run.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ env.RUN_ID }}
+          path: ${{ runner.temp }}/flybridge-runs/${{ env.RUN_ID }}/
+          if-no-files-found: ignore
+          retention-days: 14
 
   release:
     needs: checks
