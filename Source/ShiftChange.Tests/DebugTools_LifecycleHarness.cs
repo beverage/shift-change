@@ -29,7 +29,7 @@ namespace ShiftChange.Tests
     /// through the pawn's own tracker (<see cref="RunSwap"/>), to test whether the driver builds
     /// that ledger.</para>
     ///
-    /// <para>Engine traps shape the fixtures (docs/TESTING.md, "Four engine traps"). Jobs are pooled,
+    /// <para>Engine traps shape the fixtures (docs/TESTING.md, "Five engine traps"). Jobs are pooled,
     /// so <see cref="RunSwap"/> watches the driver, not the job. A generated colonist is not
     /// tended, so the fixture removes what it arrives needing tended. And the swap steps the
     /// game's own clock, so everything on the map moves while it runs: a test holds still what it

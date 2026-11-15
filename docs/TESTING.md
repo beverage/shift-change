@@ -87,7 +87,7 @@ only while unpaused or within one frame.
 
 Every test that ticks runs on the game's own clock. `GameClock` steps
 `TickManager.DoSingleTick` itself, so every map, pawn and comp ticks as in
-play, and a colonist can walk ("Four engine traps"). It pauses the game's own
+play, and a colonist can walk ("Five engine traps"). It pauses the game's own
 speed while it steps, turns the storyteller and random mental breaks off, and
 puts them back after. The tests leave autosave alone: holding it is DevTools'
 job, for every mod's tests (SmashPhil/DevTools#18 skips the game's autosave tick
@@ -100,7 +100,7 @@ shortest setting it writes all five. The tests in
 (`StoryFixture.Swap`); every other test that ticks steps the clock within its
 frame, through `SwapNow` (`HarnessFixtures.RunSwap`) or a bill's own steps
 (`GameClock.Step`). Three kinds of test needed what they arranged held in place
-first ("Four engine traps"). A change at the stand takes its garments' equip
+first ("Five engine traps"). A change at the stand takes its garments' equip
 delays to the tick, 180 to 570 in these tests, the same in every run; with the
 walk, 429 to 436 so far.
 
@@ -322,7 +322,7 @@ tables against the def database, with no map (`WhatCountsAsRecreation`,
 stand (`AStandServesWorkOrRecreationNotBoth`). `GoingToBedInTheRoomSendsThemToChange` puts a bed
 in the stand's room and covers going to bed there, every refusal, the mid-sleep
 re-trigger and the wake-up. Its precondition is a colonist who needs no doctor,
-which the fixture arranges ("Four engine traps"): an untagged lay-down by a
+which the fixture arranges ("Five engine traps"): an untagged lay-down by a
 colonist who needs a doctor is medical bed rest, which no sleep stand dresses.
 
 **Bed rest, deposit only and fishing** (`WhatSendsThemToChange`). A stand ticked
@@ -615,7 +615,7 @@ so the counts are DevTools' own and no test checks them.
 every other case takes for granted about its fixture. Forty colonists from the
 fixture in a row need no tending. Asthma makes a colonist an urgent patient
 until the fixture removes it. A cell of natural rock past the
-pad becomes ground with a room under `OpenGround`. "Four engine traps" says why
+pad becomes ground with a room under `OpenGround`. "Five engine traps" says why
 each is there. It also checks that the margin around the pad is in rooms that
 touch the map edge. Six cases put a stand in the open, on the pad left unwalled
 or on the margin outside its door, and the mod tests "in the open" with
@@ -714,7 +714,7 @@ fishing out with no giver, and the fix waited for stands that can serve beyond
 their room. The mechanism exists because a suite that always prints one failure
 is ignored within a week.
 
-## Four engine traps
+## Five engine traps
 
 None is visible from the API surface. All are recorded at their call sites.
 
@@ -762,6 +762,23 @@ The fixture
 removes what a generated colonist needs tended
 (`DebugTools_Fixtures.RemoveTendableConditions`); the bed-rest, sleep and
 urgent-patient cases each did that for themselves before.
+
+**The game brings pawns of its own.** DevTools' game runs between tests, and
+its storyteller with it. When a test kills or kidnaps its colonist, the colony
+has lost its last one, and a colony that ever held three gets the stranger in
+black 180 ticks later (`StorytellerComp_Triggered`, `StrangerInBlackJoin`). The
+tests in `LosingAStandOrAColonist` that kill and kidnap set that off in every
+run. The stranger then wandered DevTools' map, working like any colonist, until
+some test's clearing happened to destroy them. When they were still there, they
+could haul the potatoes `HaulOnTheWayToABillKeepsTheUniformOn` had put out for
+its crafter to the stockpile it had made, so the game had no haul left to offer
+the crafter, and the case failed about one run in nine. The map also spawns
+wild animals as its clock runs, and they eat food left outside: sparrows eating
+those potatoes failed the same check, because a pawn eating holds a claim on
+its food that no other pawn can reserve past
+(`PhysicalInteractionReservationManager`), whatever its faction. Every test on
+the pad now starts with no pawn but its own: `ReadyPad` sends every other away
+and Test.log names them (`HarnessFixture.SendAwayStrays`).
 
 ## Static checks
 

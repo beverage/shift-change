@@ -111,7 +111,7 @@ through the engine's synchronous loader (`SavedGameLoaderNow`;
 the written file as well as the loaded state. They run last, since they replace
 `Current.Game`. A real gravship launch is the one thing still out of reach.
 
-**Four engine traps live in the driver cases**, all invisible from the API and
+**Five engine traps live in the driver cases**, all invisible from the API and
 all already paid for once. Pathfinding is asynchronous, so ticking a
 single pawn never completes a walk — step the game's clock (`GameClock`), never
 `Pawn.DoTick`. Jobs are pooled, so a `Job` reference held across its own
@@ -119,9 +119,13 @@ completion silently becomes the pawn's *next* job — watch `jobs.curDriver`,
 never the job. The whole map ticks on the clock, so what a case arranged moves
 while a swap runs — Odyssey's air drifts between rooms, a spawned colonist
 wanders off, a Goto ends — and the case holds it (`Fixture.Hold`, `StayPut`,
-`WorkingAt`). And a generated colonist is not tended, so one with asthma is an
-urgent patient — the fixture removes what it arrives needing tended.
-docs/TESTING.md, "Four engine traps".
+`WorkingAt`). A generated colonist is not tended, so one with asthma is an
+urgent patient — the fixture removes what it arrives needing tended. And the
+game brings pawns of its own: a test that kills or kidnaps the colony's last
+colonist brings the stranger in black, who hauls a test's items first, and the
+map spawns wild animals, which eat them — `ReadyPad` sends away every pawn a
+test did not stage.
+docs/TESTING.md, "Five engine traps".
 
 **Every colony exit must reach the reaper.** Vanilla routes death, trade,
 kidnap and map exit through `Pawn_Ownership.UnclaimAll`, which

@@ -11,7 +11,7 @@ namespace ShiftChange.Tests
     /// time, so every map, pawn, comp and the pathfinder tick as they do in play. A pawn ticked on
     /// its own (<c>Pawn.DoTick</c>) gets none of that: path requests are served in
     /// <c>Map.MapPreTick</c>, and needs read <c>TicksGame</c>, which only the clock moves
-    /// (docs/TESTING.md, "Four engine traps").
+    /// (docs/TESTING.md, "Five engine traps").
     ///
     /// <para>Stepped rather than let run at speed, for an exact count: at speed a frame runs as
     /// many ticks as it likes. The game's own speed is set to paused while it steps, so no frame

@@ -524,7 +524,7 @@ namespace ShiftChange.Tests
         ///
         /// <para>The whole game ticks, as in play: the map, every pawn on it, the test's other
         /// colonists included, and the clock that needs and cooldowns read, none of which ticking
-        /// the one pawn alone would do (docs/TESTING.md, "Four engine traps").</para>
+        /// the one pawn alone would do (docs/TESTING.md, "Five engine traps").</para>
         /// </summary>
         internal static bool RunSwap(Fixture fix, Action<string> why, int maxTicks)
         {

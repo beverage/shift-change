@@ -136,9 +136,10 @@ namespace ShiftChange.Tests
         internal CellRect Pad;
 
         /// <summary>
-        /// Finds the current map's pad and looks the camera away from it, then sets
-        /// <see cref="Map"/> and <see cref="Pad"/>; leaves <see cref="Map"/> null, the test
-        /// failed with the reason, when there is no map, no pad, or the camera still sees it.
+        /// Finds the current map's pad, looks the camera away from it and sends away any pawn the
+        /// game brought in (<see cref="SendAwayStrays"/>), then sets <see cref="Map"/> and
+        /// <see cref="Pad"/>; leaves <see cref="Map"/> null, the test failed with the reason, when
+        /// there is no map, no pad, or the camera still sees it.
         /// </summary>
         internal IEnumerator ReadyPad()
         {
@@ -179,9 +180,48 @@ namespace ShiftChange.Tests
                 Test.Fail("the camera still sees the pad at " + pad + " after looking away");
                 yield break;
             }
+            // After the frames above, in which the game runs and the storyteller with it.
+            SendAwayStrays(map);
 
             Map = map;
             Pad = pad;
+        }
+
+        /// <summary>
+        /// Removes every pawn on <paramref name="map"/>, before the test stages its own. The last
+        /// test's tear-down removed that test's pawns, so any still here came from the game, and
+        /// left in, they get to what a test set out for its own colonist first
+        /// (docs/TESTING.md, "Five engine traps"):
+        /// - The stranger in black. When a test kills or kidnaps its colonist, the colony has
+        ///   lost its last one, and the storyteller sends the stranger 180 ticks later
+        ///   (<c>StorytellerComp_Triggered</c>, <c>StrangerInBlackJoin</c>), who arrives while the
+        ///   game runs between tests and stays until some test's clearing happens to remove
+        ///   them. The stranger hauled the potatoes put out for
+        ///   <c>HaulOnTheWayToABillKeepsTheUniformOn</c>'s crafter before the crafter was asked.
+        /// - Wild animals, which the map spawns as its clock runs and which eat food left
+        ///   outside. A pawn eating holds a claim on its food that no other pawn of any faction
+        ///   can reserve past (<c>PhysicalInteractionReservationManager</c>), so the crafter could
+        ///   not reserve the potatoes while sparrows ate them.
+        /// Test.log names what was sent away.
+        /// </summary>
+        internal static void SendAwayStrays(Map map)
+        {
+            List<Pawn> strays = map.mapPawns.AllPawnsSpawned.ToList();
+            if (strays.Count == 0)
+            {
+                return;
+            }
+            List<string> names = new List<string>();
+            for (int i = 0; i < strays.Count; i++)
+            {
+                Pawn stray = strays[i];
+                names.Add(stray.RaceProps.Humanlike ? stray.LabelShort + " (" + stray.KindLabel + ")"
+                                                    : stray.KindLabel);
+                CompShiftStand.OnShiftStands.Remove(stray);
+                stray.Destroy();
+            }
+            DevLog.Write("[ShiftChange] sent away what the game brought onto DevTools' map: "
+                         + string.Join(", ", names));
         }
 
         /// <summary>Runs a test's body; the save/load fixture runs it as a load runs.</summary>

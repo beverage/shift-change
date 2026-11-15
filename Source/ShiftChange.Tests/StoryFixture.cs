@@ -299,7 +299,7 @@ namespace ShiftChange.Tests
         /// One change at the stand, through the real driver on the colonist's own job tracker,
         /// with the game's clock stepped until that driver ends. Watches the driver, not the job,
         /// since jobs are pooled, and records how it ended, since a driver also ends when its job
-        /// fails (docs/TESTING.md, "Four engine traps").
+        /// fails (docs/TESTING.md, "Five engine traps").
         /// </summary>
         internal static IEnumerator Swap(Fixture fix, SwapLeg leg)
         {
