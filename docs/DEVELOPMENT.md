@@ -302,8 +302,11 @@ your list once and restores it verbatim.
 
 ## CI
 
-`.github/workflows/ci.yml`. Most of these checks exist because the codebase
-broke that way once; the rest block a failure that would land silently.
+`.github/workflows/ci.yml`, in three jobs: `checks`, `tests` and `release`.
+
+`checks` runs on every push and every pull request, with no secrets. Most of
+its checks exist because the codebase broke that way once; the rest block a
+failure that would land silently.
 
 | Check | Catches |
 |---|---|
@@ -316,17 +319,16 @@ broke that way once; the rest block a failure that would land silently.
 | Media build | the filming config rotting between shoots, discovered on a shoot |
 | Release build | compile errors against Krafs |
 
-The lifecycle harness runs in a second workflow,
-`.github/workflows/harness.yml`, on every push to any branch: the Release
-build, then the tests against it and a dll of the DevTools the test machine
-carries, then every case as a DevTools test in RimWorld 1.7 on a Linux machine with
-Harmony, Core, DevTools and this mod (and the machine's own shim for running
-without a window), once with every DLC and once with Odyssey alone.
-The job passes on DevTools' exit code together with the `Result: Passed` line
-it writes last in `Test.log`; its summary lists the failed and skipped tests
-and the totals. The Odyssey run skips one test more than the other, the
-recolor case, which needs Ideology. The workflow needs secrets, so unlike
-`ci.yml` it does not run on pull requests: a fork's change is tested once its
+`tests` runs on every push to a branch here: the Release build, then the tests
+against it and a dll of the DevTools the test machine carries, then every test
+under DevTools in RimWorld 1.7 on a Fly machine with Harmony, Core, DevTools and
+this mod (and the machine's own shim for running without a window), once with
+every DLC and once with Odyssey alone. Each run passes on DevTools' exit code
+together with the `Result: Passed` line it writes last in `Test.log`; its
+summary lists the failed and skipped tests and the totals. The Odyssey run skips
+one test more than the other, the recolor case, which needs Ideology. A push of
+only Markdown, `docs/` or `media/` starts no machine. The job needs the lab's
+secrets, so it never runs on a pull request: a fork's change is tested once its
 branch is pushed here.
 
 That is the minimal list only. `--full` on this machine, against a real mod
