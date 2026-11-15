@@ -408,6 +408,7 @@ order, which follows patch order, decides nothing.
 | `allowRemovingItems`, default false | one flag driving both `IHaulSource.HaulSourceEnabled` and `IApparelSource.ApparelSourceEnabled` (`:102-104`). This default is what stops haulers carting uniforms to stockpiles and stops `JobGiver_OptimizeApparel` raiding the stand. It does not reach traders — see [Withholding from trade](#withholding-from-trade) |
 | One outfit of capacity, structurally | `HasRoomForApparelOfDef` (`:332-342`) is not a count limit but a conflict check, refusing anything that cannot be worn together with what is already there |
 | Eviction | `TryDropThingsToMakeRoomForThingOfDef` (`:344-364`) drops conflicting contents on the floor nearby |
+| One weapon slot | `HeldWeapon`, `TryAddHeldWeapon` and `RemoveHeldWeapon` keep one weapon in the same container as the apparel, so `HeldItems` counts it. `fixedStorageSettings` allows Weapons and `defaultStorageSettings` disallows them, so a stand takes one only when the player ticks it. What a stand does with it: see [Weapons](#weapons) |
 
 The capacity fact is load-bearing. A stand is one outfit's worth, full stop,
 which killed the "shared stand holding several pawns' sets" design at the root:
@@ -515,8 +516,9 @@ any capable colonist while somebody's own clothes sit inside. It also recovers
 the one case the key migration declines.
 
 **The borrower, not the owner, is the ledger's truth.** The comp records, scribed
-by reference: the borrower, the garments they parked, the garments they took, and
-which parked garments were force-worn at check-in. Rebuilding the return trip
+by reference: the borrower, the garments they parked, the garments they took,
+which parked garments were force-worn at check-in, the stand's weapon they took
+and their own weapon in the pack. Rebuilding the return trip
 from the assigned owner would be wrong the moment a stand is reassigned
 mid-shift.
 
@@ -531,8 +533,9 @@ stateDiagram-v2
 ```
 
 `Free` means the ledger is empty and the stand is claimable. `OnShift` means it
-holds a borrower, the parked civvies, the taken uniform, and the forced-flag
-snapshot. When the stand itself despawns, the mode decides: a gravship flight
+holds a borrower, the parked civvies, the taken uniform, the forced-flag
+snapshot, and either weapon. It counts each of those alone, so a destroyed tool
+cannot strand a rifle in a pack. When the stand itself despawns, the mode decides: a gravship flight
 and a minify keep the ledger, because the stand keeps its contents, and a
 teardown releases it. The reasoning for each is on `CompShiftStand.PostDeSpawn`,
 beside the branches.
@@ -602,6 +605,11 @@ question the driver will answer. `ApparelUtility.CanWearTogether`, `PawnCanWear`
 biocoding checks and `Pawn_ApparelTracker.IsLocked` are wrapped there and nowhere
 else.
 
+The weapon's questions sit there for the same reason: `CanWield`, `HandAllows`,
+`NeedsAssigning` with its `AngersJealousPersona`, and `WeaponToIssue` for who
+gets it, and `WeaponForDraft` for what a change of draft brings out. See
+[Weapons](#weapons).
+
 ## The forced-apparel lifecycle
 
 The forced flag (`SetForced`) is what exempts apparel from
@@ -640,8 +648,11 @@ looks, through `ThoughtWorker_RoyalTitleApparelRequirementNotMet` and
 
 ## Pausing the wardrobe optimizer
 
-While a pawn is checked out, `JobGiver_OptimizeApparel.TryGiveJob` is prefixed off
-entirely.
+While a pawn is in uniform, `JobGiver_OptimizeApparel.TryGiveJob` is prefixed off
+entirely. `ClothesMoved` is the test, so a weapon-only loan pauses nothing: all the
+pawn wears is their own. The interception judges what the optimizer then gives
+like any other job, so a `Wear` outside a room stand's room changes them back
+first, once per garment the optimizer wants.
 
 Found in play: Ideology's apparel-recolor branch rides that giver
 (`JobGiver_OptimizeApparel.cs:84`) and fires whenever any *worn* item has a
@@ -657,7 +668,7 @@ changing out.
 A second guard works when a `RecolorApparel` job starts: a queued one is saved
 with the pawn and survives a load, and the driver dyes whatever its queue names,
 wherever it sits. Its `TryMakePreToilReservations` is failed — the vanilla-routine
-way to cancel — when the pawn is on shift and the job is not `playerForced`, or
+way to cancel — when the pawn is in uniform and the job is not `playerForced`, or
 when any queued garment is parked in a stand, ordered or not. The order reaches
 this guard too: `Pawn_JobTracker.TryTakeOrderedJob` sets `playerForced` and then
 asks for reservations, and logs a warning when they fail, so the flag is what
@@ -799,6 +810,259 @@ raid → change back → draft → fight → undraft leaves no residue.
 
 Nothing here is automatic. No auto-change on raid, and drafting a pawn in uniform
 is left alone, because that is a legitimate player choice.
+
+The button reads the ledger, not the wardrobe, so a pawn on a weapon-only loan
+gets it too. Pressed on a drafted pawn, it sends the stand's weapon home from the
+pack and leaves their own in hand (`ChangingBackWhileDraftedReturnsTheStandsWeapon`).
+
+## Weapons
+
+A stand hands out the weapon it holds. The weapon goes in the pawn's hand and
+whatever they held goes in their pack, and changing back reverses it. A smith's
+hammer and a charge rifle take the same path: there is no def list, no test for
+work stats and no setting. Sidearms and any off-hand are never touched, and no
+code here names another mod.
+
+**Stocking is the opt-in.** `OutfitStandBase`'s default filter disallows
+Weapons, so a stand holds one only where the player turned weapons on in the
+storage tab or a colonist left one there through vanilla's own stand job. A stand
+already holding one starts issuing it when the mod updates.
+
+**A new stand stocks a weapon from its own row; vanilla's default would not.**
+`disallowedCategories` runs `SetAllow(category, false)`, which also turns off the
+category's six special filters (smeltable, burnable and biocoded, each way).
+`ThingFilter.Allows(Thing)` refuses a thing matched by a disallowed special, and every
+weapon matches three of them, so `Allows(def)` reads true while `Allows(thing)` and
+`AllowedToAccept` read false and `HaulToStorageJob` returns null. The row reads ticked
+and nothing else happens. Ticking a sub-category changes nothing either, since
+`DescendantSpecialThingFilterDefs` walks down from it and these six are parented on
+`Weapons`.
+
+So `Patches/ShiftChange_OutfitStand.xml` lists the six under `specialFiltersToAllow` on
+`OutfitStandBase`'s default filter, which resolves after `disallowedCategories`. It sits
+on the abstract base, so every stand inheriting that default gets it, Outfit Stands
+Plus's four included. Nothing else moves: weapon defs stay disallowed, so a new stand
+wants no weapon until one is ticked, and a special only ever refuses things inside its
+own parent category, so apparel is untouched. `Weapons` stays under
+`disallowedCategories`, because taking it out would turn the rows on with less XML but
+also allow by default any def a mod files under both Apparel and Weapons. No Default
+Shelf Storage replaces this whole node, in either load order, and its empty filter
+leaves the rows on anyway.
+
+A built stand saves its own filter, so it keeps the rows off. There the six rows and
+then the weapon works, or the `Weapons` row itself, which allows every weapon.
+`EveryStandStartsWithTheWeaponRowsOn`, `AHaulerStocksANewStandFromTheWeaponsOwnRow` and `AnOlderStandWantsItsWeaponRowsOnFirst`
+hold this, and `ASaveMidLoanKeepsBothWeapons` holds that the save outranks the def.
+
+**The pawn's own weapon rides in the pack, not on the stand,** though the slot is
+free while the stand's weapon is out and vanilla's own job swaps through it. A
+fight needs the pawn's own within reach, and the pack is the one place every
+neighbour counts as carried:
+Compositable Loadouts reads a listed weapon on a stand as missing and fetches a
+spare, and finds it satisfied in a pack. Nothing empties the pack either, since
+`JobGiver_DropUnusedInventory` drops only food and drugs.
+
+### The moves
+
+`Swap/WeaponHands.cs` carries them out and `SwapPlan` decides. `Release` takes a
+weapon off the pawn, hand or pack, and returns it held by nothing. `Draw` puts
+one in an empty hand. `ToPack`, `FromPack` and `Exchange` are built from those.
+
+- **A hand is emptied by a drop,** `TryDropEquipment` then `DeSpawn`, never
+  `Pawn_EquipmentTracker.Remove`. Vanilla Expanded Framework clears a weapon's
+  hediffs from a postfix on that drop, and its other route is a `CompTick`, which
+  a weapon inside a stand never gets. Vanilla's own stand drops too, so every
+  neighbour's hook fires in the order it has always seen.
+- **A pawn on no map cannot drop,** because `TryDropEquipment` reads `MapHeld`.
+  `ToPack` crosses with `TryTransferEquipmentToContainer` instead, which raises
+  the same `Notify_EquipmentRemoved` and no hook on the drop. Only exits reach
+  that branch.
+- **Nothing ends held by nothing,** which would delete it from the world. A
+  refused move puts the weapon back where it was, or on the ground beside the
+  pawn, as `PutBack` does for a garment. On no map there is no ground, so a
+  refused move leaves the weapon where it was.
+
+### Who gets it
+
+`SwapPlan.WeaponToIssue` answers for the selector and for the driver, which asks
+again on arrival. A deposit-only stand issues none. A refusal skips the weapon
+and still issues the uniform.
+
+`CanWield` makes vanilla's stand checks: Violent-disabled for any weapon, so a
+pacifist gets no hammer either, Shooting-disabled for ranged, no Manipulation, a
+quest lodger, `EquipmentUtility.CanEquip`. It is stricter in two places. A persona
+weapon goes only to the pawn it is bonded to, by the test in
+`GetPersonaWeaponConfirmationText`, because equipping one bonds it for good and a
+stand has nobody to ask. And a weapon that stacks stays on the stand: the ledger
+tracks one thing, a drop can merge it into a ground stack, and `AddEquipment`
+would take the whole stack. Vanilla's own stackable weapons, wood and beer, are
+not in the Weapons category, so a stand never holds one.
+
+`HandAllows` refuses to replace a `destroyOnDrop` weapon, since `GenDrop`
+destroys it, a weapon that stacks, for the reason above, and the same def the
+stand holds, which would gain nothing. A persona weapon gives way like any
+other. Its traits' equipped hediffs (painless, fast mover, neural cooling) and
+stat offsets stop while it is in the pack, as any weapon's equipped stats do.
+The bond and the bonded thoughts read `Pawn_EquipmentTracker.bondedWeapon`
+wherever it lies, and so does kill thirst's thought, but only a kill made with
+the weapon in hand feeds the thirst: `Pawn_EquipmentTracker.Notify_KilledPawn`
+tells equipped items alone, so a kill with the stand's weapon on shift resets
+nothing and fires no on-kill trait.
+
+`NeedsAssigning` names what a shared stand holds back, since nobody is there to
+say yes: any weapon from a slave, because `SlaveRebellionUtility` divides an armed
+slave's rebellion interval by 4 and counts anything that does damage, a ranged
+weapon from a Brawler, which vanilla's stand warns of in its equip order, and
+any loan that would anger a jealous persona weapon (`AngersJealousPersona`).
+While Royalty is active, `Pawn_EquipmentTracker.Notify_EquipmentAdded` tells the
+pawn's bonded weapon of every primary they equip, wherever the bonded one lies,
+and each of its traits hears it through
+`WeaponTraitWorker.Notify_OtherWeaponWielded`. Royalty's Jealous trait is the
+only one in the game that answers: `JealousRage`, −15 mood for a day, discarded
+once the bonded weapon is back in hand, and given only to a pawn with a mood. A
+loan equips the stand's weapon, then the pawn's own on a draft and on the change
+back, so the only loan that equips nothing else is the persona weapon itself
+lent to an empty hand. `AngersJealousPersona` counts any trait whose worker
+class overrides that hook, found by reflection once per class
+(`AnswersAnotherWeapon`), so another mod's trait that answers it is held back
+too, whatever it does. The mood check applies to Jealous and workers built on
+it, the one answer whose terms are known. Reading `workerClass` instantiates no
+worker. A stand assigned to the pawn is the player's yes, so it lends to all
+three. Any assignment counts, one made with Assign all included, since the
+assign list holds slaves.
+
+A weapon-only stand dresses like any other: `HasStock`, `WouldDress`, `OnShift`
+and the driver's empty-plan checks all count the weapon, and a uniform refused
+by the decency pass still lets it go. Vanilla's stand job adds no time for a
+weapon. Ours adds its `EquipDelay`, so a weapon-only swap has a real wait, and
+`Interop_OutfitStandsPlus` scales it as usual.
+
+### The return trip
+
+Two steps, whatever state the pawn is in. If they hold the issued weapon, in hand
+or pack, it goes back to the stand, and if not it is gone. Then, if the hand is
+empty and their own weapon is in the pack, they draw it. That one rule covers a
+tool another mod moved to the pack, a rifle already drawn, a spare or a player's
+choice in the hand (left alone, with the rifle staying in the pack), and a tool
+Outfit Stands Plus' return job has already put on the stand. That job moves the
+hand only when the stand's filter allows the weapon; on a filter that refuses it
+the job leaves the hand alone, and the loan stays open just the same.
+
+The slot is empty while the weapon is out, so a hauler may fill it.
+`TryAddHeldWeapon` then refuses and the returning weapon goes down beside the
+stand, unforbidden (`AWeaponComingBackToARefilledSlotGoesDown`).
+
+### Exits
+
+`ReleaseBorrower` and `AbandonLedger` settle the weapons before they clear the
+ledger, in `SettleWeapons`. A pawn who has not departed, whose stand burned for
+instance, gets the return trip's second step with the issued weapon going to the
+pack, and keeps it as an ordinary item. A departed pawn keeps what they hold and
+nothing moves, which also keeps hand moves out of `Map.FinalizeLoading`, since
+`PostSpawnSetup` releases only a departed borrower.
+
+A stand burned in its box hears no despawn, so `PostDestroy` releases it.
+Removing a map is safe because `MapDeiniter.Deinit` passes its pawns to the world
+first, and each reaches the reaper already despawned, so their moves stay between
+containers. `Notify_MapRemoved` then meets only a borrower somewhere else.
+`PreKidnapped` runs before the pawn reads as kidnapped, so a kidnapped borrower
+settles like one who stayed, and both weapons go with them either way.
+
+**Downing.** `DropAndForbidEverything` drops the hand and the pack near the pawn,
+unless they are in bed. The hand's weapon lands forbidden, and the pack's only
+outside the home area, which is `DropAllNearPawn`'s own rule.
+`mindState.droppedWeapon` remembers whichever was in hand, and a colonist who
+gets up where they fell gets `JobGiver_PickupDroppedWeapon`'s `Equip` for it,
+high in the colonist think tree and ignoring forbidden. A rescue carry despawns
+the pawn, which clears that note, so a rescued borrower fetches nothing on
+getting up. The stand's weapon is the player's to deal with, as for any downed
+colonist, and their own is fetched after the trip back (the third rule below).
+
+Without the rules below, that fetch ends the loan wrong. A radius or an area
+stand changes the pawn back before an `Equip`, which is no work it dresses for,
+and so does a room stand when the room touches the map edge, since it then
+covers nothing. The trip back finds neither weapon and closes the loan, and the
+`Equip` queued behind it makes the stand's weapon the pawn's own, with their own
+left where it fell. Inside a covered room the fetch runs in uniform and the trip
+back returns the stand's weapon, but the pawn's own stays on the ground with the
+hand empty. And any other job the stand does not dress for can change the pawn
+back before the fetch, emergency work among them, which sits above the fetch in
+the colonist tree. The note then outlives the loan and hands the pawn the
+stand's weapon as their own. Three rules:
+
+- **The fetch of the weapon on loan keeps the uniform on**
+  (`FetchesLentWeapon`, in the prefix just above the return trip). It is part of
+  the loan, so the weapon goes back into hand on loan still and the trip back
+  returns it. The vacuum gate sits above it, so a fetch through vacuum in a
+  weaker uniform still changes back first.
+- **The end of the loan forgets the stand's weapon**
+  (`WeaponHands.ForgetDropped`, from `ReturnWeapon` and `SettleWeapons`). A note
+  naming it is dropped, so a trip back made before the fetch leaves it where it
+  fell, for the player, as the drafted case below does.
+- **The end of the loan points the note at the pawn's own weapon**
+  (`WeaponHands.DrawOrFetch`, from `ReturnWeapon` and `SettleWeapons`) when the
+  pack no longer holds it, the hand is empty and it lies on the pawn's map.
+  Vanilla's fetch then takes it up once the pawn is free. This also covers a trip
+  back made before any fetch, a rescued borrower, a stand that burns while its
+  borrower lies downed, and Hospitality, whose downing patch drops the hand
+  without the remember flag. An own weapon the player dropped out of the pack by
+  hand is fetched the same way, as it would have been drawn from the pack. One
+  the draw itself put down, because the hand or the pack refused it, is left
+  alone, so the fetch never retries a refused draw.
+
+A borrower downed while drafted held their own weapon, so that is the one
+remembered and fetched. The stand's weapon stays forbidden where it fell, and
+the trip back closes the loan without it.
+
+The note the third rule sets is still pending if the job queued behind the trip
+back dresses the pawn at another stand, since `ThinkNode_QueuedJob` sits above
+the fetch. The fetch of their own weapon is then an `Equip` during that second
+loan: it changes them back first, or, inside a room that stand covers, runs in
+uniform, and `MakeRoomFor` drops the second stand's weapon unforbidden, as any
+equip on loan does. That takes a downing during the first loan with their own
+weapon left inside the second stand's room.
+
+### Drafting
+
+`Patch_DraftClearsDressBlock` records the old value in a prefix and trades only
+on a real change, since the setter's postfix also runs on a set that changes
+nothing. An undrafted pawn landing from a flier or a gravship makes one. A drafted
+pawn landing makes a real change, because a despawn drops the controller and the
+new one starts undrafted, and it finds their own weapon already in hand.
+
+One rule both ways: the weapon the change calls for comes out of the pack if the
+hand holds the other one or nothing. Drafting calls for the pawn's own, undrafting
+for the stand's, and anything else in the hand stays. So a pawn whose own weapon
+was destroyed in the fight goes back to work with the stand's, and a pawn whose
+issued weapon was destroyed draws their own and keeps it. A pawn with no weapon
+of their own fights with the stand's. A pawn issued a better weapon than their
+own still fights with their own, which keeps the rule to one line. A persona
+weapon trades like any other, in either direction: a loan that would anger a
+jealous one opens only on a stand assigned to the pawn, so the player has
+already said yes to what the trades cost.
+
+It runs only for a spawned pawn who is not downed or broken, because the setter
+has callers in the middle of something: `MakeDowned` undrafts while dropping
+everything, and arrivals draft whoever comes in. A pawn leaving the colony needs
+no check. Banishment and any other faction change take the controller away
+before `SetFaction`'s own undraft, so the setter never runs, `Kill` sets no draft,
+and `GuestRelease` unclaims first. `ABorrowerBanishedWhileDraftedKeepsWhatTheyHold` asserts the
+controller is gone, because that, and no check of ours, is why nothing moves.
+
+A mental break gets past the gate. `TryStartMentalState` undrafts before it sets
+the state, so that undraft reads as ordinary and trades back, and the pawn breaks
+holding the stand's weapon with their own in the pack. Both stay on the pawn, so
+nothing is lost. A pawn who despawns drafted and comes back undrafted hears no
+set, so they hold their own weapon until the next real change.
+
+The trade is keyed on the ledger, so it reads neither interception switch, and a
+throw is caught, since it would otherwise land in whatever set the draft. The
+danger gate and Change back are unchanged: a drafted pawn keeps the uniform.
+
+### What a pawn holding a tool cannot do
+
+`WorkGiver_HunterHunt.HasHuntingWeapon` reads the primary only, so a pawn holding
+a hammer gets no hunting jobs until they change back. Accepted.
 
 ## Rooms to work types
 
@@ -1764,6 +2028,21 @@ replaced the call, this finds nothing to replace and says so.
 for a report that might be ours, and an exception while reading the list does
 the same until the game restarts.
 
+### A weapon on loan, as other mods see it
+
+Nothing in Shift Change names these mods. Each row is what its code does with
+the moves in [Weapons](#weapons), read from source or a decompile, not run.
+
+| Mod | What it does with a loan |
+|---|---|
+| Vanilla Expanded Framework | Needs the drop path, which every hand move takes. Its `ApparelExtension` hooks run on any route |
+| Compositable Loadouts | `InventoryAndEquipment` counts the pawn's own weapon in the pack, so nothing is fetched and no bill is interrupted. It never takes an unlisted hammer from the hand. If one item accepts both weapons at quantity 1, one is surplus and it unloads that one, which the return trip handles |
+| Simple Sidearms | Finds the pawn's own weapon in the pack, so nothing is retrieved. Our moves go straight to `AddEquipment`, and only its own jobs and gizmo write its memory, so the tool is not remembered. Its quick switch puts the rifle in hand when idle, undrafted included, and `ToolAutoSwitch` draws the tool for work. With that setting off, or for a weapon with no work stats, the issued weapon stays in the pack until they change back |
+| Rules of Engagement | A policy finds the rifle in the pack. Our moves do not reach it. Its own can: with an enemy adjacent, the rifle drawn and the hammer in the pack, it takes the hammer to fight, and for a colonist with no policy that writes a lasting one. Accepted, with no code here |
+| Combat Extended | Counted, and both weapons count as bulk. A custom loadout can drop an unlisted hammer, which the return trip handles. No support is claimed |
+| Outfit Stands Plus | Nothing weapon-specific. Its return job puts the hand on an empty slot if the stand's filter allows it, and otherwise leaves the hand alone. The return trip covers both |
+| Vanilla | A gear tab drop and an equip order reach the pack, so removing the mod mid-loan loses nothing |
+
 ## The recreation branch
 
 Work jobs name their purpose through `workGiverDef.workType`; recreation jobs
@@ -2282,6 +2561,9 @@ never fired at all.
   Deliberately not a `GameComponent`: a component writes its class name into every
   save, costing players a one-time load error after uninstalling. The guard has
   zero save footprint.
+- **The weapons scribe by reference too**, flat in the comp's node as
+  `shiftChangeIssuedWeapon` and `shiftChangeOwnWeapon`, and the driver scribes
+  the weapon its plan will move.
 - **One scribed flag defaults to `true`.** An absent `withholdFromTrade` node
   means on, so saves that predate the flag load with the trade protection.
   Why, and what it costs an opt-out: see
@@ -2290,7 +2572,9 @@ never fired at all.
   vanilla buildings' nodes, skipped silently when unrecognized, plus vanilla's own
   forced-apparel flags. Removing the mod reverts every stand to plain vanilla
   furniture. A pawn mid-shift keeps wearing the uniform, which can be unforced by
-  hand, and their own clothes are sitting in the stand.
+  hand, and their own clothes are sitting in the stand. A pawn on a weapon loan
+  keeps the stand's weapon in hand and their own in the pack, where a gear tab
+  drop and an equip order reach it.
 
 ## Development tooling
 

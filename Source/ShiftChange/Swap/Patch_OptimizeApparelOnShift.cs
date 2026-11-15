@@ -19,7 +19,8 @@ namespace ShiftChange
     /// giver leaves it alone, and the pawn's own clothes are parked in the stand, out of a
     /// worn-apparel scan's sight. So the whole giver is skipped while a pawn is checked out.
     /// <c>nextApparelOptimizeTick</c> is left alone, so the first think cycle after changing back
-    /// optimizes the pawn's own clothes as normal.</para>
+    /// optimizes the pawn's own clothes as normal. A loan that moved no clothes pauses nothing,
+    /// since all the pawn wears is their own.</para>
     ///
     /// <para>The styling station's float-menu order calls <c>TryCreateRecolorJob</c> directly
     /// and never passes through this giver. It is the player's order, so it proceeds on shift
@@ -44,7 +45,7 @@ namespace ShiftChange
             try
             {
                 SessionGuard.Ensure();
-                if (CompShiftStand.OnShiftStandFor(pawn) == null)
+                if (CompShiftStand.OnShiftStandFor(pawn)?.ClothesMoved != true)
                 {
                     return true;
                 }
@@ -70,10 +71,10 @@ namespace ShiftChange
     ///
     /// <para>Failing <c>TryMakePreToilReservations</c> is the clean kill: a queued job that fails
     /// it is ended quietly as no longer valid, and the pawn picks another job. The job is
-    /// blocked while the pawn is on shift (the worn apparel is the uniform) unless the player
-    /// ordered it, and whenever any queued garment is parked in an outfit stand, ordered or not,
-    /// since the pawn no longer wears it. Off shift, in their own clothes, recoloring runs as
-    /// normal.</para>
+    /// blocked while the pawn is in uniform (<see cref="CompShiftStand.ClothesMoved"/>) unless
+    /// the player ordered it, and whenever any queued garment is parked in an outfit stand,
+    /// ordered or not, since the pawn no longer wears it. In their own clothes, recoloring runs
+    /// as normal.</para>
     /// </summary>
     [HarmonyPatch(typeof(JobDriver_RecolorApparel), nameof(JobDriver_RecolorApparel.TryMakePreToilReservations))]
     public static class Patch_RecolorExecutionGuard
@@ -91,7 +92,8 @@ namespace ShiftChange
                 // TryTakeOrderedJob sets playerForced before it asks for reservations, and the
                 // flag is saved with a queued job.
                 bool ordered = job != null && job.playerForced;
-                if (pawn != null && !ordered && CompShiftStand.OnShiftStandFor(pawn) != null)
+                if (pawn != null && !ordered
+                    && CompShiftStand.OnShiftStandFor(pawn)?.ClothesMoved == true)
                 {
                     __result = false;
                     return false;

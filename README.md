@@ -113,7 +113,8 @@ yourself. Turn it off for a stand you keep as a shop shelf; a stand set to "Not
 used for shift changes" is tradeable either way.
 
 A stand that is dressing anyone says so in its inspect pane: what it dresses
-for, who owns or is currently wearing it, and whether it's empty. A stand in a
+for, who owns or is currently wearing it, who has its weapon, and whether it's
+empty. A stand in a
 room with no role says nothing at all, and behaves like ordinary furniture.
 
 ## Dressing for recreation
@@ -321,6 +322,79 @@ build site, so each builder changes before fetching their first load. The
 stands are the mechanized ones from
 [Outfit Stands Plus](#mod-compatibility).*
 
+## Handing out tools and weapons
+
+A stand can hold one weapon as well as an outfit, and it hands that out too.
+Tool mods usually make their tools weapons, so this is how a smith picks up the
+hammer at the forge.
+
+To stock one, open Weapons in the stand's storage tab and tick the weapon. A
+hauler brings one, the same as a garment.
+
+A stand built before 1.6.0 keeps the settings it was built with, and it refuses
+the weapon you ticked until the six rows at the top of that list are on. Each
+shows with an asterisk: allow smeltable, allow non-smeltable, allow burnable,
+allow non-burnable, allow biocoded weapons and allow non-biocoded weapons. Tick
+those first, or build a new stand. Ticking Weapons itself turns them on too, but
+the stand will then take any weapon.
+
+The stand's weapon goes in the colonist's hand, and whatever they were holding
+goes in their pack. Changing back reverses it. Anything the game calls a weapon
+is treated the same way, tool or rifle, so there is no list of tools and nothing
+to set up. Only the weapon in hand moves, and sidearms stay where they are. A
+stand holding nothing but a weapon works as well.
+
+**Drafting draws their own weapon.** A drafted colonist puts the stand's weapon
+in their pack and takes up their own, and undrafting swaps them back. The
+uniform stays on either way. A colonist with a weapon of their own always fights
+with it, even if the stand's is better. One who came to the stand empty-handed
+fights with the stand's.
+
+**Some colonists get the outfit and not the weapon:**
+
+- Anyone who can't use it: incapable of violence, which covers a hammer as it
+  does everywhere else in the game, incapable of shooting for a ranged weapon,
+  or with no working hands.
+- Anyone holding a weapon that is destroyed when it is put down, a weapon that
+  stacks, or the same kind of weapon the stand holds.
+
+**A shared stand holds its weapon back from three kinds of colonist.** It arms
+no slave, because a slave holding a weapon rebels four times as soon, tools
+included. It gives a Brawler no ranged weapon, which would cost them mood. And
+it lends no weapon to a colonist bonded to a jealous persona weapon, which costs
+them mood whenever they take up another weapon, wherever the persona weapon is.
+The one exception is the persona weapon itself, lent to a colonist with empty
+hands. Assign the stand to that colonist and it lends to them anyway.
+
+A persona weapon on the stand goes only to the colonist bonded to it. Equipping
+one bonds it for good, and a stand has nobody to ask first. A persona weapon of
+a colonist's own goes in their pack like any other weapon, and comes out when
+they are drafted. In the pack, its traits that work only while it is held, such
+as painless, fast mover or psychic hypersensitizer, stop until the colonist
+changes back, and a kill made with the stand's weapon does nothing for its kill
+thirst. A weapon that stacks stays on the stand, and a stand set to
+**Deposit only** hands out no weapon.
+
+A colonist holding a hammer gets no hunting jobs until they change back, because
+hunting looks only at the weapon in hand.
+
+**If the loan is cut short, the weapons stay in the colony.** When a stand is
+destroyed, the colonist keeps its weapon in their pack as an ordinary item and
+takes up their own. A downed colonist drops both beside them, as they would
+anything else they carry. If they get up where they fell, they pick up the
+weapon that was in their hand. When that was the stand's, it goes back when they
+change back, and they then go and get their own. One drafted when they fell had
+their own in hand, so the stand's weapon stays on the ground for you to deal
+with. It stays there too when they were carried to bed, or changed back before
+picking it up, and they then go back for their own. A hauler can fill the stand's empty slot
+while its weapon is out, and that weapon is then set down beside the stand when
+it comes back.
+
+**A stand already holding a weapon starts handing it out.** That is only a stand
+where you turned weapons on in the storage tab, or one a colonist left a weapon on
+while using it. To keep a weapon on display, set the stand to "Not used for
+shift changes".
+
 ## The rules it follows
 
 - **Automatic only**, for work, recreation and sleeping alike. Right-click orders
@@ -373,8 +447,9 @@ stands are the mechanized ones from
   out of uniform, they'll step over and change, unless they're mid-treatment on
   a patient. A stand serving a radius or an area waits for their next job
   instead, since either can reach a long way.
-- **Change back** appears on any colonist currently in a uniform, for when you
-  want them out of it now rather than at their next job. They will get there on
+- **Change back** appears on any colonist currently in a uniform or holding a
+  stand's weapon, for when you want them out of it now rather than at their next
+  job. They will get there on
   their own, raid or no raid, but "on their own next job" can be a long time if
   the job they just started was sleep.
 
@@ -524,6 +599,14 @@ works alongside this mod as well. A colonist who hauls out of their work room in
 uniform unloads in it too, and changes back on their next ordinary job, rather
 than walking back to the stand with full pockets to change before unloading.
 
+**[Simple Sidearms](https://steamcommunity.com/sharedfiles/filedetails/?id=927155256)**
+and **[Compositable Loadouts](https://steamcommunity.com/sharedfiles/filedetails/?id=2679126859)**
+both count a weapon in the pack as carried, so neither sends a colonist for a
+spare while their own weapon rides there. Simple Sidearms also moves weapons
+between hand and pack by itself: an idle colonist on shift may draw their own
+weapon, and it brings the stand's tool out again at the work. The stand still
+gets its tool back at the end of the shift, from whichever place it ended up.
+
 **An apparel mod is worth having.** Not required and not a dependency, but
 vanilla has no scrubs and no chef's whites, and the one lab coat it does have
 is Anomaly's, so in a pure vanilla game there is very little to actually dress
@@ -546,7 +629,9 @@ Add it to an existing save freely: your existing outfit stands gain the new
 controls on load, nothing needs rebuilding. Removing it is also safe: stands
 revert to ordinary vanilla furniture, and a colonist who was mid-shift
 keeps the uniform (**Clear forced apparel** on the Assign tab un-forces it)
-with their own clothes waiting in the stand.
+with their own clothes waiting in the stand. A stand's weapon stays in their
+hand and their own stays in their pack, where you can drop it from the gear tab
+and equip it again.
 
 ## Status
 

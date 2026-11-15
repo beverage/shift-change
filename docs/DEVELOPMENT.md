@@ -465,14 +465,15 @@ Folders by concern. Everything outside `Dev/` ships, and `check-invariants.py` h
 | `Patch_JobInterception.Vacuum.cs` | The vacuum gate: on a vacuum map, whether every place a job names can be reached through air and through doors the colonist may pass (the air walk), asked by the stand search before a swap that would take protection away, and before a colonist goes on into vacuum in a uniform that protects less; whether the walk back to the stand stays in air; and the messages, at most one an hour per colonist, for an order into vacuum and for a colonist who cannot get back to their own clothes. |
 | `JobPlace.cs` | Where a job happens: the cell its target names and, for a solid target, the cell beside it with a room. |
 | `JobRoomTargets.cs` | Tables for jobs whose targets mislead: which end is the place, the ignored givers, deliveries, giver-less fishing, the ride-along, incidental and pass-through lists. |
-| `Patch_ChangeBackGizmo.cs` | "Change back" command on a pawn in uniform, setting the latch per stand and trigger that the stand search honours; drafting drops it. |
+| `Patch_ChangeBackGizmo.cs` | "Change back" command on a pawn in uniform, setting the latch per stand and trigger that the stand search honours; drafting drops it, and trades a lent weapon for the pawn's own. |
 
 #### `Swap/`
 
 | File | Role |
 |---|---|
-| `JobDriver_SwapAtStand.cs` | Moves apparel, one direction at a time. Sets the forced flag on the way in, clears it on the way out. |
-| `SwapPlan.cs` | The single answer to "what would this swap move". Every wearability predicate lives here. |
+| `JobDriver_SwapAtStand.cs` | Moves apparel and the stand's weapon, one direction at a time. Sets the forced flag on the way in, clears it on the way out. |
+| `SwapPlan.cs` | The single answer to "what would this swap move". Every wearability predicate and weapon gate lives here. |
+| `WeaponHands.cs` | The moves every weapon transfer is built from, between the hand, the pack and the ground. `SwapPlan` decides; this carries it out. |
 | `Patch_OptimizeApparelOnShift.cs` | Pauses the vanilla wardrobe optimizer while a pawn is checked out. |
 | `Patch_ParkedKitOutscoresSpares.cs` | Stops a checked-out pawn re-arming from the colony's spare pile while their own kit sits parked in the stand. |
 
@@ -583,7 +584,7 @@ set up with; and `Checks/`, the suite's checks of itself.
 |---|---|
 | `About/About.xml` | Metadata, dependencies. `Preview.png` is needed only for Workshop upload. |
 | `Defs/JobDefs/` | `ShiftChange_SwapAtStand`, the swap job, both directions. |
-| `Patches/` | Adds the two comps to the vanilla outfit stand def. |
+| `Patches/` | Adds the two comps to the vanilla outfit stand def, and turns the six weapon rows on in the stand base's default filter. |
 | `Languages/English/Keyed/` | Gizmo and inspect strings. |
 | `Assemblies/` | Build output. Exactly one dll. |
 | `LoadFolders.xml` | The root for 1.6 and 1.7, and `Tests/` under 1.7 only while DevTools is active. Once the file exists it decides every folder the game loads, so the root entries are what load the mod at all. |

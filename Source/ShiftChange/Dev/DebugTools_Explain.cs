@@ -240,7 +240,7 @@ namespace ShiftChange
                                   .Append(", depositOnly=").Append(any.DepositOnly)
                                   .Append(", excluded=").Append(any.IsExcluded)
                                   .Append(", onShift=").Append(any.OnShift)
-                                  .Append(", hasWearable=").AppendLine(any.HasWearable.ToString());
+                                  .Append(", hasStock=").AppendLine(any.HasStock.ToString());
                         }
                     }
                 }

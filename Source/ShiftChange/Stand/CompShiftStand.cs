@@ -27,7 +27,7 @@ namespace ShiftChange
 
     /// <summary>
     /// Shift Change's half of a vanilla outfit stand: what it dresses for, and a ledger
-    /// of the garments that went between it and its borrower, because
+    /// of the garments and weapons that went between it and its borrower, because
     /// <see cref="Building_OutfitStand"/> records nothing about whose clothes it holds.
     /// Partial: settings in .Triggers, what it serves in .Catchment, display in .Ui.
     /// </summary>
@@ -43,6 +43,14 @@ namespace ShiftChange
         /// <c>Pawn_ApparelTracker.Notify_ApparelRemoved</c> clears the flag.</summary>
         internal List<Apparel> storedForcedApparel = new List<Apparel>();
 
+        /// <summary>The stand's weapon, out with the borrower. It may have been destroyed
+        /// since, so every reader asks whether the pawn still has it.</summary>
+        internal ThingWithComps issuedWeapon;
+
+        /// <summary>The borrower's own weapon, in their pack while the stand's is out. Null
+        /// when their hand was empty. Like <see cref="issuedWeapon"/>, it may be gone.</summary>
+        internal ThingWithComps ownWeapon;
+
         /// <summary>Who wears this stand's uniform now. The return trip follows this,
         /// not the assigned owner, because a pool stand lends to anyone.</summary>
         internal Pawn borrower;
@@ -54,10 +62,14 @@ namespace ShiftChange
 
         public Building_OutfitStand Stand => parent as Building_OutfitStand;
 
-        /// <summary>The ledger is open: a uniform is out, or a pawn's own clothes are parked.
-        /// Either half counts: a deposit-only stand issues nothing and still owes the parked
-        /// garments back.</summary>
-        public bool OnShift => issuedUniform.Count > 0 || storedOwnerApparel.Count > 0;
+        /// <summary>The ledger is open: a uniform or a weapon is out, or a pawn's own clothes
+        /// or weapon are in the ledger. Any half counts: a deposit-only stand issues nothing and
+        /// still owes the parked garments back, and a weapon-only stand moves no clothes.</summary>
+        public bool OnShift => ClothesMoved || issuedWeapon != null || ownWeapon != null;
+
+        /// <summary>The clothes half of the ledger is open. On a weapon-only loan it is not, and
+        /// the pawn wears nothing but their own clothes.</summary>
+        internal bool ClothesMoved => issuedUniform.Count > 0 || storedOwnerApparel.Count > 0;
 
         public Pawn Borrower => borrower;
 
@@ -85,12 +97,12 @@ namespace ShiftChange
         }
 
         /// <summary>Whether the reaper would have released this pawn, had the stand been on a
-        /// map to find when they left: dead, gone from the colony, or kidnapped. Kidnapping
-        /// runs <c>UnclaimAll</c> but keeps the player faction, so <see cref="StillOurs"/>
-        /// alone passes a kidnapped colonist.</summary>
+        /// map to find when they left: dead, destroyed, gone from the colony, or kidnapped.
+        /// Kidnapping runs <c>UnclaimAll</c> but keeps the player faction, so
+        /// <see cref="StillOurs"/> alone passes a kidnapped colonist.</summary>
         internal static bool Departed(Pawn pawn)
         {
-            if (pawn == null || pawn.Dead || !StillOurs(pawn))
+            if (pawn.DestroyedOrNull() || pawn.Dead || !StillOurs(pawn))
             {
                 return true;
             }
@@ -130,26 +142,8 @@ namespace ShiftChange
             return ShiftChangeMod.PoolingEnabled;
         }
 
-        public bool HasWearable
-        {
-            get
-            {
-                Building_OutfitStand stand = Stand;
-                if (stand == null)
-                {
-                    return false;
-                }
-                IReadOnlyList<Thing> held = stand.HeldItems;
-                for (int i = 0; i < held.Count; i++)
-                {
-                    if (held[i] is Apparel)
-                    {
-                        return true;
-                    }
-                }
-                return false;
-            }
-        }
+        /// <summary>The stand holds something to hand out, apparel or a weapon.</summary>
+        public bool HasStock => Stand != null && Stand.HeldItems.Count > 0;
 
         /// <summary>Keeps vanilla's "Allow removing items" flag off while the stand is in
         /// service; called on spawn and on every entry into service. The flag is what
@@ -235,11 +229,13 @@ namespace ShiftChange
                 {
                     // Another stand holds this borrower's checkout, so this one is
                     // a stale copy, from a box set down after the shift moved on. Taking
-                    // the entry would strand the checkout the other stand still holds.
-                    storedOwnerApparel.Clear();
-                    issuedUniform.Clear();
-                    storedForcedApparel.Clear();
-                    borrower = null;
+                    // the entry would strand the checkout the other stand still holds. Its
+                    // weapons settle as on any close with no return trip, though not on a load.
+                    if (!respawningAfterLoad)
+                    {
+                        SettleWeapons(borrower);
+                    }
+                    ClearLedger();
                 }
                 else
                 {
@@ -250,7 +246,7 @@ namespace ShiftChange
                         // flags off; after a gravship landing nothing did, so this only
                         // re-sets one cleared by hand, which changes nothing while the
                         // shift lasts: the optimizer, the one reader that acts on the
-                        // flag, is paused for anyone on shift, and every way out of the
+                        // flag, is paused for anyone in uniform, and every way out of the
                         // shift clears it. Not on a load, where the flags are the pawn's
                         // own saved state and the player may have cleared one.
                         ForceIssued(borrower);
@@ -334,6 +330,15 @@ namespace ShiftChange
             ReleaseBorrower();
         }
 
+        /// <summary>The stand is gone with no despawn to say so, boxed and burnt with its box, or
+        /// destroyed in a mode <see cref="PostDeSpawn"/> reads as a move. A stand already released
+        /// has nothing left to release.</summary>
+        public override void PostDestroy(DestroyMode mode, Map previousMap)
+        {
+            base.PostDestroy(mode, previousMap);
+            ReleaseBorrower();
+        }
+
         /// <summary>Takes the forced flag off the issued garments the holder still wears.
         /// Every path that drops the ledger while the uniform may still be worn calls it,
         /// since a forced uniform with no ledger is stuck
@@ -385,11 +390,42 @@ namespace ShiftChange
             if (holder != null)
             {
                 UnforceIssued(holder);
+                SettleWeapons(holder);
                 OnShiftStands.Remove(holder);
             }
+            ClearLedger();
+        }
+
+        /// <summary>
+        /// Puts the weapons right for a ledger closing with no return trip: the stand's weapon
+        /// goes to the pack as an ordinary item, and the pawn's own comes out if the hand is then
+        /// empty, or is fetched from the ground after a downing
+        /// (<see cref="WeaponHands.DrawOrFetch"/>). The stand's weapon, if a downing left it on
+        /// the ground, is no longer theirs to fetch (<see cref="WeaponHands.ForgetDropped"/>).
+        /// After the driver's own return there is nothing left to move. A departed pawn
+        /// keeps what they hold, which also keeps hand moves out of <c>Map.FinalizeLoading</c>,
+        /// since on a load <see cref="PostSpawnSetup"/> releases only a departed borrower.
+        /// </summary>
+        internal void SettleWeapons(Pawn holder)
+        {
+            if (Departed(holder))
+            {
+                return;
+            }
+            WeaponHands.ToPack(holder, issuedWeapon);
+            WeaponHands.ForgetDropped(holder, issuedWeapon);
+            WeaponHands.DrawOrFetch(holder, ownWeapon);
+        }
+
+        /// <summary>Forgets every half of the ledger and who it was for. The registry entry
+        /// stays with the caller, since not every caller has one to remove.</summary>
+        internal void ClearLedger()
+        {
             storedOwnerApparel.Clear();
             issuedUniform.Clear();
             storedForcedApparel.Clear();
+            issuedWeapon = null;
+            ownWeapon = null;
             borrower = null;
         }
 
@@ -400,6 +436,10 @@ namespace ShiftChange
             Scribe_Collections.Look(ref issuedUniform, "issuedUniform", LookMode.Reference);
             Scribe_Collections.Look(ref storedForcedApparel, "storedForcedApparel", LookMode.Reference);
             Scribe_References.Look(ref borrower, "borrower");
+            // Prefixed: comps scribe flat into the stand's node, beside other mods' comps. A
+            // destroyed weapon loads back as null, so the load branch below has nothing to strip.
+            Scribe_References.Look(ref issuedWeapon, "shiftChangeIssuedWeapon");
+            Scribe_References.Look(ref ownWeapon, "shiftChangeOwnWeapon");
             Scribe_Collections.Look(ref workTypeOverrides, "workTypeOverrides", LookMode.Def);
             Scribe_Values.Look(ref recreationOverride, "recreation", defaultValue: false);
             Scribe_Values.Look(ref restOverride, "rest", defaultValue: false);
@@ -483,12 +523,20 @@ namespace ShiftChange
             }
         }
 
+        /// <summary>Records the weapon half of a dress trip, on its own and before the apparel
+        /// half: the apparel path can return early, and <see cref="NotifyDressed"/> leaves this
+        /// half alone.</summary>
+        public void NotifyWeaponIssued(Pawn pawn, ThingWithComps weapon, ThingWithComps own)
+        {
+            issuedWeapon = weapon;
+            ownWeapon = own;
+            borrower = pawn;
+            OnShiftStands[pawn] = this;
+        }
+
         public void NotifyUndressed(Pawn pawn)
         {
-            storedOwnerApparel.Clear();
-            issuedUniform.Clear();
-            storedForcedApparel.Clear();
-            borrower = null;
+            ClearLedger();
             OnShiftStands.Remove(pawn);
             // Not Notify_StandFreed: in a toil finish action the pawn still holds the
             // stand's reservation. JobDriver_SwapAtStand announces after its release.
@@ -514,17 +562,16 @@ namespace ShiftChange
         /// the stand's reservation is released.</param>
         public void AbandonLedger(Pawn formerBorrower, bool announce = true)
         {
+            Pawn holder = borrower ?? formerBorrower;
             // Nothing to do for a dead or traded borrower, whose flags left with them; a
             // banished one is alive and still in the uniform.
-            UnforceIssued(borrower ?? formerBorrower);
+            UnforceIssued(holder);
+            SettleWeapons(holder);
             if (formerBorrower != null)
             {
                 OnShiftStands.Remove(formerBorrower);
             }
-            storedOwnerApparel.Clear();
-            issuedUniform.Clear();
-            storedForcedApparel.Clear();
-            borrower = null;
+            ClearLedger();
             // Excludes the former borrower, who still wears the uniform.
             if (announce)
             {

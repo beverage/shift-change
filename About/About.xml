@@ -54,6 +54,8 @@ A colonist woken and drafted stays in whatever they are wearing. Undraft them an
 
 Their own clothes wait in the stand in every case, and come back exactly as they were, force-worn markers included.
 
+A stand hands out a weapon as well as clothes. Tick a hammer in the stand's storage tab, and whoever changes there takes it in hand, with their own weapon in their pack until they change back. Tools from any mod count, because the game calls them weapons. Drafting draws their own weapon, and undrafting puts the stand's back. A shared stand arms no slave and gives a Brawler no ranged weapon; assign it to them and it will.
+
 Rooms are read from their role, so hospitals, laboratories, kitchens, workshops, barns, rec rooms and bedrooms all work with no setup at all.
 
 Most of this you will never touch. Six optional controls per stand, each shipping on a default that already works:

@@ -35,6 +35,12 @@ namespace ShiftChange
         internal List<Apparel> toWear = new List<Apparel>();
         internal List<Apparel> toStore = new List<Apparel>();
 
+        /// <summary>
+        /// The stand's weapon, going to the pawn's hand on a dress trip. The return trip plans
+        /// none: it reads the ledger on arrival, since the pawn may have moved the weapon by then.
+        /// </summary>
+        internal ThingWithComps toWield;
+
         internal Building_OutfitStand Stand => job.targetA.Thing as Building_OutfitStand;
 
         internal CompShiftStand Comp => Stand?.TryGetComp<CompShiftStand>();
@@ -46,6 +52,7 @@ namespace ShiftChange
             Scribe_Values.Look(ref undressing, "undressing", defaultValue: false);
             Scribe_Collections.Look(ref toWear, "toWear", LookMode.Reference);
             Scribe_Collections.Look(ref toStore, "toStore", LookMode.Reference);
+            Scribe_References.Look(ref toWield, "toWield");
         }
 
         public override bool TryMakePreToilReservations(bool errorOnFailed)
@@ -58,6 +65,7 @@ namespace ShiftChange
             base.Notify_Starting();
             toWear = new List<Apparel>();
             toStore = new List<Apparel>();
+            toWield = null;
             duration = 0;
 
             CompShiftStand comp = Comp;
@@ -76,16 +84,25 @@ namespace ShiftChange
                 PlanDress(comp);
             }
 
+            // SecondsToTicks rounds where vanilla's stand truncates, so each garment can take one
+            // tick more than it does there.
             foreach (Apparel apparel in toWear)
             {
-                duration += (int)(apparel.GetStatValue(StatDefOf.EquipDelay) * 60f);
+                duration += apparel.GetStatValue(StatDefOf.EquipDelay).SecondsToTicks();
             }
             foreach (Apparel apparel in toStore)
             {
-                duration += (int)(apparel.GetStatValue(StatDefOf.EquipDelay) * 60f);
+                duration += apparel.GetStatValue(StatDefOf.EquipDelay).SecondsToTicks();
+            }
+            // A weapon counts like a garment, so a weapon-only swap has a real wait. Vanilla's
+            // stand adds no time for one, so this whole term is ours.
+            ThingWithComps moving = undressing ? comp.issuedWeapon : toWield;
+            if (moving != null && (!undressing || WeaponHands.Holds(pawn, moving)))
+            {
+                duration += moving.GetStatValue(StatDefOf.EquipDelay).SecondsToTicks();
             }
             // Outfit Stands Plus scales a swap at any stand carrying its comp, vanilla's included;
-            // apply its factor so a shift change is never slower than a manual swap there. No-op
+            // apply its factor so a shift change there gets the speed-up a manual swap gets. No-op
             // without that mod.
             duration = Interop_OutfitStandsPlus.ApplySwapSpeedFactor(Stand, duration);
         }
@@ -97,6 +114,7 @@ namespace ShiftChange
         internal void PlanDress(CompShiftStand comp)
         {
             SwapPlan.BuildDress(pawn, Stand, toWear, toStore);
+            toWield = SwapPlan.WeaponToIssue(pawn, Stand);
         }
 
         /// <summary>Going off shift: uniform back in the stand, own clothes on.</summary>
@@ -159,6 +177,18 @@ namespace ShiftChange
             {
                 // Nothing has moved yet; clothes posted into a despawned container would be lost.
                 return;
+            }
+
+            // Ahead of the apparel, and recording its own half of the ledger: every early return
+            // below leaves that half standing, so none of them can strand a weapon. A weapon-only
+            // trip then ends in NothingToWear, which on a dress trip does nothing.
+            if (undressing)
+            {
+                ReturnWeapon(stand, comp);
+            }
+            else
+            {
+                IssueWeapon(stand, comp);
             }
 
             // Re-validate before anything comes off: the walk is long enough for the uniform to
@@ -309,7 +339,53 @@ namespace ShiftChange
         }
 
         /// <summary>
-        /// The plan came up empty on arrival, with nothing moved yet. Dressing records nothing.
+        /// The stand's weapon into the pawn's hand and whatever was there into their pack, if it
+        /// is still theirs to take: the walk is long enough for a hauler to empty the slot, or
+        /// the pawn to pick up something the stand may not replace. A move that fails puts
+        /// everything back where it was.
+        /// </summary>
+        internal void IssueWeapon(Building_OutfitStand stand, CompShiftStand comp)
+        {
+            if (toWield == null || toWield != SwapPlan.WeaponToIssue(pawn, stand)
+                || !stand.RemoveHeldWeapon(toWield))
+            {
+                return;
+            }
+            ThingWithComps own = pawn.equipment.Primary;
+            if (own != null && !WeaponHands.ToPack(pawn, own))
+            {
+                PutWeaponBack(stand, toWield);
+                return;
+            }
+            if (WeaponHands.Draw(pawn, toWield))
+            {
+                comp.NotifyWeaponIssued(pawn, toWield, own);
+                return;
+            }
+            PutWeaponBack(stand, toWield);
+            WeaponHands.FromPack(pawn, own);
+        }
+
+        /// <summary>
+        /// Two steps, whatever the pawn did on shift, so both read where things are now and not
+        /// where the dress trip left them. The issued weapon goes back if the pawn has it, from
+        /// hand or pack; if not it is gone, as a garment is. Then their own weapon comes out of
+        /// the pack if the hand is empty; anything else in the hand was their choice and stays,
+        /// with their own weapon left in the pack. One a downing dropped is fetched from the
+        /// ground instead (<see cref="WeaponHands.DrawOrFetch"/>), and the stand's weapon, left
+        /// where it fell, is no longer theirs to fetch (<see cref="WeaponHands.ForgetDropped"/>).
+        /// The caller's path clears the ledger.
+        /// </summary>
+        internal void ReturnWeapon(Building_OutfitStand stand, CompShiftStand comp)
+        {
+            PutWeaponBack(stand, WeaponHands.Release(pawn, comp.issuedWeapon));
+            WeaponHands.ForgetDropped(pawn, comp.issuedWeapon);
+            WeaponHands.DrawOrFetch(pawn, comp.ownWeapon);
+        }
+
+        /// <summary>
+        /// The plan came up empty on arrival, with no apparel moved yet. Dressing records nothing
+        /// here; a weapon handed over has already recorded itself.
         /// The return trip lands here only as a last resort, when taking the uniform off would
         /// leave the pawn bare (<see cref="WearingAnythingBesides"/>, or coverage at a
         /// deposit-only stand, as <see cref="DoTransfer"/> checks).
@@ -318,8 +394,8 @@ namespace ShiftChange
         {
             if (!undressing)
             {
-                // Nothing this pawn can put on: no state changed, so there is nothing to record.
-                // This backstops the stand selector's WouldDress check.
+                // Nothing this pawn can put on, so no apparel state changed. This backstops the
+                // stand selector's WouldDress check.
                 return;
             }
 
@@ -405,6 +481,24 @@ namespace ShiftChange
             }
             Log.Error("[ShiftChange] could not return " + apparel.LabelCap
                       + " to the stand, the floor or " + pawn.LabelShort + " — it may be lost.");
+        }
+
+        /// <summary>
+        /// <see cref="PutBack"/> for a weapon held by nothing. The stand's one slot can have
+        /// been refilled while the weapon was out, so the ground is an ordinary outcome here.
+        /// </summary>
+        internal void PutWeaponBack(Building_OutfitStand stand, ThingWithComps weapon)
+        {
+            if (weapon == null || weapon.ParentHolder != null)
+            {
+                return;
+            }
+            if (stand.Spawned && (stand.TryAddHeldWeapon(weapon)
+                                  || WeaponHands.PlaceNear(weapon, stand.Position, stand.Map)))
+            {
+                return;
+            }
+            WeaponHands.PutDown(pawn, weapon);
         }
     }
 }
