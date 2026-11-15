@@ -382,12 +382,11 @@ namespace ShiftChange.Tests
         /// <summary>
         /// Shift Change stopping after repeated errors, driven by real throws through the catch
         /// block of the real <see cref="Patch_JobInterception.Prefix"/> rather than by calling the
-        /// counter (the seam is <see cref="Patch_JobInterception.injectFaults"/>). Three claims:
-        /// errors below the limit are counted and the mod keeps working, the limit stops it, and a
-        /// new game starts it again (<see cref="Patch_JobInterception.faulted"/>). The third
-        /// guards a past bug in which only quitting the game started it again. A save cannot be
-        /// loaded here, so the test resets the game reference under <see cref="SessionGuard"/>,
-        /// the trigger a load pulls.
+        /// counter (<see cref="SceneKit.Fault"/>). Three claims: errors below the limit are counted
+        /// and the mod keeps working, the limit stops it, and a new game starts it again
+        /// (<see cref="Patch_JobInterception.faulted"/>). The third guards a past bug in which only
+        /// quitting the game started it again. A save cannot be loaded here, so the test resets the
+        /// game reference under <see cref="SessionGuard"/>, the trigger a load pulls.
         ///
         /// <para>The three errors are made on purpose. Each logs an error, and the third also logs
         /// the stop. Only those are allowed: a throw of any other kind logs its own error, which

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using HarmonyLib;
 using RimWorld;
@@ -332,18 +333,39 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// Makes interception throw <paramref name="times"/> times, via the real patch entry.
+        /// Makes interception throw <paramref name="times"/> times, via the real patch entry. A
+        /// Harmony prefix on <c>TryInsertSwap</c> throws in its place, so each throw reaches the
+        /// catch in <see cref="Patch_JobInterception.Prefix"/> as a real one would, and comes off
+        /// again before this returns, so the shipped code carries nothing for the test.
         /// </summary>
         internal static void Fault(Pawn pawn, int times)
         {
-            Patch_JobInterception.injectFaults = times;
-            for (int i = 0; i < times; i++)
+            Harmony harmony = new Harmony(FaultHarmonyId);
+            MethodInfo decide = AccessTools.Method(typeof(Patch_JobInterception),
+                                                   nameof(Patch_JobInterception.TryInsertSwap));
+            harmony.Patch(decide, prefix: new HarmonyMethod(typeof(SceneKit), nameof(ThrowInstead)));
+            try
             {
-                Patch_JobInterception.Prefix(
-                    JobMaker.MakeJob(JobDefOf.Wait), null, pawn, pawn.jobs);
+                for (int i = 0; i < times; i++)
+                {
+                    Patch_JobInterception.Prefix(JobMaker.MakeJob(JobDefOf.Wait), null, pawn, pawn.jobs);
+                }
             }
-            // Disarm in case a call never reached the injection point.
-            Patch_JobInterception.injectFaults = 0;
+            finally
+            {
+                harmony.Unpatch(decide, HarmonyPatchType.Prefix, FaultHarmonyId);
+            }
+        }
+
+        /// <summary>The Harmony id <see cref="Fault"/> patches under.</summary>
+        internal const string FaultHarmonyId = "MrBeverage.ShiftChange.Tests.Fault";
+
+        /// <summary>
+        /// <see cref="Fault"/>'s prefix: throws before <c>TryInsertSwap</c> runs.
+        /// </summary>
+        internal static bool ThrowInstead()
+        {
+            throw new Exception("[ShiftChange] injected test fault");
         }
 
         /// <summary>

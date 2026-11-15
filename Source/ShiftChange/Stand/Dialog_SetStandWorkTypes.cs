@@ -599,7 +599,7 @@ namespace ShiftChange
         /// The Serves menu, in three sections (<see cref="ServesMenuOption"/>): this room and a
         /// radius; every allowed area except Home, each with its colour; then New allowed area and
         /// Manage areas. An area that leaves out the stand's own cell is faded and says why in red,
-        /// since a stand outside its area serves nothing. Built apart from the click so the harness
+        /// since a stand outside its area serves nothing. Built apart from the click so the tests
         /// can read and pick the options. It is not vanilla's
         /// <c>AreaUtility.MakeAllowedAreaListFloatMenu</c>, which lists Home, opens the menu
         /// itself, has no swatches, fading or sections, and leaves this window open behind Manage

@@ -68,7 +68,7 @@ namespace ShiftChange
                 {
                     if (!File.Exists(path))
                     {
-                        // Any non-Debug build (Release, Media, the harness runs) deletes the
+                        // Any non-Debug build (Release, Media, the test runs) deletes the
                         // file. Keep polling: when a Debug build writes it again, it is handled
                         // like any other change.
                         continue;
