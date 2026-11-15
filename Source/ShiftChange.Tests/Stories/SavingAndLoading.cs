@@ -863,7 +863,8 @@ namespace ShiftChange.Tests
         /// <summary>
         /// Saves the game under <paramref name="name"/>, with a note, or fails the test.
         /// <c>GameDataSaveLoader.SaveGame</c> returns nothing and catches and logs its own
-        /// exceptions, so success is the file being there.
+        /// exceptions, so success is the file being there, which is why an earlier save under
+        /// the same name must be gone first: left in place, it would pass for this game's.
         /// </summary>
         internal static bool TrySave(Story story, string name, out string path)
         {
@@ -875,7 +876,13 @@ namespace ShiftChange.Tests
             }
             catch (Exception)
             {
-                // A failed delete is not itself a failure; whether the file is there decides.
+                // Whether the file is still there decides, below.
+            }
+            if (File.Exists(path))
+            {
+                story.Check(false, "the game saves as " + name + ": an earlier save at " + path
+                                   + " could not be removed first");
+                return false;
             }
             GameDataSaveLoader.SaveGame(name);
             if (File.Exists(path))

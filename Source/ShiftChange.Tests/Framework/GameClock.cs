@@ -36,9 +36,10 @@ namespace ShiftChange.Tests
         /// <summary>
         /// Steps the clock until <paramref name="done"/> holds after a tick, or
         /// <paramref name="most"/> ticks have run, and records which in <paramref name="run"/>,
-        /// letting a frame pass every <see cref="TicksPerFrame"/> ticks.
+        /// letting a frame pass every <see cref="TicksPerFrame"/> ticks. <paramref name="hold"/>,
+        /// as in <see cref="Step"/>, runs before every tick and once at the end.
         /// </summary>
-        internal static IEnumerator Run(Func<bool> done, int most, ClockRun run)
+        internal static IEnumerator Run(Func<bool> done, int most, ClockRun run, Action hold = null)
         {
             using (Held held = new Held())
             {
@@ -46,6 +47,7 @@ namespace ShiftChange.Tests
                 {
                     for (int i = 0; i < TicksPerFrame && run.Ticks < most; i++)
                     {
+                        hold?.Invoke();
                         held.Tick();
                         run.Ticks++;
                         if (done())
@@ -59,6 +61,7 @@ namespace ShiftChange.Tests
                         yield return null;
                     }
                 }
+                hold?.Invoke();
             }
         }
 

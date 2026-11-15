@@ -633,10 +633,43 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// Runs one swap through the real driver: starts the job on the pawn's own tracker, then
-        /// steps the game's clock (<see cref="GameClock.Step"/>), within this frame, until the job
-        /// ends. Returns false, after saying why to <paramref name="why"/> a line at a time, when
-        /// the swap gets no driver, ends with anything but <c>Succeeded</c>, or outlasts
+        /// Starts a change at the scene's stand on the colonist's own job tracker and returns its
+        /// driver, with <paramref name="ended"/> told how it ends. Null, with the reason in
+        /// <paramref name="notStarted"/>, when the change is not what runs once
+        /// <c>StartJob</c> returns: a job can end as it starts (a failed reservation, the game's
+        /// guard against ten jobs in one tick) and leave another job's driver current, and
+        /// watching that driver would take its end for the change's.
+        ///
+        /// <para>Watch the driver, never the Job. Jobs are pooled: when ours ends it goes back to
+        /// JobMaker's pool and is handed out again as the pawn's next job, so <c>CurJob != swap</c>
+        /// compares a reference vanilla has already recycled and stays equal. Drivers are built
+        /// per job and never pooled.</para>
+        /// </summary>
+        internal static JobDriver StartSwap(Scene scene, Action<JobCondition> ended, out string notStarted)
+        {
+            Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, scene.OutfitStand);
+            scene.Colonist.jobs.StartJob(swap, JobCondition.InterruptForced, null,
+                resumeCurJobAfterwards: false, cancelBusyStances: true, null,
+                JobTag.ChangingApparel);
+            JobDriver started = scene.Colonist.jobs.curDriver;
+            if (!(started is JobDriver_SwapAtStand))
+            {
+                notStarted = "the change ended as it started, and "
+                             + (scene.Colonist.CurJobDef == null ? "no job" : scene.Colonist.CurJobDef.defName)
+                             + " took its place";
+                return null;
+            }
+            started.AddFinishAction(ended);
+            notStarted = null;
+            return started;
+        }
+
+        /// <summary>
+        /// Runs one swap through the real driver: starts it on the pawn's own tracker
+        /// (<see cref="StartSwap"/>), then steps the game's clock (<see cref="GameClock.Step"/>),
+        /// within this frame, until it ends. Returns false, after saying why to
+        /// <paramref name="why"/> a line at a time, when the swap does not start, ends with
+        /// anything but <c>Succeeded</c>, or outlasts
         /// <paramref name="maxTicks"/>. Every caller checks it, so a swap that gave up fails
         /// loudly instead of falling through to checks that pass for the wrong reason.
         ///
@@ -646,32 +679,17 @@ namespace ShiftChange.Tests
         /// </summary>
         internal static bool RunSwap(Scene scene, Action<string> why, int maxTicks)
         {
-            Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, scene.OutfitStand);
-            scene.Colonist.jobs.StartJob(swap, JobCondition.InterruptForced, null,
-                resumeCurJobAfterwards: false, cancelBusyStances: true, null,
-                JobTag.ChangingApparel);
-
-            // Watch the driver, never the Job. Jobs are pooled: when ours ends it goes back to
-            // JobMaker's pool and is handed out again as the pawn's next job, so `CurJob != swap`
-            // compares a reference vanilla has already recycled and stays equal. Drivers are built
-            // per job and never pooled.
-            JobDriver started = scene.Colonist.jobs.curDriver;
-            if (started == null)
-            {
-                why("the swap job never got a driver");
-                return false;
-            }
-
             // Capture how it ended, not only that it did: "the driver changed" is also true of a
             // job that failed its reservations and died before its transfer toil.
             JobCondition ended = JobCondition.None;
-            started.AddFinishAction(c => ended = c);
-
-            // A job can end as it starts, on a failed reservation, before any tick.
-            if (scene.Colonist.jobs.curDriver == started)
+            JobDriver started = StartSwap(scene, c => ended = c, out string notStarted);
+            if (started == null)
             {
-                GameClock.Step(() => scene.Colonist.jobs?.curDriver != started, maxTicks, scene.Hold);
+                why(notStarted);
+                return false;
             }
+
+            GameClock.Step(() => scene.Colonist.jobs?.curDriver != started, maxTicks, scene.Hold);
             if (scene.Colonist.jobs?.curDriver != started)
             {
                 if (ended == JobCondition.Succeeded)
@@ -849,10 +867,13 @@ namespace ShiftChange.Tests
                 {
                     scene.OutfitStand.Destroy();
                 }
+                // What the test made lies on the scene's map, which for a ship or a second-map
+                // scene is not the pad's.
+                Map own = scene.Map ?? map;
                 for (int i = 0; i < scene.Areas.Count; i++)
                 {
                     Area area = scene.Areas[i];
-                    if (area != null && map.areaManager.AllAreas.Contains(area))
+                    if (area != null && own.areaManager.AllAreas.Contains(area))
                     {
                         area.Delete();
                     }
@@ -864,15 +885,15 @@ namespace ShiftChange.Tests
                 {
                     foreach (IntVec3 cell in scene.Outside)
                     {
-                        map.zoneManager.ZoneAt(cell)?.Delete();
+                        own.zoneManager.ZoneAt(cell)?.Delete();
                     }
-                    GenDebug.ClearArea(scene.Outside, map);
+                    GenDebug.ClearArea(scene.Outside, own);
                 }
                 for (int i = 0; i < scene.Claimed.Count; i++)
                 {
                     IntVec3 cell = scene.Claimed[i];
-                    map.zoneManager.ZoneAt(cell)?.Delete();
-                    GenDebug.ClearArea(CellRect.SingleCell(cell), map);
+                    own.zoneManager.ZoneAt(cell)?.Delete();
+                    GenDebug.ClearArea(CellRect.SingleCell(cell), own);
                 }
                 // After the pawn and the stand, which may be standing on it. Caught: this runs in
                 // the test's finally, and a throw would end the run for every test after this one.

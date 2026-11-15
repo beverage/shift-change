@@ -213,16 +213,18 @@ namespace ShiftChange.Tests
 
         /// <summary>
         /// The frame every story test runs in. Opens the story with the test's sentence, finds the
-        /// pad when <paramref name="onPad"/>, and runs <paramref name="run"/>. Then, whatever
-        /// happened: puts Keep colonists decent back as it was, clears what the test set up on the
-        /// pad (<see cref="CurrentScene"/>), skips a test whose only trouble was a known gap, and
-        /// writes the story to Test.log.
+        /// pad when <paramref name="onPad"/>, and runs <paramref name="run"/>, whose exception,
+        /// even from a step after the clock ran, is the story's last line
+        /// (<see cref="Guarded"/>). Then, whatever happened: puts Shift Change's settings and the
+        /// interception's switches back as they were (<see cref="SettingsAsFound"/>), clears what
+        /// the test set up on the pad (<see cref="CurrentScene"/>), skips a test whose only trouble
+        /// was a known gap, and writes the story to Test.log.
         /// </summary>
         internal IEnumerator Tell(string test, bool onPad, Func<Story, IEnumerator> run)
         {
             Story story = new Story(Sentence(test) ?? test);
             CurrentScene = null;
-            bool decent = ShiftChangeMod.Settings != null && ShiftChangeMod.Settings.keepColonistsDecent;
+            SettingsAsFound found = new SettingsAsFound();
             try
             {
                 if (Sentence(test) == null)
@@ -243,14 +245,11 @@ namespace ShiftChange.Tests
                     Map = Find.CurrentMap;
                     Pad = CellRect.Empty;
                 }
-                yield return run(story);
+                yield return Guarded(run(story), story.Threw);
             }
             finally
             {
-                if (ShiftChangeMod.Settings != null)
-                {
-                    ShiftChangeMod.Settings.keepColonistsDecent = decent;
-                }
+                found.PutBack();
                 if (CurrentScene != null)
                 {
                     Teardown(CurrentScene, Map, Pad);
@@ -312,6 +311,61 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
+        /// Runs <paramref name="routine"/> and the routines it yields, one step per frame as
+        /// DevTools would, and hands what any of them throws to <paramref name="threw"/> rather
+        /// than to DevTools, ending the routine there. A test that steps the clock runs over
+        /// several frames, out of reach of <see cref="Now"/>'s catch; without this its exception
+        /// would fail the test with no line in its story. The routines left open are disposed, so
+        /// their own clean-up runs (<see cref="GameClock.Held"/>).
+        /// </summary>
+        internal static IEnumerator Guarded(IEnumerator routine, Action<Exception> threw)
+        {
+            Stack<IEnumerator> open = new Stack<IEnumerator>();
+            open.Push(routine);
+            try
+            {
+                while (open.Count > 0)
+                {
+                    IEnumerator step = open.Peek();
+                    bool more;
+                    Exception thrown = null;
+                    try
+                    {
+                        more = step.MoveNext();
+                    }
+                    catch (Exception e)
+                    {
+                        more = false;
+                        thrown = e;
+                    }
+                    if (thrown != null)
+                    {
+                        threw(thrown);
+                        yield break;
+                    }
+                    if (!more)
+                    {
+                        (open.Pop() as IDisposable)?.Dispose();
+                        continue;
+                    }
+                    if (step.Current is IEnumerator inner)
+                    {
+                        open.Push(inner);
+                        continue;
+                    }
+                    yield return step.Current;
+                }
+            }
+            finally
+            {
+                while (open.Count > 0)
+                {
+                    (open.Pop() as IDisposable)?.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
         /// Sets a scene up with <paramref name="build"/>, retrying a build that throws as
         /// <see cref="StageFor"/> does. Null, the test failed, when none could be set up.
         /// </summary>
@@ -329,6 +383,9 @@ namespace ShiftChange.Tests
                         story.Check(true, description);
                         return scene;
                     }
+                    // Not a flake but something missing, so no retry; what the build spawned
+                    // before it found out goes, as no scene carries it to the tear-down.
+                    Teardown(null, Map, Pad);
                     break;
                 }
                 catch (Exception e)
@@ -365,6 +422,9 @@ namespace ShiftChange.Tests
                                           + (kit == StageKit.Displacing ? " and a parka" : ""));
                         return scene;
                     }
+                    // As in BuildFor: no retry, and nothing left on the pad.
+                    Teardown(null, Map, Pad);
+                    break;
                 }
                 catch (Exception e)
                 {
@@ -381,8 +441,8 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// Turns Keep colonists decent on or off for this test; <see cref="Staged"/> puts it
-        /// back. False, the test failed, when the mod's settings cannot be read.
+        /// Turns Keep colonists decent on or off for this test; <see cref="Tell"/> puts it back.
+        /// False, the test failed, when the mod's settings cannot be read.
         /// </summary>
         internal static bool SetDecent(Story story, bool on)
         {
@@ -434,19 +494,15 @@ namespace ShiftChange.Tests
         /// </summary>
         internal static IEnumerator Swap(Scene scene, SwapLeg leg)
         {
-            Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, scene.OutfitStand);
-            scene.Colonist.jobs.StartJob(swap, JobCondition.InterruptForced, null,
-                resumeCurJobAfterwards: false, cancelBusyStances: true, null,
-                JobTag.ChangingApparel);
-            JobDriver started = scene.Colonist.jobs.curDriver;
+            JobDriver started = StartSwap(scene, c => leg.Ended = c, out string notStarted);
             if (started == null)
             {
-                leg.Why = "the change never started";
+                leg.Why = notStarted;
                 yield break;
             }
-            started.AddFinishAction(c => leg.Ended = c);
 
-            yield return GameClock.Run(() => scene.Colonist.jobs?.curDriver != started, MostTicks, leg.Clock);
+            yield return GameClock.Run(() => scene.Colonist.jobs?.curDriver != started, MostTicks, leg.Clock,
+                                       scene.Hold);
 
             if (!leg.Clock.Done)
             {
@@ -512,9 +568,46 @@ namespace ShiftChange.Tests
         /// </summary>
         internal static Pawn AnotherColonist(Story story, Scene scene, Gender gender, string nick)
         {
-            return AnotherColonist(story, scene, gender, nick,
-                                   scene.OutfitStand.Position + new IntVec3(2, 0, scene.Extras.Count + 1),
-                                   "beside the stand");
+            return AnotherColonist(story, scene, gender, nick, BesideTheStand(scene), "beside the stand");
+        }
+
+        /// <summary>
+        /// A free cell beside the scene's stand, inside the pad's edge, where an enclosed pad has
+        /// its wall. The stand stands one cell in from the pad's south-west corner
+        /// (<see cref="SceneKit.Stage"/>). First the next cell up the column two east of it, one
+        /// per extra so far, where the tests have always put another colonist; once that column
+        /// reaches the edge, or its cell is taken, the first free cell east of the stand.
+        /// </summary>
+        internal static IntVec3 BesideTheStand(Scene scene)
+        {
+            // The pad's inside, counted from the stand: one cell in from each edge.
+            int most = PadSize - 3;
+            IntVec3 stand = scene.OutfitStand.Position;
+            IntVec3 next = stand + new IntVec3(2, 0, scene.Extras.Count + 1);
+            if (scene.Extras.Count + 1 <= most && Free(scene, next))
+            {
+                return next;
+            }
+            for (int x = 2; x <= most; x++)
+            {
+                for (int z = 1; z <= most; z++)
+                {
+                    IntVec3 cell = stand + new IntVec3(x, 0, z);
+                    if (Free(scene, cell))
+                    {
+                        return cell;
+                    }
+                }
+            }
+            return next;
+        }
+
+        /// <summary>
+        /// Whether a pawn can be put on <paramref name="cell"/>: standable, and nobody on it.
+        /// </summary>
+        internal static bool Free(Scene scene, IntVec3 cell)
+        {
+            return cell.InBounds(scene.Map) && cell.Standable(scene.Map) && cell.GetFirstPawn(scene.Map) == null;
         }
 
         /// <summary>
