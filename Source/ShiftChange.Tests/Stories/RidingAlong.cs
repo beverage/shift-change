@@ -575,7 +575,7 @@ namespace ShiftChange.Tests
 
             void Body(Scene scene, Story story)
             {
-                if (!ModsConfig.IsActive("avilmask.CommonSense"))
+                if (!ModActive("avilmask.CommonSense"))
                 {
                     story.KnownGap(false, "Common Sense's haul of an ingredient ahead of a bill keeps a cook in uniform",
                         "Common Sense is not on this mod list; --with=avilmask.commonsense loads it");

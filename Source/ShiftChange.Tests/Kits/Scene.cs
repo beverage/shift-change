@@ -65,5 +65,19 @@ namespace ShiftChange.Tests
         /// this shape: it returns null when nothing is displaced.
         /// </summary>
         NonDisplacing,
+
+        /// <summary>
+        /// Stand: a club (<see cref="WeaponKit.MakeWeapon"/>) and nothing else. Colonist: shirt
+        /// and trousers, empty-handed. Stage it with a work type tagged Violent
+        /// (<see cref="WeaponKit.ArmedOnly"/> asks for Hunting), or a backstory can leave a
+        /// colonist who refuses every weapon.
+        /// </summary>
+        WeaponOnly,
+
+        /// <summary>
+        /// <see cref="NonDisplacing"/> with the club on the stand as well and the hand empty, for
+        /// the tests where an outfit and a weapon go out together.
+        /// </summary>
+        WeaponAndUniform,
     }
 }

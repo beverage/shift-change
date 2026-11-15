@@ -326,7 +326,8 @@ this mod (and the machine's own shim for running without a window), once with
 every DLC and once with Odyssey alone. Each run passes on DevTools' exit code
 together with the `Result: Passed` line it writes last in `Test.log`; its
 summary lists the failed and skipped tests and the totals. The Odyssey run skips
-one test more than the other, the recolor case, which needs Ideology. A push of
+two tests more than the other: the recolor case, which needs Ideology, and the
+jealous persona weapon case, which needs Royalty active. A push of
 only Markdown, `docs/` or `media/` starts no machine. The job needs the lab's
 secrets, so it never runs on a pull request: a fork's change is tested once its
 branch is pushed here.
@@ -555,7 +556,9 @@ set up with; and `Checks/`, the suite's checks of itself.
 | `Kits/VacuumKit.cs` | The vacuum staging every vacuum test shares, on the second map, which is a vacuum map: a ship of a room, open floor and a second room, its doors and its held air. |
 | `Kits/GiverTables.cs` | The tables of the game's work givers and jobs the tests read: which serve patients, which are left alone on purpose, which make deliveries, which jobs ride along. |
 | `Kits/SaveRoundTrip.cs` | What the save/load tests share: the save files and keys, the synchronous load (`Load`, through `NoteLoad`), and readers of the written file. |
-| `Kits/GameDefs.cs` | `WorkType` and `Giver`: the defs the tests name most, looked up by defName. |
+| `Kits/GameDefs.cs` | `WorkType`, `Giver` and `StatNamed`: the defs the tests name most, looked up by defName; `ModActive`, whether a mod is on the list. |
+| `Kits/WeaponKit.cs` | Weapon loans: arming a stand and a colonist (`ArmedOnly`, `ArmedWithUniform`), a loan through the real driver (`Lend`), the stand's weapon rows, and where each weapon ends up (`Settled`, `Untouched`, `Closed`). |
+| `Kits/ToolKit.cs` | Tool loans for the fixtures that need other mods: a stand holding the tool, the work that sends a colonist to it and its working step, the stats a tool raises, and Simple Sidearms' memory and switches, reached by reflection. |
 | `Checks/TestOrder.cs` | Checks that DevTools runs every fixture's tests once, in declaration order, at priorities of their own. |
 | `Checks/LoadNote.cs` | Checks how the save/load tests note a load that aborted: which log entries count as the load's own, and that the note applies only to the game that load made. |
 | `Stories/TheTestColony.cs` | What every test takes for granted about the colony it runs in: a colonist who needs no doctor, and open ground past the pad. Runs first. |
@@ -574,7 +577,13 @@ set up with; and `Checks/`, the suite's checks of itself.
 | `Stories/StayingInUniform.cs` | Work that keeps the uniform on away from the stand, in a radius, at bed and play, for the job they dressed for, on a delivery and as an urgent patient, and what changes them back. |
 | `Stories/StoringWhatTheyMade.cs` | Carrying what a bill made to a stockpile: when the trip keeps a crafter in uniform. |
 | `Stories/RidingAlong.cs` | Errands that ride along with the stand's work: feeding a patient, a meal run, hauls ahead of a bill, Common Sense and Pick Up And Haul. |
-| `Stories/SavingAndLoading.cs` | Saving and loading a stand in use, older saves, another mod's owner list and an allowed area. Runs last, on a world of its own. Deletes the saves it wrote once all four have run, except those a failed test used (`RemoveSaves`). |
+| `Stories/LendingAWeapon.cs` | A stand lending its weapon: the colonist's own in the pack, the weapon rows and stocking, and every check that keeps a weapon on the stand. |
+| `Stories/EndingALoan.cs` | Every way a loan ends: the trip back from each state, a stand burnt or boxed, a borrower banished or on no map, a map removed, and Outfit Stands Plus' job to put things back. |
+| `Stories/DraftingWithALoan.cs` | Drafting and undrafting a borrower: the trade between the stand's weapon and their own, and what holds it still. |
+| `Stories/DownedWithALoan.cs` | A borrower downed and back on their feet: what each weapon does, the fetch of both, and a trip back before or after it. |
+| `Stories/VanillaWeaponsExpandedTools.cs` | Only with Vanilla Weapons Expanded and Simple Sidearms loaded: the hammer and compound bow on a round trip, Simple Sidearms' memory and switches across a loan, and a weapon's hediff. |
+| `Stories/MedievalOverhaulTools.cs` | Only with Medieval Overhaul loaded: its pickaxe stocked by a hauler and on a round trip. |
+| `Stories/SavingAndLoading.cs` | Saving and loading a stand in use, older saves, another mod's owner list, an allowed area and a weapon loan. Runs last, on a world of its own. Deletes the saves it wrote once all five have run, except those a failed test used (`RemoveSaves`). |
 | `Stories/ButtonsAndOrders.cs` | The stand's switch and buttons, spares of parked clothes, and a recolor order on shift. |
 | `Stories/ReadingJobsAndRooms.cs` | What counts as recreation and sleep, the tables of rooms, jobs and buildings, the Work types window's sizing, and the room a job at a wall belongs to. |
 

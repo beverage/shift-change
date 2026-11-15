@@ -15,7 +15,8 @@ namespace ShiftChange.Tests
         /// <summary>
         /// What every test takes for granted about the colonist it is handed and the ground past
         /// the pad. Forty colonists in a row from <see cref="DebugTools_Fixtures.AveragePawn"/>
-        /// need no tending (<see cref="DebugTools_Fixtures.RemoveTendableConditions"/>). Untended
+        /// carry nothing in their pack, where a loan puts the colonist's own weapon, and need no
+        /// tending (<see cref="DebugTools_Fixtures.RemoveTendableConditions"/>). Untended
         /// asthma makes a colonist an urgent patient until the test colony removes it, which shows
         /// the removal is what keeps them out of bed. A cell of natural rock past the pad becomes
         /// open ground with a room under <see cref="SceneKit.OpenGround"/>. The margin
@@ -48,17 +49,23 @@ namespace ShiftChange.Tests
                             "the ring of cells around the pad reaches the map's edge, so a stand just outside "
                             + "the pad stands in the open (" + enclosed + " of those cells do not)");
 
+                int packed = 0;
                 int tending = 0;
                 for (int i = 0; i < 40; i++)
                 {
                     Pawn p = DebugTools_Fixtures.AveragePawn(Gender.Male, "Check");
+                    if (p.inventory.innerContainer.Count > 0)
+                    {
+                        packed++;
+                    }
                     if (p.health.HasHediffsNeedingTend())
                     {
                         tending++;
                     }
                     p.Destroy();
                 }
-                story.Check(tending == 0, "forty new test colonists in a row: none needs a doctor's tending");
+                story.Check(packed == 0, "forty new test colonists in a row: none carries anything in their pack");
+                story.Check(tending == 0, "and none needs a doctor's tending");
 
                 // Asthma stands for any condition a generated colonist arrives needing tended.
                 HediffDef asthma = DefDatabase<HediffDef>.GetNamedSilentFail("Asthma");

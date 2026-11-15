@@ -84,6 +84,14 @@ namespace ShiftChange.Tests
                 story.Check(scene.Comp.Covers(pastWall, scene.Map), "which reaches past the wall, as a radius does");
 
                 int ringCells = GenRadial.NumCellsInRadius(radius);
+                CellRect reach = Pad.ExpandedBy(PadReach);
+                bool inReach = true;
+                for (int i = 0; i <= ringCells; i++)
+                {
+                    inReach &= reach.Contains(at + GenRadial.RadialPattern[i]);
+                }
+                story.Check(inReach, "the ring and the first cell past it lie within the "
+                                     + PadReach + " cells past the pad that the map is sure to have");
                 int checkedCells = 0;
                 bool allIn = true;
                 for (int i = 0; i < ringCells; i++)
@@ -101,8 +109,9 @@ namespace ShiftChange.Tests
                     }
                 }
                 IntVec3 next = at + GenRadial.RadialPattern[ringCells];
-                story.Check(checkedCells > 0 && allIn,
-                            "every cell the ring outlines is covered (" + checkedCells + " checked)");
+                story.Check(checkedCells == ringCells && allIn,
+                            "every cell the ring outlines is covered (" + checkedCells + " of " + ringCells
+                            + " checked)");
                 story.Check(next.InBounds(scene.Map) && !scene.Comp.Covers(next, scene.Map),
                             "and the first cell past the ring is not");
                 story.Check(scene.Comp.Covers(at + new IntVec3(radius, 0, 0), scene.Map),

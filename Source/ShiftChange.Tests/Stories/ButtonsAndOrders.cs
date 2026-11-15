@@ -406,8 +406,10 @@ namespace ShiftChange.Tests
                 story.Check(JobGiver_OptimizeApparel.TryCreateRecolorJob(pawn, out _, dryRun: true),
                             "the styling station would recolor it");
 
-                story.Check(!OptimizerJob(pawn).IsValid,
-                            "on shift " + name + " does not go to dye the outfit unasked, though it is marked");
+                ThinkResult onShift = OptimizerJob(pawn);
+                story.Check(!onShift.IsValid,
+                            "on shift " + name + " does not go to dye the outfit unasked, though it is marked"
+                            + " (the optimizer gave " + Named(onShift) + ")");
                 story.Check(RefusedAtReservations(pawn, RecolorJob(pawn, ordered: false, names: null)),
                             "and a recolor they were not ordered to do is refused");
 
@@ -430,7 +432,8 @@ namespace ShiftChange.Tests
                 ThinkResult offShift = OptimizerJob(pawn);
                 story.Check(offShift.IsValid && offShift.Job.def == JobDefOf.RecolorApparel
                             && Reserves(pawn, offShift.Job),
-                            "off shift, " + name + " goes to recolor unasked, and can reserve the station and dye");
+                            "off shift, " + name + " goes to recolor unasked, and can reserve the station and dye"
+                            + " (the optimizer gave " + Named(offShift) + ")");
                 story.Check(RefusedAtReservations(pawn, RecolorJob(pawn, ordered: false, names: parked)),
                             "but recoloring the clothes on the stand is still refused");
             }
@@ -547,6 +550,12 @@ namespace ShiftChange.Tests
         }
 
         // What the recolor test builds and reads.
+
+        /// <summary>What the optimizer gave, for a failed check to name.</summary>
+        internal static string Named(ThinkResult result)
+        {
+            return result.IsValid ? result.Job.ToString() : "nothing";
+        }
 
         /// <summary>The optimizer's answer for this pawn now, its retry delay cleared.</summary>
         internal static ThinkResult OptimizerJob(Pawn pawn)

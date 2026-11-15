@@ -159,9 +159,9 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// Runs <paramref name="body"/> on a stand holding a duster and a colonist dressed per
-        /// <paramref name="kit"/> on its interaction cell (<see cref="Stage"/>), for a test that
-        /// steps the game's clock.
+        /// Runs <paramref name="body"/> on a stand stocked and a colonist dressed per
+        /// <paramref name="kit"/>, the colonist on its interaction cell (<see cref="Stage"/>,
+        /// <see cref="StageSays"/>), for a test that steps the game's clock.
         /// </summary>
         internal IEnumerator Staged(Func<Scene, Story, IEnumerator> body,
                                     StageKit kit = StageKit.Displacing, Gender gender = Gender.Male,
@@ -171,8 +171,9 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// Runs <paramref name="body"/> on a stand holding a duster and a colonist dressed per
-        /// <paramref name="kit"/> on its interaction cell (<see cref="Stage"/>), within one frame.
+        /// Runs <paramref name="body"/> on a stand stocked and a colonist dressed per
+        /// <paramref name="kit"/>, the colonist on its interaction cell (<see cref="Stage"/>,
+        /// <see cref="StageSays"/>), within one frame.
         /// </summary>
         internal IEnumerator Staged(Action<Scene, Story> body,
                                     StageKit kit = StageKit.Displacing, Gender gender = Gender.Male,
@@ -417,9 +418,7 @@ namespace ShiftChange.Tests
                     if (scene != null)
                     {
                         CurrentScene = scene;
-                        story.Check(true, "a stand holding a duster, and " + scene.Colonist.LabelShort
-                                          + " beside it in a shirt, trousers"
-                                          + (kit == StageKit.Displacing ? " and a parka" : ""));
+                        story.Check(true, StageSays(kit, scene.Colonist.LabelShort));
                         return scene;
                     }
                     // As in BuildFor: no retry, and nothing left on the pad.
@@ -438,6 +437,21 @@ namespace ShiftChange.Tests
                 ? "a stand and a colonist could be set up"
                 : "a stand and a colonist could be set up in " + BuildAttempts + " tries, last: " + last);
             return null;
+        }
+
+        /// <summary>What <see cref="Stage"/> sets up for <paramref name="kit"/>, in the game's words.</summary>
+        internal static string StageSays(StageKit kit, string name)
+        {
+            switch (kit)
+            {
+                case StageKit.WeaponOnly:
+                    return WeaponKit.ClubOnlyStand + ", and " + name + WeaponKit.BesideItEmptyHanded;
+                case StageKit.WeaponAndUniform:
+                    return WeaponKit.ClubAndDusterStand + ", and " + name + WeaponKit.BesideItEmptyHanded;
+                default:
+                    return "a stand holding a duster, and " + name + " beside it in a shirt, trousers"
+                           + (kit == StageKit.Displacing ? " and a parka" : "");
+            }
         }
 
         /// <summary>
