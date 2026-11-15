@@ -118,9 +118,9 @@ single pawn never completes a walk — step the game's clock (`GameClock`), neve
 completion silently becomes the pawn's *next* job — watch `jobs.curDriver`,
 never the job. The whole map ticks on the clock, so what a case arranged moves
 while a swap runs — Odyssey's air drifts between rooms, a spawned colonist
-wanders off, a Goto ends — and the case holds it (`Fixture.Hold`, `StayPut`,
+wanders off, a Goto ends — and the case holds it (`Scene.Hold`, `StayPut`,
 `WorkingAt`). A generated colonist is not tended, so one with asthma is an
-urgent patient — the fixture removes what it arrives needing tended. And the
+urgent patient — staging removes what it arrives needing tended. And the
 game brings pawns of its own: a test that kills or kidnaps the colony's last
 colonist brings the stranger in black, who hauls a test's items first, and the
 map spawns wild animals, which eat them — `ReadyPad` sends away every pawn a

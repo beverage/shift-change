@@ -72,10 +72,10 @@ fixture's tests in declaration order. It sorts a fixture's tests by priority
 with an unstable sort, which keeps equal tests in declaration order only up to
 16, so no fixture holds more than 16; one that would is split, which takes a new
 `CaseGroup` value and a fixture for it. One more DevTools test,
-`HarnessTestOrder`, reads the tests DevTools registered and fails unless every
+`TestOrder`, reads the tests DevTools registered and fails unless every
 fixture runs exactly the tests it declares, in declaration order, every fixture
 that plays the game runs at a priority of its own and `SavingAndLoading` at the
-lowest, and every test has a sentence of its own. Another, `HarnessLoadNote`,
+lowest, and every test has a sentence of its own. Another, `LoadNote`,
 checks how a save/load test's load notes an abort: which log entries it counts
 as its own, on queues it builds itself, and that the note applies only to the
 game that load made. A test runs on a pad only if it needs one, and the pad is
@@ -98,7 +98,7 @@ at the default interval a full pass writes no autosave, but at a player's
 shortest setting it writes all five. The tests in
 `ChangingAtAStand` and `KeepingThemDecent` let a frame pass every 250 ticks
 (`StoryFixture.Swap`); every other test that ticks steps the clock within its
-frame, through `SwapNow` (`HarnessFixtures.RunSwap`) or a bill's own steps
+frame, through `SwapNow` (`SceneKit.RunSwap`) or a bill's own steps
 (`GameClock.Step`). Three kinds of test needed what they arranged held in place
 first ("Five engine traps"). A change at the stand takes its garments' equip
 delays to the tick, 180 to 570 in these tests, the same in every run; with the
@@ -119,7 +119,7 @@ game logs by itself, which DevTools allows everywhere. The repeated-errors test
 (`RepeatedErrorsStopShiftChangeUntilTheNextGame`) allows, by text alone, the
 errors its own injected faults log. Every other
 allowance also needs a frame on the line's stack, so the same text from anywhere
-else still fails. Every fixture derives from `HarnessFixture`, which allows
+else still fails. Every fixture derives from `ShiftChangeFixture`, which allows
 lines other mods log by themselves on a full list, in whichever test is running,
 from those mods' own code: Melee Animation's late-load reports of patch
 conflicts and of weapons without its tweak data, Map Preview's note on another
@@ -219,7 +219,7 @@ the comment on its method under `Source/ShiftChange.Tests/`, and Test.log
 prints the cases in the order they run: the fixtures in `CaseGroup`'s order,
 `SavingAndLoading` last, and each fixture's tests in the order its file declares
 them. Every case is a story, in a fixture named for what a player sees
-(`WhoUsesAStand`, `ServingAnArea`, ...). The `Harness*` and `DebugTools_*` files
+(`WhoUsesAStand`, `ServingAnArea`, ...). The kits (`Kits/`)
 hold what the stories share: scenes, jobs and the pad.
 
 Most guard a bug that happened, and fail without its fix. Some instead assert a
@@ -274,7 +274,7 @@ runs as given, and its message goes up on screen once: a second order within the
 hour says nothing more, and a drafted move is warned about too
 (`AnOrderThroughVacuumOnlyWarns`). An emergency through vacuum sends a colonist in
 uniform back to change, and the same emergency inside does not
-(`AFireOutInVacuumWaitsForAChange`). On the harness's own map, the crafter in
+(`AFireOutInVacuumWaitsForAChange`). On DevTools' own map, the crafter in
 a vacsuit is dressed for a bill fetching from outside the room, as before
 (`OnAPlanetNothingChanges`).
 
@@ -547,7 +547,7 @@ reading our stand list, must offer what its own walk would, in the same order
 gap until `--with=` loads that mod.
 
 **Buttons and spares** (`ButtonsAndOrders`). The stand's buttons are read the way
-the gizmo bar gets them, without drawing (`HarnessGizmos`): the switch names what
+the gizmo bar gets them, without drawing (`GizmoKit`): the switch names what
 the stand serves (`TheSwitchSaysWhatTheStandServes`), and stands selected
 together keep their own buttons (`EachSelectedStandKeepsItsOwnButtons`). The
 parked-clothes tests are a pair that only means anything as one: a checked-out pawn refuses a spare duplicating the kit
@@ -568,9 +568,9 @@ turns on every installed expansion it has not seen, so that list has Ideology
 whenever it is installed. `--full` has it when the copied list does, and a
 runner that names every expansion as known has only the ones it activates.
 The case does not check that the order finishes and dyes anything: the pawn
-never walks under the harness, so it stops the job once it has started.
+never walks in the test, so it stops the job once it has started.
 
-**Tables and rooms** (`ReadingJobsAndRooms`, the tables in `HarnessTables`). Four cases need no map and check that
+**Tables and rooms** (`ReadingJobsAndRooms`, the tables in `GiverTables`). Four cases need no map and check that
 the static tables still match the def database, where every lookup is
 silent-fail and a renamed def empties its row with no error: the room-role
 table (`EveryKindOfRoomFindsItsWork`), the work of each giver that tends, feeds or
@@ -601,27 +601,27 @@ and one boxed and carried off every map, which keeps its binding
 (`AStandsAreaComesBackFromASave`). On the four-mod list the legacy-key test takes the key
 migration, and beside a foreign assignable it takes the decline and the
 reconcile instead; no other test reaches the decline. These tests replace
-`Current.Game`, so they run last of all; the summary of `DebugTools_SaveRoundTrip`,
+`Current.Game`, so they run last of all; the summary of `SaveRoundTrip`,
 which holds what they share, says what else follows from that. They write five
-saves (`shiftchange-harness-*`) into the Saves folder of the game they run in,
+saves (`shiftchange-test-*`) into the Saves folder of the game they run in,
 which from the Test Explorer is the player's own, and delete them once all four
 have run, except those a failed test used: those stay for a bug report, and
 Test.log names them and their folder (`SavingAndLoading.RemoveSaves`).
 
-**The harness itself.** `HarnessTestOrder` and `HarnessLoadNote`, above, run at
+**The suite itself.** `TestOrder` and `LoadNote`, above, run at
 the main menu before any test that plays. Each check signals DevTools as it is made,
 so the counts are DevTools' own and no test checks them.
 `HealthyColonistsAndOpenGround` (`TheTestColony`), run first, asserts what
-every other case takes for granted about its fixture. Forty colonists from the
-fixture in a row need no tending. Asthma makes a colonist an urgent patient
-until the fixture removes it. A cell of natural rock past the
+every other case takes for granted about its scene. Forty colonists staged in
+a row need no tending. Asthma makes a colonist an urgent patient until staging
+removes it. A cell of natural rock past the
 pad becomes ground with a room under `OpenGround`. "Five engine traps" says why
 each is there. It also checks that the margin around the pad is in rooms that
 touch the map edge. Six cases put a stand in the open, on the pad left unwalled
 or on the margin outside its door, and the mod tests "in the open" with
 `Room.TouchesMapEdge`. A generated map can put its centre in open ground cut off
 from the edge by rock, deep water or walls, where all six fail at once, so the
-pad finder (`DebugTools_LifecycleHarness.TryFindPad`) requires it, and this
+pad finder (`SceneKit.TryFindPad`) requires it, and this
 check names the cause should a pad ever land in such a place. Test.log says
 where the pad is.
 
@@ -636,10 +636,10 @@ where the pad is.
   `PreSwapMap` first, `StandAndColonistFlyTogether` does not), but no gravship is
   built or flown, so the area rebind is tested against an area re-created by
   hand on the same map, not one the landing copied. The cases that need a
-  second map use a pocket map (`HarnessFixtures.SecondMap`), and remove it with
+  second map use a pocket map (`SceneKit.SecondMap`), and remove it with
   `PocketMapUtility.DestroyPocketMap` where a takeoff would abandon the origin.
   Both reach the same map removal, but neither is a takeoff.
-- **The walk.** Fixtures stage the pawn on the stand's interaction cell, so
+- **The walk.** Scenes stage the pawn on the stand's interaction cell, so
   pathing and interruption mid-walk are untested. See the traps below.
 - **Mod compatibility.** `--full` proves the suite passes with one large mod
   list loaded — whichever one is active on the machine that ran it. It proves
@@ -671,7 +671,7 @@ where the pad is.
   wake-up case was written for. The fixture reaches "on a bed" by assigning
   `Position`, never by running a lay-down driver, so posture stays `NotLaying`
   and `InBed()` is false there for a second reason as well; a reverted guard
-  would not fire in the harness either, and the case would still pass. Catching
+  would not fire in the test either, and the case would still pass. Catching
   it needs a ticked lay-down job with a live driver, which these cases avoid
   because 1.6 pathing is async. The case does assert the two predicates'
   disagreeing answers side by side, so the trap is visible in the report to a
@@ -689,7 +689,7 @@ blockers that play had not.
 `GenSpawn.Spawn`, `Pawn.Kill`, `PawnBanishUtility.Banish`, the real
 `Patch_JobInterception.Prefix` and the real `JobDriver_SwapAtStand` — never our
 own comp handlers directly. Decision functions such as `TryInsertSwap`, the one
-the prefix calls, are driven directly where the decision is the claim. A harness
+the prefix calls, are driven directly where the decision is the claim. A test
 that hand-rolls the call sequence tests the author's model of the engine, and
 the first two traps below are cases where that model would have been wrong.
 
@@ -778,7 +778,7 @@ those potatoes failed the same check, because a pawn eating holds a claim on
 its food that no other pawn can reserve past
 (`PhysicalInteractionReservationManager`), whatever its faction. Every test on
 the pad now starts with no pawn but its own: `ReadyPad` sends every other away
-and Test.log names them (`HarnessFixture.SendAwayStrays`).
+and Test.log names them (`StoryFixture.SendAwayStrays`).
 
 ## Static checks
 
@@ -813,14 +813,14 @@ returns one of `StoryFixture`'s frames:
 | Frame | The body gets |
 |---|---|
 | `Staged(body, kit, gender)` | a stand holding a duster and a colonist beside it, from `Stage`; a body that changes at the stand (`Swap`) is an `IEnumerator` and steps the game's clock |
-| `Staged(build, scene, body)` | the fixture `build`, a `(map, pad) => Fixture`, sets up on the pad; `scene` says what that is, as the story's first line |
-| `OnThePad(body)` | DevTools' map and the pad, as `Map` and `Pad`, and no fixture |
-| `Told(body)` | no map, no pad and no camera move |
+| `Staged(build, description, body)` | the scene `build`, a `(map, pad) => Scene`, sets up on the pad; `description` says what that is, as the story's first line |
+| `OnThePad(body)` | DevTools' map and the pad, as `Map` and `Pad`, and no scene |
+| `Unstaged(body)` | no map, no pad and no camera move |
 
 A body that steps the clock within its frame changes at the stand with
-`SwapNow(story, fix)`, which notes where a change that gave up got stuck, and
-every fixture has `NotSentStraightBack(story, fix)` and `AnotherColonist(story,
-fix, gender, nick)` to hand. `SavingAndLoading` runs its bodies as the game runs
+`SwapNow(story, scene)`, which notes where a change that gave up got stuck, and
+every story fixture has `NotSentStraightBack(story, scene)` and
+`AnotherColonist(story, scene, gender, nick)` to hand. `SavingAndLoading` runs its bodies as the game runs
 a load (`Wrap`).
 
 Every frame clears the pad after the test, whatever it did. A fixture holds at
@@ -845,7 +845,7 @@ because `FindAvailableStand` walks `room.ContainedThings` and an open pad is the
 whole outdoors.
 
 A case that puts something past the pad takes the cell with
-`OpenGround(fix, cell)`, which clears it to bare soil and has `Teardown` clear
+`OpenGround(scene, cell)`, which clears it to bare soil and has `Teardown` clear
 it again. The pad finder checks one cell of margin around the pad, for ground in
 a room that touches the map edge, and no more, so further out a map can have
 natural rock, and anything left there stays on the map for every case after.
