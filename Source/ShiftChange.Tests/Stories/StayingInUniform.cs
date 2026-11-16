@@ -566,7 +566,7 @@ namespace ShiftChange.Tests
                         givers.Add(giver);
                     }
                 }
-                bool complexJobs = ModsConfig.IsActive("FrozenSnowFox.ComplexJobs");
+                bool complexJobs = ModActive("FrozenSnowFox.ComplexJobs");
                 int complexFound = 0;
                 if (complexJobs)
                 {

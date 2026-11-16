@@ -115,7 +115,17 @@ namespace ShiftChange
 
             if (OnShift && borrower != null)
             {
-                line += "\n" + "ShiftChange.InspectOnShift".Translate(borrower.LabelShort);
+                // A line each, since a stand lends either without the other: a weapon-only loan
+                // wears nothing, and a weapon out leaves nothing on the stand to show for it.
+                if (ClothesMoved)
+                {
+                    line += "\n" + "ShiftChange.InspectOnShift".Translate(borrower.LabelShort);
+                }
+                if (WeaponHands.Holds(borrower, issuedWeapon))
+                {
+                    line += "\n" + "ShiftChange.InspectWeaponOut".Translate(
+                        borrower.LabelShort, issuedWeapon.LabelNoParenthesis);
+                }
                 // A stand outside the borrower's allowed area is passed over by the return trip,
                 // so they keep the outfit on, and nothing else on screen says why. Asked live, so
                 // the line lifts when the area changes (docs/DESIGN.md, "Allowed areas").
@@ -131,7 +141,7 @@ namespace ShiftChange
                 // the storage filter, the setting that makes it work.
                 line += "\n" + "ShiftChange.InspectDepositOnly".Translate();
             }
-            else if (!HasWearable)
+            else if (!HasStock)
             {
                 line += "\n" + "ShiftChange.InspectEmpty".Translate();
             }

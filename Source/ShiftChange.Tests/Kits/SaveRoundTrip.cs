@@ -31,7 +31,7 @@ namespace ShiftChange.Tests
     internal static class SaveRoundTrip
     {
         /// <summary>
-        /// The five save files. They are deleted once the tests have all run, except those a
+        /// The six save files. They are deleted once the tests have all run, except those a
         /// failed test used, which stay to inspect (<see cref="SavingAndLoading.RemoveSaves"/>).
         /// </summary>
         internal const string SaveName = "shiftchange-test-roundtrip";
@@ -39,10 +39,15 @@ namespace ShiftChange.Tests
         internal const string ReSaveName = "shiftchange-test-resave";
         internal const string ForeignSaveName = "shiftchange-test-foreign";
         internal const string AreaSaveName = "shiftchange-test-area";
+        internal const string LoanSaveName = "shiftchange-test-loan";
 
         /// <summary>The keys an area binding scribes under.</summary>
         internal const string AreaKey = "shiftChangeServeArea";
         internal const string AreaLabelKey = "shiftChangeServeAreaLabel";
+
+        /// <summary>The keys a loan's two weapons scribe under.</summary>
+        internal const string IssuedWeaponKey = "shiftChangeIssuedWeapon";
+        internal const string OwnWeaponKey = "shiftChangeOwnWeapon";
 
         /// <summary>
         /// Our prefixed keys, and the generic keys <c>CompAssignableToPawn</c> writes, which

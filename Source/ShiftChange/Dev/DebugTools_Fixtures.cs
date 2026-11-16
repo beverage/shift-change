@@ -58,7 +58,8 @@ namespace ShiftChange
         /// discarded rolls leave nothing behind.
         ///
         /// The tests also rely on conditions it arrived needing tended being removed
-        /// (<see cref="RemoveTendableConditions"/>).
+        /// (<see cref="RemoveTendableConditions"/>), and on the pack it arrived with being
+        /// removed: beer is a melee weapon to the game, so Simple Sidearms can draw it.
         /// </summary>
         internal static Pawn AveragePawn(Gender gender, string nick, WorkTypeDef mustBeCapableOf = null)
         {
@@ -82,6 +83,7 @@ namespace ShiftChange
                 pawn = PawnGenerator.GeneratePawn(request);
             }
             RemoveTendableConditions(pawn);
+            pawn.inventory?.DestroyAll();
 
             pawn.Name = new NameTriple(gender == Gender.Female ? "Jane" : "John", nick, "Doe");
             pawn.story.traits.allTraits.Clear();
@@ -91,14 +93,16 @@ namespace ShiftChange
             // its ideoligion at random. Left in, such a precept would sometimes make the decency
             // cases stage a colonist that SwapPlan.PrefersNudity exempts. Removing the precept
             // keeps the ideoligion; KeepingThemDecent.NudistIsLeftUndressed arranges its own
-            // nudity by trait.
+            // nudity by trait. Alpha Memes' ban on all apparel goes too: its postfix on the
+            // wardrobe optimizer answers with a strip job for any pawn under it, whatever the
+            // giver said.
             if (ModsConfig.IdeologyActive && pawn.Ideo != null)
             {
                 List<Precept> nudity = new List<Precept>();
                 List<Precept> all = pawn.Ideo.PreceptsListForReading;
                 for (int i = 0; i < all.Count; i++)
                 {
-                    if (all[i].def.prefersNudity)
+                    if (all[i].def.prefersNudity || all[i].def.defName == "AM_Armour_Forbidden")
                     {
                         nudity.Add(all[i]);
                     }

@@ -7,6 +7,36 @@ posted on the Steam Workshop for that version, sorted into Added, Changed, Remov
 
 ## [Unreleased]
 
+### Added
+
+- Stands now hand out a weapon. The stand's weapon goes in the colonist's hand and whatever they
+  held goes in their pack, and changing back reverses it. A modded tool and a rifle work alike,
+  with no list and no setting. Sidearms are never touched. Requested by players.
+- A colonist drafted with a stand's weapon draws their own and puts the stand's in their pack, and
+  undrafting swaps them back. They keep the uniform on either way. A colonist with no weapon of
+  their own fights with the stand's.
+- The stand's inspect pane names the weapon out on loan and who has it.
+
+### Changed
+
+- A stand already holding a weapon starts handing it out. Vanilla's stands take no weapon unless
+  you turn weapons on in the storage tab or a colonist leaves one there, so this reaches only
+  those stands. To keep a weapon on display, set the stand to "Not used for shift changes".
+- A persona weapon on a stand goes only to the colonist bonded to it. Equipping one bonds it for
+  good, and a stand has nobody to ask first.
+- A persona weapon of a colonist's own goes in their pack like any other weapon. While it is
+  there, traits that work only in hand, such as painless or fast mover, stop until they change
+  back, and a kill made with the stand's weapon does nothing for its kill thirst.
+- A weapon that stacks stays on the stand, and one in a colonist's hand stays there.
+- A shared stand arms no slave, gives a Brawler no ranged weapon, and lends no weapon to a
+  colonist bonded to a jealous persona weapon, except that weapon to empty hands. Assign the stand
+  to that colonist and it lends to them anyway.
+- A new stand starts with the six rows at the top of its Weapons list on, so ticking a weapon is
+  enough to stock it. With those rows off, as vanilla builds a stand, the stand refuses the weapon
+  you ticked and no hauler comes. A new stand still takes apparel as before, and no weapon until
+  you tick one. A stand already built keeps its settings, so tick those six rows first or build a
+  new stand.
+
 ### Fixed
 
 - With Complex Jobs, a barn stand changed a colonist out of uniform before they fed a sick animal
@@ -17,8 +47,11 @@ posted on the Steam Workshop for that version, sorted into Added, Changed, Remov
 - With Rimatomics, an automatic stand took about four seconds of game time to notice its room
   taking a new role, such as a bed set to medical turning the room into a hospital, and while
   paused it waited for you to unpause. It notices at once now.
+- A stand destroyed inside its box left whoever had borrowed it with the uniform still forced on
+  them. It now lets them go.
 
-Unchanged: a stand in a prison cell serves only what you tick. Complex Jobs moves feeding
+Unchanged: a stand holding no weapon leaves the hand alone, and a stand set to Deposit only hands
+out no weapon. A stand in a prison cell serves only what you tick. Complex Jobs moves feeding
 prisoners from Warden to Nurse, or to its own Prison Care if you switch that on, so tick that
 beside Warden, or a warden changes out of uniform before carrying a meal to a prisoner.
 

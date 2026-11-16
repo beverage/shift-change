@@ -779,6 +779,111 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
+        /// Saves in the middle of a weapon loan, loads it, and checks that the stand's two
+        /// references came back to the same two weapons, its club in the colonist's hand and their
+        /// own autopistol in their pack. Then the loaded colonist changes back through the real
+        /// driver, since a reference that resolved to the wrong thing would pass a look at the
+        /// stand's record and fail only on the way home.
+        ///
+        /// <para>The stand holds a weapon and no clothes, so the weapon references are all that
+        /// keeps it on shift across the load. Its weapon rows go off before the save: a new stand
+        /// starts with them on, so finding them off after the load can only come from the save,
+        /// which is how a stand built before stands lent weapons keeps its settings.</para>
+        /// </summary>
+        [Test]
+        [TestDescription("a save in the middle of a weapon loan keeps both weapons where they were, "
+                         + "and the loan still ends")]
+        internal IEnumerator ASaveMidLoanKeepsBothWeapons()
+        {
+            return Unstaged(Body);
+
+            void Body(Story story)
+            {
+                Map map = Find.CurrentMap;
+                if (map == null || !TryFindPad(map, out IntVec3 origin))
+                {
+                    CannotStage(story, "the loaded map has a clear pad to set the stand up on");
+                    return;
+                }
+                Scene scene = WeaponKit.ArmedOnly(map, new CellRect(origin.x, origin.z, PadSize, PadSize));
+                if (scene == null)
+                {
+                    story.Check(false, "a stand holding a club and a colonist beside it could be set up");
+                    return;
+                }
+                story.Note(WeaponKit.ArmedOnlySays);
+                string name = scene.Colonist.LabelShort;
+                if (!WeaponKit.Lend(story, scene, out ThingWithComps issued, out ThingWithComps own))
+                {
+                    return;
+                }
+                story.Check(scene.Comp.issuedWeapon == issued && scene.Comp.ownWeapon == own,
+                            "the stand records the club it lent and the autopistol " + name + " put away");
+                scene.OutfitStand.GetStoreSettings().filter.SetAllow(ThingCategoryDefOf.Weapons, allow: false);
+                story.Note("the stand's weapon rows are switched off, which a new stand starts with on");
+
+                // Captured before the load: afterwards these objects belong to a disposed game.
+                IntVec3 standCell = scene.OutfitStand.Position;
+                int colonistID = scene.Colonist.thingIDNumber;
+                string issuedLoadID = issued.GetUniqueLoadID();
+                string ownLoadID = own.GetUniqueLoadID();
+
+                if (!TrySave(story, LoanSaveName, out string savePath))
+                {
+                    return;
+                }
+                string saved = File.ReadAllText(savePath);
+                story.Check(NodeContains(saved, IssuedWeaponKey, issuedLoadID),
+                            "the save names the club under " + IssuedWeaponKey);
+                story.Check(NodeContains(saved, OwnWeaponKey, ownLoadID),
+                            "and the autopistol under " + OwnWeaponKey);
+
+                Load(LoanSaveName);
+                story.Note("the game is loaded from " + LoanSaveName);
+                story.Check(!Logged(UnconsumedWarning),
+                            "the load resolved every reference it read: the log has no warning of any left over");
+
+                Building_OutfitStand loaded = FindStand(standCell);
+                if (loaded == null)
+                {
+                    MissingStand(story, "the stand is back at " + standCell + " after loading");
+                    return;
+                }
+                CompShiftStand ledger = loaded.TryGetComp<CompShiftStand>();
+                Pawn pawn = ledger?.Borrower;
+                if (!story.Check(pawn != null && pawn.thingIDNumber == colonistID,
+                                 "the loaded stand still lends to " + name))
+                {
+                    return;
+                }
+                ThingWithComps loadedIssued = ledger.issuedWeapon;
+                ThingWithComps loadedOwn = ledger.ownWeapon;
+                ThingFilter filter = loaded.GetStoreSettings().filter;
+                story.Check(ledger.OnShift, "the stand's shift is still on");
+                story.Check(!WeaponKit.WeaponRows().Any(row => filter.Allows(row)),
+                            "its weapon rows are still off, as it saved them");
+                story.Check(loadedIssued != null && loadedIssued.GetUniqueLoadID() == issuedLoadID
+                                && pawn.equipment.Primary == loadedIssued,
+                            "the club the stand records is the one in " + name + "'s hand");
+                story.Check(loadedOwn != null && loadedOwn.GetUniqueLoadID() == ownLoadID
+                                && pawn.inventory.innerContainer.Contains(loadedOwn),
+                            "and the autopistol it records is the one in their pack");
+                story.Check(CompShiftStand.OnShiftStandFor(pawn) == ledger,
+                            "the load put the loan back in " + name + "'s name");
+                if (loadedIssued == null || loadedOwn == null)
+                {
+                    return;
+                }
+
+                Scene home = new Scene { Map = loaded.Map, OutfitStand = loaded, Colonist = pawn, Comp = ledger };
+                story.Check(SwapNow(story, home), name + " changes back after the load");
+                story.Check(loaded.HeldWeapon == loadedIssued, "the club went back to the stand");
+                story.Check(pawn.equipment.Primary == loadedOwn, "the autopistol came out of their pack");
+                story.Check(!ledger.OnShift, "and the stand's record is cleared");
+            }
+        }
+
+        /// <summary>
         /// The test of an older save with no other mod's owner list beside Shift Change's: the
         /// key migration. The owner must arrive, and saving again must write it under Shift
         /// Change's own key.

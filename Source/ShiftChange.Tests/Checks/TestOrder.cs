@@ -103,10 +103,15 @@ namespace ShiftChange.Tests
                     }
                 }
             }
-            if (caseFixtures != Enum.GetValues(typeof(CaseGroup)).Length + 1)
+            // A fixture whose LoadIfModsActive names a mod this list lacks is never registered, so
+            // it is counted from its attribute, and only if it would have played the game.
+            int leftOut = typeof(ShiftChangeFixture).Assembly.GetTypes()
+                .Count(type => PlaysTheGame(type) && type.MissingRequiredMods());
+            if (caseFixtures != Enum.GetValues(typeof(CaseGroup)).Length + 1 - leftOut)
             {
                 problems.Add(caseFixtures + " fixtures that play the game registered, not one for each"
-                             + " CaseGroup and SavingAndLoading");
+                             + " CaseGroup and SavingAndLoading"
+                             + (leftOut > 0 ? ", less the " + leftOut + " whose mods are not on this list" : ""));
             }
             if (saveLoadPriority == null)
             {
@@ -122,6 +127,18 @@ namespace ShiftChange.Tests
             {
                 Test.Fail(string.Join("; ", problems));
             }
+        }
+
+        /// <summary>
+        /// Whether a type is a fixture of tests that play the game, read from its attribute's
+        /// argument, since DevTools keeps the attribute's own property internal.
+        /// </summary>
+        internal static bool PlaysTheGame(Type type)
+        {
+            CustomAttributeData fixture = type.GetCustomAttributesData()
+                .FirstOrDefault(a => a.AttributeType == typeof(TestFixtureAttribute));
+            return fixture != null && fixture.ConstructorArguments.Count == 1
+                   && Convert.ToInt32(fixture.ConstructorArguments[0].Value) == (int)TestType.Playing;
         }
     }
 }

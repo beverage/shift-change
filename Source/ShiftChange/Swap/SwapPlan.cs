@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Reflection;
 using RimWorld;
 using Verse;
 
@@ -528,13 +530,201 @@ namespace ShiftChange
         }
 
         /// <summary>
+        /// Can this pawn take this weapon in hand? The five checks vanilla's stand job makes
+        /// before it hands a weapon over, plus what our transfer needs: an equipment tracker, a
+        /// wardrobe, and a weapon that can be equipped at all, since
+        /// <c>Pawn_EquipmentTracker.AddEquipment</c> reads its <c>CompEquippable</c> unchecked.
+        ///
+        /// <para>Stricter than vanilla's stand in one place: a persona weapon goes only to the
+        /// pawn it is bonded to. Equipping one bonds it for good, and the player's equip order
+        /// asks first (<c>EquipmentUtility.GetPersonaWeaponConfirmationText</c>, whose test this
+        /// is). A stand has nobody to ask.</para>
+        ///
+        /// <para>A weapon that stacks stays put as well: <see cref="WeaponHands"/> tracks one
+        /// thing, and a stack can merge on the ground or come off the stand whole.</para>
+        /// </summary>
+        internal static bool CanWield(Pawn pawn, ThingWithComps weapon)
+        {
+            if (pawn?.equipment == null || pawn.apparel == null || weapon == null
+                || weapon.TryGetComp<CompEquippable>() == null || weapon.def.stackLimit > 1)
+            {
+                return false;
+            }
+            CompBladelinkWeapon persona = weapon.TryGetComp<CompBladelinkWeapon>();
+            if (persona != null && persona.Biocodable && persona.CodedPawn != pawn)
+            {
+                return false;
+            }
+            if (weapon.def.IsWeapon && pawn.WorkTagIsDisabled(WorkTags.Violent))
+            {
+                return false;
+            }
+            if (weapon.def.IsRangedWeapon && pawn.WorkTagIsDisabled(WorkTags.Shooting))
+            {
+                return false;
+            }
+            if (!pawn.health.capacities.CapableOf(PawnCapacityDefOf.Manipulation))
+            {
+                return false;
+            }
+            if (pawn.IsQuestLodger() && !EquipmentUtility.QuestLodgerCanEquip(weapon, pawn))
+            {
+                return false;
+            }
+            return EquipmentUtility.CanEquip(weapon, pawn, out _);
+        }
+
+        /// <summary>
+        /// May the pawn's hand give way to <paramref name="issued"/>, its weapon going to their
+        /// pack? Not for one that <c>GenDrop</c> destroys or merges into a stack, since a hand is
+        /// emptied by a drop, and not for the same def, which would gain nothing. A persona weapon
+        /// gives way like any other; what a jealous one costs is <see cref="NeedsAssigning"/>'s.
+        /// A quest lodger's weapon they may not unequip is <see cref="CanWield"/>'s to refuse.
+        /// </summary>
+        internal static bool HandAllows(Pawn pawn, ThingWithComps issued)
+        {
+            ThingWithComps hand = pawn.equipment.Primary;
+            return hand == null
+                   || (!hand.def.destroyOnDrop
+                       && hand.def.stackLimit == 1
+                       && hand.def != issued.def);
+        }
+
+        /// <summary>
+        /// The stand's weapon this pawn would take in hand, or null. A deposit-only stand hands
+        /// nothing out, and a shared stand holds back what <see cref="NeedsAssigning"/> names.
+        /// The selector and the driver both ask here, the driver again on arrival, so they agree
+        /// on who gets it.
+        /// </summary>
+        internal static ThingWithComps WeaponToIssue(Pawn pawn, Building_OutfitStand stand)
+        {
+            if (stand == null || IsDepositOnly(stand))
+            {
+                return null;
+            }
+            ThingWithComps weapon = stand.HeldWeapon;
+            if (!CanWield(pawn, weapon) || !HandAllows(pawn, weapon))
+            {
+                return null;
+            }
+            return !NeedsAssigning(pawn, weapon)
+                   || stand.TryGetComp<CompShiftStand>()?.IsAssignedTo(pawn) == true
+                ? weapon
+                : null;
+        }
+
+        /// <summary>
+        /// Would handing this weapon over want the player's say-so? A stand has nobody to ask, so
+        /// assigning it to the pawn is the answer. An armed slave rebels four times as soon
+        /// (<c>SlaveRebellionUtility</c>, tools included), a Brawler holding a ranged weapon
+        /// loses mood, which vanilla's stand warns of in its equip order, and so does a pawn whose
+        /// jealous persona weapon sees them take up another (<see cref="AngersJealousPersona"/>).
+        /// </summary>
+        internal static bool NeedsAssigning(Pawn pawn, ThingWithComps weapon)
+        {
+            return pawn.IsSlave
+                   || (weapon.def.IsRangedWeapon
+                       && pawn.story?.traits?.HasTrait(TraitDefOf.Brawler) == true)
+                   || AngersJealousPersona(pawn, weapon);
+        }
+
+        /// <summary>
+        /// Would a loan of this weapon have the pawn take up one that is not their bonded persona
+        /// weapon, while that weapon has a trait that answers it? While Royalty is active,
+        /// <c>Pawn_EquipmentTracker.Notify_EquipmentAdded</c> tells the pawn's bonded weapon of
+        /// every primary they equip, wherever the bonded one lies, and each trait's worker hears it
+        /// through <c>WeaponTraitWorker.Notify_OtherWeaponWielded</c>. Royalty's Jealous trait
+        /// answers with a mood penalty that lasts a day or until the bonded weapon is back in hand,
+        /// and only for a pawn with a mood. A worker from another mod that overrides the same hook
+        /// counts whatever it does. A loan equips the stand's weapon, then the pawn's own on a
+        /// draft and on the change back, so only the persona weapon itself, lent to an empty hand,
+        /// equips nothing else. Traits are read by their worker class, which instantiates nothing.
+        /// </summary>
+        internal static bool AngersJealousPersona(Pawn pawn, ThingWithComps weapon)
+        {
+            Thing bonded = pawn.equipment?.bondedWeapon;
+            if (!ModsConfig.RoyaltyActive || bonded == null || bonded.Destroyed
+                || (bonded == weapon && pawn.equipment.Primary == null))
+            {
+                return false;
+            }
+            List<WeaponTraitDef> traits = bonded.TryGetComp<CompBladelinkWeapon>()?.TraitsListForReading;
+            if (traits == null)
+            {
+                return false;
+            }
+            for (int i = 0; i < traits.Count; i++)
+            {
+                Type worker = traits[i].workerClass;
+                if (AnswersAnotherWeapon(worker)
+                    && (pawn.needs?.mood != null || !typeof(WeaponTraitWorker_Jealous).IsAssignableFrom(worker)))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>Each trait worker class read by <see cref="AnswersAnotherWeapon"/>.</summary>
+        internal static readonly Dictionary<Type, bool> WorkersThatAnswer = new Dictionary<Type, bool>();
+
+        /// <summary>
+        /// Does this trait worker class override <c>WeaponTraitWorker.Notify_OtherWeaponWielded</c>,
+        /// the hook the equipment tracker calls when the bonded pawn equips another weapon? A class
+        /// that only inherits it does nothing there. Read once per class.
+        /// </summary>
+        internal static bool AnswersAnotherWeapon(Type worker)
+        {
+            if (worker == null)
+            {
+                return false;
+            }
+            if (!WorkersThatAnswer.TryGetValue(worker, out bool answers))
+            {
+                MethodInfo hook = worker.GetMethod(nameof(WeaponTraitWorker.Notify_OtherWeaponWielded),
+                                                   BindingFlags.Public | BindingFlags.Instance, null,
+                                                   new[] { typeof(CompBladelinkWeapon) }, null);
+                answers = hook != null && hook.DeclaringType != typeof(WeaponTraitWorker);
+                WorkersThatAnswer[worker] = answers;
+            }
+            return answers;
+        }
+
+        /// <summary>
+        /// The pack weapon a change of draft brings out: the pawn's own on drafting, the stand's
+        /// on undrafting. It takes over from the other one or an empty hand, and anything else
+        /// in the hand was the pawn's choice and stays. A persona weapon trades like any other: a
+        /// loan that would anger a jealous one opened only on a stand assigned to the pawn
+        /// (<see cref="AngersJealousPersona"/>). Null when nothing should move. The setter also
+        /// runs inside downing and on a pawn mid-break, so only a spawned pawn on their feet and
+        /// in their right mind trades weapons.
+        /// </summary>
+        internal static ThingWithComps WeaponForDraft(Pawn pawn, CompShiftStand comp, bool drafted)
+        {
+            if (!pawn.Spawned || pawn.Downed || pawn.InMentalState)
+            {
+                return null;
+            }
+            ThingWithComps incoming = drafted ? comp.ownWeapon : comp.issuedWeapon;
+            ThingWithComps outgoing = drafted ? comp.issuedWeapon : comp.ownWeapon;
+            ThingWithComps hand = pawn.equipment?.Primary;
+            bool inPack = incoming != null && pawn.inventory != null
+                          && pawn.inventory.innerContainer.Contains(incoming);
+            return inPack && (hand == null || hand == outgoing) ? incoming : null;
+        }
+
+        /// <summary>
         /// Cheap yes/no for the stand selector: would sending this pawn here accomplish
         /// anything? Builds the plan into the shared scratch lists, so it stands only until the
         /// next call. Safe because the selector runs to completion before any job is started.
+        /// The lists hold apparel alone, so the vacuum check that reads them sees a weapon-only
+        /// plan as changing nothing.
         /// </summary>
         public static bool WouldDress(Pawn pawn, Building_OutfitStand stand)
         {
-            return BuildDress(pawn, stand, ScratchWear, ScratchStore);
+            // BuildDress first and always: the callers read what it leaves in the lists.
+            bool dresses = BuildDress(pawn, stand, ScratchWear, ScratchStore);
+            return dresses || WeaponToIssue(pawn, stand) != null;
         }
     }
 }

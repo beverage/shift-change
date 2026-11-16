@@ -21,5 +21,21 @@ namespace ShiftChange.Tests
         {
             return DefDatabase<WorkGiverDef>.GetNamedSilentFail(defName);
         }
+
+        /// <summary>A stat, such as <c>MiningSpeed</c>, or null when no loaded mod defines it.</summary>
+        internal static StatDef StatNamed(string defName)
+        {
+            return DefDatabase<StatDef>.GetNamedSilentFail(defName);
+        }
+
+        /// <summary>
+        /// Whether a mod is on this list, by packageId in any case. A Workshop copy installed
+        /// beside a local one of the same packageId is active under a <c>_steam</c> suffix, which
+        /// <c>ModsConfig.IsActive</c> does not match.
+        /// </summary>
+        internal static bool ModActive(string packageId)
+        {
+            return ModLister.GetActiveModWithIdentifier(packageId, ignorePostfix: true) != null;
+        }
     }
 }

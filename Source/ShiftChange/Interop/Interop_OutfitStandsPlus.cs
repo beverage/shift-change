@@ -10,7 +10,7 @@ namespace ShiftChange
     /// Outfit Stands Plus scales swap time by a factor from its settings, one for powered and
     /// one for unpowered stands, through <c>OutfitStandsPlusMainComp.ApplyEquipSpeedFactor</c>.
     /// Its comp sits on vanilla's stands as well as its own. This applies the same factor to a
-    /// shift change, so it is never slower than a manual swap at the same stand.
+    /// shift change, so it gets the speed-up a manual swap at the same stand gets.
     /// No assembly reference: the type is found by name, and the bridge does nothing when the
     /// mod is absent or has renamed or reshaped the comp. An exception thrown inside their code
     /// turns the bridge off for the session instead of failing the swap.

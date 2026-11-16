@@ -91,21 +91,25 @@ sees (docs/TESTING.md, "Adding a case").
 
 It asserts where the ledger lands after each despawn/death/banishment event, by
 firing the engine's real entry points at a throwaway fixture, and exits non-zero
-if a case fails. Touch `PostDeSpawn`, `PostSwapMap`, `Notify_MapRemoved`,
-`ReleaseBorrower`, `AbandonLedger` or `Patch_UnclaimStands` and run it.
+if a case fails. Touch `PostDeSpawn`, `PostDestroy`, `PostSwapMap`, `Notify_MapRemoved`,
+`ReleaseBorrower`, `AbandonLedger`, `Patch_UnclaimStands` or `Patch_DraftClearsDressBlock`
+and run it.
 
 A harness pass is not a play observation, and a skipped test (a `GAP` line in
-its story) is a known failure being tracked, not a pass. **Six gaps are expected on the default list**: the
+its story) is a known failure being tracked, not a pass. **Seven gaps are expected on the default list**: the
 Rimatomics table and marker cases skip themselves when Rimatomics is not
-loaded, and the Outfit Stands Plus, Common Sense and Pick Up And Haul cases
-when their mod is not (`--with=` loads each). The sixth is Complex Jobs'
-two delivery givers, probed by the delivery case only when that mod is loaded
-(`--with=FrozenSnowFox.ComplexJobs`). So a clean default run reads
-`0 Failed` with 6 skipped and exits 0, or 5 skipped under
-`--with=FrozenSnowFox.ComplexJobs`, where the delivery gap closes. Any other gap, or any failure, is real. It does now run
+loaded, and the two Outfit Stands Plus cases and the Common Sense and Pick Up
+And Haul cases when their mod is not (`--with=` loads each). The seventh is
+Complex Jobs' two delivery givers, probed by the delivery case only when that
+mod is loaded (`--with=FrozenSnowFox.ComplexJobs`). So a clean default run reads
+`0 Failed` with 7 skipped and exits 0, or 6 skipped under
+`--with=FrozenSnowFox.ComplexJobs`, where the delivery gap closes. The Vanilla
+Weapons Expanded and Medieval Overhaul tool fixtures register only with their
+mods loaded, so they add no gap to a list without them (docs/TESTING.md,
+"Running it"). Any other gap, or any failure, is real. It does now run
 `JobDriver_SwapAtStand` for real, through the pawn's own tracker, so "the
 driver builds a correct ledger" is covered, and the player-facing rules have
-functional cases. Save/load round trips are covered by four cases that load
+functional cases. Save/load round trips are covered by five cases that load
 through the engine's synchronous loader (`SavedGameLoaderNow`;
 `GameDataSaveLoader.LoadGame` is async and never returns control) and assert on
 the written file as well as the loaded state. They run last, since they replace

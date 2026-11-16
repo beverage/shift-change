@@ -65,4 +65,41 @@
     </match>
   </Operation>
 
+  <!-- A new stand starts with the six special filters of its Weapons list on, so a weapon's
+       own row is enough to stock it. The default filter disallows Weapons, which turns these
+       six off with the category, and every weapon matches some of them: the row reads ticked
+       and the stand refuses the weapon. specialFiltersToAllow resolves after
+       disallowedCategories, and it moves nothing else. Weapon defs stay disallowed, so a new
+       stand wants no weapon until a player ticks one, and apparel has rows of its own.
+
+       On the abstract base, so every stand inheriting this default gets it. A built stand
+       saves its own filter and keeps what it has. Ensure, then append, as with comps above. -->
+  <Operation Class="PatchOperationConditional">
+    <xpath>/Defs/ThingDef[@Name="OutfitStandBase"]/building/defaultStorageSettings/filter</xpath>
+    <match Class="PatchOperationConditional">
+      <xpath>/Defs/ThingDef[@Name="OutfitStandBase"]/building/defaultStorageSettings/filter/specialFiltersToAllow</xpath>
+      <nomatch Class="PatchOperationAdd">
+        <xpath>/Defs/ThingDef[@Name="OutfitStandBase"]/building/defaultStorageSettings/filter</xpath>
+        <value>
+          <specialFiltersToAllow />
+        </value>
+      </nomatch>
+    </match>
+  </Operation>
+
+  <Operation Class="PatchOperationConditional">
+    <xpath>/Defs/ThingDef[@Name="OutfitStandBase"]/building/defaultStorageSettings/filter/specialFiltersToAllow</xpath>
+    <match Class="PatchOperationAdd">
+      <xpath>/Defs/ThingDef[@Name="OutfitStandBase"]/building/defaultStorageSettings/filter/specialFiltersToAllow</xpath>
+      <value>
+        <li>AllowSmeltable</li>
+        <li>AllowNonSmeltableWeapons</li>
+        <li>AllowBurnableWeapons</li>
+        <li>AllowNonBurnableWeapons</li>
+        <li>AllowBiocodedWeapons</li>
+        <li>AllowNonBiocodedWeapons</li>
+      </value>
+    </match>
+  </Operation>
+
 </Patch>

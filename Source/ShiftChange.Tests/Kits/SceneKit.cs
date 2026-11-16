@@ -45,10 +45,18 @@ namespace ShiftChange.Tests
         internal const int PadSize = 7;
 
         /// <summary>
+        /// How far past the pad's edge the tests reach, and so how far inside the map's edge the
+        /// pad must lie: the ring of radius 5 that
+        /// <see cref="ServingARoomOrARing.TheRingShowsWhatARadiusCovers"/> draws around a stand one
+        /// cell in from the pad's corner, and the first cell past it, run 4 cells out.
+        /// </summary>
+        internal const int PadReach = 4;
+
+        /// <summary>
         /// Somewhere the tests can stand: the map centre if usable, so runs are comparable, and a
         /// random cell otherwise. The pad is cleared before
-        /// use, so the bar is a pad in bounds whose origin is standable and not water, not an
-        /// empty one.
+        /// use, so the bar is a pad <see cref="PadReach"/> cells inside the map's edge whose
+        /// origin is standable and not water, not an empty one.
         ///
         /// <para>Every cell of the pad and its one-cell margin must be in a room that touches the
         /// map edge. Tests reach past their pad: the exterior-wall test counts the ring around a
@@ -74,7 +82,7 @@ namespace ShiftChange.Tests
             Predicate<IntVec3> usable = c =>
             {
                 CellRect pad = new CellRect(c.x, c.z, PadSize, PadSize);
-                if (!pad.ExpandedBy(1).InBounds(map)
+                if (!pad.ExpandedBy(PadReach).InBounds(map)
                     || !c.Standable(map)
                     || c.GetTerrain(map).IsWater)
                 {
@@ -395,10 +403,11 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// A stand stocked with a duster and a pawn dressed per <paramref name="kit"/> on its
-        /// interaction cell, with no ledger yet: tests that watch the driver build one start here
-        /// and call <see cref="RunSwap"/>. The stand sits one cell in from the pad's south-west
-        /// corner. Null when the stand def, the duster or the comp cannot be had.
+        /// A stand stocked per <paramref name="kit"/>, a duster, a club or both, and a pawn dressed
+        /// per <paramref name="kit"/> on its interaction cell, with no ledger yet: tests that watch
+        /// the driver build one start here and call <see cref="RunSwap"/>. The stand sits one cell
+        /// in from the pad's south-west corner. Null when the stand def, the duster, the club or
+        /// the comp cannot be had.
         /// </summary>
         internal static Scene Stage(Map map, CellRect pad, StageKit kit,
                                       bool enclose = false, WorkTypeDef capableOf = null,
@@ -418,7 +427,12 @@ namespace ShiftChange.Tests
 
             Building_OutfitStand stand = (Building_OutfitStand)DebugTools_Fixtures.Spawn(
                 map, standDef, ThingDefOf.WoodLog, standCell, Rot4.North);
-            if (!StockOne(stand, "Apparel_Duster"))
+            if (kit != StageKit.WeaponOnly && !StockOne(stand, "Apparel_Duster"))
+            {
+                return null;
+            }
+            bool armed = kit == StageKit.WeaponOnly || kit == StageKit.WeaponAndUniform;
+            if (armed && !stand.TryAddHeldWeapon(WeaponKit.MakeWeapon()))
             {
                 return null;
             }
@@ -429,6 +443,10 @@ namespace ShiftChange.Tests
             // a whole class of stand configurations that strip a woman.
             Pawn pawn = DebugTools_Fixtures.AveragePawn(gender, "Test", capableOf);
             pawn.apparel?.DestroyAll();
+            if (armed)
+            {
+                pawn.equipment?.DestroyAllEquipment();
+            }
             if (capableOf != null)
             {
                 pawn.workSettings?.EnableAndInitialize();
@@ -566,15 +584,18 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// Strips a scene's stand to empty, so a test can state what it holds instead of working
-        /// around the duster <see cref="Stage"/> stocks.
+        /// Strips a scene's stand to empty, held weapon included, so a test can state what it
+        /// holds instead of working around what <see cref="Stage"/> stocks.
         /// </summary>
         internal static void ClearStand(Building_OutfitStand stand)
         {
             while (stand.HeldItems.Count > 0)
             {
                 Thing held = stand.HeldItems[0];
-                if (!stand.RemoveApparel(held as Apparel))
+                bool removed = held is Apparel apparel
+                    ? stand.RemoveApparel(apparel)
+                    : stand.RemoveHeldWeapon(held);
+                if (!removed)
                 {
                     break;
                 }
@@ -723,6 +744,7 @@ namespace ShiftChange.Tests
                       .Append(scene.Colonist.GetLord() == null
                               ? "none" : scene.Colonist.GetLord().LordJob.GetType().Name)
                       .Append(", onShift ").Append(scene.Comp.OnShift)
+                      .Append(", downed ").Append(scene.Colonist.Downed)
                       .Append(", rest ")
                       .Append(scene.Colonist.needs?.rest == null
                               ? "none" : scene.Colonist.needs.rest.CurLevelPercentage.ToStringPercent())
@@ -956,7 +978,9 @@ namespace ShiftChange.Tests
         /// <summary>
         /// Removes a <see cref="SecondMap"/>, destroying any pawn still on it first: map removal
         /// passes the pawns it finds to the world (<c>MapDeiniter.PassPawnsToWorld</c>), which
-        /// would keep a scene's colonist in the game after the test.
+        /// would keep a scene's colonist in the game after the test. A test checking what that
+        /// passage does sets <paramref name="keepPawns"/>, and <see cref="Teardown"/> destroys the
+        /// scene's colonist from the world.
         ///
         /// <para>It also drops the redraw the map queued for itself. A new map asks for its first
         /// full redraw once the long event it was made in is over (<c>Map.FinalizeInit</c>, through
@@ -966,13 +990,13 @@ namespace ShiftChange.Tests
         /// index and this map's entries sit after the running test's, so removing them is safe.
         /// With no long event running nothing is queued, since the redraw then runs at once.</para>
         /// </summary>
-        internal static void RemoveSecondMap(Map away)
+        internal static void RemoveSecondMap(Map away, bool keepPawns = false)
         {
             List<Action> queued = AccessTools.Field(typeof(LongEventHandler), "toExecuteWhenFinished")
                 ?.GetValue(null) as List<Action>;
             queued?.RemoveAll(action => action != null && action.Target == away);
 
-            List<Pawn> left = away.mapPawns.AllPawns.ToList();
+            List<Pawn> left = keepPawns ? new List<Pawn>() : away.mapPawns.AllPawns.ToList();
             for (int i = 0; i < left.Count; i++)
             {
                 CompShiftStand.OnShiftStands.Remove(left[i]);
@@ -992,6 +1016,15 @@ namespace ShiftChange.Tests
         /// </summary>
         internal static Scene BuildOnSecondMap(Map map, CellRect pad)
         {
+            return OnSecondMap(map, Build);
+        }
+
+        /// <summary>
+        /// A scene <paramref name="make"/> sets up on a <see cref="SecondMap"/>, given that map
+        /// and a pad at its centre. Null, with the map gone again, when it cannot be set up.
+        /// </summary>
+        internal static Scene OnSecondMap(Map map, Func<Map, CellRect, Scene> make)
+        {
             Map away = SecondMap(map);
             if (away == null)
             {
@@ -1000,7 +1033,7 @@ namespace ShiftChange.Tests
             Scene scene = null;
             try
             {
-                scene = Build(away, CellRect.CenteredOn(away.Center, PadSize / 2));
+                scene = make(away, CellRect.CenteredOn(away.Center, PadSize / 2));
             }
             finally
             {

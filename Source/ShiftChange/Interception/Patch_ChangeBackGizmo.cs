@@ -115,16 +115,52 @@ namespace ShiftChange
     /// changes. The setter also fires on undrafting, which is harmless: the latch is only ever
     /// set by the button, and a second clear is a no-op. It does not change what drafting does
     /// to a uniform; a pawn drafted in whites stays in whites.
+    ///
+    /// <para>A pawn with a weapon on loan also trades it for their own when drafted, and trades
+    /// back when undrafted, so nobody goes to a fight holding a forge hammer with a rifle in
+    /// their pack. Reads neither interception switch: it is keyed on the ledger, and a pawn on
+    /// a loan needs it whatever those say.</para>
     /// </summary>
     [HarmonyPatch(typeof(Pawn_DraftController), nameof(Pawn_DraftController.Drafted), MethodType.Setter)]
     public static class Patch_DraftClearsDressBlock
     {
-        // ReSharper disable once InconsistentNaming — Harmony field injection.
-        public static void Postfix(Pawn ___pawn)
+        /// <summary>Keeps the old value: the postfix runs on a set that changes nothing as well,
+        /// and a flier or a gravship landing makes one.</summary>
+        // ReSharper disable once InconsistentNaming — Harmony injection.
+        public static void Prefix(Pawn_DraftController __instance, out bool __state)
         {
-            if (___pawn != null)
+            __state = __instance.Drafted;
+        }
+
+        // ReSharper disable once InconsistentNaming — Harmony injection.
+        public static void Postfix(Pawn ___pawn, bool value, bool __state)
+        {
+            if (___pawn == null)
             {
-                Patch_JobInterception.ChangedBackAt.Remove(___pawn);
+                return;
+            }
+            Patch_JobInterception.ChangedBackAt.Remove(___pawn);
+            if (value != __state)
+            {
+                TradeWeapons(___pawn, value);
+            }
+        }
+
+        /// <summary>Caught, since a throw here would land in whatever set the draft, downing
+        /// among them.</summary>
+        internal static void TradeWeapons(Pawn pawn, bool drafted)
+        {
+            try
+            {
+                CompShiftStand comp = CompShiftStand.OnShiftStandFor(pawn);
+                if (comp != null)
+                {
+                    WeaponHands.Exchange(pawn, SwapPlan.WeaponForDraft(pawn, comp, drafted));
+                }
+            }
+            catch (System.Exception e)
+            {
+                Log.Error("[ShiftChange] failed to trade weapons for " + pawn.LabelShort + ": " + e);
             }
         }
     }

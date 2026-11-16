@@ -31,6 +31,18 @@ namespace ShiftChange.Tests
         StayingInUniform,
         StoringWhatTheyMade,
         RidingAlong,
+        LendingAWeapon,
+        EndingALoan,
+        DraftingWithALoan,
+        DownedWithALoan,
+
+        /// <summary>
+        /// Loaded only with Vanilla Weapons Expanded and Simple Sidearms on the list
+        /// (<c>LoadIfModsActive</c>), as the next is only with Medieval Overhaul, so either may
+        /// be missing from a run (<see cref="TestOrder"/>).
+        /// </summary>
+        VanillaWeaponsExpandedTools,
+        MedievalOverhaulTools,
     }
 
     /// <summary>

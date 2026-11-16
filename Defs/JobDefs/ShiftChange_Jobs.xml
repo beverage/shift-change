@@ -6,7 +6,7 @@
   <JobDef>
     <defName>ShiftChange_SwapAtStand</defName>
     <driverClass>ShiftChange.JobDriver_SwapAtStand</driverClass>
-    <reportString>changing clothes at TargetA.</reportString>
+    <reportString>changing at TargetA.</reportString>
     <casualInterruptible>false</casualInterruptible>
   </JobDef>
 

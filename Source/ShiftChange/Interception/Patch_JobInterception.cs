@@ -233,6 +233,18 @@ namespace ShiftChange
                     }
                     return false;
                 }
+                // Taking the weapon on loan back up, after a downing dropped it, is part of the
+                // loan. A change back first would close the loan with the weapon on the ground,
+                // and the fetch queued behind it would then make the stand's weapon their own.
+                if (FetchesLentWeapon(job, onShift))
+                {
+                    if (Verbose)
+                    {
+                        Log.Message($"[ShiftChange] {pawn.LabelShort} keeps the outfit on to take " +
+                                    $"{onShift.parent.LabelShort}'s weapon back up");
+                    }
+                    return false;
+                }
                 return ReturnTrip(job, tag, c, pawn, tracker, onShift, target, map);
             }
 
@@ -338,6 +350,17 @@ namespace ShiftChange
             // If the directions disagree, a pawn walks between stand and work forever. By the
             // recreation class, not the kind, so VisitSickPawn, which is Work, is read B-first.
             return c.RecreationJob ? JoyTargetPlace(job, map) : TargetPlace(job, map);
+        }
+
+        /// <summary>
+        /// Whether <paramref name="job"/> equips the weapon <paramref name="onShift"/> has lent
+        /// the pawn. Vanilla gives that job to a colonist who gets up where they went down, for
+        /// the weapon that fell from their hand (<c>JobGiver_PickupDroppedWeapon</c>).
+        /// </summary>
+        internal static bool FetchesLentWeapon(Job job, CompShiftStand onShift)
+        {
+            return job.def == JobDefOf.Equip && onShift.issuedWeapon != null
+                   && job.targetA.Thing == onShift.issuedWeapon;
         }
 
         /// <summary>Change the on-shift pawn back first, or let the uniform ride along.</summary>

@@ -148,6 +148,19 @@ That is the order `loadAfter` in About.xml warns against, and a warning is all
 it is: the game loads whatever order the mod list says. So a case that depends
 on another mod runs both ways before it is trusted.
 
+Two fixtures register only with their mods on the list (`LoadIfModsActive`), so
+a list without them runs none of their tests and reports no gap, and `TestOrder`
+leaves them out of its count: `VanillaWeaponsExpandedTools` needs Vanilla
+Weapons Expanded and Simple Sidearms, and `MedievalOverhaulTools` Medieval
+Overhaul. Their dependencies are named too, and Simple Sidearms runs in both
+load orders:
+
+```bash
+devtools/run-harness.sh --with=OskarPotocki.VanillaFactionsExpanded.Core --with=VanillaExpanded.VWE --with=PeteTimesSix.SimpleSidearms
+devtools/run-harness.sh --with=OskarPotocki.VanillaFactionsExpanded.Core --with=VanillaExpanded.VWE --with-after=PeteTimesSix.SimpleSidearms
+devtools/run-harness.sh --with=OskarPotocki.VanillaFactionsExpanded.Core --with=syrchalis.processor.framework --with=DankPyon.Medieval.Overhaul
+```
+
 The cases whose givers Complex Jobs moves tick each giver's own work type, not
 its vanilla name, so they test the same thing with that mod loaded: the bill
 products and the feeding cases. The hospital catchment ticks whatever its room
@@ -540,11 +553,93 @@ with a haul vanilla starts ahead of it, and at a radius stand
 (`AnUrgentPatientGoesStraightToBed`). The Serves row, the inspect pane and the
 switch's tooltip follow the mode (`ItsWordsFollowWhatItServes`).
 
-**Interop** (`WhoUsesAStand`). `OutfitStandsPlusButtonsMatchTheirOwn` covers
+**Interop** (`WhoUsesAStand` and `EndingALoan`). `OutfitStandsPlusButtonsMatchTheirOwn` covers
 code of ours that runs inside another mod: Outfit Stands Plus' stand button,
 reading our stand list, must offer what its own walk would, in the same order
-(see [DESIGN.md](DESIGN.md#outfit-stands-plus-stand-button)). It is a known
-gap until `--with=` loads that mod.
+(see [DESIGN.md](DESIGN.md#outfit-stands-plus-stand-button)).
+`OutfitStandsPlusReturnJobLeavesALoanThatCloses` runs that mod's job to put
+things back against a loan, ordered as their button orders it, because an
+unforced job waits behind a trip back of ours and never meets the loan. Both are
+known gaps until `--with=` loads that mod.
+
+**Weapons** (`LendingAWeapon`, `EndingALoan`, `DraftingWithALoan`,
+`DownedWithALoan`). A loan
+starts through the real driver (`WeaponKit.Lend`), and a draft goes through the
+game's own `Drafted` setter. A stand
+holding no clothes lends its weapon and takes the same one back
+(`AStandHoldingOnlyAWeaponLendsIt`), and `TheirOwnWeaponRidesInTheirPack` adds
+the colonist's own. `AHaulerStocksANewStandFromTheWeaponsOwnRow` follows the
+README's stocking steps with a real haul job: a new stand wants no weapon, and
+the weapon's own row brings one. `AnOlderStandWantsItsWeaponRowsOnFirst` is the
+same for a stand built under vanilla's default, where that row brings nobody
+until the six weapon rows are on, and `ASaveMidLoanKeepsBothWeapons` shows a save
+keeps those rows off though the def starts them on.
+`EveryStandStartsWithTheWeaponRowsOn` reads every stand def, so a list with
+Outfit Stands Plus covers that mod's stands, and checks that the default moved
+nothing else: the same apparel allowed, the apparel rows on, no weapon. Each
+check that keeps a weapon on the stand has a test
+(`AColonistWhoCannotWieldItStillGetsTheUniform`,
+`AColonistWhoCannotShootLeavesTheGun`, `SomeWeaponsStayInTheHand`,
+`APersonaWeaponGoesOnlyToItsBondedColonist`,
+`ASharedStandHoldsBackForTheAssignment`,
+`AJealousPersonaWeaponWaitsForTheAssignment`, `ADepositOnlyStandIssuesNoWeapon`), and
+two read the inspect pane. `ALoanThatMovedNoClothesLeavesTheWardrobeRunning`
+shows the wardrobe pause keys on the clothes half of the stand's record.
+
+`EndingALoan` fires every way a loan can end: the trip back from each state the
+colonist can be in, a stand burnt on the map and in its box, a borrower
+banished or on no map, and a map removed under the borrower or under the stand.
+`DownedWithALoan` downs a borrower under anesthetic and removes it, so they get
+up where they fell. The first two tests change them back straight away, with a
+weapon of their own and without one. In the rest the game's own think tree
+chooses what they do next with the clock stepped: in a room the stand covers, at
+a radius stand, empty-handed, drafted, and after the stand burns while they lie
+downed.
+`DraftingWithALoan` drafts and undrafts.
+`ADraftSetThatChangesNothingMovesNothing` stages the hand a real change would
+trade away, so a missing check shows, and
+`AMentalBreakTradesBackOnceThenHoldsStill` pins the order of a break's undraft
+against its state. `ABorrowerBanishedWhileDraftedKeepsWhatTheyHold` checks that
+the draft controller is gone, since no check of ours is what stops the trade
+there. `TheirOwnPersonaWeaponTradesThroughADraft` puts a persona weapon of the
+colonist's own through a whole loan, so the undraft that sends it back to the
+pack is run, and `ALentPersonaWeaponTradesThroughADraft` bonds the stand's club
+mid-loan, drafts, and changes back with the bond intact.
+`APersonaWeaponGoesOnlyToItsBondedColonist` ends by lending a stand's persona
+club to the colonist bonded to it and taking it back. All three equip a persona
+weapon, which logs an error without Royalty installed, so they are known gaps
+there (`WeaponKit.PersonaCanBeEquipped`).
+`AJealousPersonaWeaponWaitsForTheAssignment` checks, where Royalty is not active,
+that a staged jealous trait costs nothing, and its jealousy half is then a known
+gap, as on CI's Odyssey run; the minimal list has Royalty wherever it is
+installed (see the recolor case below). With it, the test takes Royalty's own
+Jealous trait and checks the `JealousRage` thought the loan gives and its discard
+on the change back. It also checks that a colonist with no mood is lent the
+club, that a stand-in for another mod's trait whose worker overrides the hook is
+held back mood or none, and that Royalty's psyfocus-on-kill worker, which only
+inherits the hook, is not.
+
+A tool mod gets one fixture, and one of its tools stands in for the rest. A
+stand reads a tool as it reads any weapon, so a second tool from the same mod
+runs the same path again. A test earns a place in a tool fixture by reaching
+something the mod or a mod beside it does differently, as Simple Sidearms'
+memory and Vanilla Expanded Framework's weapon hediffs do.
+
+**Vanilla Weapons Expanded's tools** (`VanillaWeaponsExpandedTools`, with Simple
+Sidearms on the list). A hammer goes from the work that sends a colonist to the
+stand through the working step and back, with the work stat up by the tool's
+offset and every other stat it offsets moved its way. The compound bow does the
+same for hunting stealth, with Simple Sidearms' pick asked for in hand. Three
+more read Simple Sidearms' memory across a loan, its switches mid-shift and a
+draft. `AWeaponsHediffStaysWithTheHand` holds the drop path in
+`WeaponHands.Release`: Vanilla Expanded Framework clears a weapon's hediffs only
+from a drop, so a shorter route to the pack leaves the hediff on the colonist.
+
+**Medieval Overhaul's tools** (`MedievalOverhaulTools`). Its pickaxe, found by
+defName, stands in for the rest of its work tools. A hauler stocks a new stand
+with it, and it makes the same round trip as Vanilla Weapons Expanded's hammer,
+with the colonist's rifle in the pack, as far as the working step of a job to
+mine a rock. With Simple Sidearms on the list the rifle goes through its memory.
 
 **Buttons and spares** (`ButtonsAndOrders`). The stand's buttons are read the way
 the gizmo bar gets them, without drawing (`GizmoKit`): the switch names what
@@ -598,13 +693,15 @@ legacy keys and none of the catchment keys (`ASaveFromAnOlderShiftChangeGetsItsO
 assignable with an owner of its own (`AnotherModsOwnerComesThroughALoad`); and three area
 stands, one whose area was renamed before the save, one whose area was deleted,
 and one boxed and carried off every map, which keeps its binding
-(`AStandsAreaComesBackFromASave`). On the four-mod list the legacy-key test takes the key
+(`AStandsAreaComesBackFromASave`); and a weapon loan, which must find both
+weapons again and go home through the real driver
+(`ASaveMidLoanKeepsBothWeapons`). On the four-mod list the legacy-key test takes the key
 migration, and beside a foreign assignable it takes the decline and the
 reconcile instead; no other test reaches the decline. These tests replace
 `Current.Game`, so they run last of all; the summary of `SaveRoundTrip`,
-which holds what they share, says what else follows from that. They write five
+which holds what they share, says what else follows from that. They write six
 saves (`shiftchange-test-*`) into the Saves folder of the game they run in,
-which from the Test Explorer is the player's own, and delete them once all four
+which from the Test Explorer is the player's own, and delete them once all five
 have run, except those a failed test used: those stay for a bug report, and
 Test.log names them and their folder (`SavingAndLoading.RemoveSaves`).
 
@@ -641,11 +738,25 @@ where the pad is.
   Both reach the same map removal, but neither is a takeoff.
 - **The walk.** Scenes stage the pawn on the stand's interaction cell, so
   pathing and interruption mid-walk are untested. See the traps below.
+- **Weapons, in other mods' hands.** Compositable Loadouts has no test. No weapon
+  on a tested list carries Vanilla Expanded Framework's hediff comp, so
+  `AWeaponsHediffStaysWithTheHand` adds it to one hammer, leaving the def alone. Outside
+  the two tool fixtures the weapons are a club and an autopistol, and the persona
+  weapon is a comp added to one by hand rather than one of Royalty's own. Royalty's
+  Jealous trait and its `JealousRage` thought run only with Royalty active. No
+  real trait from another mod is tested, and none of Royalty's equipped effects
+  are checked to stop in the pack and come back. `WeaponForDraft`'s
+  `!pawn.Spawned` has no test, because a despawned pawn has no draft controller,
+  and a pawn who despawns drafted and comes back undrafted is read, not run.
+  Hospitality's patch on downing makes the engine's drop without the remember
+  flag. Read from the tests, not run: with it on the list the six
+  `DownedWithALoan` tests that check the remembered weapon report a known gap
+  there, and the five that go on from it stop.
 - **Mod compatibility.** `--full` proves the suite passes with one large mod
   list loaded — whichever one is active on the machine that ran it. It proves
   nothing about correct interaction with any particular mod, and nothing at all
-  about a mod that was not installed. Two cases reach further when Outfit
-  Stands Plus is loaded: the interop case asserts against it, and the
+  about a mod that was not installed. Three cases reach further when Outfit
+  Stands Plus is loaded: the two interop cases assert against it, and the
   legacy-key case takes the branch that declines the generic keys to its comp.
   Common Sense and Pick Up And Haul each have one case that runs their code.
 - **UI.** No case draws a gizmo or a window. One case opens the settings
@@ -762,6 +873,15 @@ The fixture
 removes what a generated colonist needs tended
 (`DebugTools_Fixtures.RemoveTendableConditions`); the bed-rest, sleep and
 urgent-patient cases each did that for themselves before.
+
+A new colonist can also carry a pack. About one in fifteen arrives with drugs or
+beer, and beer is a melee weapon to the game. With Simple Sidearms loaded and
+melee above shooting, an undraft put the beer in the hand and the gun in the
+pack: 2 of 801 runs of the old harness's case that became
+`WithTheLentWeaponGoneDraftingDrawsTheirOwn`, and all nine colonists who
+carried beer followed that rule. The fixture empties
+the pack (`DebugTools_Fixtures.AveragePawn`), so a test that wants one plants
+it, and `HealthyColonistsAndOpenGround` checks forty in a row arrive with none.
 
 **The game brings pawns of its own.** DevTools' game runs between tests, and
 its storyteller with it. When a test kills or kidnaps its colonist, the colony
