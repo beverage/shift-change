@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          find About Defs Patches Languages -name '*.xml' -print0 | xargs -0 xmllint --noout
+          find About Defs Patches Languages Configs -name '*.xml' -print0 | xargs -0 xmllint --noout
 
       # Hot-reload invariants, translation keys in both directions, XML-to-C#
       # type bindings, the <Patch> root walk, and the Workshop preview size.
@@ -162,9 +162,9 @@ jobs:
   # The runner has no game, so the builds compile against Krafs.Rimworld.Ref,
   # as the checks job's do, and the tests against a DevTools.dll built from the
   # commit the Fly image carries: SmashPhil/DevTools#17 at 8966779, whose
-  # stack-qualified allowances the tests use. That dll and flybridge.py, the
-  # step that starts the machine, come from the lab's bucket by the hashes below
-  # and are checked against them.
+  # stack-qualified allowances the tests use. That dll and flybridge.py, which
+  # starts the machine and writes the job's summary, come from the lab's bucket
+  # by the hashes below and are checked against them.
   # `flybridge.py upload-tool [file]` puts a new version of either in the bucket
   # and prints its hash.
   #
@@ -197,7 +197,7 @@ jobs:
     # cancelled job, the timeout's included, stops the machine at once.
     timeout-minutes: 35
     env:
-      FLYBRIDGE_SHA256: 17563f404320b3e8f0d150ead30e84ddd8185f91e43830e5f3bdad506e6aa5e1
+      FLYBRIDGE_SHA256: 20524bf7755c83adbe1355f6b147f930ff67ef8bcbafd112b5d12682b6e946d3
       DEVTOOLS_SHA256: 7d1ed105d1697423b82c1b593ff7f2b9c4b17d961861a481c0eb7240fc5711e1
       RUN_ID: gh-${{ github.event.repository.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.dlcs }}
       AWS_ENDPOINT_URL_S3: ${{ vars.AWS_ENDPOINT_URL_S3 }}
@@ -217,6 +217,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Fetch flybridge and DevTools
+        id: fetch
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -275,19 +276,18 @@ jobs:
             fi
           done
 
-      # result.json, then DevTools' verdict: each failed or skipped fixture
-      # and test, and its totals. A skipped test is a case that skips itself
-      # without a mod or DLC this list leaves out, and does not fail the run.
+      # flybridge's summary of the run: the game's exit code and DevTools'
+      # verdict, each failed or skipped fixture and test from Test.log and its
+      # totals, DevTools' report of the run, which Configs/UnitTestConfig.xml
+      # asks for, and result.json, folded. A skipped test is a case that skips
+      # itself without a mod or DLC this list leaves out, and does not fail
+      # the run. DevTools writes the report as the run ends, so a run cut
+      # short has none or only part of one, and the summary then leaves it out
+      # and says why. It runs whenever flybridge was fetched, whatever failed
+      # after.
       - name: Summary
-        if: always()
-        run: |
-          dir="$RUNNER_TEMP/flybridge-runs/$RUN_ID"
-          if [ -f "$dir/result.json" ]; then
-            { echo '```json'; cat "$dir/result.json"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          fi
-          if [ -f "$dir/Test.log" ]; then
-            { echo '```'; grep -E '\[(Failed|Skipped)\] |^Tests finished|^Test runner finished' "$dir/Test.log" || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          fi
+        if: always() && steps.fetch.outcome == 'success'
+        run: python3 "$RUNNER_TEMP/flybridge.py" summary "$RUNNER_TEMP/flybridge-runs/$RUN_ID" >> "$GITHUB_STEP_SUMMARY"
 
       # Player.log, Test.log, result.json and the saves the tests wrote, from
       # the bucket's copy of the run.

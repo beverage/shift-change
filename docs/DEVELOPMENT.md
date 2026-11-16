@@ -324,12 +324,17 @@ against it and a dll of the DevTools the test machine carries, then every test
 under DevTools in RimWorld 1.7 on a Fly machine with Harmony, Core, DevTools and
 this mod (and the machine's own shim for running without a window), once with
 every DLC and once with Odyssey alone. Each run passes on DevTools' exit code
-together with the `Result: Passed` line it writes last in `Test.log`; its
-summary lists the failed and skipped tests and the totals. The Odyssey run skips
-one test more than the other, the recolor case, which needs Ideology. A push of
-only Markdown, `docs/` or `media/` starts no machine. The job needs the lab's
-secrets, so it never runs on a pull request: a fork's change is tested once its
-branch is pushed here.
+together with the `Result: Passed` line it writes last in `Test.log`. Its
+summary, from flybridge's `summary` command, gives the game's exit code,
+DevTools' verdict, and the failed and skipped tests and totals from
+`Test.log`, then DevTools' report of the run, `test-report.md`, which
+`Configs/UnitTestConfig.xml` asks for: each fixture's counts, and each failure
+with its message. DevTools writes the report as the run ends, so a run cut
+short has none or only part of one, and the summary then leaves it out and
+says why. The Odyssey run skips one test more than the other, the recolor
+case, which needs Ideology. A push of only Markdown, `docs/` or `media/`
+starts no machine. The job needs the lab's secrets, so it never runs on a pull
+request: a fork's change is tested once its branch is pushed here.
 
 That is the minimal list only. `--full` on this machine, against a real mod
 list, is still what a release is signed off on.

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DevTools reads this file when it runs Shift Change's tests. MarkdownReport
+     writes test-report.md beside Test.log when the run ends, and CI puts that
+     report in the job's summary. Not shipped: publish-workshop.sh's CONTENT
+     and the release zip leave Configs/ out. -->
+<TestConfig>
+  <log>
+    <report>DevTools.Testing.MarkdownReport</report>
+  </log>
+</TestConfig>
