@@ -197,7 +197,7 @@ jobs:
     # cancelled job, the timeout's included, stops the machine at once.
     timeout-minutes: 35
     env:
-      FLYBRIDGE_SHA256: 20524bf7755c83adbe1355f6b147f930ff67ef8bcbafd112b5d12682b6e946d3
+      FLYBRIDGE_SHA256: 3da53a101cc294d7aa16657df97065ffb607c17d954d945ed3128568bfcd23ef
       DEVTOOLS_SHA256: 7d1ed105d1697423b82c1b593ff7f2b9c4b17d961861a481c0eb7240fc5711e1
       RUN_ID: gh-${{ github.event.repository.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.dlcs }}
       AWS_ENDPOINT_URL_S3: ${{ vars.AWS_ENDPOINT_URL_S3 }}
@@ -260,7 +260,7 @@ jobs:
           DLCS: ${{ matrix.dlcs }}
         run: >-
           exec python3 "$RUNNER_TEMP/flybridge.py" run "$RUN_ID"
-          --image ready-1 --mods smashphil.devtools --mod "$GITHUB_WORKSPACE"
+          --image crashrep-1 --mods smashphil.devtools --mod "$GITHUB_WORKSPACE"
           --env "RW_DLCS=$DLCS" --queue-minutes 15 --max-minutes 10 --pull
           -- --pid MrBeverage.ShiftChange --test -e
 
