@@ -258,7 +258,7 @@ namespace ShiftChange.Tests
                 }
                 if (scenario.Gap && !scenario.Failing)
                 {
-                    Test.Skip("a known gap; the scenario is in Test.log");
+                    scenario.SkipForGaps();
                 }
                 scenario.WriteToLog();
             }

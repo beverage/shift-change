@@ -113,7 +113,9 @@ the test, so the scenario in Test.log shows every check. A test that stages a sc
 check saying what was set up. A test also fails when it throws, or when its
 scene cannot be set up. A test with a mod of its own to test against is a known
 gap without it (`scenario.KnownGap`, a step marked `GAP`), which DevTools reports
-as a skipped test unless a check failed too.
+as a skipped test unless a check failed too: the first gap is the skip's reason,
+in the Test Explorer's row, and the steps are its message, in the Explorer's
+summary and through the test adapter.
 
 DevTools fails a test on any warning it does not allow, apart from the few the
 game logs by itself, which DevTools allows everywhere. The repeated-errors test

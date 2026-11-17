@@ -34,7 +34,13 @@ namespace ShiftChange.Tests
         internal const string Fixed = "    FIXED ";
 
         /// <summary>True once a known gap has been noted (<see cref="KnownGap"/>).</summary>
-        internal bool Gap;
+        internal bool Gap => Gaps > 0;
+
+        /// <summary>How many known gaps have been noted.</summary>
+        internal int Gaps;
+
+        /// <summary>The first known gap, as its <c>GAP</c> step says it.</summary>
+        internal string FirstGap;
 
         /// <summary>True once a check has failed.</summary>
         internal bool Failing;
@@ -79,7 +85,19 @@ namespace ShiftChange.Tests
                 return;
             }
             Steps.Append(Gapped).Append(what).Append(": ").AppendLine(why);
-            Gap = true;
+            Gaps++;
+            FirstGap ??= what + ": " + why;
+        }
+
+        /// <summary>
+        /// Skips the test for its known gaps. The first, as its <c>GAP</c> step says it, is the
+        /// skip's reason, which the Test Explorer shows in the test's row; the steps are its
+        /// message, which the Explorer's summary and the test adapter show.
+        /// </summary>
+        internal void SkipForGaps()
+        {
+            Test.Skip("known gap, " + FirstGap + (Gaps > 1 ? " (and " + (Gaps - 1) + " more)" : ""));
+            Test.Current.FailMessage = ToString();
         }
 
         /// <summary>
