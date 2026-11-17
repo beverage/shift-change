@@ -16,7 +16,7 @@ namespace ShiftChange.Tests
     /// Who may use a stand: its owners, the groups the player picks, and stands from other mods.
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(RunOrder.First - (int)CaseGroup.WhoUsesAStand)]
-    internal class WhoUsesAStand : StoryFixture
+    internal class WhoUsesAStand : FeatureFixture
     {
         /// <summary>What <see cref="SceneKit.Build"/> sets up.</summary>
         internal const string OnShift =
@@ -53,7 +53,7 @@ namespace ShiftChange.Tests
         {
             return Staged(Build, OnShift, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 AccessTools.FieldRef<Building_OutfitStand, bool> flag =
                     Patch_AllowRemovingToggle.AllowRemovingItemsRef;
@@ -61,42 +61,42 @@ namespace ShiftChange.Tests
                 {
                     // A failure here is not a stale test: the protection rides on this field, so a
                     // rename silently removes it.
-                    story.Check(false, "the stand's Allow removing items setting can still be found");
+                    scenario.Check(false, "the stand's Allow removing items setting can still be found");
                     return;
                 }
                 WorkTypeDef doctor = WorkType("Doctor");
                 if (doctor == null)
                 {
-                    story.Check(false, "the Doctor work type exists");
+                    scenario.Check(false, "the Doctor work type exists");
                     return;
                 }
 
                 scene.Comp.SetExcluded();
                 flag(scene.OutfitStand) = true;
-                story.Note("the stand is set to Not used for shift changes, and Allow removing items turned on");
-                story.Check(flag(scene.OutfitStand),
+                scenario.Note("the stand is set to Not used for shift changes, and Allow removing items turned on");
+                scenario.Check(flag(scene.OutfitStand),
                             "a stand not used for shift changes keeps it as the player set it");
 
                 scene.Comp.SetAutomatic();
-                story.Check(!flag(scene.OutfitStand), "setting the stand to Automatic (from the room) turns it off");
+                scenario.Check(!flag(scene.OutfitStand), "setting the stand to Automatic (from the room) turns it off");
 
                 scene.Comp.SetExcluded();
                 flag(scene.OutfitStand) = true;
                 scene.Comp.ToggleWork(doctor);
-                story.Note("the stand is taken out of service and the setting turned on again, then Doctor ticked");
-                story.Check(!flag(scene.OutfitStand), "ticking Doctor turns it off");
+                scenario.Note("the stand is taken out of service and the setting turned on again, then Doctor ticked");
+                scenario.Check(!flag(scene.OutfitStand), "ticking Doctor turns it off");
 
                 scene.Comp.SetExcluded();
                 flag(scene.OutfitStand) = true;
                 scene.Comp.ToggleRecreation();
-                story.Note("and once more, with Recreation ticked this time");
-                story.Check(!flag(scene.OutfitStand), "ticking Recreation turns it off");
-                story.Check(!scene.Comp.IsExcluded, "and the stand really is back in service");
+                scenario.Note("and once more, with Recreation ticked this time");
+                scenario.Check(!flag(scene.OutfitStand), "ticking Recreation turns it off");
+                scenario.Check(!scene.Comp.IsExcluded, "and the stand really is back in service");
 
-                story.Check(!((IApparelSource)scene.OutfitStand).ApparelSourceEnabled,
+                scenario.Check(!((IApparelSource)scene.OutfitStand).ApparelSourceEnabled,
                             "so colonists choosing their outfits cannot take from the stand: "
                             + "the game's gate for that is the same setting");
-                story.Check(!((IHaulSource)scene.OutfitStand).HaulSourceEnabled,
+                scenario.Check(!((IHaulSource)scene.OutfitStand).HaulSourceEnabled,
                             "and haulers cannot take from it while it is in service");
             }
         }
@@ -119,22 +119,22 @@ namespace ShiftChange.Tests
         {
             return Staged(Build, OnShift, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
-                Pawn bystander = AnotherColonist(story, scene, Gender.Female, "Bystander");
+                Pawn bystander = AnotherColonist(scenario, scene, Gender.Female, "Bystander");
                 List<Gizmo> chain = Sentinels();
                 IEnumerable<Gizmo> passed = Patch_ChangeBackGizmo.Postfix(chain, bystander);
 
-                story.Check(CompShiftStand.OnShiftStandFor(bystander) == null,
+                scenario.Check(CompShiftStand.OnShiftStandFor(bystander) == null,
                             bystander.LabelShort + " is on shift at no stand");
-                story.Check(ReferenceEquals(passed, chain),
+                scenario.Check(ReferenceEquals(passed, chain),
                             "so Shift Change hands back the very sequence of buttons it was given, "
                             + "not a wrapper around it");
-                story.Check(SameSequence(passed, chain), "with every one of the game's buttons still in it, in order");
+                scenario.Check(SameSequence(passed, chain), "with every one of the game's buttons still in it, in order");
 
                 // Harmony never hands the patch a null colonist, but it guards against one, and
                 // dropping that guard should fail here rather than throw in somebody's colony.
-                story.Check(ReferenceEquals(Patch_ChangeBackGizmo.Postfix(chain, null), chain),
+                scenario.Check(ReferenceEquals(Patch_ChangeBackGizmo.Postfix(chain, null), chain),
                             "and with no colonist at all, the buttons are handed back untouched too");
             }
         }
@@ -147,19 +147,19 @@ namespace ShiftChange.Tests
         {
             return Staged(Build, OnShift, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 List<Gizmo> chain = Sentinels();
                 List<Gizmo> got = Patch_ChangeBackGizmo.Postfix(chain, scene.Colonist).ToList();
 
-                story.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
+                scenario.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
                             name + " is on shift at the stand, in what it held");
-                story.Check(got.Count == chain.Count + 1,
+                scenario.Check(got.Count == chain.Count + 1,
                             "so " + name + "'s buttons come back with exactly one added");
-                story.Check(SameSequence(got.Take(chain.Count), chain),
+                scenario.Check(SameSequence(got.Take(chain.Count), chain),
                             "the game's own buttons are untouched, and still in order");
-                story.Check(got.Count > chain.Count
+                scenario.Check(got.Count > chain.Count
                             && got[got.Count - 1] is Command_Action button
                             && button.groupKey == Patch_ChangeBackGizmo.GroupKey,
                             "and the one added is Change back, last");
@@ -173,13 +173,13 @@ namespace ShiftChange.Tests
                 try
                 {
                     Patch_JobInterception.Enabled = false;
-                    story.Note("Shift Change's automatic changes are switched off, as its tweak value does");
-                    story.Check(Patch_ChangeBackGizmo.Postfix(chain, scene.Colonist).Count() == chain.Count + 1,
+                    scenario.Note("Shift Change's automatic changes are switched off, as its tweak value does");
+                    scenario.Check(Patch_ChangeBackGizmo.Postfix(chain, scene.Colonist).Count() == chain.Count + 1,
                                 "Change back is still offered");
                     Patch_JobInterception.Enabled = armedBefore;
                     Patch_JobInterception.faulted = true;
-                    story.Note("switched back on, they are shut off instead, as repeated errors do");
-                    story.Check(Patch_ChangeBackGizmo.Postfix(chain, scene.Colonist).Count() == chain.Count + 1,
+                    scenario.Note("switched back on, they are shut off instead, as repeated errors do");
+                    scenario.Check(Patch_ChangeBackGizmo.Postfix(chain, scene.Colonist).Count() == chain.Count + 1,
                                 "and Change back is still offered then too");
                 }
                 finally
@@ -194,9 +194,9 @@ namespace ShiftChange.Tests
                 // button pointing at a stand that is not on the map.
                 IntVec3 cell = scene.OutfitStand.Position;
                 scene.OutfitStand.DeSpawn(DestroyMode.WillReplace);
-                story.Note("the stand is lifted off the map, as a gravship takeoff does, still keeping "
+                scenario.Note("the stand is lifted off the map, as a gravship takeoff does, still keeping "
                            + name + "'s clothes");
-                story.Check(ReferenceEquals(Patch_ChangeBackGizmo.Postfix(chain, scene.Colonist), chain),
+                scenario.Check(ReferenceEquals(Patch_ChangeBackGizmo.Postfix(chain, scene.Colonist), chain),
                             "while the stand is off the map, " + name + " gets no Change back at all");
                 GenSpawn.Spawn(scene.OutfitStand, cell, scene.Map, Rot4.North);
                 scene.OutfitStand.PostSwapMap();
@@ -214,7 +214,7 @@ namespace ShiftChange.Tests
         {
             return Staged(Build, OnShift, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string vanillaLabel = "CommandAllowRemovingApparel".Translate().ToString();
                 string ours = "ShiftChange.AllowRemovingDesc".Translate().RawText;
@@ -225,13 +225,13 @@ namespace ShiftChange.Tests
                 List<Gizmo> chain = new List<Gizmo> { Sentinels()[0], foreign };
                 IEnumerable<Gizmo> passed = Patch_AllowRemovingToggle.Postfix(chain, scene.OutfitStand);
 
-                story.Check(scene.Comp.IsExcluded, "the stand is set to Not used for shift changes");
-                story.Check(ReferenceEquals(passed, chain),
+                scenario.Check(scene.Comp.IsExcluded, "the stand is set to Not used for shift changes");
+                scenario.Check(ReferenceEquals(passed, chain),
                             "so Shift Change hands back the very sequence of buttons it was given, "
                             + "not a wrapper around it");
-                story.Check(foreign.defaultDesc == untouched,
+                scenario.Check(foreign.defaultDesc == untouched,
                             "and the Allow removing items tooltip is left exactly as the game wrote it");
-                story.Check(!foreign.Disabled, "with the button still live");
+                scenario.Check(!foreign.Disabled, "with the button still live");
 
                 scene.Comp.SetAutomatic();
                 Command_Toggle governed = RemovalToggle(vanillaLabel, active: false, desc: untouched);
@@ -245,20 +245,20 @@ namespace ShiftChange.Tests
                 List<Gizmo> governedChain = new List<Gizmo> { governed, alreadyOn, stranger };
                 List<Gizmo> got = Patch_AllowRemovingToggle.Postfix(governedChain, scene.OutfitStand).ToList();
 
-                story.Check(!scene.Comp.IsExcluded, "set to Automatic (from the room), the stand is back in service");
-                story.Check(SameSequence(got, governedChain), "every button still comes through, in order");
-                story.Check(governed.defaultDesc != untouched && governed.defaultDesc.Contains(ours),
+                scenario.Check(!scene.Comp.IsExcluded, "set to Automatic (from the room), the stand is back in service");
+                scenario.Check(SameSequence(got, governedChain), "every button still comes through, in order");
+                scenario.Check(governed.defaultDesc != untouched && governed.defaultDesc.Contains(ours),
                             "the Allow removing items tooltip now carries Shift Change's paragraph "
                             + "as well as the game's");
                 // TaggedString's implicit conversion to string strips tags, so the patch must use
                 // .RawText on both halves of the tooltip: assigning a Translate() result straight
                 // to the field silently deletes the colour and bold. This check guards that.
-                story.Check(ours.Contains("<color") && governed.defaultDesc.Contains("<color"),
+                scenario.Check(ours.Contains("<color") && governed.defaultDesc.Contains("<color"),
                             "with its colour and bold intact, not stripped on the way");
-                story.Check(governed.Disabled,
+                scenario.Check(governed.Disabled,
                             "a button that is off is greyed out while the stand is in service");
-                story.Check(!alreadyOn.Disabled, "while one already on keeps its way back out");
-                story.Check(stranger.defaultDesc == untouched && !stranger.Disabled,
+                scenario.Check(!alreadyOn.Disabled, "while one already on keeps its way back out");
+                scenario.Check(stranger.defaultDesc == untouched && !stranger.Disabled,
                             "and another mod's toggle passes through untouched");
             }
         }
@@ -275,48 +275,48 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing), BesideAStand, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 CompAssignableToPawn assignable =
                     scene.OutfitStand.TryGetComp<CompAssignableToPawn_ShiftStand>();
                 if (assignable == null)
                 {
-                    story.Check(false, "the stand has Shift Change's owner list");
+                    scenario.Check(false, "the stand has Shift Change's owner list");
                     return;
                 }
 
                 Pawn a = scene.Colonist;
-                Pawn b = AnotherColonist(story, scene, Gender.Female, "OwnerB");
-                Pawn c = AnotherColonist(story, scene, Gender.Male, "Outsider");
+                Pawn b = AnotherColonist(scenario, scene, Gender.Female, "OwnerB");
+                Pawn c = AnotherColonist(scenario, scene, Gender.Male, "Outsider");
                 string first = a.LabelShort, second = b.LabelShort, outsider = c.LabelShort;
 
-                story.Check(scene.Comp.IsPool, "with no owners, the stand is shared");
-                story.Check(scene.Comp.CanBeClaimedBy(a) && scene.Comp.CanBeClaimedBy(c),
+                scenario.Check(scene.Comp.IsPool, "with no owners, the stand is shared");
+                scenario.Check(scene.Comp.CanBeClaimedBy(a) && scene.Comp.CanBeClaimedBy(c),
                             "and anyone able may use it, " + first + " and " + outsider + " alike");
 
                 assignable.TryAssignPawn(a);
-                story.Note(first + " is made its owner");
-                story.Check(!scene.Comp.IsPool, "with an owner, it is no longer shared");
-                story.Check(scene.Comp.IsAssignedTo(a), first + " is listed as its owner");
-                story.Check(scene.Comp.CanBeClaimedBy(a), first + " may use it");
-                story.Check(!scene.Comp.CanBeClaimedBy(c), "and nobody else may: not " + outsider);
+                scenario.Note(first + " is made its owner");
+                scenario.Check(!scene.Comp.IsPool, "with an owner, it is no longer shared");
+                scenario.Check(scene.Comp.IsAssignedTo(a), first + " is listed as its owner");
+                scenario.Check(scene.Comp.CanBeClaimedBy(a), first + " may use it");
+                scenario.Check(!scene.Comp.CanBeClaimedBy(c), "and nobody else may: not " + outsider);
 
                 assignable.TryAssignPawn(b);
-                story.Note(second + " is made an owner too");
-                story.Check(scene.Comp.AssignedOwners.Count == 2, "the stand lists both owners");
-                story.Check(scene.Comp.CanBeClaimedBy(a), "the first owner, " + first + ", may still use it");
+                scenario.Note(second + " is made an owner too");
+                scenario.Check(scene.Comp.AssignedOwners.Count == 2, "the stand lists both owners");
+                scenario.Check(scene.Comp.CanBeClaimedBy(a), "the first owner, " + first + ", may still use it");
                 // The one a single-owner reader gets wrong.
-                story.Check(scene.Comp.CanBeClaimedBy(b), "and so may the second, " + second);
-                story.Check(!scene.Comp.CanBeClaimedBy(c), "while " + outsider + " still may not");
+                scenario.Check(scene.Comp.CanBeClaimedBy(b), "and so may the second, " + second);
+                scenario.Check(!scene.Comp.CanBeClaimedBy(c), "while " + outsider + " still may not");
 
                 assignable.TryUnassignPawn(a);
-                story.Check(!scene.Comp.CanBeClaimedBy(a),
+                scenario.Check(!scene.Comp.CanBeClaimedBy(a),
                             "removing " + first + " as an owner means " + first + " may no longer use it");
-                story.Check(scene.Comp.CanBeClaimedBy(b), "and leaves " + second + " its owner");
+                scenario.Check(scene.Comp.CanBeClaimedBy(b), "and leaves " + second + " its owner");
 
                 assignable.TryUnassignPawn(b);
-                story.Check(scene.Comp.IsPool, "removing the last owner makes the stand shared again");
-                story.Check(scene.Comp.CanBeClaimedBy(c), "and " + outsider + " may use it again");
+                scenario.Check(scene.Comp.IsPool, "removing the last owner makes the stand shared again");
+                scenario.Check(scene.Comp.CanBeClaimedBy(c), "and " + outsider + " may use it again");
             }
         }
 
@@ -332,51 +332,51 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing), BesideAStand, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 CompAssignableToPawn assignable =
                     scene.OutfitStand.TryGetComp<CompAssignableToPawn_ShiftStand>();
                 if (assignable == null)
                 {
-                    story.Check(false, "the stand has Shift Change's owner list");
+                    scenario.Check(false, "the stand has Shift Change's owner list");
                     return;
                 }
 
-                Pawn man = AnotherColonist(story, scene, Gender.Male, "FilterM");
-                Pawn woman = AnotherColonist(story, scene, Gender.Female, "FilterF");
+                Pawn man = AnotherColonist(scenario, scene, Gender.Male, "FilterM");
+                Pawn woman = AnotherColonist(scenario, scene, Gender.Female, "FilterF");
                 string he = man.LabelShort, she = woman.LabelShort;
 
                 Dialog_AssignStandOwners dialog = new Dialog_AssignStandOwners(assignable);
-                story.Note("the stand's owner window is opened");
+                scenario.Note("the stand's owner window is opened");
 
                 dialog.filter = Dialog_AssignStandOwners.Filter.All;
                 List<Pawn> all = dialog.Candidates();
-                story.Check(all.Contains(man) && all.Contains(woman),
+                scenario.Check(all.Contains(man) && all.Contains(woman),
                             "under All, both " + he + " and " + she + " are offered");
 
                 dialog.filter = Dialog_AssignStandOwners.Filter.Male;
                 List<Pawn> males = dialog.Candidates();
-                story.Check(males.Contains(man), "under Men, " + he + " is offered");
-                story.Check(!males.Contains(woman), "and " + she + " is not");
-                story.Check(males.All(p => p.gender == Gender.Male),
+                scenario.Check(males.Contains(man), "under Men, " + he + " is offered");
+                scenario.Check(!males.Contains(woman), "and " + she + " is not");
+                scenario.Check(males.All(p => p.gender == Gender.Male),
                             "and no woman anywhere in the colony slipped through");
 
                 dialog.filter = Dialog_AssignStandOwners.Filter.Female;
                 List<Pawn> females = dialog.Candidates();
-                story.Check(females.Contains(woman), "under Women, " + she + " is offered");
-                story.Check(!females.Contains(man), "and " + he + " is not");
+                scenario.Check(females.Contains(woman), "under Women, " + she + " is offered");
+                scenario.Check(!females.Contains(man), "and " + he + " is not");
 
                 // An owner leaves the list of colonists to add; the window draws them among the
                 // owners above it, whatever the filter says.
                 assignable.TryAssignPawn(woman);
                 dialog.filter = Dialog_AssignStandOwners.Filter.All;
-                story.Note(she + " is made an owner, and the filter set back to All");
-                story.Check(!dialog.Candidates().Contains(woman), she + " is no longer offered to add");
-                story.Check(assignable.AssignedPawnsForReading.Contains(woman),
+                scenario.Note(she + " is made an owner, and the filter set back to All");
+                scenario.Check(!dialog.Candidates().Contains(woman), she + " is no longer offered to add");
+                scenario.Check(assignable.AssignedPawnsForReading.Contains(woman),
                             "because she is among the stand's owners now");
 
                 dialog.filter = Dialog_AssignStandOwners.Filter.Male;
-                story.Check(assignable.AssignedPawnsForReading.Contains(woman),
+                scenario.Check(assignable.AssignedPawnsForReading.Contains(woman),
                             "and under Men, which leaves her out, she is still an owner");
 
                 assignable.TryUnassignPawn(woman);
@@ -399,68 +399,68 @@ namespace ShiftChange.Tests
         {
             return Staged(StageWithForeignAssignable, BesideAStandWithTwoLists, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 CompAssignableToPawn_ShiftStand ours =
                     scene.OutfitStand.TryGetComp<CompAssignableToPawn_ShiftStand>();
                 CompAssignableToPawn foreign = ForeignAssignableOn(scene.OutfitStand);
                 if (ours == null || foreign == null)
                 {
-                    story.Check(false, "the stand has Shift Change's owner list and another mod's");
+                    scenario.Check(false, "the stand has Shift Change's owner list and another mod's");
                     return;
                 }
                 if (foreign.TotalSlots != 1)
                 {
                     // The second-owner checks assume one place, as Outfit Stands Plus has; a bigger
                     // list is a different test.
-                    story.Check(false, "the other mod's list has room for one owner, as Outfit Stands Plus's does");
+                    scenario.Check(false, "the other mod's list has room for one owner, as Outfit Stands Plus's does");
                     return;
                 }
 
                 Pawn a = scene.Colonist;
-                Pawn b = AnotherColonist(story, scene, Gender.Female, "CopyB");
+                Pawn b = AnotherColonist(scenario, scene, Gender.Female, "CopyB");
                 string first = a.LabelShort, second = b.LabelShort;
 
-                story.Check(foreign.AssignedPawnsForReading.Count == 0,
+                scenario.Check(foreign.AssignedPawnsForReading.Count == 0,
                             "with no owners, the other mod's list is empty");
 
                 ours.TryAssignPawn(a);
-                story.Check(OwnersAre(foreign, a),
+                scenario.Check(OwnersAre(foreign, a),
                             "with " + first + " as its one owner, the other mod's list names "
                             + first + " and nobody else");
 
                 ours.TryAssignPawn(b);
-                story.Check(ours.AssignedPawnsForReading.Count == 2,
+                scenario.Check(ours.AssignedPawnsForReading.Count == 2,
                             "with " + second + " added, Shift Change lists both owners");
-                story.Check(foreign.AssignedPawnsForReading.Count == 0,
+                scenario.Check(foreign.AssignedPawnsForReading.Count == 0,
                             "and two do not fit the other list's one place, so it is emptied, not cut short");
 
                 ours.TryUnassignPawn(a);
-                story.Check(OwnersAre(foreign, b), "back to one owner, the other list names " + second);
+                scenario.Check(OwnersAre(foreign, b), "back to one owner, the other list names " + second);
 
                 // The release unassigns through Shift Change's list, so the other list follows and
                 // a colonist who died or left loses their button on the stand.
                 Patch_UnclaimStands.ReapStandsFor(b);
-                story.Note("the game releases what " + second + " owned, as when a colonist dies");
-                story.Check(ours.AssignedPawnsForReading.Count == 0, "Shift Change's list lets " + second + " go");
-                story.Check(foreign.AssignedPawnsForReading.Count == 0, "and the other list with it");
+                scenario.Note("the game releases what " + second + " owned, as when a colonist dies");
+                scenario.Check(ours.AssignedPawnsForReading.Count == 0, "Shift Change's list lets " + second + " go");
+                scenario.Check(foreign.AssignedPawnsForReading.Count == 0, "and the other list with it");
 
                 IEnumerable<Gizmo> hidden = null;
                 scene.Comp.SetAutomatic();
-                story.Check(!Patch_ForeignOwnerGizmos.Prefix(foreign, ref hidden),
+                scenario.Check(!Patch_ForeignOwnerGizmos.Prefix(foreign, ref hidden),
                             "a stand in service hides the other mod's Set owner button");
 
                 scene.Comp.SetExcluded();
                 List<Command> ourGizmos = ours.CompGetGizmosExtra().OfType<Command>().ToList();
-                story.Check(!Patch_ForeignOwnerGizmos.Prefix(foreign, ref hidden),
+                scenario.Check(!Patch_ForeignOwnerGizmos.Prefix(foreign, ref hidden),
                             "and so does a stand set to Not used for shift changes");
-                story.Check(ourGizmos.Count == 1, "which shows Shift Change's owner button in its place");
-                story.Check(ourGizmos.Count == 1
+                scenario.Check(ourGizmos.Count == 1, "which shows Shift Change's owner button in its place");
+                scenario.Check(ourGizmos.Count == 1
                             && ourGizmos[0].defaultLabel == "CommandThingSetOwnerLabel".Translate(),
                             "labelled Set owner, since a stand not used for shift changes is shared by nobody");
 
                 ours.TryAssignPawn(a);
-                story.Check(OwnersAre(foreign, a), "and there too the other list names " + first + " once ours does");
+                scenario.Check(OwnersAre(foreign, a), "and there too the other list names " + first + " once ours does");
 
                 ours.TryUnassignPawn(a);
                 scene.Comp.SetAutomatic();
@@ -486,24 +486,24 @@ namespace ShiftChange.Tests
         {
             return Staged(StageWithForeignAssignable, BesideAStandWithTwoLists, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 CompAssignableToPawn_ShiftStand ours =
                     scene.OutfitStand.TryGetComp<CompAssignableToPawn_ShiftStand>();
                 CompAssignableToPawn foreign = ForeignAssignableOn(scene.OutfitStand);
                 if (ours == null || foreign == null)
                 {
-                    story.Check(false, "the stand has Shift Change's owner list and another mod's");
+                    scenario.Check(false, "the stand has Shift Change's owner list and another mod's");
                     return;
                 }
                 if (foreign.TotalSlots != 1)
                 {
-                    story.Check(false, "the other mod's list has room for one owner, as Outfit Stands Plus's does");
+                    scenario.Check(false, "the other mod's list has room for one owner, as Outfit Stands Plus's does");
                     return;
                 }
 
                 Pawn a = scene.Colonist;
-                Pawn b = AnotherColonist(story, scene, Gender.Female, "ReconcileB");
+                Pawn b = AnotherColonist(scenario, scene, Gender.Female, "ReconcileB");
                 string first = a.LabelShort, second = b.LabelShort;
 
                 // In service both lists name someone and disagree; Shift Change's is the one the
@@ -512,20 +512,20 @@ namespace ShiftChange.Tests
                 ours.TryAssignPawn(a);
                 Diverge(foreign, a, b);
                 ours.ownersUnified = false;
-                story.Note("as an older save left it: the stand in service and owned by " + first
+                scenario.Note("as an older save left it: the stand in service and owned by " + first
                            + ", the other mod's list naming " + second + " instead; the stand is loaded");
                 ours.UnifyOwners();
-                story.Check(OwnersAre(ours, a) && OwnersAre(foreign, a),
+                scenario.Check(OwnersAre(ours, a) && OwnersAre(foreign, a),
                             "a stand in service keeps its own owner, " + first
                             + ", and the other list's stale one is replaced");
-                story.Check(ours.ownersUnified, "and the stand is marked as reconciled");
+                scenario.Check(ours.ownersUnified, "and the stand is marked as reconciled");
 
                 // Not used for shift changes: the other mod's list is the one the player could see.
                 scene.Comp.SetExcluded();
                 Diverge(foreign, a, b);
                 ours.ownersUnified = false;
                 ours.UnifyOwners();
-                story.Check(OwnersAre(ours, b) && OwnersAre(foreign, b),
+                scenario.Check(OwnersAre(ours, b) && OwnersAre(foreign, b),
                             "a stand set to Not used for shift changes takes the other mod's owner, "
                             + second + ", instead");
 
@@ -535,7 +535,7 @@ namespace ShiftChange.Tests
                 foreign.ForceAddPawn(a);
                 ours.ownersUnified = false;
                 ours.UnifyOwners();
-                story.Check(OwnersAre(ours, a),
+                scenario.Check(OwnersAre(ours, a),
                             "a stand with no owners of its own adopts the only owner there is, " + first);
 
                 // Only Shift Change's list names anyone, and two of them: nothing to adopt, and
@@ -543,7 +543,7 @@ namespace ShiftChange.Tests
                 ours.TryAssignPawn(b);
                 ours.ownersUnified = false;
                 ours.UnifyOwners();
-                story.Check(ours.AssignedPawnsForReading.Count == 2
+                scenario.Check(ours.AssignedPawnsForReading.Count == 2
                             && foreign.AssignedPawnsForReading.Count == 0,
                             "a stand with two owners keeps both, and the other list, with room for one, "
                             + "stays empty");
@@ -552,7 +552,7 @@ namespace ShiftChange.Tests
                 ours.TryUnassignPawn(b);
                 Diverge(foreign, a, b);
                 ours.UnifyOwners();
-                story.Check(OwnersAre(ours, a) && OwnersAre(foreign, a),
+                scenario.Check(OwnersAre(ours, a) && OwnersAre(foreign, a),
                             "once reconciled, a stand whose other list drifted rewrites it from its own, "
                             + "never adopting it");
 
@@ -578,56 +578,56 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing), BesideAStand, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 CompAssignableToPawn_ShiftStand ours =
                     scene.OutfitStand.TryGetComp<CompAssignableToPawn_ShiftStand>();
                 WorkTypeDef doctor = WorkType("Doctor");
                 if (ours == null || doctor == null)
                 {
-                    story.Check(false, "the stand has Shift Change's owner list, and the Doctor work type exists");
+                    scenario.Check(false, "the stand has Shift Change's owner list, and the Doctor work type exists");
                     return;
                 }
 
                 Pawn a = scene.Colonist;
-                Pawn b = AnotherColonist(story, scene, Gender.Female, "GroupB");
+                Pawn b = AnotherColonist(scenario, scene, Gender.Female, "GroupB");
 
                 scene.Comp.SetAutomatic();
                 ours.TryAssignPawn(a);
                 ours.TryAssignPawn(b);
-                story.Check(OwnersAre(ours, a, b),
+                scenario.Check(OwnersAre(ours, a, b),
                             "a stand in service, owned by the group of " + a.LabelShort + " and " + b.LabelShort);
 
                 scene.Comp.SetExcluded();
-                story.Check(scene.Comp.IsExcluded && OwnersAre(ours, a, b),
+                scenario.Check(scene.Comp.IsExcluded && OwnersAre(ours, a, b),
                             "set to Not used for shift changes, it keeps both owners");
 
                 // A stand out of service has no work types to start from, so each tick below
                 // starts a fresh set.
                 scene.Comp.ToggleWork(doctor);
-                story.Check(!scene.Comp.IsExcluded && scene.Comp.WorkTypes.Count == 1,
+                scenario.Check(!scene.Comp.IsExcluded && scene.Comp.WorkTypes.Count == 1,
                             "ticking Doctor puts it back in service, for that one work type");
                 scene.Comp.ToggleWork(doctor);
-                story.Check(scene.Comp.IsExcluded && OwnersAre(ours, a, b),
+                scenario.Check(scene.Comp.IsExcluded && OwnersAre(ours, a, b),
                             "unticking that last work type takes it out again, and it keeps both owners");
 
                 scene.Comp.ToggleRecreation();
-                story.Check(!scene.Comp.IsExcluded && scene.Comp.HandlesRecreation(),
+                scenario.Check(!scene.Comp.IsExcluded && scene.Comp.HandlesRecreation(),
                             "ticking Recreation puts it back in service");
                 scene.Comp.ToggleRecreation();
-                story.Check(scene.Comp.IsExcluded && OwnersAre(ours, a, b),
+                scenario.Check(scene.Comp.IsExcluded && OwnersAre(ours, a, b),
                             "unticking Recreation keeps both owners");
 
                 scene.Comp.ToggleRest();
-                story.Check(!scene.Comp.IsExcluded && scene.Comp.HandlesRest(),
+                scenario.Check(!scene.Comp.IsExcluded && scene.Comp.HandlesRest(),
                             "ticking Sleeping puts it back in service");
                 scene.Comp.ToggleRest();
-                story.Check(scene.Comp.IsExcluded && OwnersAre(ours, a, b),
+                scenario.Check(scene.Comp.IsExcluded && OwnersAre(ours, a, b),
                             "unticking Sleeping keeps both owners");
 
                 scene.Comp.SetAutomatic();
-                story.Check(OwnersAre(ours, a, b), "and set to Automatic (from the room), the group is whole");
-                story.Check(scene.Comp.CanBeClaimedBy(a) && scene.Comp.CanBeClaimedBy(b),
+                scenario.Check(OwnersAre(ours, a, b), "and set to Automatic (from the room), the group is whole");
+                scenario.Check(scene.Comp.CanBeClaimedBy(a) && scene.Comp.CanBeClaimedBy(b),
                             "and either owner may use the stand");
 
                 ours.TryUnassignPawn(a);
@@ -652,52 +652,52 @@ namespace ShiftChange.Tests
         {
             return Staged(StageWithForeignAssignable, BesideAStandWithTwoLists, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 CompAssignableToPawn_ShiftStand ours =
                     scene.OutfitStand.TryGetComp<CompAssignableToPawn_ShiftStand>();
                 CompAssignableToPawn foreign = ForeignAssignableOn(scene.OutfitStand);
                 if (ours == null || foreign == null)
                 {
-                    story.Check(false, "the stand has Shift Change's owner list and another mod's");
+                    scenario.Check(false, "the stand has Shift Change's owner list and another mod's");
                     return;
                 }
                 if (foreign.TotalSlots != 1)
                 {
-                    story.Check(false, "the other mod's list has room for one owner, as Outfit Stands Plus's does");
+                    scenario.Check(false, "the other mod's list has room for one owner, as Outfit Stands Plus's does");
                     return;
                 }
 
                 Pawn a = scene.Colonist;
-                Pawn b = AnotherColonist(story, scene, Gender.Female, "PickB");
-                Pawn c = AnotherColonist(story, scene, Gender.Male, "PickC");
+                Pawn b = AnotherColonist(scenario, scene, Gender.Female, "PickB");
+                Pawn c = AnotherColonist(scenario, scene, Gender.Male, "PickC");
                 string first = a.LabelShort, second = b.LabelShort, third = c.LabelShort;
                 Dialog_AssignStandOwners dialog = new Dialog_AssignStandOwners(ours);
 
                 scene.Comp.SetAutomatic();
                 dialog.Assign(a);
                 dialog.Assign(b);
-                story.Note("in the stand's owner window, " + first + " and then " + second + " are assigned");
-                story.Check(!dialog.SingleOwner, "on a stand in service, the window adds owners rather than picks one");
-                story.Check(OwnersAre(ours, a, b), "so the two make a group");
-                story.Check(foreign.AssignedPawnsForReading.Count == 0,
+                scenario.Note("in the stand's owner window, " + first + " and then " + second + " are assigned");
+                scenario.Check(!dialog.SingleOwner, "on a stand in service, the window adds owners rather than picks one");
+                scenario.Check(OwnersAre(ours, a, b), "so the two make a group");
+                scenario.Check(foreign.AssignedPawnsForReading.Count == 0,
                             "which does not fit the other mod's one place, so its list is empty");
 
                 scene.Comp.SetExcluded();
-                story.Check(dialog.SingleOwner, "set to Not used for shift changes, the window picks one colonist");
-                story.Check(OwnersAre(ours, a, b), "and until a pick is made, the group is kept");
+                scenario.Check(dialog.SingleOwner, "set to Not used for shift changes, the window picks one colonist");
+                scenario.Check(OwnersAre(ours, a, b), "and until a pick is made, the group is kept");
 
                 dialog.Assign(c);
-                story.Check(OwnersAre(ours, c), "picking " + third + " replaces the whole kept group");
-                story.Check(OwnersAre(foreign, c),
+                scenario.Check(OwnersAre(ours, c), "picking " + third + " replaces the whole kept group");
+                scenario.Check(OwnersAre(foreign, c),
                             "and the other list names " + third + ", so the other mod's button comes back");
 
                 dialog.Assign(a);
-                story.Check(OwnersAre(ours, a) && OwnersAre(foreign, a),
+                scenario.Check(OwnersAre(ours, a) && OwnersAre(foreign, a),
                             "picking " + first + " next replaces " + third);
 
                 scene.Comp.SetAutomatic();
-                story.Check(OwnersAre(ours, a),
+                scenario.Check(OwnersAre(ours, a),
                             "back in service, the pick stands, and the group it replaced stays gone");
 
                 ours.TryUnassignPawn(a);
@@ -724,33 +724,33 @@ namespace ShiftChange.Tests
         {
             return Staged(StageWithForeignAssignable, BesideAStandWithTwoLists, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 CompAssignableToPawn_ShiftStand ours =
                     scene.OutfitStand.TryGetComp<CompAssignableToPawn_ShiftStand>();
                 CompAssignableToPawn foreign = ForeignAssignableOn(scene.OutfitStand);
                 if (ours == null || foreign == null)
                 {
-                    story.Check(false, "the stand has Shift Change's owner list and another mod's");
+                    scenario.Check(false, "the stand has Shift Change's owner list and another mod's");
                     return;
                 }
                 if (foreign.TotalSlots != 1)
                 {
-                    story.Check(false, "the other mod's list has room for one owner, as Outfit Stands Plus's does");
+                    scenario.Check(false, "the other mod's list has room for one owner, as Outfit Stands Plus's does");
                     return;
                 }
 
                 Pawn a = scene.Colonist;
-                Pawn b = AnotherColonist(story, scene, Gender.Female, "KeptB");
+                Pawn b = AnotherColonist(scenario, scene, Gender.Female, "KeptB");
 
                 scene.Comp.SetAutomatic();
                 ours.TryAssignPawn(a);
                 ours.TryAssignPawn(b);
                 scene.Comp.SetExcluded();
-                story.Check(OwnersAre(ours, a, b),
+                scenario.Check(OwnersAre(ours, a, b),
                             "a stand set to Not used for shift changes keeps its group of "
                             + a.LabelShort + " and " + b.LabelShort);
-                story.Check(foreign.AssignedPawnsForReading.Count == 0,
+                scenario.Check(foreign.AssignedPawnsForReading.Count == 0,
                             "which fits no single place, so the other mod's list names nobody");
 
                 Map map = scene.Map;
@@ -761,24 +761,24 @@ namespace ShiftChange.Tests
                 MinifiedThing box = scene.OutfitStand.MakeMinified();
                 if (box == null)
                 {
-                    story.Check(false, "the stand can be packed up to move");
+                    scenario.Check(false, "the stand can be packed up to move");
                     return;
                 }
-                story.Check(ours.AssignedPawnsForReading.Count == 0,
+                scenario.Check(ours.AssignedPawnsForReading.Count == 0,
                             "packed up, the stand sets its owners aside, off its list");
 
                 box.InnerThing = null;
                 box.Destroy();
                 GenSpawn.Spawn(scene.OutfitStand, to, map, rot);
-                story.Note("the stand is set down two cells further north");
+                scenario.Note("the stand is set down two cells further north");
 
-                story.Check(scene.OutfitStand.Spawned && scene.Comp.IsExcluded,
+                scenario.Check(scene.OutfitStand.Spawned && scene.Comp.IsExcluded,
                             "it stands again, still not used for shift changes");
-                story.Check(OwnersAre(ours, a, b), "with the whole group back, not just its last member");
-                story.Check(foreign.AssignedPawnsForReading.Count == 0, "and the other list still names nobody");
+                scenario.Check(OwnersAre(ours, a, b), "with the whole group back, not just its last member");
+                scenario.Check(foreign.AssignedPawnsForReading.Count == 0, "and the other list still names nobody");
 
                 scene.Comp.SetAutomatic();
-                story.Check(OwnersAre(ours, a, b), "set to Automatic (from the room), the group may use it again");
+                scenario.Check(OwnersAre(ours, a, b), "set to Automatic (from the room), the group may use it again");
 
                 ours.TryUnassignPawn(a);
                 ours.TryUnassignPawn(b);
@@ -814,15 +814,15 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing), BesideAStand, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 if (Patch_OutfitStandsPlusUseButton.useCompType == null)
                 {
-                    story.KnownGap(false, "Outfit Stands Plus' button gives what its own search gives",
+                    scenario.KnownGap(false, "Outfit Stands Plus' button gives what its own search gives",
                         "Outfit Stands Plus is not on this mod list; --with=khamenman.outfitstandsplus loads it");
                     return;
                 }
-                if (!story.Check(Patch_OutfitStandsPlusUseButton.applied,
+                if (!scenario.Check(Patch_OutfitStandsPlusUseButton.applied,
                                  Patch_OutfitStandsPlusUseButton.applied
                                      ? "Shift Change's change to its button took hold at startup"
                                      : "Shift Change's change to its button took hold at startup; it stood aside because "
@@ -837,12 +837,12 @@ namespace ShiftChange.Tests
                     Patch_OutfitStandsPlusUseButton.walkSite);
                 List<CodeInstruction> running = PatchProcessor.GetCurrentInstructions(
                     Patch_OutfitStandsPlusUseButton.walkSite);
-                story.Check(original.Count(Patch_OutfitStandsPlusUseButton.IsTheWalk) == 1,
+                scenario.Check(original.Count(Patch_OutfitStandsPlusUseButton.IsTheWalk) == 1,
                             "Outfit Stands Plus' own code walks every building the colony owns, once");
-                story.Check(!running.Any(Patch_OutfitStandsPlusUseButton.IsTheWalk)
+                scenario.Check(!running.Any(Patch_OutfitStandsPlusUseButton.IsTheWalk)
                             && running.Count(i => i.Calls(standsCall)) == 1,
                             "the code that runs asks Shift Change's list of stands instead, once");
-                story.Check(Patch_OutfitStandsPlusUseButton.callsReplaced == 1,
+                scenario.Check(Patch_OutfitStandsPlusUseButton.callsReplaced == 1,
                             "as the line Shift Change logged at startup says: "
                             + Patch_OutfitStandsPlusUseButton.callsReplaced + " replaced");
 
@@ -851,7 +851,7 @@ namespace ShiftChange.Tests
                     "OutfitStandsPlus.ThingComps.CompAssignableToPawn_OutfitStandsPlusBase");
                 FieldInfo standField = commandType == null ? null : AccessTools.Field(commandType, "OutfitStand");
                 ThingDef powered = DefDatabase<ThingDef>.GetNamedSilentFail("OutfitStandsPlus_MechanizedOutfitStand");
-                if (!story.Check(standField != null && ownerCompType != null && powered != null,
+                if (!scenario.Check(standField != null && ownerCompType != null && powered != null,
                                  "Outfit Stands Plus' button, owner list and mechanized outfit stand can all be found"))
                 {
                     return;
@@ -859,7 +859,7 @@ namespace ShiftChange.Tests
 
                 Map map = scene.Map;
                 Pawn owner = scene.Colonist;
-                Pawn other = AnotherColonist(story, scene, Gender.Female, "Other");
+                Pawn other = AnotherColonist(scenario, scene, Gender.Female, "Other");
                 IntVec3 origin = scene.OutfitStand.Position;
                 Building_OutfitStand poweredStand = (Building_OutfitStand)DebugTools_Fixtures.Spawn(
                     map, powered, ThingDefOf.Steel, origin + new IntVec3(4, 0, 0), Rot4.North);
@@ -874,7 +874,7 @@ namespace ShiftChange.Tests
                     ForeignAssignableOn(scene.OutfitStand), ForeignAssignableOn(poweredStand),
                     ForeignAssignableOn(secondVanilla), ForeignAssignableOn(unowned),
                 };
-                if (!story.Check(lists.All(c => c != null && ownerCompType.IsInstanceOfType(c)),
+                if (!scenario.Check(lists.All(c => c != null && ownerCompType.IsInstanceOfType(c)),
                                  "every stand carries Outfit Stands Plus' owner list"))
                 {
                     return;
@@ -883,22 +883,22 @@ namespace ShiftChange.Tests
                 lists[1].ForceAddPawn(owner);
                 lists[2].ForceAddPawn(owner);
                 lists[3].ForceAddPawn(owner);
-                story.Note(other.LabelShort + " owns the first stand; " + owner.LabelShort
+                scenario.Note(other.LabelShort + " owns the first stand; " + owner.LabelShort
                            + " owns a mechanized stand, a second stand put up after it, and a third "
                            + "that belongs to no faction");
 
                 ThingComp ownerUse = UseCompOn(owner);
                 ThingComp otherUse = UseCompOn(other);
-                if (!story.Check(ownerUse != null && otherUse != null,
+                if (!scenario.Check(ownerUse != null && otherUse != null,
                                  "both colonists carry Outfit Stands Plus' stand button"))
                 {
                     return;
                 }
 
-                BothAgree(story, ownerUse, otherUse, standField,
+                BothAgree(scenario, ownerUse, otherUse, standField,
                           new[] { poweredStand, secondVanilla }, scene.OutfitStand,
                           "as put up", out List<Gizmo> ownerButtons);
-                story.Check(ownerButtons.Count == 2 && ownerButtons[0].GroupsWith(ownerButtons[1]),
+                scenario.Check(ownerButtons.Count == 2 && ownerButtons[0].GroupsWith(ownerButtons[1]),
                             "the owner's two buttons merge into one, so their order decides where a click goes");
 
                 poweredStand.SetFaction(null);
@@ -906,9 +906,9 @@ namespace ShiftChange.Tests
                 // No faction change clears an owner list, in the game, Outfit Stands Plus or this
                 // mod, so this adds nothing; it stays so the second gather tests the order alone.
                 lists[1].ForceAddPawn(owner);
-                story.Note("the mechanized stand is given to no faction and back, "
+                scenario.Note("the mechanized stand is given to no faction and back, "
                            + "which moves it to the end of the colony's buildings");
-                BothAgree(story, ownerUse, otherUse, standField,
+                BothAgree(scenario, ownerUse, otherUse, standField,
                           new[] { secondVanilla, poweredStand }, scene.OutfitStand,
                           "after the mechanized stand changed hands and came back", out _);
 
@@ -919,7 +919,7 @@ namespace ShiftChange.Tests
                     Type on = Patch_OutfitStandsPlusUseButton.Stands(map.listerBuildings).GetType();
                     Patch_OutfitStandsPlusUseButton.Enabled = false;
                     Type off = Patch_OutfitStandsPlusUseButton.Stands(map.listerBuildings).GetType();
-                    story.Check(on.DeclaringType == typeof(Patch_OutfitStandsPlusUseButton)
+                    scenario.Check(on.DeclaringType == typeof(Patch_OutfitStandsPlusUseButton)
                                 && off.DeclaringType == typeof(ListerBuildings),
                                 "Shift Change's tweak value for it hands back its list when on, "
                                 + "and the game's walk when off");
@@ -935,7 +935,7 @@ namespace ShiftChange.Tests
         /// Gathers both colonists' Outfit Stands Plus buttons with Shift Change's list off, then
         /// on, and checks the walk gives what the world says and the list gives exactly the same.
         /// </summary>
-        internal static void BothAgree(Story story, ThingComp ownerUse, ThingComp otherUse, FieldInfo standField,
+        internal static void BothAgree(Scenario scenario, ThingComp ownerUse, ThingComp otherUse, FieldInfo standField,
                                        Building_OutfitStand[] ownerExpected, Building_OutfitStand otherExpected,
                                        string when, out List<Gizmo> ownerButtons)
         {
@@ -955,13 +955,13 @@ namespace ShiftChange.Tests
                 Patch_OutfitStandsPlusUseButton.Enabled = before;
             }
 
-            story.Check(walkOwner.SequenceEqual(ownerExpected),
+            scenario.Check(walkOwner.SequenceEqual(ownerExpected),
                         when + ": its own walk gives the owner " + Labels(ownerExpected)
                         + ", and not the stand with no faction (got " + Labels(walkOwner) + ")");
-            story.Check(listOwner.SequenceEqual(walkOwner),
+            scenario.Check(listOwner.SequenceEqual(walkOwner),
                         when + ": Shift Change's list gives the owner the same stands in the same order (got "
                         + Labels(listOwner) + ")");
-            story.Check(walkOther.SequenceEqual(new[] { otherExpected }) && listOther.SequenceEqual(walkOther),
+            scenario.Check(walkOther.SequenceEqual(new[] { otherExpected }) && listOther.SequenceEqual(walkOther),
                         when + ": both give the other colonist their own stand and nothing else");
         }
 

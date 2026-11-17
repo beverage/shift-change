@@ -19,7 +19,7 @@ namespace ShiftChange.Tests
     /// happens.</para>
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(RunOrder.First - (int)CaseGroup.ReadingJobsAndRooms)]
-    internal class ReadingJobsAndRooms : StoryFixture
+    internal class ReadingJobsAndRooms : FeatureFixture
     {
         /// <summary>
         /// What Shift Change counts as recreation, and which rooms dress for it, read from the
@@ -38,42 +38,42 @@ namespace ShiftChange.Tests
         {
             return Unstaged(Body);
 
-            void Body(Story story)
+            void Body(Scenario scenario)
             {
                 JobDef chess = DefDatabase<JobDef>.GetNamedSilentFail("Play_Chess");
                 JobDef reading = DefDatabase<JobDef>.GetNamedSilentFail("Reading");
                 JobDef visitSick = DefDatabase<JobDef>.GetNamedSilentFail("VisitSickPawn");
                 if (chess == null || reading == null || visitSick == null)
                 {
-                    story.Check(false, "the game has its chess, reading and visiting-the-sick jobs");
+                    scenario.Check(false, "the game has its chess, reading and visiting-the-sick jobs");
                     return;
                 }
 
-                story.Check(chess.joyKind != null, "chess is still a joy activity to the game");
-                story.Check(Patch_JobInterception.IsRecreationJob(JobMaker.MakeJob(chess)),
+                scenario.Check(chess.joyKind != null, "chess is still a joy activity to the game");
+                scenario.Check(Patch_JobInterception.IsRecreationJob(JobMaker.MakeJob(chess)),
                             "and Shift Change counts it as recreation");
-                story.Check(!Patch_JobInterception.IsRecreationJob(JobMaker.MakeJob(JobDefOf.Wait)),
+                scenario.Check(!Patch_JobInterception.IsRecreationJob(JobMaker.MakeJob(JobDefOf.Wait)),
                             "standing about, which is no joy activity, does not count");
 
-                story.Check(reading.joyKind != null,
+                scenario.Check(reading.joyKind != null,
                             "reading is a joy activity to the game as well, "
                             + "so what leaves it out is how it runs, not its kind");
-                story.Check(!Patch_JobInterception.IsRecreationJob(JobMaker.MakeJob(reading)),
+                scenario.Check(!Patch_JobInterception.IsRecreationJob(JobMaker.MakeJob(reading)),
                             "and it does not count, because a reader picks their spot only once the book is in hand");
 
-                story.Check(visitSick.joyKind != null,
+                scenario.Check(visitSick.joyKind != null,
                             "visiting the sick is still a joy activity to the game");
-                story.Check(Patch_JobInterception.IsRecreationJob(JobMaker.MakeJob(visitSick)),
+                scenario.Check(Patch_JobInterception.IsRecreationJob(JobMaker.MakeJob(visitSick)),
                             "and counts as recreation, so wherever Shift Change looks for its room, "
                             + "it finds the same one");
 
                 RoomRoleDef recRoom = DefDatabase<RoomRoleDef>.GetNamedSilentFail("RecRoom");
                 RoomRoleDef hospital = DefDatabase<RoomRoleDef>.GetNamedSilentFail("Hospital");
-                story.Check(recRoom != null && RoomWorkTypes.RecreationForRole(recRoom),
+                scenario.Check(recRoom != null && RoomWorkTypes.RecreationForRole(recRoom),
                             "a stand in a rec room dresses for recreation without being told");
-                story.Check(hospital == null || !RoomWorkTypes.RecreationForRole(hospital),
+                scenario.Check(hospital == null || !RoomWorkTypes.RecreationForRole(hospital),
                             "one in a hospital, a room for work, does not");
-                story.Check(!RoomWorkTypes.RecreationForRole(null),
+                scenario.Check(!RoomWorkTypes.RecreationForRole(null),
                             "and neither does one in a room with no role");
             }
         }
@@ -91,7 +91,7 @@ namespace ShiftChange.Tests
         {
             return Unstaged(Body);
 
-            void Body(Story story)
+            void Body(Scenario scenario)
             {
                 JobDef laydown = DefDatabase<JobDef>.GetNamedSilentFail("LayDown");
                 JobDef groundSleep = DefDatabase<JobDef>.GetNamedSilentFail("Wait_Asleep");
@@ -99,38 +99,38 @@ namespace ShiftChange.Tests
                 WorkGiverDef recuperate = Giver("PatientGoToBedRecuperate");
                 if (laydown == null || groundSleep == null)
                 {
-                    story.Check(false, "the game has its jobs for lying down and for sleeping on the ground");
+                    scenario.Check(false, "the game has its jobs for lying down and for sleeping on the ground");
                     return;
                 }
 
-                story.Check(laydown.driverClass != null
+                scenario.Check(laydown.driverClass != null
                             && typeof(JobDriver_LayDown).IsAssignableFrom(laydown.driverClass),
                             "lying down still runs the game's lying-down routine");
-                story.Check(groundSleep.driverClass != null
+                scenario.Check(groundSleep.driverClass != null
                             && typeof(JobDriver_LayDown).IsAssignableFrom(groundSleep.driverClass),
                             "so does sleeping on the ground, which is why Shift Change asks for a bed");
-                story.Check(!Patch_JobInterception.IsRestJob(JobMaker.MakeJob(laydown)),
+                scenario.Check(!Patch_JobInterception.IsRestJob(JobMaker.MakeJob(laydown)),
                             "and lying down with no bed does not count as sleep");
 
                 // The medical half: facts of the game's defs and nothing more, all true while the
                 // tickbox does nothing. Bed rest is the work type MedicalRestWorkType charges a
                 // tagged lay-down to; that it dresses is tested where medical bed rest dresses at
                 // a stand holding a gown.
-                story.Check(bedRest != null, "the game still has its bed rest work type");
-                story.Check(bedRest == null || bedRest.visible,
+                scenario.Check(bedRest != null, "the game still has its bed rest work type");
+                scenario.Check(bedRest == null || bedRest.visible,
                             "still shown, so it still appears in the stand's own Work types grid");
-                story.Check(recuperate == null || recuperate.workType == bedRest,
+                scenario.Check(recuperate == null || recuperate.workType == bedRest,
                             "and recuperating in bed is still bed rest work, so charging medical rest "
                             + "to it matches what the work tab shows a player");
 
                 RoomRoleDef bedroom = DefDatabase<RoomRoleDef>.GetNamedSilentFail("Bedroom");
                 RoomRoleDef recRoom = DefDatabase<RoomRoleDef>.GetNamedSilentFail("RecRoom");
-                story.Check(bedroom != null && RoomWorkTypes.RestForRole(bedroom),
+                scenario.Check(bedroom != null && RoomWorkTypes.RestForRole(bedroom),
                             "a stand in a bedroom dresses for sleep without being told");
-                story.Check(recRoom == null || !RoomWorkTypes.RestForRole(recRoom),
+                scenario.Check(recRoom == null || !RoomWorkTypes.RestForRole(recRoom),
                             "one in a rec room does not: no kind of room dresses for more than one of "
                             + "work, recreation and sleep");
-                story.Check(!RoomWorkTypes.RestForRole(null),
+                scenario.Check(!RoomWorkTypes.RestForRole(null),
                             "and neither does one in a room with no role");
             }
         }
@@ -156,15 +156,15 @@ namespace ShiftChange.Tests
         {
             return Unstaged(Body);
 
-            void Body(Story story)
+            void Body(Scenario scenario)
             {
-                story.Check(RoomWorkTypes.Defaults.Count > 0,
+                scenario.Check(RoomWorkTypes.Defaults.Count > 0,
                             "Shift Change knows which work belongs in which kind of room");
                 foreach (KeyValuePair<string, string[]> entry in RoomWorkTypes.Defaults)
                 {
                     string kind = entry.Key.ToLowerInvariant();
                     RoomRoleDef role = DefDatabase<RoomRoleDef>.GetNamedSilentFail(entry.Key);
-                    story.Check(role != null, "the game still knows a " + kind + " when it sees one");
+                    scenario.Check(role != null, "the game still knows a " + kind + " when it sees one");
                     int resolved = 0;
                     for (int i = 0; i < entry.Value.Length; i++)
                     {
@@ -174,7 +174,7 @@ namespace ShiftChange.Tests
                         }
                         else
                         {
-                            story.Check(false, "the game still has " + entry.Value[i]
+                            scenario.Check(false, "the game still has " + entry.Value[i]
                                                + ", work a " + kind + "'s stand dresses for");
                         }
                     }
@@ -194,7 +194,7 @@ namespace ShiftChange.Tests
 
                     if (role != null)
                     {
-                        story.Check(RoomWorkTypes.ForRole(role).Count == resolved,
+                        scenario.Check(RoomWorkTypes.ForRole(role).Count == resolved,
                                     "an automatic stand in a " + kind + " dresses for "
                                     + (resolved == 1 ? "its one work type" : "all " + resolved + " of its work types"));
                     }
@@ -216,10 +216,10 @@ namespace ShiftChange.Tests
         {
             return Unstaged(Body);
 
-            void Body(Story story)
+            void Body(Scenario scenario)
             {
                 WorkTypeDef warden = WorkType("Warden");
-                story.Check(warden != null, "the game still has its Warden work");
+                scenario.Check(warden != null, "the game still has its Warden work");
                 foreach (KeyValuePair<string, string> row in GiverTables.PatientGiverRoles)
                 {
                     WorkGiverDef giver = Giver(row.Key);
@@ -230,11 +230,11 @@ namespace ShiftChange.Tests
                     }
                     if (giver?.workType == null || role == null)
                     {
-                        story.Check(false, "the game still has " + row.Key + ", its work type and the "
+                        scenario.Check(false, "the game still has " + row.Key + ", its work type and the "
                                            + row.Value.ToLowerInvariant() + " room");
                         continue;
                     }
-                    story.Check(RoomWorkTypes.ForRole(role).Contains(giver.workType),
+                    scenario.Check(RoomWorkTypes.ForRole(role).Contains(giver.workType),
                                 "'" + Called(giver, row.Key) + "' is " + WorkCalled(giver.workType, giver.workType.defName)
                                 + " work, which a " + role.label + "'s automatic stand serves");
                 }
@@ -249,17 +249,17 @@ namespace ShiftChange.Tests
                     WorkTypeDef work = giver?.workType;
                     if (work == null)
                     {
-                        story.Check(false, "the game still has " + name + " and its work type");
+                        scenario.Check(false, "the game still has " + name + " and its work type");
                         continue;
                     }
                     if (work != warden && GiverTables.IsModWork(work))
                     {
-                        story.Note("'" + Called(giver, name) + "' is " + work.defName + " work from "
+                        scenario.Note("'" + Called(giver, name) + "' is " + work.defName + " work from "
                                    + (work.modContentPack?.Name ?? "a patch")
                                    + ", which a prison cell's stand serves once ticked beside Warden");
                         continue;
                     }
-                    story.Check(work == warden,
+                    scenario.Check(work == warden,
                                 "'" + Called(giver, name) + "' is Warden work, so a stand ticked for Warden serves it"
                                 + (work == warden ? "" : " (it is " + work.defName + ")"));
                 }
@@ -287,41 +287,41 @@ namespace ShiftChange.Tests
         {
             return Unstaged(Body);
 
-            void Body(Story story)
+            void Body(Scenario scenario)
             {
-                story.Check(JobRoomTargets.RoomIsTargetB.Count > 0,
+                scenario.Check(JobRoomTargets.RoomIsTargetB.Count > 0,
                             "Shift Change lists loading jobs it places where their load lies, not where it goes");
-                story.Check(JobRoomTargets.IgnoredGivers.Count > 0, "work givers whose jobs dress nobody");
-                story.Check(JobRoomTargets.RideAlongJobs.Count > 0, "and follow-up jobs the outfit stays on for");
-                story.Check(!JobRoomTargets.RoomIsTargetB.Any(string.IsNullOrEmpty)
+                scenario.Check(JobRoomTargets.IgnoredGivers.Count > 0, "work givers whose jobs dress nobody");
+                scenario.Check(JobRoomTargets.RideAlongJobs.Count > 0, "and follow-up jobs the outfit stays on for");
+                scenario.Check(!JobRoomTargets.RoomIsTargetB.Any(string.IsNullOrEmpty)
                             && !JobRoomTargets.IgnoredGivers.Any(string.IsNullOrEmpty)
                             && !JobRoomTargets.RideAlongJobs.Any(string.IsNullOrEmpty),
                             "no row on those lists is blank");
-                story.Check(!JobRoomTargets.UsesTargetB(null) && !JobRoomTargets.Ignored(null)
+                scenario.Check(!JobRoomTargets.UsesTargetB(null) && !JobRoomTargets.Ignored(null)
                             && !JobRoomTargets.RidesAlong(null),
                             "and a job of no kind is on none of them");
 
                 // The giver separates a fresh haul from a follow-up: a listed job rides along only
                 // without one.
                 Job unload = JobMaker.MakeJob(JobDefOf.UnloadYourInventory);
-                story.Check(JobRoomTargets.RidesAlong(unload),
+                scenario.Check(JobRoomTargets.RidesAlong(unload),
                             "unloading their inventory, as a haul leaves it with no work giver, keeps the outfit on");
                 unload.workGiverDef = Giver("HaulGeneral");
-                story.Check(unload.workGiverDef == null || !JobRoomTargets.RidesAlong(unload),
+                scenario.Check(unload.workGiverDef == null || !JobRoomTargets.RidesAlong(unload),
                             "and the same unloading handed out as hauling work does not");
-                story.Check(JobRoomTargets.RidesAlong(JobMaker.MakeJob(JobDefOf.Wait_MaintainPosture, 1)),
+                scenario.Check(JobRoomTargets.RidesAlong(JobMaker.MakeJob(JobDefOf.Wait_MaintainPosture, 1)),
                             "the one-tick pause between jobs keeps it on, built as the game builds it");
                 // Both built as the game builds them, with no giver: the carry a feeding or a play
                 // session ends with (ChildcareUtility), and the rescue the childcare giver's NonScanJob
                 // and the think tree hand out.
                 if (JobDefOf.BringBabyToSafety != null)
                 {
-                    story.Check(JobRoomTargets.RidesAlong(JobMaker.MakeJob(JobDefOf.BringBabyToSafety)),
+                    scenario.Check(JobRoomTargets.RidesAlong(JobMaker.MakeJob(JobDefOf.BringBabyToSafety)),
                                 "carrying a baby to safety, as a feeding or a play session ends, keeps it on");
                 }
                 if (JobDefOf.BringBabyToSafetyUnforced != null)
                 {
-                    story.Check(JobRoomTargets.RidesAlong(JobMaker.MakeJob(JobDefOf.BringBabyToSafetyUnforced)),
+                    scenario.Check(JobRoomTargets.RidesAlong(JobMaker.MakeJob(JobDefOf.BringBabyToSafetyUnforced)),
                                 "and so does rescuing a baby left somewhere unsafe");
                 }
 
@@ -333,13 +333,13 @@ namespace ShiftChange.Tests
                     }
                     if (JobRoomTargets.RoomIsTargetB.Contains(job.defName))
                     {
-                        story.Check(false, "the game's own job " + job.defName
+                        scenario.Check(false, "the game's own job " + job.defName
                                            + " is not placed where its load lies");
                     }
                     if (JobRoomTargets.RideAlongJobs.Contains(job.defName)
                         && !GiverTables.DeliberatelyRiddenOfficialJobs.Contains(job.defName))
                     {
-                        story.Check(false, "the game's own job " + job.defName
+                        scenario.Check(false, "the game's own job " + job.defName
                                            + " is not a follow-up the outfit stays on for");
                     }
                 }
@@ -349,7 +349,7 @@ namespace ShiftChange.Tests
                         && JobRoomTargets.IgnoredGivers.Contains(giver.defName)
                         && !GiverTables.DeliberatelyIgnoredOfficialGivers.Contains(giver.defName))
                     {
-                        story.Check(false, "the game's own work giver " + giver.defName
+                        scenario.Check(false, "the game's own work giver " + giver.defName
                                            + " still dresses whoever does its work");
                     }
                     if (giver.modContentPack != null && giver.modContentPack.IsOfficialMod
@@ -358,7 +358,7 @@ namespace ShiftChange.Tests
                         && !(GiverTables.DeliberatelyIgnoredOfficialGivers.Contains(giver.defName)
                              && JobRoomTargets.Ignored(giver)))
                     {
-                        story.Check(false, "the game's meal run " + giver.defName + " (" + giver.giverClass.Name
+                        scenario.Check(false, "the game's meal run " + giver.defName + " (" + giver.giverClass.Name
                                            + ") dresses nobody, and these tests name it");
                     }
                 }
@@ -369,10 +369,10 @@ namespace ShiftChange.Tests
                     {
                         continue;
                     }
-                    story.Check(giver != null && JobRoomTargets.Ignored(giver),
+                    scenario.Check(giver != null && JobRoomTargets.Ignored(giver),
                                 "the game's meal run " + name + " is there, and dresses nobody");
                 }
-                story.Check(DefDatabase<JobDef>.GetNamedSilentFail("UnloadYourInventory") != null,
+                scenario.Check(DefDatabase<JobDef>.GetNamedSilentFail("UnloadYourInventory") != null,
                             "the game's job for unloading an inventory, UnloadYourInventory, is still there");
 
                 // The delivery givers go by class, so they are held to their named official givers the
@@ -383,14 +383,14 @@ namespace ShiftChange.Tests
                     if (giver.modContentPack != null && giver.modContentPack.IsOfficialMod
                         && !GiverTables.OfficialDeliveryGivers.Contains(giver.defName))
                     {
-                        story.Check(false, "the game's own work giver " + giver.defName
+                        scenario.Check(false, "the game's own work giver " + giver.defName
                                            + " is not taken for one that delivers to a site");
                     }
                 }
                 foreach (string name in GiverTables.OfficialDeliveryGivers)
                 {
                     WorkGiverDef giver = Giver(name);
-                    if (!story.Check(giver != null && JobRoomTargets.DeliveryGivers.Contains(giver)
+                    if (!scenario.Check(giver != null && JobRoomTargets.DeliveryGivers.Contains(giver)
                                      && !JobRoomTargets.Ignored(giver),
                                      "the game's " + name + " is there, and delivers to a site "
                                      + "rather than dressing nobody"))
@@ -401,7 +401,7 @@ namespace ShiftChange.Tests
                     delivery.workGiverDef = giver;
                     Job site = JobMaker.MakeJob(JobDefOf.RemoveFloor);
                     site.workGiverDef = giver;
-                    story.Check(JobRoomTargets.IsDelivery(delivery) && !JobRoomTargets.IsDelivery(site),
+                    scenario.Check(JobRoomTargets.IsDelivery(delivery) && !JobRoomTargets.IsDelivery(site),
                                 "its " + delivery.def.defName + " counts as a delivery, "
                                 + "and a floor removal it hands out does not");
                 }
@@ -413,7 +413,7 @@ namespace ShiftChange.Tests
                     Job cutting = JobMaker.MakeJob(JobDefOf.CutPlant);
                     cutting.workGiverDef = seeds;
                     Job unstamped = JobMaker.MakeJob(JobDefOf.PlantSeed);
-                    story.Check(!JobRoomTargets.Ignored(seeds) && JobRoomTargets.IsDelivery(planting)
+                    scenario.Check(!JobRoomTargets.Ignored(seeds) && JobRoomTargets.IsDelivery(planting)
                                 && !JobRoomTargets.IsDelivery(cutting) && !JobRoomTargets.IsDelivery(unstamped),
                                 "sowing a seed counts as a delivery, but cutting a plant in the way, "
                                 + "or sowing no work handed out, does not");
@@ -421,13 +421,13 @@ namespace ShiftChange.Tests
 
                 if (!GiverTables.RimatomicsLoaded)
                 {
-                    story.KnownGap(false, "the lists' rows from other mods resolve against a loaded Rimatomics",
+                    scenario.KnownGap(false, "the lists' rows from other mods resolve against a loaded Rimatomics",
                                    "Rimatomics is not on this mod list, so every name check above was skipped");
                     return;
                 }
                 foreach (string name in JobRoomTargets.RoomIsTargetB)
                 {
-                    story.Check(DefDatabase<JobDef>.GetNamedSilentFail(name) != null,
+                    scenario.Check(DefDatabase<JobDef>.GetNamedSilentFail(name) != null,
                                 "the listed job " + name + " is in the game");
                 }
                 foreach (string name in JobRoomTargets.IgnoredGivers)
@@ -436,7 +436,7 @@ namespace ShiftChange.Tests
                     {
                         continue;
                     }
-                    story.Check(Giver(name) != null,
+                    scenario.Check(Giver(name) != null,
                                 "the listed work giver " + name + " is in the game");
                 }
             }
@@ -456,18 +456,18 @@ namespace ShiftChange.Tests
         {
             return Unstaged(Body);
 
-            void Body(Story story)
+            void Body(Scenario scenario)
             {
                 foreach (string name in new[] { "Hauling", "Cleaning", "Construction", "Firefighter" })
                 {
                     WorkTypeDef work = WorkType(name);
-                    story.Check(work != null && JobRoomTargets.PassesThrough(work),
+                    scenario.Check(work != null && JobRoomTargets.PassesThrough(work),
                                 WorkCalled(work, name).CapitalizeFirst() + " passes through a work stand's radius");
                 }
                 foreach (string name in new[] { "Doctor", "Cooking", "BasicWorker", "PlantCutting", "Growing", "Mining" })
                 {
                     WorkTypeDef work = WorkType(name);
-                    story.Check(work != null && !JobRoomTargets.PassesThrough(work),
+                    scenario.Check(work != null && !JobRoomTargets.PassesThrough(work),
                                 WorkCalled(work, name).CapitalizeFirst() + " does not");
                 }
                 WorkTypeDef tagged = new WorkTypeDef
@@ -476,35 +476,35 @@ namespace ShiftChange.Tests
                     workTags = WorkTags.ManualDumb | WorkTags.Hauling,
                 };
                 WorkTypeDef untagged = new WorkTypeDef { defName = "Hauling", workTags = WorkTags.ManualDumb };
-                story.Note("two made-up work types: one tagged as hauling under a name of its own, "
+                scenario.Note("two made-up work types: one tagged as hauling under a name of its own, "
                            + "one called Hauling with no such tag");
-                story.Check(JobRoomTargets.PassesThrough(tagged),
+                scenario.Check(JobRoomTargets.PassesThrough(tagged),
                             "a mod's work type tagged as hauling passes through, whatever it is called");
-                story.Check(!JobRoomTargets.PassesThrough(untagged),
+                scenario.Check(!JobRoomTargets.PassesThrough(untagged),
                             "and one called Hauling without the tag does not: the tag is the test");
-                story.Check(!JobRoomTargets.PassesThrough(null), "nor does a job of no work type");
+                scenario.Check(!JobRoomTargets.PassesThrough(null), "nor does a job of no work type");
 
                 WorkGiverDef giver = Giver("HaulGeneral");
-                story.Check(JobRoomTargets.IncidentalJobs.Count == 6,
+                scenario.Check(JobRoomTargets.IncidentalJobs.Count == 6,
                             "Shift Change lists six odd jobs that keep the outfit on inside a stand's radius");
-                story.Check(giver != null, "the game's general hauling work is there");
+                scenario.Check(giver != null, "the game's general hauling work is there");
                 foreach (string name in JobRoomTargets.IncidentalJobs)
                 {
                     JobDef def = DefDatabase<JobDef>.GetNamedSilentFail(name);
-                    if (!story.Check(def != null, "the game has its " + name + " job, so the row can match"))
+                    if (!scenario.Check(def != null, "the game has its " + name + " job, so the row can match"))
                     {
                         continue;
                     }
                     Job job = JobMaker.MakeJob(def);
-                    story.Check(JobRoomTargets.IsIncidental(job),
+                    scenario.Check(JobRoomTargets.IsIncidental(job),
                                 name + ", when no work handed it out, is one of them");
                     job.workGiverDef = giver;
-                    story.Check(!JobRoomTargets.IsIncidental(job), "and handed out as hauling work, it is not");
+                    scenario.Check(!JobRoomTargets.IsIncidental(job), "and handed out as hauling work, it is not");
                 }
                 foreach (JobDef def in new[] { JobDefOf.LayDown, JobDefOf.Ingest, JobDefOf.HaulToCell,
                                                JobDefOf.Wait_Combat })
                 {
-                    story.Check(!JobRoomTargets.IsIncidental(JobMaker.MakeJob(def)),
+                    scenario.Check(!JobRoomTargets.IsIncidental(JobMaker.MakeJob(def)),
                                 def.defName + " is no odd job");
                 }
             }
@@ -527,16 +527,16 @@ namespace ShiftChange.Tests
         {
             return Unstaged(Body);
 
-            void Body(Story story)
+            void Body(Scenario scenario)
             {
-                story.Check(RoomContentsWork.Markers.Length > 0,
+                scenario.Check(RoomContentsWork.Markers.Length > 0,
                             "Shift Change lists buildings whose presence gives a room its work");
-                story.Check(RoomContentsWork.Markers.Select(m => m.typeName).Distinct().Count()
+                scenario.Check(RoomContentsWork.Markers.Select(m => m.typeName).Distinct().Count()
                             == RoomContentsWork.Markers.Length,
                             "and lists none of them twice");
                 foreach (RoomContentsWork.Marker marker in RoomContentsWork.Markers)
                 {
-                    story.Check(!marker.typeName.NullOrEmpty()
+                    scenario.Check(!marker.typeName.NullOrEmpty()
                                 && marker.workNames != null && marker.workNames.Length > 0,
                                 marker.typeName + " names what to look for and at least one work type");
                 }
@@ -549,15 +549,15 @@ namespace ShiftChange.Tests
                     .FirstOrDefault(d => d.comps == null || d.comps.Count == 0);
                 if (withComps != null)
                 {
-                    story.Check(RoomContentsWork.HasComp(withComps, typeof(ThingComp)),
+                    scenario.Check(RoomContentsWork.HasComp(withComps, typeof(ThingComp)),
                                 "Shift Change sees the components " + withComps.defName + " is built with");
                 }
                 if (without != null)
                 {
-                    story.Check(!RoomContentsWork.HasComp(without, typeof(ThingComp)),
+                    scenario.Check(!RoomContentsWork.HasComp(without, typeof(ThingComp)),
                                 "and sees none on " + without.defName + ", which has none");
                 }
-                story.Check(!RoomContentsWork.HasComp(null, typeof(ThingComp)),
+                scenario.Check(!RoomContentsWork.HasComp(null, typeof(ThingComp)),
                             "and asking about no building at all is harmless");
 
                 foreach (RoomContentsWork.Marker marker in RoomContentsWork.Markers)
@@ -566,13 +566,13 @@ namespace ShiftChange.Tests
                     {
                         continue;   // that mod is not installed; the row simply drops
                     }
-                    story.Check(RoomContentsWork.Active.Contains(marker),
+                    scenario.Check(RoomContentsWork.Active.Contains(marker),
                                 "with its mod loaded, " + marker.typeName
                                 + " found its work types too, not just its building");
                 }
                 if (!GiverTables.RimatomicsLoaded)
                 {
-                    story.KnownGap(false, "every listed building finds its work against a loaded Rimatomics",
+                    scenario.KnownGap(false, "every listed building finds its work against a loaded Rimatomics",
                                    "Rimatomics is not on this mod list, so no marker could resolve");
                 }
             }
@@ -599,7 +599,7 @@ namespace ShiftChange.Tests
         {
             return Unstaged(Body);
 
-            void Body(Story story)
+            void Body(Scenario scenario)
             {
                 // Called by reflection: the mod's dll names Rect's 1.6 assembly, which 1.7 maps to its
                 // own Rect when it loads the dll, so the compiler sees two types where the game has one.
@@ -607,7 +607,7 @@ namespace ShiftChange.Tests
                     typeof(Dialog_SetStandWorkTypes), nameof(Dialog_SetStandWorkTypes.BodyRect));
                 if (bodyRect == null)
                 {
-                    story.Check(false, "the Work types window's sizing is there to call");
+                    scenario.Check(false, "the Work types window's sizing is there to call");
                     return;
                 }
                 float[] bodies = { 180f, 533f, 665f, 847f, 1200f };
@@ -621,7 +621,7 @@ namespace ShiftChange.Tests
                         Rect given = (Rect)bodyRect.Invoke(null, args);
                         bool scrolling = (bool)args[2];
 
-                        story.Check(given.height >= bodies[b] - 0.5f,
+                        scenario.Check(given.height >= bodies[b] - 0.5f,
                                     "a list " + bodies[b].ToString("0") + " tall, in a window "
                                     + contents[c].ToString("0") + " tall, is given "
                                     + given.height.ToString("0") + ", room for all of it");
@@ -629,7 +629,7 @@ namespace ShiftChange.Tests
                         // A body that fits must not open a scroll view: every clipped region is one
                         // more thing that has to clip the way we assume.
                         bool shouldScroll = bodies[b] > contents[c] + 1f;
-                        story.Check(scrolling == shouldScroll,
+                        scenario.Check(scrolling == shouldScroll,
                                     shouldScroll
                                         ? "and it scrolls, being taller than the window"
                                         : "and it does not scroll, since it fits");
@@ -658,7 +658,7 @@ namespace ShiftChange.Tests
         {
             return OnThePad(Body);
 
-            void Body(Story story)
+            void Body(Scenario scenario)
             {
                 Map map = Map;
                 CellRect pad = Pad;
@@ -684,24 +684,24 @@ namespace ShiftChange.Tests
                 {
                     wall = GenSpawn.Spawn(ThingMaker.MakeThing(ThingDefOf.Wall, ThingDefOf.Steel),
                                           cell, map);
-                    if (!story.Check(wall != null && wall.Spawned,
+                    if (!scenario.Check(wall != null && wall.Spawned,
                                      "a steel wall goes up in the middle of the pad, standing in for a solid machine"))
                     {
                         return;
                     }
-                    story.Check(wall.def.passability == Traversability.Impassable
+                    scenario.Check(wall.def.passability == Traversability.Impassable
                                 && wall.def.Fillage == FillCategory.Full,
                                 "nobody can walk through it, and it fills its cell");
-                    story.Check(cell.GetRoom(map) == null,
+                    scenario.Check(cell.GetRoom(map) == null,
                                 "so its own cell belongs to no room, the case this test is about");
 
                     IntVec3 bearing = Patch_JobInterception.RoomBearing(
                         cell, new LocalTargetInfo(wall), map);
                     Room after = bearing.GetRoom(map);
-                    story.Check(after != null, "a job at the wall is placed in a cell that has a room");
+                    scenario.Check(after != null, "a job at the wall is placed in a cell that has a room");
 
                     // Read from the probe after the spawn, so both sides come from the same generation.
-                    story.Check(before == null || probe.IsValid,
+                    scenario.Check(before == null || probe.IsValid,
                                 "a cell beside the wall was in its room before it went up");
                     Room expected = probe.IsValid ? probe.GetRoom(map) : null;
                     bool sameRoom = before == null || expected == null || after == expected;
@@ -710,7 +710,7 @@ namespace ShiftChange.Tests
                         // Name both rooms: a bare mismatch cannot tell a genuinely split room from a
                         // rebuilt object carrying the same cells. `before` is read after the spawn, so
                         // it reports whatever its abandoned object last cached.
-                        story.Note("expected room " + (expected == null ? -1 : expected.ID)
+                        scenario.Note("expected room " + (expected == null ? -1 : expected.ID)
                                    + " (" + (expected == null ? -1 : expected.CellCount)
                                    + " cells), stale before room " + before.ID
                                    + " (" + before.CellCount + " cells, outdoors " + before.PsychologicallyOutdoors
@@ -722,7 +722,7 @@ namespace ShiftChange.Tests
                                    + "), bearing " + bearing + " from " + cell + ", pad " + pad
                                    + ", regions dirty on entry " + dirtyOnEntry);
                     }
-                    story.Check(sameRoom, "and it is that room, the one the wall stands in");
+                    scenario.Check(sameRoom, "and it is that room, the one the wall stands in");
                 }
                 finally
                 {
@@ -758,7 +758,7 @@ namespace ShiftChange.Tests
         {
             return OnThePad(Body);
 
-            void Body(Story story)
+            void Body(Scenario scenario)
             {
                 Map map = Map;
                 CellRect pad = Pad;
@@ -770,19 +770,19 @@ namespace ShiftChange.Tests
                 {
                     GenDebug.ClearArea(surround, map);
                     SceneKit.EnclosePad(map, pad);
-                    story.Note("the pad and a cell around it are cleared, then the pad is walled in wood, "
+                    scenario.Note("the pad and a cell around it are cleared, then the pad is walled in wood, "
                                + "floored and roofed");
 
                     Room inside = pad.CenterCell.GetRoom(map);
-                    if (!story.Check(inside != null && !inside.PsychologicallyOutdoors,
+                    if (!scenario.Check(inside != null && !inside.PsychologicallyOutdoors,
                                      "the walled pad makes a real indoor room"))
                     {
                         return;
                     }
 
                     int x = pad.CenterCell.x;
-                    EdgeWallFindsTheRoom(story, map, new IntVec3(x, 0, pad.maxZ), inside, "north");
-                    EdgeWallFindsTheRoom(story, map, new IntVec3(x, 0, pad.minZ), inside, "south");
+                    EdgeWallFindsTheRoom(scenario, map, new IntVec3(x, 0, pad.maxZ), inside, "north");
+                    EdgeWallFindsTheRoom(scenario, map, new IntVec3(x, 0, pad.minZ), inside, "south");
                 }
                 finally
                 {
@@ -801,10 +801,10 @@ namespace ShiftChange.Tests
         /// and the test proves nothing), and a job at the wall must be placed in the room, not
         /// outdoors.
         /// </summary>
-        internal static void EdgeWallFindsTheRoom(Story story, Map map, IntVec3 cell, Room inside, string edge)
+        internal static void EdgeWallFindsTheRoom(Scenario scenario, Map map, IntVec3 cell, Room inside, string edge)
         {
             Thing wall = cell.GetEdifice(map);
-            if (!story.Check(wall != null, "there is a wall on the pad's " + edge + " side"))
+            if (!scenario.Check(wall != null, "there is a wall on the pad's " + edge + " side"))
             {
                 return;
             }
@@ -832,13 +832,13 @@ namespace ShiftChange.Tests
                 }
             }
 
-            story.Check(inRoom > 0 && inRoom == elsewhere,
+            scenario.Check(inRoom > 0 && inRoom == elsewhere,
                         "the cells around the " + edge + " wall split evenly, " + inRoom + " in the room and "
                         + elsewhere + " outside, so a tie-break decides");
 
             IntVec3 bearing = Patch_JobInterception.RoomBearing(
                 cell, new LocalTargetInfo(wall), map);
-            story.Check(bearing.GetRoom(map) == inside,
+            scenario.Check(bearing.GetRoom(map) == inside,
                         "a job at the " + edge + " wall is placed in the room it encloses");
         }
 

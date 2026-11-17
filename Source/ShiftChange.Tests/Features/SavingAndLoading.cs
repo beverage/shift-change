@@ -29,7 +29,7 @@ namespace ShiftChange.Tests
     [WarningsAllowedFrom(SavingAndLoading.VarietyFrame, SavingAndLoading.StaleReference)]
     [ErrorsAllowedFrom(SavingAndLoading.VarietyFrame, SavingAndLoading.WrongReference)]
     [ErrorsAllowedFrom(SavingAndLoading.OwnLoadFrame, SavingAndLoading.VehicleCacheAbort)]
-    internal class SavingAndLoading : StoryFixture, IWorldGeneration
+    internal class SavingAndLoading : FeatureFixture, IWorldGeneration
     {
         WorldGenerationSettings IWorldGeneration.WorldGenerationSettings
         {
@@ -181,29 +181,29 @@ namespace ShiftChange.Tests
         {
             return OnThePad(Body);
 
-            void Body(Story story)
+            void Body(Scenario scenario)
             {
                 Scene scene = Build(Map, Pad);
                 if (scene == null)
                 {
-                    story.Check(false, "a colonist on shift at a stand can be set up on the pad");
+                    scenario.Check(false, "a colonist on shift at a stand can be set up on the pad");
                     return;
                 }
                 string name = scene.Colonist.LabelShort;
-                story.Note(name + " is on shift at a stand: he wears what it held, and it keeps the "
+                scenario.Note(name + " is on shift at a stand: he wears what it held, and it keeps the "
                            + "clothes of his that made way");
 
                 CompAssignableToPawn_ShiftStand owned =
                     scene.OutfitStand.TryGetComp<CompAssignableToPawn_ShiftStand>();
                 if (owned == null)
                 {
-                    story.Check(false, "the stand has Shift Change's owner list");
+                    scenario.Check(false, "the stand has Shift Change's owner list");
                     return;
                 }
                 // Through the comp's own call, not its backing list: the copy into another mod's
                 // owner list happens there.
                 owned.TryAssignPawn(scene.Colonist);
-                story.Note(name + " is made the stand's owner");
+                scenario.Note(name + " is made the stand's owner");
 
                 // Build leaves the forced marks empty, and they are under test: record the change
                 // again through NotifyDressed with one kept garment marked.
@@ -211,12 +211,12 @@ namespace ShiftChange.Tests
                 List<Apparel> issued = new List<Apparel>(scene.Comp.issuedUniform);
                 if (stored.Count == 0 || issued.Count == 0)
                 {
-                    story.Check(false, "the stand keeps clothes of " + name + "'s, and has lent him its own");
+                    scenario.Check(false, "the stand keeps clothes of " + name + "'s, and has lent him its own");
                     return;
                 }
                 scene.Comp.NotifyDressed(scene.Colonist, stored, issued,
                                        new List<Apparel> { stored[0] });
-                story.Note("the change is recorded again, with " + name + "'s " + stored[0].def.label
+                scenario.Note("the change is recorded again, with " + name + "'s " + stored[0].def.label
                            + " remembered as forced, as clothes he was told to wear are");
 
                 // What the stand serves rides in the same save, at a radius other than the default
@@ -225,13 +225,13 @@ namespace ShiftChange.Tests
                 WorkTypeDef doctor = WorkType("Doctor");
                 if (doctor == null)
                 {
-                    story.Check(false, "the game has its Doctor work");
+                    scenario.Check(false, "the game has its Doctor work");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(9);
-                story.Note(doctor.labelShort + " is ticked, and the stand serves within 9 cells");
+                scenario.Note(doctor.labelShort + " is ticked, and the stand serves within 9 cells");
 
                 // Captured before the load: afterwards these objects belong to a disposed game.
                 IntVec3 standCell = scene.OutfitStand.Position;
@@ -249,10 +249,10 @@ namespace ShiftChange.Tests
                 if (Patch_AllowRemovingToggle.AllowRemovingItemsRef != null)
                 {
                     Patch_AllowRemovingToggle.AllowRemovingItemsRef(scene.OutfitStand) = true;
-                    story.Note("Allow removing items is switched on, as a save can carry it");
+                    scenario.Note("Allow removing items is switched on, as a save can carry it");
                 }
 
-                if (!TrySave(story, SaveName, out string savePath))
+                if (!TrySave(scenario, SaveName, out string savePath))
                 {
                     return;
                 }
@@ -265,16 +265,16 @@ namespace ShiftChange.Tests
                 int foreignCopies = scene.OutfitStand.AllComps.OfType<CompAssignableToPawn>()
                     .Count(c => !(c is CompAssignableToPawn_ShiftStand));
                 int genericHits = NodeBodies(saved, LegacyKey).Count(body => body.Contains(ownerLoadID));
-                story.Note("Shift Change saves a stand's owners under a key of its own, " + OurKey
+                scenario.Note("Shift Change saves a stand's owners under a key of its own, " + OurKey
                            + "; the game's owner lists, and older versions of Shift Change, under " + LegacyKey);
-                story.Check(NodeContains(saved, OurKey, ownerLoadID),
+                scenario.Check(NodeContains(saved, OurKey, ownerLoadID),
                             "the save names " + name + " as the stand's owner under Shift Change's own key");
-                story.Check(genericHits == foreignCopies,
+                scenario.Check(genericHits == foreignCopies,
                             foreignCopies == 0
                                 ? "and not under the game's"
                                 : "and under the game's only as the other mod's list's copy (" + genericHits
                                   + " found, " + foreignCopies + " expected)");
-                story.Check(saved.Contains("<shiftChangeServes>Radius</shiftChangeServes>")
+                scenario.Check(saved.Contains("<shiftChangeServes>Radius</shiftChangeServes>")
                             && saved.Contains("<shiftChangeServeRadius>9</shiftChangeServeRadius>"),
                             "the save says the stand serves within 9 cells, under Shift Change's own keys");
 
@@ -282,7 +282,7 @@ namespace ShiftChange.Tests
                 // stand that already exists: the setting is read only as a stand is made.
                 bool newStandsWas = ShiftChangeMod.Settings.newStandsInService;
                 ShiftChangeMod.Settings.newStandsInService = false;
-                story.Note("New stands are used for shift changes is switched off for the load");
+                scenario.Note("New stands are used for shift changes is switched off for the load");
                 try
                 {
                     Load(SaveName);
@@ -291,20 +291,20 @@ namespace ShiftChange.Tests
                 {
                     ShiftChangeMod.Settings.newStandsInService = newStandsWas;
                 }
-                story.Note("the game is loaded from " + SaveName + ", in place of the one it was saved from");
+                scenario.Note("the game is loaded from " + SaveName + ", in place of the one it was saved from");
 
                 // A line known to be there, for the checks that a line is absent: logged after the
                 // load, so that a load which cleared the log could not hide it.
                 Log.Message(SaveRoundTrip.Probe);
-                story.Check(Logged(SaveRoundTrip.Probe),
+                scenario.Check(Logged(SaveRoundTrip.Probe),
                             "a line just written to the log is found there, so searching the log works");
-                story.Check(!Logged(UnconsumedWarning),
+                scenario.Check(!Logged(UnconsumedWarning),
                             "the load resolved every reference it read: the log has no warning of any left over");
 
                 Building_OutfitStand loaded = FindStand(standCell);
                 if (loaded == null)
                 {
-                    MissingStand(story, "the stand is back at " + standCell + " after loading");
+                    MissingStand(scenario, "the stand is back at " + standCell + " after loading");
                     return;
                 }
 
@@ -313,30 +313,30 @@ namespace ShiftChange.Tests
                     loaded.TryGetComp<CompAssignableToPawn_ShiftStand>();
                 if (ledger == null || assign == null)
                 {
-                    story.Check(false, "the loaded stand still has Shift Change's settings and owner list");
+                    scenario.Check(false, "the loaded stand still has Shift Change's settings and owner list");
                     return;
                 }
 
-                story.Check(assign.AssignedPawnsForReading.Any(p => p != null && p.thingIDNumber == ownerID),
+                scenario.Check(assign.AssignedPawnsForReading.Any(p => p != null && p.thingIDNumber == ownerID),
                             name + " is still the stand's owner");
-                story.Check(ledger.Borrower != null && ledger.Borrower.thingIDNumber == ownerID,
+                scenario.Check(ledger.Borrower != null && ledger.Borrower.thingIDNumber == ownerID,
                             "and still the one it lends its outfit to");
-                story.Check(ledger.OnShift, "the stand's shift is still on");
-                story.Check(ledger.storedOwnerApparel.Count == storedCount,
+                scenario.Check(ledger.OnShift, "the stand's shift is still on");
+                scenario.Check(ledger.storedOwnerApparel.Count == storedCount,
                             "it still keeps all " + storedCount + " of " + name + "'s own garments");
-                story.Check(ledger.issuedUniform.Count == issuedCount,
+                scenario.Check(ledger.issuedUniform.Count == issuedCount,
                             "and still has all " + issuedCount + " of its own lent to him");
-                story.Check(ledger.storedForcedApparel.Any(a => a != null
+                scenario.Check(ledger.storedForcedApparel.Any(a => a != null
                                 && a.GetUniqueLoadID() == forcedLoadID),
                             "his " + forcedLabel + " is still remembered as forced, the same garment");
-                story.Check(ledger.serves == CatchmentKind.Radius && ledger.serveRadius == 9,
+                scenario.Check(ledger.serves == CatchmentKind.Radius && ledger.serveRadius == 9,
                             "the stand still serves within 9 cells");
-                story.Check(CompShiftStand.CatchmentStands.Contains(ledger),
+                scenario.Check(CompShiftStand.CatchmentStands.Contains(ledger),
                             "and the load listed it again among the stands that serve beyond their room");
-                story.Check(!ledger.IsExcluded,
+                scenario.Check(!ledger.IsExcluded,
                             "the loaded stand is still used for shift changes, though New stands are used "
                             + "for shift changes was off: that setting reaches only stands built after it");
-                story.Check(Patch_AllowRemovingToggle.AllowRemovingItemsRef != null
+                scenario.Check(Patch_AllowRemovingToggle.AllowRemovingItemsRef != null
                                 && !Patch_AllowRemovingToggle.AllowRemovingItemsRef(loaded),
                             "and Allow removing items, saved on, came back off, as for any stand in service");
             }
@@ -370,13 +370,13 @@ namespace ShiftChange.Tests
         {
             return Unstaged(Body);
 
-            void Body(Story story)
+            void Body(Scenario scenario)
             {
                 SavesInUse.Add(SaveName);
                 string sourcePath = GenFilePaths.FilePathForSavedGame(SaveName);
                 if (!File.Exists(sourcePath))
                 {
-                    story.Check(false, "the save the test before wrote, " + SaveName + ", is there to rewrite");
+                    scenario.Check(false, "the save the test before wrote, " + SaveName + ", is there to rewrite");
                     return;
                 }
                 string source = File.ReadAllText(sourcePath);
@@ -387,7 +387,7 @@ namespace ShiftChange.Tests
                 string ownerLoadID = FirstListEntry(source, OurKey);
                 if (ownerLoadID == null)
                 {
-                    story.Check(false, "that save names the stand's owner under Shift Change's own key");
+                    scenario.Check(false, "that save names the stand's owner under Shift Change's own key");
                     return;
                 }
 
@@ -397,38 +397,38 @@ namespace ShiftChange.Tests
                     OurMarkerNode, ""), CatchmentNodes, "");
                 if (!NodeContains(legacy, LegacyKey, ownerLoadID))
                 {
-                    story.Check(false, "rewritten, it names the owner under the game's key instead");
+                    scenario.Check(false, "rewritten, it names the owner under the game's key instead");
                     return;
                 }
                 SavesInUse.Add(LegacySaveName);
                 File.WriteAllText(GenFilePaths.FilePathForSavedGame(LegacySaveName), legacy);
-                story.Note(SaveName + " is rewritten as " + LegacySaveName + ", the way an older Shift "
+                scenario.Note(SaveName + " is rewritten as " + LegacySaveName + ", the way an older Shift "
                            + "Change saved: the stand's owners under the game's key, " + LegacyKey
                            + ", not its own");
 
-                story.Check(!legacy.Contains(OurMarkerKey),
+                scenario.Check(!legacy.Contains(OurMarkerKey),
                             "the rewritten save has no mark that the stand's owner lists were reconciled, "
                             + "as no save that old does");
-                story.Check(source.Contains("<" + CatchmentKeyPrefix) && !legacy.Contains("<" + CatchmentKeyPrefix),
+                scenario.Check(source.Contains("<" + CatchmentKeyPrefix) && !legacy.Contains("<" + CatchmentKeyPrefix),
                             "nor what the stand serves, which the save it came from had, as no save that old does");
 
                 Load(LegacySaveName);
-                story.Note("the game is loaded from " + LegacySaveName);
+                scenario.Note("the game is loaded from " + LegacySaveName);
 
-                story.Check(!Logged(UnconsumedWarning),
+                scenario.Check(!Logged(UnconsumedWarning),
                             "loading it resolved every reference it read: the log has no warning of any left over");
 
                 Building_OutfitStand loaded = FindStandAnywhere();
                 if (loaded == null)
                 {
-                    MissingStand(story, "the stand is on the loaded map");
+                    MissingStand(scenario, "the stand is on the loaded map");
                     return;
                 }
                 CompAssignableToPawn_ShiftStand assign =
                     loaded.TryGetComp<CompAssignableToPawn_ShiftStand>();
                 if (assign == null)
                 {
-                    story.Check(false, "the loaded stand still has Shift Change's owner list");
+                    scenario.Check(false, "the loaded stand still has Shift Change's owner list");
                     return;
                 }
 
@@ -438,11 +438,11 @@ namespace ShiftChange.Tests
                     .ToList();
                 if (foreigners.Count == 0)
                 {
-                    KeyMigration(story, assign, ownerLoadID);
+                    KeyMigration(scenario, assign, ownerLoadID);
                 }
                 else
                 {
-                    DeclinedAndReconciled(story, assign, foreigners, ownerLoadID);
+                    DeclinedAndReconciled(scenario, assign, foreigners, ownerLoadID);
                 }
             }
         }
@@ -477,12 +477,12 @@ namespace ShiftChange.Tests
         {
             return Unstaged(Body);
 
-            void Body(Story story)
+            void Body(Scenario scenario)
             {
                 Map map = Find.CurrentMap;
                 if (map == null || !TryFindPad(map, out IntVec3 origin))
                 {
-                    CannotStage(story, "the loaded map has a clear pad to set a stand up on");
+                    CannotStage(scenario, "the loaded map has a clear pad to set a stand up on");
                     return;
                 }
                 // A fresh pad on the current map: the map and pad DevTools handed these tests
@@ -492,7 +492,7 @@ namespace ShiftChange.Tests
                 ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
                 if (standDef == null)
                 {
-                    story.Check(false, "the game has its outfit stand");
+                    scenario.Check(false, "the game has its outfit stand");
                     return;
                 }
 
@@ -513,23 +513,23 @@ namespace ShiftChange.Tests
                 {
                     foreignProps = new CompProperties_AssignableToPawn();
                     standDef.comps.Add(foreignProps);
-                    story.Note("every outfit stand is given a second owner list, the game's own kind, "
+                    scenario.Note("every outfit stand is given a second owner list, the game's own kind, "
                                + "as another outfit-stand mod gives one");
                 }
                 else
                 {
-                    story.Note("outfit stands already carry another mod's owner list");
+                    scenario.Note("outfit stands already carry another mod's owner list");
                 }
                 try
                 {
                     Scene scene = Stage(map, pad, StageKit.Displacing);
                     if (scene == null)
                     {
-                        story.Check(false, "a stand with the second owner list, and a colonist, could be set up");
+                        scenario.Check(false, "a stand with the second owner list, and a colonist, could be set up");
                         return;
                     }
                     string name = scene.Colonist.LabelShort;
-                    story.Note("a stand holding a duster, and " + name
+                    scenario.Note("a stand holding a duster, and " + name
                                + " beside it in a shirt, trousers and a parka");
 
                     List<CompAssignableToPawn> foreigners = scene.OutfitStand.AllComps
@@ -541,7 +541,7 @@ namespace ShiftChange.Tests
                         scene.OutfitStand.TryGetComp<CompAssignableToPawn_ShiftStand>();
                     if (foreign == null || ours == null)
                     {
-                        story.Check(false, "the stand has Shift Change's owner list and another mod's");
+                        scenario.Check(false, "the stand has Shift Change's owner list and another mod's");
                         return;
                     }
 
@@ -552,45 +552,45 @@ namespace ShiftChange.Tests
                     ours.ownersUnified = false;
                     string ownerLoadID = scene.Colonist.GetUniqueLoadID();
                     IntVec3 standCell = scene.OutfitStand.Position;
-                    story.Note(name + " is made the stand's owner through the other list alone, and the "
+                    scenario.Note(name + " is made the stand's owner through the other list alone, and the "
                                + "stand is not marked reconciled, as a stand from before Shift Change "
                                + "copied its owners across");
 
                     // Checked, so a mod list that grows a second other list says so: the test is
                     // Shift Change's list against theirs, and a second turns it into theirs against
                     // theirs while it still goes through the motions.
-                    story.Check(foreigners.Count == 1,
+                    scenario.Check(foreigners.Count == 1,
                                 "the stand carries exactly one other mod's owner list, so what is tried "
                                 + "is Shift Change's list against that one");
-                    story.Check(ours.AssignedPawnsForReading.Count == 0,
+                    scenario.Check(ours.AssignedPawnsForReading.Count == 0,
                                 "Shift Change's own list starts empty: " + name
                                 + " is the other list's owner, not its own");
 
-                    if (!TrySave(story, ForeignSaveName, out string savePath))
+                    if (!TrySave(scenario, ForeignSaveName, out string savePath))
                     {
                         return;
                     }
                     string saved = File.ReadAllText(savePath);
-                    story.Check(NodeContains(saved, LegacyKey, ownerLoadID),
+                    scenario.Check(NodeContains(saved, LegacyKey, ownerLoadID),
                                 "the save names " + name + " under the game's key, " + LegacyKey
                                 + ", the other list's");
-                    story.Check(!NodeContains(saved, OurKey, ownerLoadID),
+                    scenario.Check(!NodeContains(saved, OurKey, ownerLoadID),
                                 "and never under Shift Change's own");
 
                     Load(ForeignSaveName);
-                    story.Note("the game is loaded from " + ForeignSaveName);
+                    scenario.Note("the game is loaded from " + ForeignSaveName);
 
-                    story.Check(!Logged(DuplicateRegistration),
+                    scenario.Check(!Logged(DuplicateRegistration),
                                 "no list read the shared key twice: the log has no warning of it");
-                    story.Check(!Logged(FailedTake),
+                    scenario.Check(!Logged(FailedTake),
                                 "none asked for references it never read");
-                    story.Check(!Logged(UnconsumedWarning),
+                    scenario.Check(!Logged(UnconsumedWarning),
                                 "and the load resolved every reference it read, with none left over");
 
                     Building_OutfitStand loaded = FindStand(standCell) ?? FindStandAnywhere();
                     if (loaded == null)
                     {
-                        MissingStand(story, "the stand is on the loaded map");
+                        MissingStand(scenario, "the stand is on the loaded map");
                         return;
                     }
                     CompAssignableToPawn loadedForeign = loaded.AllComps
@@ -600,17 +600,17 @@ namespace ShiftChange.Tests
                         loaded.TryGetComp<CompAssignableToPawn_ShiftStand>();
                     if (loadedForeign == null || loadedOurs == null)
                     {
-                        story.Check(false, "the loaded stand still has both owner lists");
+                        scenario.Check(false, "the loaded stand still has both owner lists");
                         return;
                     }
 
-                    story.Check(loadedForeign.AssignedPawnsForReading.Any(p => p != null
+                    scenario.Check(loadedForeign.AssignedPawnsForReading.Any(p => p != null
                                     && p.GetUniqueLoadID() == ownerLoadID),
                                 "the other list still has " + name + " as its owner");
-                    story.Check(loadedOurs.AssignedPawnsForReading.Any(p => p != null
+                    scenario.Check(loadedOurs.AssignedPawnsForReading.Any(p => p != null
                                     && p.GetUniqueLoadID() == ownerLoadID),
                                 "and Shift Change's adopted " + name + ", the only owner either list had");
-                    story.Check(loadedOurs.ownersUnified,
+                    scenario.Check(loadedOurs.ownersUnified,
                                 "and the stand is marked reconciled, so it never adopts again");
                 }
                 finally
@@ -650,12 +650,12 @@ namespace ShiftChange.Tests
         {
             return Unstaged(Body);
 
-            void Body(Story story)
+            void Body(Scenario scenario)
             {
                 Map map = Find.CurrentMap;
                 if (map == null || !TryFindPad(map, out IntVec3 origin))
                 {
-                    CannotStage(story, "the loaded map has a clear pad to set the stands up on");
+                    CannotStage(scenario, "the loaded map has a clear pad to set the stands up on");
                     return;
                 }
                 CellRect pad = new CellRect(origin.x, origin.z, PadSize, PadSize);
@@ -665,11 +665,11 @@ namespace ShiftChange.Tests
                     : Stage(map, pad, StageKit.Displacing, enclose: true);
                 if (scene == null)
                 {
-                    story.Check(false, "the game has its Doctor work, and a stand and a colonist "
+                    scenario.Check(false, "the game has its Doctor work, and a stand and a colonist "
                                        + "could be set up in a walled room");
                     return;
                 }
-                story.Note("a stand holding a duster in a walled room, and " + scene.Colonist.LabelShort
+                scenario.Note("a stand holding a duster in a walled room, and " + scene.Colonist.LabelShort
                            + " beside it in a shirt, trousers and a parka");
 
                 IntVec3 boundCell = scene.OutfitStand.Position;
@@ -680,7 +680,7 @@ namespace ShiftChange.Tests
                 Area_Allowed doomed = CatchmentKit.NewArea(scene, "Shift test gone", lostCell);
                 if (lost == null || area == null || doomed == null)
                 {
-                    story.Check(false, "a second stand and two allowed areas could be set up");
+                    scenario.Check(false, "a second stand and two allowed areas could be set up");
                     return;
                 }
                 // A third stand, uninstalled and carried by a pawn off every map, as a caravan
@@ -689,18 +689,18 @@ namespace ShiftChange.Tests
                 CompShiftStand boxed = CatchmentKit.StageStand(scene, boundCell + new IntVec3(3, 0, 3));
                 if (boxed == null)
                 {
-                    story.Check(false, "a third stand could be set up");
+                    scenario.Check(false, "a third stand could be set up");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 scene.Comp.SetServeArea(area);
                 area.SetLabel("Shift test renamed");
-                story.Note("the stand serves " + doctor.labelShort + " in the allowed area \"Shift test area\", "
+                scenario.Note("the stand serves " + doctor.labelShort + " in the allowed area \"Shift test area\", "
                            + "painted on it and a cell nearby, which is then renamed \"Shift test renamed\"");
                 lost.ToggleWork(doctor);
                 lost.SetServeArea(doomed);
                 doomed.Delete();
-                story.Note("a second stand serves " + doctor.labelShort + " in \"Shift test gone\", "
+                scenario.Note("a second stand serves " + doctor.labelShort + " in \"Shift test gone\", "
                            + "painted on it alone, which is then deleted");
                 boxed.ToggleWork(doctor);
                 boxed.SetServeArea(area);
@@ -711,41 +711,41 @@ namespace ShiftChange.Tests
                 string carrierID = carrier.ThingID;
                 string areaLoadID = area.GetUniqueLoadID();
                 string doomedLoadID = doomed.GetUniqueLoadID();
-                story.Note("a third serves " + doctor.labelShort + " in the renamed area, and is uninstalled "
+                scenario.Note("a third serves " + doctor.labelShort + " in the renamed area, and is uninstalled "
                            + "and given to Carrier, a pawn off every map, to carry");
 
-                story.Check(scene.Comp.serves == CatchmentKind.Area && lost.serves == CatchmentKind.Area,
+                scenario.Check(scene.Comp.serves == CatchmentKind.Area && lost.serves == CatchmentKind.Area,
                             "both stands on the map serve an allowed area before the save");
-                story.Check(carried && boxed.parent.MapHeld == null && boxed.serveArea == area
+                scenario.Check(carried && boxed.parent.MapHeld == null && boxed.serveArea == area
                                 && boxed.serves == CatchmentKind.Area,
                             "and the boxed one, serving the renamed area, is carried off every map");
 
-                if (!TrySave(story, AreaSaveName, out string savePath))
+                if (!TrySave(scenario, AreaSaveName, out string savePath))
                 {
                     return;
                 }
                 string saved = File.ReadAllText(savePath);
-                story.Check(NodeContains(saved, AreaKey, areaLoadID),
+                scenario.Check(NodeContains(saved, AreaKey, areaLoadID),
                             "the save refers to the stand's area by its new name");
-                story.Check(NodeContains(saved, AreaLabelKey, "Shift test renamed"),
+                scenario.Check(NodeContains(saved, AreaLabelKey, "Shift test renamed"),
                             "and gives that name as its label");
-                story.Check(!NodeContains(saved, AreaKey, doomedLoadID)
+                scenario.Check(!NodeContains(saved, AreaKey, doomedLoadID)
                                 && NodeContains(saved, AreaLabelKey, "Shift test gone"),
                             "the deleted area's stand keeps the area's name in the save, but no reference to it");
-                story.Check(NodeBodies(saved, AreaKey).Count() == 2
+                scenario.Check(NodeBodies(saved, AreaKey).Count() == 2
                                 && NodeBodies(saved, AreaKey).All(body => body.Contains(areaLoadID)),
                             "and only the first stand and the boxed one refer to an area, both to the live one");
 
                 Load(AreaSaveName);
-                story.Note("the game is loaded from " + AreaSaveName);
-                story.Check(!Logged(UnconsumedWarning),
+                scenario.Note("the game is loaded from " + AreaSaveName);
+                scenario.Check(!Logged(UnconsumedWarning),
                             "the load resolved every reference it read: the log has no warning of any left over");
 
                 Building_OutfitStand loadedBound = FindStand(boundCell);
                 Building_OutfitStand loadedLost = FindStand(lostCell);
                 if (loadedBound == null || loadedLost == null)
                 {
-                    MissingStand(story, "the two stands are back at " + boundCell + " and " + lostCell
+                    MissingStand(scenario, "the two stands are back at " + boundCell + " and " + lostCell
                                         + " after loading");
                     return;
                 }
@@ -753,27 +753,27 @@ namespace ShiftChange.Tests
                 CompShiftStand unbound = loadedLost.TryGetComp<CompShiftStand>();
                 if (bound == null || unbound == null)
                 {
-                    story.Check(false, "the loaded stands still have Shift Change's settings");
+                    scenario.Check(false, "the loaded stands still have Shift Change's settings");
                     return;
                 }
                 Area live = bound.LiveServeArea();
                 Pawn loadedCarrier = Find.WorldPawns.AllPawnsAliveOrDead.FirstOrDefault(p => p.ThingID == carrierID);
                 CompShiftStand loadedBoxed = (loadedCarrier?.inventory?.innerContainer
                         .OfType<MinifiedThing>().FirstOrDefault()?.InnerThing)?.TryGetComp<CompShiftStand>();
-                story.Check(loadedBoxed != null && loadedBoxed.serves == CatchmentKind.Area && live != null
+                scenario.Check(loadedBoxed != null && loadedBoxed.serves == CatchmentKind.Area && live != null
                                 && loadedBoxed.serveArea == live,
                             "the boxed stand came back still bound to the area, off every map");
-                story.Check(bound.serves == CatchmentKind.Area && live != null
+                scenario.Check(bound.serves == CatchmentKind.Area && live != null
                                 && live.Label == "Shift test renamed",
                             "the first stand came back serving its area, under the new name");
-                story.Check(bound.Covers(paintedCell, loadedBound.Map),
+                scenario.Check(bound.Covers(paintedCell, loadedBound.Map),
                             "which covers the cell painted in it");
-                story.Check(CompShiftStand.CatchmentStands.Contains(bound),
+                scenario.Check(CompShiftStand.CatchmentStands.Contains(bound),
                             "and the load listed it again among the stands that serve beyond their room");
-                story.Check(unbound.serves == CatchmentKind.Area && unbound.serveArea == null
+                scenario.Check(unbound.serves == CatchmentKind.Area && unbound.serveArea == null
                                 && unbound.serveAreaLabel == "Shift test gone",
                             "the second came back with its allowed area gone, still under the name \"Shift test gone\"");
-                story.Check(!unbound.Covers(lostCell, loadedLost.Map),
+                scenario.Check(!unbound.Covers(lostCell, loadedLost.Map),
                             "and serves nothing, not even its own cell");
             }
         }
@@ -783,25 +783,25 @@ namespace ShiftChange.Tests
         /// key migration. The owner must arrive, and saving again must write it under Shift
         /// Change's own key.
         /// </summary>
-        internal static void KeyMigration(Story story, CompAssignableToPawn_ShiftStand assign,
+        internal static void KeyMigration(Scenario scenario, CompAssignableToPawn_ShiftStand assign,
                                           string ownerLoadID)
         {
-            story.Note("the stand has no other mod's owner list, so Shift Change reads the game's key itself");
-            story.Check(assign.AssignedPawnsForReading.Any(p => p != null
+            scenario.Note("the stand has no other mod's owner list, so Shift Change reads the game's key itself");
+            scenario.Check(assign.AssignedPawnsForReading.Any(p => p != null
                             && p.GetUniqueLoadID() == ownerLoadID),
                         "Shift Change's owner list has the owner the older save named");
 
             // Only a migration that collected the reference writes the owner back out under Shift
             // Change's key; an owner held in memory that is never saved passes the check above.
-            if (!TrySave(story, ReSaveName, out string resavePath))
+            if (!TrySave(scenario, ReSaveName, out string resavePath))
             {
                 return;
             }
             string resaved = File.ReadAllText(resavePath);
 
-            story.Check(NodeContains(resaved, OurKey, ownerLoadID),
+            scenario.Check(NodeContains(resaved, OurKey, ownerLoadID),
                         "saving again names the owner under Shift Change's own key");
-            story.Check(!NodeContains(resaved, LegacyKey, ownerLoadID),
+            scenario.Check(!NodeContains(resaved, LegacyKey, ownerLoadID),
                         "and no longer under the game's");
         }
 
@@ -821,41 +821,41 @@ namespace ShiftChange.Tests
         /// The copy writes it back, so saving again writes it under Shift Change's key and under
         /// the game's once per other list, the count the first test makes.</para>
         /// </summary>
-        internal static void DeclinedAndReconciled(Story story, CompAssignableToPawn_ShiftStand assign,
+        internal static void DeclinedAndReconciled(Scenario scenario, CompAssignableToPawn_ShiftStand assign,
                                                    List<CompAssignableToPawn> foreigners,
                                                    string ownerLoadID)
         {
             CompAssignableToPawn foreign = foreigners[0];
-            story.Note("the stand also has another mod's owner list, and the game's key is that list's, "
+            scenario.Note("the stand also has another mod's owner list, and the game's key is that list's, "
                        + "so Shift Change leaves the key to it");
-            story.Check(foreigners.Count == 1,
+            scenario.Check(foreigners.Count == 1,
                         "the stand carries exactly one other mod's owner list, so what is tried "
                         + "is Shift Change's list against that one");
-            story.Check(!Logged(DuplicateRegistration),
+            scenario.Check(!Logged(DuplicateRegistration),
                         "Shift Change left the game's key to the other list: the log has no warning "
                         + "that it was read twice");
-            story.Check(!Logged(FailedTake),
+            scenario.Check(!Logged(FailedTake),
                         "nor that a list asked for references it never read");
-            story.Check(foreign.AssignedPawnsForReading.Any(p => p != null
+            scenario.Check(foreign.AssignedPawnsForReading.Any(p => p != null
                             && p.GetUniqueLoadID() == ownerLoadID),
                         "the other list still has its owner");
-            story.Check(assign.AssignedPawnsForReading.Any(p => p != null
+            scenario.Check(assign.AssignedPawnsForReading.Any(p => p != null
                             && p.GetUniqueLoadID() == ownerLoadID),
                         "and Shift Change's adopted that owner through the reconcile, the only way "
                         + "open beside another mod's list");
-            story.Check(assign.ownersUnified,
+            scenario.Check(assign.ownersUnified,
                         "and the stand is marked reconciled, so it never adopts again");
 
-            if (!TrySave(story, ReSaveName, out string resavePath))
+            if (!TrySave(scenario, ReSaveName, out string resavePath))
             {
                 return;
             }
             string resaved = File.ReadAllText(resavePath);
             int genericHits = NodeBodies(resaved, LegacyKey).Count(body => body.Contains(ownerLoadID));
 
-            story.Check(NodeContains(resaved, OurKey, ownerLoadID),
+            scenario.Check(NodeContains(resaved, OurKey, ownerLoadID),
                         "saving again names the adopted owner under Shift Change's own key");
-            story.Check(genericHits == foreigners.Count,
+            scenario.Check(genericHits == foreigners.Count,
                         "and under the game's only as the other list's copy (" + genericHits + " found, "
                         + foreigners.Count + " expected)");
         }
@@ -866,7 +866,7 @@ namespace ShiftChange.Tests
         /// exceptions, so success is the file being there, which is why an earlier save under
         /// the same name must be gone first: left in place, it would pass for this game's.
         /// </summary>
-        internal static bool TrySave(Story story, string name, out string path)
+        internal static bool TrySave(Scenario scenario, string name, out string path)
         {
             SavesInUse.Add(name);
             path = GenFilePaths.FilePathForSavedGame(name);
@@ -880,17 +880,17 @@ namespace ShiftChange.Tests
             }
             if (File.Exists(path))
             {
-                story.Check(false, "the game saves as " + name + ": an earlier save at " + path
+                scenario.Check(false, "the game saves as " + name + ": an earlier save at " + path
                                    + " could not be removed first");
                 return false;
             }
             GameDataSaveLoader.SaveGame(name);
             if (File.Exists(path))
             {
-                story.Note("the game is saved as " + name);
+                scenario.Note("the game is saved as " + name);
                 return true;
             }
-            story.Check(false, "the game saves as " + name + ": nothing was written to " + path);
+            scenario.Check(false, "the game saves as " + name + ": nothing was written to " + path);
             return false;
         }
 
@@ -906,15 +906,15 @@ namespace ShiftChange.Tests
         /// and with no abort in that load the stand is missing for a reason nobody understands,
         /// which stays a failure.</para>
         /// </summary>
-        internal static void MissingStand(Story story, string where)
+        internal static void MissingStand(Scenario scenario, string where)
         {
             string culprit = LoadAbortCulprit();
             if (culprit == null)
             {
-                story.Check(false, where + ", so the rest can be checked");
+                scenario.Check(false, where + ", so the rest can be checked");
                 return;
             }
-            story.KnownGap(false, where,
+            scenario.KnownGap(false, where,
                            "the game's map loading (Map.FinalizeLoading) aborted in " + culprit
                            + ", so the map spawned nothing. Not Shift Change's doing: another mod's "
                            + "static cache, not cleared between loads in one session");
@@ -931,18 +931,18 @@ namespace ShiftChange.Tests
         /// <see cref="SaveRoundTrip.FinalizeAbort"/>
         /// (<see cref="SaveRoundTrip.LoadAbortCulprit"/>). A map that was never usable
         /// is a broken run and stays a failure, as a test does when DevTools' own map has no pad
-        /// (<see cref="StoryFixture.ReadyPad"/>). Nothing past setting up is excused: no stand
+        /// (<see cref="FeatureFixture.ReadyPad"/>). Nothing past setting up is excused: no stand
         /// def, no stand, an owner list missing off the stand all still fail.</para>
         /// </summary>
-        internal static void CannotStage(Story story, string where)
+        internal static void CannotStage(Scenario scenario, string where)
         {
             string culprit = LoadAbortCulprit();
             if (culprit == null)
             {
-                story.Check(false, where);
+                scenario.Check(false, where);
                 return;
             }
-            story.KnownGap(false, where,
+            scenario.KnownGap(false, where,
                            "the game's map loading (Map.FinalizeLoading) aborted in " + culprit
                            + ", so the map an earlier test left behind has no regions to set "
                            + "anything up on. Not Shift Change's doing: another mod's static cache, "

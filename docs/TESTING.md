@@ -62,10 +62,11 @@ and never to `Player.log`, and it ends the coroutine. When that is DevTools'
 test runner, nothing is left to quit the game, so the script stops it as soon as
 stderr shows it and prints the exception.
 
-Each case is a DevTools test of its own, written as a story, in a fixture under
-`Source/ShiftChange.Tests/` named for what a player sees, which holds its tests'
-bodies too ([Adding a case](#adding-a-case)). A test's `[TestDescription]` is
-the sentence its story opens with in `Test.log`, and its tooltip in DevTools'
+Each case is a DevTools test of its own, written as a BDD scenario: a test is a
+scenario, its fixture a feature, and each check or note in it a step. The
+features sit under `Source/ShiftChange.Tests/Features/`, each named for what a
+player sees and holding its tests' bodies too ([Adding a case](#adding-a-case)).
+A test's `[TestDescription]` is the sentence its scenario opens with in `Test.log`, and its tooltip in DevTools'
 Test Explorer. DevTools runs the fixtures by `ExecutionPriority`, each at its
 place in `CaseGroup`, except `SavingAndLoading`, which runs last, and a
 fixture's tests in declaration order. It sorts a fixture's tests by priority
@@ -97,21 +98,21 @@ player's oldest. Until a DevTools with that change is in use, nothing holds it:
 at the default interval a full pass writes no autosave, but at a player's
 shortest setting it writes all five. The tests in
 `ChangingAtAStand` and `KeepingThemDecent` let a frame pass every 250 ticks
-(`StoryFixture.Swap`); every other test that ticks steps the clock within its
+(`FeatureFixture.Swap`); every other test that ticks steps the clock within its
 frame, through `SwapNow` (`SceneKit.RunSwap`) or a bill's own steps
 (`GameClock.Step`). Three kinds of test needed what they arranged held in place
 first ("Five engine traps"). A change at the stand takes its garments' equip
 delays to the tick, 180 to 570 in these tests, the same in every run; with the
 walk, 429 to 436 so far.
 
-The tests are written for a player to read (`Story`): each check is a line in
-the game's words, and the first that fails fails the test with every line so far
-and its own marked `>>  FAIL`, which DevTools shows in the Test Explorer's
-summary and under the test's row in Test.log. A check does not stop the test, so
-the story in Test.log shows every check. A test that stages a scene opens with a
+The tests are written for a player to read (`Scenario`): each check is a step in
+the game's words and a soft assertion. The first that fails fails the test with
+every step so far and its own marked `>>  FAIL`, which DevTools shows in the Test
+Explorer's summary and under the test's row in Test.log. A check does not stop
+the test, so the scenario in Test.log shows every check. A test that stages a scene opens with a
 check saying what was set up. A test also fails when it throws, or when its
 scene cannot be set up. A test with a mod of its own to test against is a known
-gap without it (`story.KnownGap`, a line marked `GAP`), which DevTools reports
+gap without it (`scenario.KnownGap`, a step marked `GAP`), which DevTools reports
 as a skipped test unless a check failed too.
 
 DevTools fails a test on any warning it does not allow, apart from the few the
@@ -218,9 +219,9 @@ About a hundred and fifty cases. This section is a map: the detail lives with ea
 the comment on its method under `Source/ShiftChange.Tests/`, and Test.log
 prints the cases in the order they run: the fixtures in `CaseGroup`'s order,
 `SavingAndLoading` last, and each fixture's tests in the order its file declares
-them. Every case is a story, in a fixture named for what a player sees
+them. Every case is a scenario, in a feature named for what a player sees
 (`WhoUsesAStand`, `ServingAnArea`, ...). The kits (`Kits/`)
-hold what the stories share: scenes, jobs and the pad.
+hold what the scenarios share: scenes, jobs and the pad.
 
 Most guard a bug that happened, and fail without its fix. Some instead assert a
 rule the store description promises players. That kind exists because all
@@ -778,7 +779,7 @@ those potatoes failed the same check, because a pawn eating holds a claim on
 its food that no other pawn can reserve past
 (`PhysicalInteractionReservationManager`), whatever its faction. Every test on
 the pad now starts with no pawn but its own: `ReadyPad` sends every other away
-and Test.log names them (`StoryFixture.SendAwayStrays`).
+and Test.log names them (`FeatureFixture.SendAwayStrays`).
 
 ## Static checks
 
@@ -805,35 +806,35 @@ actually writes — the greps found none of seven.
 
 ## Adding a case
 
-Add a test to the story fixture it belongs with, at the point it should run: a
+Add a scenario to the feature it belongs with, at the point it should run: a
 `[Test]` named for what a player would recognise, with a sentence in the game's
 words as its `[TestDescription]`. Its body is a local function, and the test
-returns one of `StoryFixture`'s frames:
+returns one of `FeatureFixture`'s frames:
 
 | Frame | The body gets |
 |---|---|
 | `Staged(body, kit, gender)` | a stand holding a duster and a colonist beside it, from `Stage`; a body that changes at the stand (`Swap`) is an `IEnumerator` and steps the game's clock |
-| `Staged(build, description, body)` | the scene `build`, a `(map, pad) => Scene`, sets up on the pad; `description` says what that is, as the story's first line |
+| `Staged(build, description, body)` | the scene `build`, a `(map, pad) => Scene`, sets up on the pad; `description` says what that is, as the scenario's first step |
 | `OnThePad(body)` | DevTools' map and the pad, as `Map` and `Pad`, and no scene |
 | `Unstaged(body)` | no map, no pad and no camera move |
 
 A body that steps the clock within its frame changes at the stand with
-`SwapNow(story, scene)`, which notes where a change that gave up got stuck, and
-every story fixture has `NotSentStraightBack(story, scene)` and
-`AnotherColonist(story, scene, gender, nick)` to hand. `SavingAndLoading` runs its bodies as the game runs
+`SwapNow(scenario, scene)`, which notes where a change that gave up got stuck, and
+every feature has `NotSentStraightBack(scenario, scene)` and
+`AnotherColonist(scenario, scene, gender, nick)` to hand. `SavingAndLoading` runs its bodies as the game runs
 a load (`Wrap`).
 
 Every frame clears the pad after the test, whatever it did. A fixture holds at
 most 16 tests ([Running it](#running-it) says why), and runs at its place in
 `CaseGroup`.
 
-Each check is `story.Check(condition, text)`, its text what a player would see
+Each check is `scenario.Check(condition, text)`, its text what a player would see
 or understand: colonists by name, garments, rooms and settings by what the game
 or the stand's window calls them. The first check that fails names the test's
-failure; a failed check does not stop the test, so the story shows every check,
+failure; a failed check does not stop the test, so the scenario shows every check,
 and `Check` returns its condition for a test to stop where the rest would be
-moot. `story.Note(text)` adds a line that is not a check, such as a
-setting turned on or a job handed out. `story.KnownGap(condition, what, why)`
+moot. `scenario.Note(text)` adds a step that is not a check, such as a
+setting turned on or a job handed out. `scenario.KnownGap(condition, what, why)`
 marks something not yet true, which skips the test, and says so when it holds.
 Pair every negative with a line showing the same thing going the other way.
 

@@ -15,7 +15,7 @@ namespace ShiftChange.Tests
     /// Setting up what the tests play on, the pad and the <see cref="Scene"/> a test stages on it,
     /// the swap, and the teardown, shared by every test. Most
     /// tests build a throwaway scene, drive it, check the outcome and tear it down
-    /// (<see cref="StoryFixture"/>); a lifecycle test fires one real engine event at a checked-out
+    /// (<see cref="FeatureFixture"/>); a lifecycle test fires one real engine event at a checked-out
     /// stand and checks where the ledger lands.
     ///
     /// <para>Each lifecycle test splits in two. The engine's half is read from the game's code and

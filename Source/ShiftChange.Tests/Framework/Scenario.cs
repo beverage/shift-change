@@ -5,27 +5,28 @@ using DevTools.Testing;
 namespace ShiftChange.Tests
 {
     /// <summary>
-    /// What a test did, in the words of the game: its sentence, then a line for each check and
-    /// note, in order. The first check that fails fails the test with the story so far, its own
-    /// line marked, so whoever reads the failure sees what had happened when it went wrong: a
-    /// player in the Test Explorer, a developer in Test.log or in an IDE. The whole story, checks
-    /// after the failure included, goes in Test.log when the test ends.
+    /// A test as a BDD scenario, in the words of the game: its title, the test's sentence, then a
+    /// step for each check and note, in order. The checks are soft assertions: the first that
+    /// fails fails the test with the steps so far, its own marked, so whoever reads the failure
+    /// sees what had happened when it went wrong: a player in the Test Explorer, a developer in
+    /// Test.log or in an IDE. Every step, those after the failure included, goes in Test.log when
+    /// the test ends.
     ///
     /// <para>Plain text with a marker in the margin, never colour: the same text reaches the
     /// Test Explorer, Test.log and the test adapter, and each would show colour codes as
     /// junk.</para>
     /// </summary>
-    internal sealed class Story
+    internal sealed class Scenario
     {
         internal const string Passed = "    PASS  ";
         internal const string Failed = ">>  FAIL  ";
         internal const string Noted = "          ";
 
-        internal readonly StringBuilder Lines = new StringBuilder();
+        internal readonly StringBuilder Steps = new StringBuilder();
 
-        internal Story(string sentence)
+        internal Scenario(string sentence)
         {
-            Lines.AppendLine(sentence);
+            Steps.AppendLine(sentence);
         }
 
         internal const string Gapped = "    GAP   ";
@@ -41,17 +42,17 @@ namespace ShiftChange.Tests
         /// <summary>A line of context, which passes or fails nothing.</summary>
         internal void Note(string line)
         {
-            Lines.Append(Noted).AppendLine(line);
+            Steps.Append(Noted).AppendLine(line);
         }
 
         /// <summary>
-        /// A check: a line in the story, and a signal to DevTools. A failure does not stop the
-        /// test, so the story shows every check; the first failure names the test's failure.
+        /// A check: a step in the scenario, and a signal to DevTools. A failure does not stop the
+        /// test, so the scenario shows every check; the first failure names the test's failure.
         /// </summary>
         /// <returns>The condition, so a test can stop where the rest would be moot.</returns>
         internal bool Check(bool condition, string what)
         {
-            Lines.Append(condition ? Passed : Failed).AppendLine(what);
+            Steps.Append(condition ? Passed : Failed).AppendLine(what);
             if (condition)
             {
                 Expect.IsTrue(true, what);
@@ -59,7 +60,7 @@ namespace ShiftChange.Tests
             else if (!Failing)
             {
                 Failing = true;
-                Test.Fail(what, Lines.ToString().TrimEnd());
+                Test.Fail(what, Steps.ToString().TrimEnd());
             }
             return condition;
         }
@@ -74,36 +75,36 @@ namespace ShiftChange.Tests
         {
             if (condition)
             {
-                Lines.Append(Fixed).Append(what).AppendLine(" (a known gap that now holds: make it a check)");
+                Steps.Append(Fixed).Append(what).AppendLine(" (a known gap that now holds: make it a check)");
                 return;
             }
-            Lines.Append(Gapped).Append(what).Append(": ").AppendLine(why);
+            Steps.Append(Gapped).Append(what).Append(": ").AppendLine(why);
             Gap = true;
         }
 
         /// <summary>
-        /// What a test threw, as its last line, failing it with the story so far if nothing has
+        /// What a test threw, as its last step, failing it with the steps so far if nothing has
         /// yet.
         /// </summary>
         internal void Threw(System.Exception e)
         {
-            Lines.Append(Failed).Append("the test threw ").AppendLine(e.ToString());
+            Steps.Append(Failed).Append("the test threw ").AppendLine(e.ToString());
             if (!Failing)
             {
                 Failing = true;
-                Test.Fail("the test threw " + e.GetType().Name + ": " + e.Message, Lines.ToString().TrimEnd());
+                Test.Fail("the test threw " + e.GetType().Name + ": " + e.Message, Steps.ToString().TrimEnd());
             }
         }
 
-        /// <summary>Writes the whole story to Test.log.</summary>
-        internal void Tell()
+        /// <summary>Writes the whole scenario to Test.log.</summary>
+        internal void WriteToLog()
         {
-            DevLog.Write(Lines.ToString().TrimEnd());
+            DevLog.Write(Steps.ToString().TrimEnd());
         }
 
         public override string ToString()
         {
-            return Lines.ToString().TrimEnd();
+            return Steps.ToString().TrimEnd();
         }
     }
 }

@@ -17,7 +17,7 @@ namespace ShiftChange.Tests
     /// included, what a deposit-only stand takes from them, and the settings that decide it.
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(RunOrder.First - (int)CaseGroup.WhatSendsThemToChange)]
-    internal class WhatSendsThemToChange : StoryFixture
+    internal class WhatSendsThemToChange : FeatureFixture
     {
         /// <summary>What <see cref="Stage"/> sets up with the pad walled, roofed and floored.</summary>
         internal const string InARoom =
@@ -56,7 +56,7 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 JobDef chess = DefDatabase<JobDef>.GetNamedSilentFail("Play_Chess");
@@ -64,25 +64,25 @@ namespace ShiftChange.Tests
                 WorkGiverDef tend = Giver("DoctorTendToHumanlikes");
                 if (chess == null || reading == null)
                 {
-                    story.Check(false, "the game has its chess and reading jobs");
+                    scenario.Check(false, "the game has its chess and reading jobs");
                     return;
                 }
 
                 // The pad's room has no role, so tick the trigger by hand.
                 scene.Comp.ToggleRecreation();
-                story.Note("Recreation is ticked on the stand");
-                story.Check(scene.Comp.HandlesRecreation(), "the stand serves recreation");
-                story.Check(SendsToChangeKeepingQueue(scene, JoyJob(scene, chess)),
+                scenario.Note("Recreation is ticked on the stand");
+                scenario.Check(scene.Comp.HandlesRecreation(), "the stand serves recreation");
+                scenario.Check(SendsToChangeKeepingQueue(scene, JoyJob(scene, chess)),
                             name + " sits down to chess in its room and is sent to change first");
 
                 Job forced = JoyJob(scene, chess);
                 forced.playerForced = true;
-                story.Check(!SendsToChangeKeepingQueue(scene, forced), "but not when the player orders the game");
-                story.Check(!SendsToChangeKeepingQueue(scene, JoyJob(scene, reading)),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, forced), "but not when the player orders the game");
+                scenario.Check(!SendsToChangeKeepingQueue(scene, JoyJob(scene, reading)),
                             "nor before reading, which is recreation too but picks its spot only once begun");
                 if (tend != null)
                 {
-                    story.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                    scenario.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                                 "nor before tending a patient, which is work, not recreation");
                 }
 
@@ -90,8 +90,8 @@ namespace ShiftChange.Tests
                 if (doctor != null)
                 {
                     scene.Comp.ToggleWork(doctor);
-                    story.Note("the stand is switched to doctoring");
-                    story.Check(!SendsToChangeKeepingQueue(scene, JoyJob(scene, chess)),
+                    scenario.Note("the stand is switched to doctoring");
+                    scenario.Check(!SendsToChangeKeepingQueue(scene, JoyJob(scene, chess)),
                                 "and a stand serving doctoring lets the same game of chess go by");
                 }
             }
@@ -119,7 +119,7 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Bed");
@@ -127,7 +127,7 @@ namespace ShiftChange.Tests
                 WorkTypeDef bedRest = WorkType("PatientBedRest");
                 if (bedDef == null || laydown == null || bedRest == null)
                 {
-                    story.Check(false, "the game has its bed, its lay-down job and its bed rest work");
+                    scenario.Check(false, "the game has its bed, its lay-down job and its bed rest work");
                     return;
                 }
 
@@ -137,7 +137,7 @@ namespace ShiftChange.Tests
                     Rot4.North) as Building_Bed;
                 if (bed == null)
                 {
-                    story.Check(false, "a bed is built in the stand's room");
+                    scenario.Check(false, "a bed is built in the stand's room");
                     return;
                 }
                 bed.Medical = true;
@@ -146,14 +146,14 @@ namespace ShiftChange.Tests
                 // need no doctor to begin with: vanilla does not tend the conditions of a pawn
                 // generated to join the player, so the scene's colonist arrives without them.
                 scene.Comp.ToggleWork(bedRest);
-                story.Note("a bed for medical use is built in the room, and the stand is ticked for resting in bed");
-                story.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist),
+                scenario.Note("a bed for medical use is built in the room, and the stand is ticked for resting in bed");
+                scenario.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist),
                             name + " needs no doctor to begin with");
-                story.Check(bed.Medical, "the bed is for medical use, so the room is a hospital");
-                story.Check(scene.Comp.HandlesWork(bedRest), "and the stand is ticked for resting in bed");
-                story.Check(!scene.Comp.HandlesRest(),
+                scenario.Check(bed.Medical, "the bed is for medical use, so the room is a hospital");
+                scenario.Check(scene.Comp.HandlesWork(bedRest), "and the stand is ticked for resting in bed");
+                scenario.Check(!scene.Comp.HandlesRest(),
                             "but not for sleeping: the gown and the pyjamas are separate rows");
-                story.Check(SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed),
+                scenario.Check(SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed),
                                                       JobTag.RestingForMedicalReasons),
                             "so " + name + ", going to bed to recuperate, changes at the stand first");
 
@@ -165,18 +165,18 @@ namespace ShiftChange.Tests
                 Hediff wound = HediffMaker.MakeHediff(HediffDefOf.Cut, scene.Colonist, part);
                 wound.Severity = 6f;
                 scene.Colonist.health.AddHediff(wound, part);
-                story.Note(name + " is given a cut, left untended");
-                story.Check(HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist),
+                scenario.Note(name + " is given a cut, left untended");
+                scenario.Check(HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist),
                             "which makes " + name + " need a doctor now");
-                story.Check(!scene.Colonist.Downed,
+                scenario.Check(!scene.Colonist.Downed,
                             "without downing them, which would keep them from the stand for another reason");
-                story.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed),
                                                        JobTag.RestingForMedicalReasons),
                             "so going to bed now, " + name + " is not sent to the stand first");
 
                 scene.Colonist.health.RemoveHediff(wound);
-                story.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist), "the cut is gone again");
-                story.Check(SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed),
+                scenario.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist), "the cut is gone again");
+                scenario.Check(SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed),
                                                       JobTag.RestingForMedicalReasons),
                             "and " + name + " changes first again, so it was the wound that kept them from it");
 
@@ -185,9 +185,9 @@ namespace ShiftChange.Tests
                 IntVec3 wasAt = scene.Colonist.Position;
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = bed.Position;
-                story.Check(Patch_JobInterception.OnABed(scene.Colonist),
+                scenario.Check(Patch_JobInterception.OnABed(scene.Colonist),
                             name + ", standing on the bed, counts as in it");
-                story.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed),
                                                        JobTag.RestingForMedicalReasons),
                             "and told again to rest there, stays in bed");
 
@@ -196,7 +196,7 @@ namespace ShiftChange.Tests
 
                 Job forced = JobMaker.MakeJob(laydown, bed);
                 forced.playerForced = true;
-                story.Check(!SendsToChangeKeepingQueue(scene, forced, JobTag.RestingForMedicalReasons),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, forced, JobTag.RestingForMedicalReasons),
                             "a trip to the sickbed the player orders never stops at the stand");
             }
         }
@@ -217,12 +217,12 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 if (ShiftChangeMod.Settings == null)
                 {
-                    story.Check(false, "Shift Change's settings can be read");
+                    scenario.Check(false, "Shift Change's settings can be read");
                     return;
                 }
                 WorkGiverDef tendEmergency = Giver("DoctorTendEmergency");
@@ -235,33 +235,33 @@ namespace ShiftChange.Tests
                 if (tendEmergency == null || fightFires == null || doctor == null
                     || firefighter == null || bedRest == null || bedDef == null || laydown == null)
                 {
-                    story.Check(false, "the game has its emergency tending and firefighting, its doctoring, "
+                    scenario.Check(false, "the game has its emergency tending and firefighting, its doctoring, "
                                        + "firefighting and bed rest work, a bed and its lay-down job");
                     return;
                 }
 
                 bool was = ShiftChangeMod.Settings.medicalEmergenciesChangeFirst;
-                story.Check(!was, "Medical emergencies change first is off, as it ships");
-                story.Check(tendEmergency.emergency,
+                scenario.Check(!was, "Medical emergencies change first is off, as it ships");
+                scenario.Check(tendEmergency.emergency,
                             "the game still counts tending patients with urgent needs as an emergency");
-                story.Check(fightFires.emergency, "and fighting fires too, which is the trap");
+                scenario.Check(fightFires.emergency, "and fighting fires too, which is the trap");
 
                 scene.Comp.ToggleWork(doctor);
                 scene.Comp.ToggleWork(firefighter);
-                story.Note("the stand is ticked for doctoring and firefighting");
-                story.Check(scene.Comp.HandlesWork(doctor), "the stand serves doctoring");
-                story.Check(scene.Comp.HandlesWork(firefighter),
+                scenario.Note("the stand is ticked for doctoring and firefighting");
+                scenario.Check(scene.Comp.HandlesWork(doctor), "the stand serves doctoring");
+                scenario.Check(scene.Comp.HandlesWork(firefighter),
                             "and firefighting, so a refusal below cannot mean no stand serves it");
-                story.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tendEmergency)),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tendEmergency)),
                             "with the setting off, " + name + " answers an emergency tend without changing");
-                story.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, fightFires)),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, fightFires)),
                             "and goes to fight a fire without changing");
 
                 ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = true;
-                story.Note("Medical emergencies change first is turned on");
-                story.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tendEmergency)),
+                scenario.Note("Medical emergencies change first is turned on");
+                scenario.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tendEmergency)),
                             "with it on, " + name + " changes first for the emergency tend");
-                story.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, fightFires)),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, fightFires)),
                             "but still goes straight to the fire: the setting is for medical emergencies only");
 
                 // The patient side: the critical patient's job carries no giver to flag, so the
@@ -273,7 +273,7 @@ namespace ShiftChange.Tests
                 if (bed == null)
                 {
                     ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = was;
-                    story.Check(false, "a bed is built in the stand's room");
+                    scenario.Check(false, "a bed is built in the stand's room");
                     return;
                 }
                 bed.Medical = true;
@@ -283,24 +283,24 @@ namespace ShiftChange.Tests
                 Hediff wound = HediffMaker.MakeHediff(HediffDefOf.Cut, scene.Colonist, part);
                 wound.Severity = 6f;
                 scene.Colonist.health.AddHediff(wound, part);
-                story.Note("a bed for medical use is built in the room, the stand is ticked for resting in bed "
+                scenario.Note("a bed for medical use is built in the room, the stand is ticked for resting in bed "
                            + "too, and " + name + " is given a cut, left untended");
-                story.Check(HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist),
+                scenario.Check(HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist),
                             "which makes " + name + " an urgent patient");
-                story.Check(scene.Comp.HandlesWork(bedRest), "and the stand is ticked for resting in bed");
-                story.Check(SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed),
+                scenario.Check(scene.Comp.HandlesWork(bedRest), "and the stand is ticked for resting in bed");
+                scenario.Check(SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed),
                                                       JobTag.RestingForMedicalReasons),
                             "so with the setting on, " + name + " stops at the stand on the way to the sickbed");
 
                 ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = false;
-                story.Note("Medical emergencies change first is turned off");
-                story.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed),
+                scenario.Note("Medical emergencies change first is turned off");
+                scenario.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed),
                                                        JobTag.RestingForMedicalReasons),
                             "and with it off goes straight to bed: one setting covers doctor and patient");
 
                 scene.Colonist.health.RemoveHediff(wound);
                 ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = was;
-                story.Check(!ShiftChangeMod.Settings.medicalEmergenciesChangeFirst,
+                scenario.Check(!ShiftChangeMod.Settings.medicalEmergenciesChangeFirst,
                             "Medical emergencies change first is off again for the tests that follow");
             }
         }
@@ -319,45 +319,45 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 bool was = ShiftChangeMod.Settings.newStandsInService;
-                story.Check(was, "New stands are used for shift changes is on, as it ships");
+                scenario.Check(was, "New stands are used for shift changes is on, as it ships");
                 try
                 {
                     CompShiftStand on = (ThingMaker.MakeThing(scene.OutfitStand.def, ThingDefOf.WoodLog)
                         as ThingWithComps)?.TryGetComp<CompShiftStand>();
-                    story.Check(on != null && on.IsAutomatic,
+                    scenario.Check(on != null && on.IsAutomatic,
                                 "with it on, a new stand starts on Automatic, from its room");
 
                     ShiftChangeMod.Settings.newStandsInService = false;
-                    story.Note("New stands are used for shift changes is turned off");
+                    scenario.Note("New stands are used for shift changes is turned off");
                     Building_OutfitStand stand =
                         ThingMaker.MakeThing(scene.OutfitStand.def, ThingDefOf.WoodLog) as Building_OutfitStand;
                     CompShiftStand off = stand?.TryGetComp<CompShiftStand>();
                     if (off == null || Patch_AllowRemovingToggle.AllowRemovingItemsRef == null)
                     {
-                        story.Check(false, "with it off, a stand can still be made, and its Allow removing items read");
+                        scenario.Check(false, "with it off, a stand can still be made, and its Allow removing items read");
                         return;
                     }
-                    story.Check(off.IsExcluded, "with it off, a new stand starts as Not used for shift changes");
+                    scenario.Check(off.IsExcluded, "with it off, a new stand starts as Not used for shift changes");
 
                     // Built with Allow removing items ticked: a stand in service would untick it here.
                     stand.SetFactionDirect(Faction.OfPlayer);
                     Patch_AllowRemovingToggle.AllowRemovingItemsRef(stand) = true;
                     GenSpawn.Spawn(stand, scene.OutfitStand.Position + new IntVec3(2, 0, 0), scene.Map, Rot4.North);
-                    story.Note("it is built two cells along, with Allow removing items ticked");
-                    story.Check(off.IsExcluded, "and stays so once it is on the map");
-                    story.Check(Patch_AllowRemovingToggle.AllowRemovingItemsRef(stand),
+                    scenario.Note("it is built two cells along, with Allow removing items ticked");
+                    scenario.Check(off.IsExcluded, "and stays so once it is on the map");
+                    scenario.Check(Patch_AllowRemovingToggle.AllowRemovingItemsRef(stand),
                                 "its Allow removing items stays ticked, as on a vanilla stand");
-                    story.Check(!off.BlocksTrade, "and what it holds can be traded");
-                    story.Check(!scene.Comp.IsExcluded, "while the stand built before the change is still in service");
+                    scenario.Check(!off.BlocksTrade, "and what it holds can be traded");
+                    scenario.Check(!scene.Comp.IsExcluded, "while the stand built before the change is still in service");
                 }
                 finally
                 {
                     ShiftChangeMod.Settings.newStandsInService = was;
                 }
-                story.Check(ShiftChangeMod.Settings.newStandsInService,
+                scenario.Check(ShiftChangeMod.Settings.newStandsInService,
                             "New stands are used for shift changes is on again for the tests that follow");
             }
         }
@@ -380,12 +380,12 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 if (ShiftChangeMod.Settings == null)
                 {
-                    story.Check(false, "Shift Change's settings can be read");
+                    scenario.Check(false, "Shift Change's settings can be read");
                     return;
                 }
                 WorkTypeDef doctor = WorkType("Doctor");
@@ -406,7 +406,7 @@ namespace ShiftChange.Tests
                     || fightFires == null || hauling == null || doctorFeed == null || chess == null || reading == null
                     || visitSick == null || unload == null || bedDef == null || mealDef == null)
                 {
-                    story.Check(false, "the game has the work, work givers, jobs, bed and meal the table uses");
+                    scenario.Check(false, "the game has the work, work givers, jobs, bed and meal the table uses");
                     return;
                 }
                 Map map = scene.Map;
@@ -417,35 +417,35 @@ namespace ShiftChange.Tests
                 Thing steel = CatchmentKit.Steel(map, at + new IntVec3(1, 0, 3));
                 if (bed == null || meal == null || steel == null)
                 {
-                    story.Check(false, "a bed, a meal and a stack of steel are put in the stand's room");
+                    scenario.Check(false, "a bed, a meal and a stack of steel are put in the stand's room");
                     return;
                 }
-                story.Note("a bed, a simple meal and twenty steel are put in the stand's room");
+                scenario.Note("a bed, a simple meal and twenty steel are put in the stand's room");
                 IntVec3 cell = at + new IntVec3(3, 0, 2);
 
-                story.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist)
+                scenario.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist)
                             && !Patch_JobInterception.OnABed(scene.Colonist),
                             name + " needs no doctor and is not in a bed");
 
                 // Work, recreation, and the row the order exists for.
                 JobClass visitAsWork = KindOf(scene, Stamped(visitSick, visitGiver));
-                SortsAs(story, scene, "tending a patient for " + GiverLabel(tend),
+                SortsAs(scenario, scene, "tending a patient for " + GiverLabel(tend),
                         CatchmentKit.WorkAt(tend, cell), null, JobKind.Work, doctor);
-                story.Check(visitGiver.workType == doctor || GiverTables.IsModWork(visitGiver.workType),
+                scenario.Check(visitGiver.workType == doctor || GiverTables.IsModWork(visitGiver.workType),
                             GiverLabel(visitGiver) + " belongs to the doctor's work, or to a mod's own");
-                SortsAs(story, scene, "visiting the sick for " + GiverLabel(visitGiver),
+                SortsAs(scenario, scene, "visiting the sick for " + GiverLabel(visitGiver),
                         Stamped(visitSick, visitGiver), null, JobKind.Work, visitGiver.workType);
-                story.Check(visitAsWork.RecreationJob,
+                scenario.Check(visitAsWork.RecreationJob,
                             "and still recreation too, so its room is read from where the visitor sits");
-                SortsAs(story, scene, "visiting the sick for fun, from no work", JobMaker.MakeJob(visitSick), null,
+                SortsAs(scenario, scene, "visiting the sick for fun, from no work", JobMaker.MakeJob(visitSick), null,
                         JobKind.Recreation, null);
-                SortsAs(story, scene, "a game of chess", JobMaker.MakeJob(chess), null, JobKind.Recreation, null);
-                SortsAs(story, scene, "reading, which the game counts as recreation", JobMaker.MakeJob(reading), null,
+                SortsAs(scenario, scene, "a game of chess", JobMaker.MakeJob(chess), null, JobKind.Recreation, null);
+                SortsAs(scenario, scene, "reading, which the game counts as recreation", JobMaker.MakeJob(reading), null,
                         JobKind.Other, null);
-                story.Check(!KindOf(scene, JobMaker.MakeJob(reading)).RecreationJob,
+                scenario.Check(!KindOf(scene, JobMaker.MakeJob(reading)).RecreationJob,
                             "and not recreation here, since a reader picks their spot only once begun");
-                SortsAs(story, scene, "eating", IngestJob(meal), null, JobKind.Other, null);
-                story.Check(KindOf(scene, IngestJob(meal)).Ingest, "which counts as eating");
+                SortsAs(scenario, scene, "eating", IngestJob(meal), null, JobKind.Other, null);
+                scenario.Check(KindOf(scene, IngestJob(meal)).Ingest, "which counts as eating");
 
                 // Sleep and medical rest, the setting off and on. The patient givers tag a medical
                 // lay-down RestingForMedicalReasons, and vanilla requeues it untagged when it slips a
@@ -455,23 +455,23 @@ namespace ShiftChange.Tests
                 try
                 {
                     ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = false;
-                    story.Note("Medical emergencies change first is off");
+                    scenario.Note("Medical emergencies change first is off");
                     JobClass sleep = KindOf(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed));
                     JobClass ground = KindOf(scene, JobMaker.MakeJob(JobDefOf.LayDown, scene.Colonist.Position));
-                    SortsAs(story, scene, "going to bed", JobMaker.MakeJob(JobDefOf.LayDown, bed), null,
+                    SortsAs(scenario, scene, "going to bed", JobMaker.MakeJob(JobDefOf.LayDown, bed), null,
                             JobKind.Rest, null);
-                    story.Check(sleep.OrdinarySleep && sleep.LyingDown && !sleep.UrgentPatient,
+                    scenario.Check(sleep.OrdinarySleep && sleep.LyingDown && !sleep.UrgentPatient,
                                 "ordinary sleep, lying down, and no urgent patient's");
-                    SortsAs(story, scene, "going to bed to recuperate, as bed rest sends a patient",
+                    SortsAs(scenario, scene, "going to bed to recuperate, as bed rest sends a patient",
                             JobMaker.MakeJob(JobDefOf.LayDown, bed), JobTag.RestingForMedicalReasons,
                             JobKind.Work, bedRest);
-                    story.Check(!KindOf(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed),
+                    scenario.Check(!KindOf(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed),
                                                     JobTag.RestingForMedicalReasons).OrdinarySleep,
                                 "which is not ordinary sleep");
-                    SortsAs(story, scene, "sleeping on the ground",
+                    SortsAs(scenario, scene, "sleeping on the ground",
                             JobMaker.MakeJob(JobDefOf.LayDown, scene.Colonist.Position),
                             null, JobKind.Other, null);
-                    story.Check(ground.LyingDown && !ground.RestJob, "lying down, but not going to bed");
+                    scenario.Check(ground.LyingDown && !ground.RestJob, "lying down, but not going to bed");
 
                     BodyPartRecord part = scene.Colonist.health.hediffSet.GetNotMissingParts().FirstOrDefault();
                     wound = HediffMaker.MakeHediff(HediffDefOf.Cut, scene.Colonist, part);
@@ -479,26 +479,26 @@ namespace ShiftChange.Tests
                     // shows they stay on their feet.
                     wound.Severity = 6f;
                     scene.Colonist.health.AddHediff(wound, part);
-                    story.Note(name + " is given a cut, left untended");
+                    scenario.Note(name + " is given a cut, left untended");
                     JobClass urgent = KindOf(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed));
-                    story.Check(HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist) && !scene.Colonist.Downed,
+                    scenario.Check(HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist) && !scene.Colonist.Downed,
                                 "which makes " + name + " an urgent patient, still on their feet");
-                    SortsAs(story, scene, "the urgent patient going to bed to recuperate, with the setting off",
+                    SortsAs(scenario, scene, "the urgent patient going to bed to recuperate, with the setting off",
                             JobMaker.MakeJob(JobDefOf.LayDown, bed), JobTag.RestingForMedicalReasons,
                             JobKind.Rest, null);
-                    SortsAs(story, scene, "and the same trip to bed put back in the queue",
+                    SortsAs(scenario, scene, "and the same trip to bed put back in the queue",
                             JobMaker.MakeJob(JobDefOf.LayDown, bed), null, JobKind.Rest, null);
-                    story.Check(urgent.UrgentPatient && !urgent.OrdinarySleep,
+                    scenario.Check(urgent.UrgentPatient && !urgent.OrdinarySleep,
                                 "an urgent patient's, never ordinary sleep");
 
                     ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = true;
-                    story.Note("Medical emergencies change first is turned on");
-                    SortsAs(story, scene, "the urgent patient going to bed, with the setting on",
+                    scenario.Note("Medical emergencies change first is turned on");
+                    SortsAs(scenario, scene, "the urgent patient going to bed, with the setting on",
                             JobMaker.MakeJob(JobDefOf.LayDown, bed), JobTag.RestingForMedicalReasons,
                             JobKind.Work, bedRest);
-                    SortsAs(story, scene, "and put back in the queue", JobMaker.MakeJob(JobDefOf.LayDown, bed), null,
+                    SortsAs(scenario, scene, "and put back in the queue", JobMaker.MakeJob(JobDefOf.LayDown, bed), null,
                             JobKind.Work, bedRest);
-                    story.Check(!KindOf(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed)).UrgentPatient,
+                    scenario.Check(!KindOf(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed)).UrgentPatient,
                                 "and no longer an urgent patient's, now the setting lets them change");
                 }
                 finally
@@ -513,18 +513,18 @@ namespace ShiftChange.Tests
                 // Deliveries and the site jobs the same givers hand out.
                 foreach (WorkGiverDef giver in JobRoomTargets.DeliveryGivers.OrderBy(g => g.defName))
                 {
-                    SortsAs(story, scene, "steel carried for " + GiverLabel(giver),
+                    SortsAs(scenario, scene, "steel carried for " + GiverLabel(giver),
                             CatchmentKit.DeliveryAt(giver, steel.Position, cell), null,
                             JobKind.Delivery, giver.workType);
-                    SortsAs(story, scene, "and a floor removal it hands out", CatchmentKit.FloorRemovalAt(giver, cell),
+                    SortsAs(scenario, scene, "and a floor removal it hands out", CatchmentKit.FloorRemovalAt(giver, cell),
                             null, JobKind.Work, giver.workType);
                 }
                 WorkGiverDef seeds = Giver(JobRoomTargets.SeedPlanter);
                 if (seeds != null)
                 {
-                    SortsAs(story, scene, "sowing for " + GiverLabel(seeds), Stamped(JobDefOf.PlantSeed, seeds),
+                    SortsAs(scenario, scene, "sowing for " + GiverLabel(seeds), Stamped(JobDefOf.PlantSeed, seeds),
                             null, JobKind.Delivery, seeds.workType);
-                    SortsAs(story, scene, "and cutting a plant, which it hands out too",
+                    SortsAs(scenario, scene, "and cutting a plant, which it hands out too",
                             Stamped(JobDefOf.CutPlant, seeds), null, JobKind.Work, seeds.workType);
                 }
 
@@ -540,11 +540,11 @@ namespace ShiftChange.Tests
                     JobDef def = RideAlongKit.DeliverFoodGivers.Contains(giverName)
                         ? JobDefOf.DeliverFood
                         : JobDefOf.FeedPatient;
-                    SortsAs(story, scene, "a meal carried for " + GiverLabel(giver),
+                    SortsAs(scenario, scene, "a meal carried for " + GiverLabel(giver),
                             RideAlongKit.FeedingJob(def, meal, scene.Colonist, giver), null,
                             JobKind.MealRun, giver.workType);
                 }
-                SortsAs(story, scene, "a haul handed out by " + GiverLabel(doctorFeed),
+                SortsAs(scenario, scene, "a haul handed out by " + GiverLabel(doctorFeed),
                         CatchmentKit.Haul(doctorFeed, steel, cell), null, JobKind.IgnoredGiver, doctorFeed.workType);
 
                 // The gates: the jobs that ride along (the job tracker's pause, an unload), a direct
@@ -552,36 +552,36 @@ namespace ShiftChange.Tests
                 Job forced = CatchmentKit.WorkAt(tend, cell);
                 forced.playerForced = true;
                 JobClass order = KindOf(scene, forced);
-                SortsAs(story, scene, "a moment's pause between jobs",
+                SortsAs(scenario, scene, "a moment's pause between jobs",
                         JobMaker.MakeJob(JobDefOf.Wait_MaintainPosture, 1),
                         null, JobKind.RidesAlong, null);
-                story.Check(Patch_JobInterception.ExemptInEitherDirection(
+                scenario.Check(Patch_JobInterception.ExemptInEitherDirection(
                                 KindOf(scene, JobMaker.MakeJob(JobDefOf.Wait_MaintainPosture, 1))),
                             "which never sends anyone to change, either way");
-                SortsAs(story, scene, "unloading their inventory, from no work", JobMaker.MakeJob(unload), null,
+                SortsAs(scenario, scene, "unloading their inventory, from no work", JobMaker.MakeJob(unload), null,
                         JobKind.RidesAlong, null);
-                SortsAs(story, scene, "a haul for " + GiverLabel(hauling),
+                SortsAs(scenario, scene, "a haul for " + GiverLabel(hauling),
                         CatchmentKit.Haul(hauling, steel, cell), null, JobKind.Work, hauling.workType);
-                SortsAs(story, scene, "a haul from no work, as the game's haul on the way starts",
+                SortsAs(scenario, scene, "a haul from no work, as the game's haul on the way starts",
                         RideAlongKit.GiverlessHaul(steel, cell), null, JobKind.Other, null);
-                story.Check(order.Kind == JobKind.Work && order.PlayerForced
+                scenario.Check(order.Kind == JobKind.Work && order.PlayerForced
                             && Patch_JobInterception.ExemptInEitherDirection(order),
                             "a tend the player orders is still work, and never sends anyone to change");
 
                 try
                 {
                     ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = false;
-                    story.Note("Medical emergencies change first is off");
-                    story.Check(KindOf(scene, CatchmentKit.WorkAt(tendEmergency, cell)).ExemptEmergency
+                    scenario.Note("Medical emergencies change first is off");
+                    scenario.Check(KindOf(scene, CatchmentKit.WorkAt(tendEmergency, cell)).ExemptEmergency
                                 && KindOf(scene, CatchmentKit.WorkAt(fightFires, cell)).ExemptEmergency,
                                 "an emergency tend and a fire never wait for a change");
-                    story.Check(!KindOf(scene, CatchmentKit.WorkAt(tend, cell)).ExemptEmergency,
+                    scenario.Check(!KindOf(scene, CatchmentKit.WorkAt(tend, cell)).ExemptEmergency,
                                 "while an ordinary tend may");
                     ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = true;
-                    story.Note("Medical emergencies change first is turned on");
-                    story.Check(!KindOf(scene, CatchmentKit.WorkAt(tendEmergency, cell)).ExemptEmergency,
+                    scenario.Note("Medical emergencies change first is turned on");
+                    scenario.Check(!KindOf(scene, CatchmentKit.WorkAt(tendEmergency, cell)).ExemptEmergency,
                                 "the emergency tend may wait for one now");
-                    story.Check(KindOf(scene, CatchmentKit.WorkAt(fightFires, cell)).ExemptEmergency,
+                    scenario.Check(KindOf(scene, CatchmentKit.WorkAt(fightFires, cell)).ExemptEmergency,
                                 "and the fire still never does");
                 }
                 finally
@@ -592,10 +592,10 @@ namespace ShiftChange.Tests
                 Job walk = JobMaker.MakeJob(JobDefOf.Goto, cell);
                 Job walkForWork = JobMaker.MakeJob(JobDefOf.Goto, cell);
                 walkForWork.workGiverDef = tend;
-                SortsAs(story, scene, "a walk", walk, null, JobKind.Other, null);
-                story.Check(KindOf(scene, walk).Incidental,
+                SortsAs(scenario, scene, "a walk", walk, null, JobKind.Other, null);
+                scenario.Check(KindOf(scene, walk).Incidental,
                             "and one the outfit can stay on for, inside a stand's radius or area");
-                story.Check(!KindOf(scene, walkForWork).Incidental, "but not the same walk for work");
+                scenario.Check(!KindOf(scene, walkForWork).Incidental, "but not the same walk for work");
 
                 // Odyssey hands fishing out with no giver, so it is sorted by tag. Vanilla requeues
                 // a job without its tag when it slips a haul in ahead, hence the row put back in the
@@ -606,15 +606,15 @@ namespace ShiftChange.Tests
                 {
                     Job forcedFish = JobMaker.MakeJob(fish, cell, cell);
                     forcedFish.playerForced = true;
-                    SortsAs(story, scene, "fishing for " + GiverLabel(fishGiver), Stamped(fish, fishGiver),
+                    SortsAs(scenario, scene, "fishing for " + GiverLabel(fishGiver), Stamped(fish, fishGiver),
                             JobTag.Fieldwork, JobKind.Work, fishGiver.workType);
-                    SortsAs(story, scene, "fishing as Odyssey hands it out, from no work",
+                    SortsAs(scenario, scene, "fishing as Odyssey hands it out, from no work",
                             JobMaker.MakeJob(fish, cell, cell), JobTag.Fieldwork, JobKind.Work, fishGiver.workType);
-                    SortsAs(story, scene, "and put back in the queue", JobMaker.MakeJob(fish, cell, cell), null,
+                    SortsAs(scenario, scene, "and put back in the queue", JobMaker.MakeJob(fish, cell, cell), null,
                             JobKind.Work, fishGiver.workType);
-                    SortsAs(story, scene, "and tagged as an order", JobMaker.MakeJob(fish, cell, cell), JobTag.Misc,
+                    SortsAs(scenario, scene, "and tagged as an order", JobMaker.MakeJob(fish, cell, cell), JobTag.Misc,
                             JobKind.Other, null);
-                    SortsAs(story, scene, "and ordered by the player", forcedFish, null, JobKind.Other, null);
+                    SortsAs(scenario, scene, "and ordered by the player", forcedFish, null, JobKind.Other, null);
                 }
             }
         }
@@ -641,14 +641,14 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 Map map = scene.Map;
                 ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
                 ThingDef dusterDef = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_Duster");
                 if (standDef == null || dusterDef == null)
                 {
-                    story.Check(false, "the game has its outfit stand and duster");
+                    scenario.Check(false, "the game has its outfit stand and duster");
                     return;
                 }
 
@@ -662,7 +662,7 @@ namespace ShiftChange.Tests
                     origin + new IntVec3(3, 0, 0), Rot4.North) as Building_OutfitStand;
                 if (other == null)
                 {
-                    story.Check(false, "a second, ordinary stand is built three cells along");
+                    scenario.Check(false, "a second, ordinary stand is built three cells along");
                     return;
                 }
                 ClearStand(other);
@@ -671,11 +671,11 @@ namespace ShiftChange.Tests
                 // tiebreak has one answer and the switch below shows.
                 Apparel garment = DebugTools_Fixtures.MakeGarment(dusterDef, null);
                 GenSpawn.Spawn(garment, origin + new IntVec3(1, 0, 0), map);
-                story.Note("the stand is emptied, a second, empty stand is built three cells along, "
+                scenario.Note("the stand is emptied, a second, empty stand is built three cells along, "
                            + "and a duster is dropped beside the first");
 
                 IHaulDestination found;
-                story.Check(
+                scenario.Check(
                     StoreUtility.TryFindBestBetterNonSlotGroupStorageFor(
                         garment, null, map, StoragePriority.Normal, Faction.OfPlayer, out found)
                     && found == scene.OutfitStand,
@@ -684,9 +684,9 @@ namespace ShiftChange.Tests
 
                 scene.Comp.ToggleRest();
                 scene.Comp.SetDepositOnly(true);
-                story.Note("the first stand is ticked for sleeping, with Deposit only, issue no outfit");
-                story.Check(scene.Comp.DepositOnly, "the stand is deposit only");
-                story.Check(
+                scenario.Note("the first stand is ticked for sleeping, with Deposit only, issue no outfit");
+                scenario.Check(scene.Comp.DepositOnly, "the stand is deposit only");
+                scenario.Check(
                     StoreUtility.TryFindBestBetterNonSlotGroupStorageFor(
                         garment, null, map, StoragePriority.Normal, Faction.OfPlayer, out found)
                     && found == other,
@@ -694,26 +694,26 @@ namespace ShiftChange.Tests
 
                 // Only the haul search is narrowed: if this fails, a stand's own deposit and a
                 // player's ordered delivery went with it.
-                story.Check(((IHaulDestination)scene.OutfitStand).Accepts(garment),
+                scenario.Check(((IHaulDestination)scene.OutfitStand).Accepts(garment),
                             "while the stand still accepts the duster, so its owner's deposit and a "
                             + "delivery the player orders still go there");
 
                 if (!StockOne(other, "Apparel_Duster"))
                 {
-                    story.Check(false, "the ordinary stand takes a duster of its own");
+                    scenario.Check(false, "the ordinary stand takes a duster of its own");
                     return;
                 }
-                story.Check(!((IHaulDestination)other).Accepts(garment),
+                scenario.Check(!((IHaulDestination)other).Accepts(garment),
                             "the ordinary stand, holding a duster now, has no room for another, "
                             + "by the game's own rule");
                 bool anywhere = StoreUtility.TryFindBestBetterNonSlotGroupStorageFor(
                     garment, null, map, StoragePriority.Normal, Faction.OfPlayer, out found);
-                story.Check(!anywhere || (found != scene.OutfitStand && found != other),
+                scenario.Check(!anywhere || (found != scene.OutfitStand && found != other),
                             "so with one stand deposit only and the other full, neither takes it");
 
                 scene.Comp.SetDepositOnly(false);
-                story.Note("Deposit only is turned off");
-                story.Check(StoreUtility.TryFindBestBetterNonSlotGroupStorageFor(
+                scenario.Note("Deposit only is turned off");
+                scenario.Check(StoreUtility.TryFindBestBetterNonSlotGroupStorageFor(
                                 garment, null, map, StoragePriority.Normal, Faction.OfPlayer, out found)
                             && found == scene.OutfitStand,
                             "and the hauler comes back to the first stand at once");
@@ -737,7 +737,7 @@ namespace ShiftChange.Tests
                                           capableOf: WorkType("Doctor")),
                           InARoomADoctor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
@@ -745,44 +745,44 @@ namespace ShiftChange.Tests
                 WorkGiverDef urgent = Giver("DoctorTendEmergency");
                 if (doctor == null || tend == null)
                 {
-                    story.Check(false, "the game has its doctoring and tending");
+                    scenario.Check(false, "the game has its doctoring and tending");
                     return;
                 }
                 // The pad's room has no role to infer work from, so name the work.
                 scene.Comp.ToggleWork(doctor);
-                story.Note("the stand is ticked for doctoring");
+                scenario.Note("the stand is ticked for doctoring");
 
-                story.Check(scene.Comp.HandlesWork(doctor), "the stand serves doctoring");
-                story.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                scenario.Check(scene.Comp.HandlesWork(doctor), "the stand serves doctoring");
+                scenario.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                             name + " changes before tending a patient on their own");
 
                 Job forced = WorkJob(scene, tend);
                 forced.playerForced = true;
-                story.Check(!SendsToChangeKeepingQueue(scene, forced),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, forced),
                             "but never when the player orders it with a right-click");
 
                 if (urgent != null)
                 {
-                    story.Check(urgent.emergency,
+                    scenario.Check(urgent.emergency,
                                 "the game still counts tending patients with urgent needs as an emergency");
-                    story.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, urgent)),
+                    scenario.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, urgent)),
                                 "and " + name + " answers one without stopping at the stand");
                 }
 
                 if (scene.Colonist.drafter != null)
                 {
                     scene.Colonist.drafter.Drafted = true;
-                    story.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                    scenario.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                                 "drafted, " + name + " is never sent to change");
                     scene.Colonist.drafter.Drafted = false;
-                    story.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                    scenario.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                                 "and undrafted, is sent to change for the same tending again");
                 }
 
                 WorkGiverDef cook = Giver("DoBillsCook");
                 if (cook != null)
                 {
-                    story.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, cook)),
+                    scenario.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, cook)),
                                 name + " cooks without changing: the stand does not serve cooking");
                 }
             }
@@ -804,37 +804,37 @@ namespace ShiftChange.Tests
                                           capableOf: WorkType("Doctor")),
                           InARoomADoctor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
                 WorkGiverDef tend = Giver("DoctorTendToHumanlikes");
                 if (doctor == null || tend == null)
                 {
-                    story.Check(false, "the game has its doctoring and tending");
+                    scenario.Check(false, "the game has its doctoring and tending");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 int swept = MakeCalm(scene.Map);
-                story.Note("the stand is ticked for doctoring, and the map is calm ("
+                scenario.Note("the stand is ticked for doctoring, and the map is calm ("
                            + swept + " hostile things cleared)");
 
-                story.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                scenario.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                             "idle, " + name + " changes before tending a patient");
 
                 Job swap = JobMaker.MakeJob(ShiftChangeDefOf.ShiftChange_SwapAtStand, scene.OutfitStand);
                 scene.Colonist.jobs.StartJob(swap, JobCondition.InterruptForced, null,
                     resumeCurJobAfterwards: false, cancelBusyStances: true, null,
                     JobTag.ChangingApparel);
-                story.Check(scene.Colonist.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
+                scenario.Check(scene.Colonist.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
                             name + " starts changing at the stand");
-                story.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                             "and a tending job handed to them now is not put off for another change");
 
                 scene.Colonist.jobs.EndCurrentJob(JobCondition.InterruptForced, startNewJob: false);
-                story.Check(scene.Colonist.CurJobDef != ShiftChangeDefOf.ShiftChange_SwapAtStand,
+                scenario.Check(scene.Colonist.CurJobDef != ShiftChangeDefOf.ShiftChange_SwapAtStand,
                             "the change is stopped");
-                story.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                scenario.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                             "and the next tending job sends " + name + " to change as usual");
             }
         }
@@ -852,36 +852,36 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing), InTheOpen, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 WorkTypeDef doctor = WorkType("Doctor");
                 if (doctor == null)
                 {
-                    story.Check(false, "the game has its doctoring");
+                    scenario.Check(false, "the game has its doctoring");
                     return;
                 }
 
                 scene.Comp.ToggleWork(doctor);
-                story.Note("doctoring is ticked on the stand");
-                story.Check(scene.Comp.HandlesWork(doctor), "the stand serves doctoring");
-                story.Check(!scene.Comp.HandlesRecreation(), "and not recreation");
+                scenario.Note("doctoring is ticked on the stand");
+                scenario.Check(scene.Comp.HandlesWork(doctor), "the stand serves doctoring");
+                scenario.Check(!scene.Comp.HandlesRecreation(), "and not recreation");
 
                 scene.Comp.ToggleRecreation();
-                story.Note("Recreation is ticked");
-                story.Check(scene.Comp.HandlesRecreation(), "the stand serves recreation");
-                story.Check(!scene.Comp.HandlesWork(doctor), "and doctoring was cleared, not kept beside it");
-                story.Check(scene.Comp.WorkTypes.Count == 0, "with no work left ticked");
+                scenario.Note("Recreation is ticked");
+                scenario.Check(scene.Comp.HandlesRecreation(), "the stand serves recreation");
+                scenario.Check(!scene.Comp.HandlesWork(doctor), "and doctoring was cleared, not kept beside it");
+                scenario.Check(scene.Comp.WorkTypes.Count == 0, "with no work left ticked");
 
                 scene.Comp.ToggleWork(doctor);
-                story.Note("doctoring is ticked again");
-                story.Check(scene.Comp.HandlesWork(doctor), "the stand serves doctoring again");
-                story.Check(!scene.Comp.HandlesRecreation(), "and recreation was cleared in turn");
+                scenario.Note("doctoring is ticked again");
+                scenario.Check(scene.Comp.HandlesWork(doctor), "the stand serves doctoring again");
+                scenario.Check(!scene.Comp.HandlesRecreation(), "and recreation was cleared in turn");
 
                 scene.Comp.ToggleRecreation();
                 scene.Comp.ToggleRecreation();
-                story.Note("Recreation is ticked and unticked");
-                story.Check(!scene.Comp.HandlesRecreation(), "recreation is off again");
-                story.Check(scene.Comp.IsExcluded,
+                scenario.Note("Recreation is ticked and unticked");
+                scenario.Check(!scene.Comp.HandlesRecreation(), "recreation is off again");
+                scenario.Check(scene.Comp.IsExcluded,
                             "and the stand reads as Not used for shift changes, not Automatic");
             }
         }
@@ -904,7 +904,7 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Bed");
@@ -913,7 +913,7 @@ namespace ShiftChange.Tests
                 WorkGiverDef recuperate = Giver("PatientGoToBedRecuperate");
                 if (bedDef == null || laydown == null || groundSleep == null)
                 {
-                    story.Check(false, "the game has its bed, its lay-down job and sleeping on the ground");
+                    scenario.Check(false, "the game has its bed, its lay-down job and sleeping on the ground");
                     return;
                 }
 
@@ -923,10 +923,10 @@ namespace ShiftChange.Tests
                     Rot4.North) as Building_Bed;
                 if (bed == null)
                 {
-                    story.Check(false, "a bed is built in the stand's room");
+                    scenario.Check(false, "a bed is built in the stand's room");
                     return;
                 }
-                story.Note("a bed is built in the stand's room");
+                scenario.Note("a bed is built in the stand's room");
 
                 // Sleeping is not ticked by hand, since a bed changes the room's role:
                 // RoomRoleWorker_Bedroom scores a room holding one unowned humanlike bed at 100000,
@@ -938,32 +938,32 @@ namespace ShiftChange.Tests
                 // which no sleep stand dresses, so going to bed needs a colonist who needs no doctor;
                 // the scene's colonist is generated without one
                 // (DebugTools_Fixtures.RemoveTendableConditions).
-                story.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist),
+                scenario.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist),
                             name + " needs no doctor to begin with");
-                story.Check(scene.Comp.HandlesRest(),
+                scenario.Check(scene.Comp.HandlesRest(),
                             "the bed makes the room a bedroom, so the stand serves sleep on its own");
-                story.Check(scene.Comp.IsAutomatic,
+                scenario.Check(scene.Comp.IsAutomatic,
                             "the stand is on Automatic: the room decides, not a tick in its settings");
-                story.Check(!scene.Comp.HandlesRecreation(),
+                scenario.Check(!scene.Comp.HandlesRecreation(),
                             "and it does not serve recreation, which no room serves beside sleep");
                 if (!scene.Comp.HandlesRest())
                 {
                     // A modded room role may outscore the bedroom here: then tick Sleeping instead.
                     scene.Comp.ToggleRest();
-                    story.Check(scene.Comp.HandlesRest(), "Sleeping, ticked by hand instead, makes it serve sleep");
+                    scenario.Check(scene.Comp.HandlesRest(), "Sleeping, ticked by hand instead, makes it serve sleep");
                 }
 
-                story.Check(Patch_JobInterception.IsRestJob(JobMaker.MakeJob(laydown, bed)),
+                scenario.Check(Patch_JobInterception.IsRestJob(JobMaker.MakeJob(laydown, bed)),
                             "lying down in the bed counts as going to sleep");
-                story.Check(SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed)),
+                scenario.Check(SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed)),
                             "and going to bed in this room sends " + name + " to change at the stand first");
 
                 Job onTheFloor = JobMaker.MakeJob(groundSleep, scene.Colonist.Position);
-                story.Check(!Patch_JobInterception.IsRestJob(onTheFloor),
+                scenario.Check(!Patch_JobInterception.IsRestJob(onTheFloor),
                             "sleeping on the ground does not count as going to bed");
-                story.Check(!SendsToChangeKeepingQueue(scene, onTheFloor), "and sends nobody to change");
+                scenario.Check(!SendsToChangeKeepingQueue(scene, onTheFloor), "and sends nobody to change");
 
-                story.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed),
                                                        JobTag.RestingForMedicalReasons),
                             "going to bed to rest for medical reasons does not send " + name + " to change");
 
@@ -971,13 +971,13 @@ namespace ShiftChange.Tests
                 {
                     Job viaWorkGiver = JobMaker.MakeJob(laydown, bed);
                     viaWorkGiver.workGiverDef = recuperate;
-                    story.Check(!SendsToChangeKeepingQueue(scene, viaWorkGiver),
+                    scenario.Check(!SendsToChangeKeepingQueue(scene, viaWorkGiver),
                                 "nor does going to bed to recuperate, the bed rest work's own job");
                 }
 
                 Job forced = JobMaker.MakeJob(laydown, bed);
                 forced.playerForced = true;
-                story.Check(!SendsToChangeKeepingQueue(scene, forced),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, forced),
                             "and going to bed on the player's order never stops at the stand");
 
                 // The lay-down handed out again in the night, the reason OnABed exists:
@@ -986,13 +986,13 @@ namespace ShiftChange.Tests
                 // needs a current job, so it is false for a colonist lying in their own bed (true only
                 // at the wake-up, when a job starts while the lay-down is current). OnABed reads the
                 // colonist's cell instead.
-                story.Check(!Patch_JobInterception.OnABed(scene.Colonist), name + ", by the stand, is not on a bed");
+                scenario.Check(!Patch_JobInterception.OnABed(scene.Colonist), name + ", by the stand, is not on a bed");
                 IntVec3 wasAt = scene.Colonist.Position;
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = bed.Position;
-                story.Note(name + " is moved onto the bed");
-                story.Check(Patch_JobInterception.OnABed(scene.Colonist), name + " now counts as on the bed");
-                story.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed)),
+                scenario.Note(name + " is moved onto the bed");
+                scenario.Check(Patch_JobInterception.OnABed(scene.Colonist), name + " now counts as on the bed");
+                scenario.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed)),
                             "and told again to lie down, is not walked to the stand");
 
                 // The two readings disagree about this colonist, yet no check fails if OnABed is
@@ -1001,15 +1001,15 @@ namespace ShiftChange.Tests
                 // false here for a second reason, and the wake-up below would still pass. Catching
                 // that needs a lay-down ticked with a live driver. The check sets the two answers
                 // side by side, as a tripwire for a reader.
-                story.Check(!scene.Colonist.InBed(),
+                scenario.Check(!scene.Colonist.InBed(),
                             "though the game itself says " + name + " is not in bed: that is why Shift Change "
                             + "reads the cell, and why this test alone cannot catch a return to the game's reading");
 
                 // Delete StaysInBed's CanBeginNowWhileLyingDown half and every check above still
                 // passes: so both directions, from the same place on the bed.
-                story.Check(Patch_JobInterception.StaysInBed(scene.Colonist, JobMaker.MakeJob(laydown, bed)),
+                scenario.Check(Patch_JobInterception.StaysInBed(scene.Colonist, JobMaker.MakeJob(laydown, bed)),
                             "lying down keeps " + name + " in bed, so nothing changes them back");
-                story.Check(!Patch_JobInterception.StaysInBed(scene.Colonist,
+                scenario.Check(!Patch_JobInterception.StaysInBed(scene.Colonist,
                                 JobMaker.MakeJob(JobDefOf.Wait, scene.Colonist.Position)),
                             "a job that cannot be done lying down does not: this is the wake-up, "
                             + "and it must change them back while they are still by the stand");
@@ -1018,14 +1018,14 @@ namespace ShiftChange.Tests
                 // eating), built as JobGiver_MeditateInBed builds one: the colonist's cell first, the
                 // bed second, so only the second half of TargetsBedUnder can catch it.
                 Job inBedByTarget = JobMaker.MakeJob(JobDefOf.Wait, scene.Colonist.Position, bed);
-                story.Check(Patch_JobInterception.TargetsBedUnder(scene.Colonist, inBedByTarget),
+                scenario.Check(Patch_JobInterception.TargetsBedUnder(scene.Colonist, inBedByTarget),
                             "a job aimed at this very bed counts as staying in it");
-                story.Check(Patch_JobInterception.StaysInBed(scene.Colonist, inBedByTarget),
+                scenario.Check(Patch_JobInterception.StaysInBed(scene.Colonist, inBedByTarget),
                             "so it keeps " + name + " in bed, though the job does not say it is done lying down");
 
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = wasAt;
-                story.Check(!Patch_JobInterception.OnABed(scene.Colonist), name + " is back by the stand, off the bed");
+                scenario.Check(!Patch_JobInterception.OnABed(scene.Colonist), name + " is back by the stand, off the bed");
 
                 // The wake-up, end to end: the checks above test the rules, not that the change back
                 // is put first. This runs the decision with the colonist on shift and on the bed,
@@ -1037,28 +1037,28 @@ namespace ShiftChange.Tests
                 // one vanilla put back behind a haul, and an errand ahead of the job they dressed for
                 // keeps the outfit on (QueuedAheadOfServedWork), which would answer the wake-up.
                 ClearSwapDecision(scene.Colonist);
-                if (!SwapNow(story, scene))
+                if (!SwapNow(scenario, scene))
                 {
-                    story.Check(false, name + " changes into the stand's duster for the wake-up");
+                    scenario.Check(false, name + " changes into the stand's duster for the wake-up");
                     return;
                 }
-                story.Note(name + " changes into the stand's duster");
-                story.Check(scene.Comp.OnShift, name + " is on shift, so there is a way back to change");
+                scenario.Note(name + " changes into the stand's duster");
+                scenario.Check(scene.Comp.OnShift, name + " is on shift, so there is a way back to change");
 
                 IntVec3 outside = new IntVec3(scene.OutfitStand.Position.x + 8, 0, scene.OutfitStand.Position.z);
                 if (!outside.InBounds(scene.Map) || outside.GetRoom(scene.Map) == scene.OutfitStand.GetRoom())
                 {
-                    story.Check(false, "there is ground outside the stand's room, eight cells along");
+                    scenario.Check(false, "there is ground outside the stand's room, eight cells along");
                     return;
                 }
 
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = bed.Position;
-                story.Note(name + " is moved onto the bed, in the duster");
-                story.Check(SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.Wait, outside)),
+                scenario.Note(name + " is moved onto the bed, in the duster");
+                scenario.Check(SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.Wait, outside)),
                             "waking, a job that takes " + name + " out of the room changes them back first, "
                             + "before they do it");
-                story.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed)),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(laydown, bed)),
                             "while lying down again still does not");
 
                 scene.Colonist.pather?.StopDead();
@@ -1081,7 +1081,7 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 ThingDef parkaDef = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_Parka");
@@ -1089,7 +1089,7 @@ namespace ShiftChange.Tests
                 ThingDef pantsDef = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_Pants");
                 if (parkaDef == null || shirtDef == null || pantsDef == null)
                 {
-                    story.Check(false, "the game has its parka, shirt and trousers");
+                    scenario.Check(false, "the game has its parka, shirt and trousers");
                     return;
                 }
                 Apparel parka = null;
@@ -1103,60 +1103,60 @@ namespace ShiftChange.Tests
                 }
                 if (parka == null)
                 {
-                    story.Check(false, name + " wears a parka to leave at the stand");
+                    scenario.Check(false, name + " wears a parka to leave at the stand");
                     return;
                 }
 
                 scene.Comp.ToggleRest();
                 scene.Comp.SetDepositOnly(true);
-                story.Note("the stand is ticked for sleeping, with Deposit only, issue no outfit");
-                story.Check(scene.Comp.DepositOnly, "the stand is set to Deposit only");
+                scenario.Note("the stand is ticked for sleeping, with Deposit only, issue no outfit");
+                scenario.Check(scene.Comp.DepositOnly, "the stand is set to Deposit only");
 
                 // The storage filter decides, and its default is generous: OutfitStandBase ships
                 // defaultStorageSettings (apparel, less utility items and weapons) and PostMake
                 // copies it onto every stand. That default is what gives the never-naked rule work.
                 StorageSettings settings = scene.OutfitStand.GetStoreSettings();
-                story.Check(settings.filter.Allows(parkaDef),
+                scenario.Check(settings.filter.Allows(parkaDef),
                             "a newly built stand's storage filter takes ordinary clothes such as the parka");
 
                 settings.filter.SetDisallowAll();
-                story.Note("everything is unticked in the stand's storage filter");
-                story.Check(!SwapPlan.WouldDress(scene.Colonist, scene.OutfitStand),
+                scenario.Note("everything is unticked in the stand's storage filter");
+                scenario.Check(!SwapPlan.WouldDress(scene.Colonist, scene.OutfitStand),
                             "and with nothing allowed, the stand is not one to change at");
 
                 settings.filter.SetAllow(parkaDef, allow: true);
-                story.Note("the parka is allowed in the filter");
+                scenario.Note("the parka is allowed in the filter");
                 List<Apparel> wear = new List<Apparel>();
                 List<Apparel> store = new List<Apparel>();
-                story.Check(SwapPlan.BuildDress(scene.Colonist, scene.OutfitStand, wear, store),
+                scenario.Check(SwapPlan.BuildDress(scene.Colonist, scene.OutfitStand, wear, store),
                             "with the parka allowed, the stand plans a change for " + name);
-                story.Check(wear.Count == 0, "which hands out nothing");
-                story.Check(store.Count == 1 && store.Contains(parka),
+                scenario.Check(wear.Count == 0, "which hands out nothing");
+                scenario.Check(store.Count == 1 && store.Contains(parka),
                             "and takes in exactly what the filter allows, the parka, and nothing else");
 
                 // Never bare: widen the filter to everything they have on and the stand must decline.
                 settings.filter.SetAllow(shirtDef, allow: true);
                 settings.filter.SetAllow(pantsDef, allow: true);
-                story.Check(!SwapPlan.WouldDress(scene.Colonist, scene.OutfitStand),
+                scenario.Check(!SwapPlan.WouldDress(scene.Colonist, scene.OutfitStand),
                             "with the shirt and trousers allowed too, the stand would take everything, so it declines");
                 settings.filter.SetAllow(shirtDef, allow: false);
                 settings.filter.SetAllow(pantsDef, allow: false);
-                story.Note("the shirt and trousers are disallowed again");
+                scenario.Note("the shirt and trousers are disallowed again");
 
-                story.Check(SwapNow(story, scene), name + " leaves their things at the stand");
-                story.Check(parka.ParentHolder == scene.OutfitStand, "the parka is on the stand");
-                story.Check(!scene.Colonist.apparel.WornApparel.Contains(parka), "and off " + name);
-                story.Check(scene.Colonist.apparel.WornApparel.Count == 2, "who keeps their own shirt and trousers on");
-                story.Check(scene.Comp.OnShift, "the stand counts as in use");
-                story.Check(scene.Comp.Borrower == scene.Colonist, "by " + name);
-                story.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
+                scenario.Check(SwapNow(scenario, scene), name + " leaves their things at the stand");
+                scenario.Check(parka.ParentHolder == scene.OutfitStand, "the parka is on the stand");
+                scenario.Check(!scene.Colonist.apparel.WornApparel.Contains(parka), "and off " + name);
+                scenario.Check(scene.Colonist.apparel.WornApparel.Count == 2, "who keeps their own shirt and trousers on");
+                scenario.Check(scene.Comp.OnShift, "the stand counts as in use");
+                scenario.Check(scene.Comp.Borrower == scene.Colonist, "by " + name);
+                scenario.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
                             "and " + name + " is on shift at it, so there is a way back");
-                story.Check(scene.Comp.IssuedUniformForReading.Count == 0,
+                scenario.Check(scene.Comp.IssuedUniformForReading.Count == 0,
                             "though it handed out nothing, which is the point");
 
-                story.Check(SwapNow(story, scene), name + " collects their things");
-                story.Check(scene.Colonist.apparel.WornApparel.Contains(parka), "the parka is back on");
-                story.Check(!scene.Comp.OnShift, "and the stand is free again");
+                scenario.Check(SwapNow(scenario, scene), name + " collects their things");
+                scenario.Check(scene.Colonist.apparel.WornApparel.Contains(parka), "the parka is back on");
+                scenario.Check(!scene.Comp.OnShift, "and the stand is free again");
 
                 // The utility layer, last because it changes what the colonist wears. A shield belt
                 // covers neither torso nor legs, and utility items are what a stand's default filter
@@ -1166,20 +1166,20 @@ namespace ShiftChange.Tests
                 // asks it.
                 if (!WearOne(scene.Colonist, "Apparel_ShieldBelt"))
                 {
-                    story.Check(false, name + " can put on a shield belt");
+                    scenario.Check(false, name + " can put on a shield belt");
                     return;
                 }
                 settings.filter.SetAllow(shirtDef, allow: true);
                 settings.filter.SetAllow(pantsDef, allow: true);
-                story.Note(name + " puts on a shield belt, and the shirt and trousers are allowed again");
+                scenario.Note(name + " puts on a shield belt, and the shirt and trousers are allowed again");
                 List<Apparel> beltWear = new List<Apparel>();
                 List<Apparel> beltStore = new List<Apparel>();
-                story.Check(!SwapPlan.BuildDress(scene.Colonist, scene.OutfitStand, beltWear, beltStore),
+                scenario.Check(!SwapPlan.BuildDress(scene.Colonist, scene.OutfitStand, beltWear, beltStore),
                             "the stand plans no change that would leave " + name + " in just the shield belt");
-                story.Check(beltStore.Count == 0, "and leaves no half-made plan behind");
-                story.Check(SwapPlan.WouldBeNude(scene.Colonist, scene.Colonist.apparel.WornApparel),
+                scenario.Check(beltStore.Count == 0, "and leaves no half-made plan behind");
+                scenario.Check(SwapPlan.WouldBeNude(scene.Colonist, scene.Colonist.apparel.WornApparel),
                             "since taking off everything " + name + " wears would leave them naked");
-                story.Check(!SwapPlan.WouldBeNude(scene.Colonist, beltWear), "while taking off nothing would not");
+                scenario.Check(!SwapPlan.WouldBeNude(scene.Colonist, beltWear), "while taking off nothing would not");
             }
         }
 
@@ -1209,7 +1209,7 @@ namespace ShiftChange.Tests
             return Staged((map, pad) => StageWithDoorway(map, pad, WorkType("Fishing")),
                           InARoomWithADoorAFisher, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef fishing = WorkType("Fishing");
@@ -1217,17 +1217,17 @@ namespace ShiftChange.Tests
                 JobDef fish = JobDefOf.Fish;
                 if (fishing == null || fishGiver == null || fish == null)
                 {
-                    story.Check(false, "the game has Odyssey's fishing work, its work giver and its fishing job");
+                    scenario.Check(false, "the game has Odyssey's fishing work, its work giver and its fishing job");
                     return;
                 }
                 if (scene.Outside.Area == 0)
                 {
-                    story.Check(false, "the room has a door and open ground outside it");
+                    scenario.Check(false, "the room has a door and open ground outside it");
                     return;
                 }
                 scene.Comp.ToggleWork(fishing);
                 int swept = MakeCalm(scene.Map);
-                story.Note("the stand is ticked for fishing, and the map is calm ("
+                scenario.Note("the stand is ticked for fishing, and the map is calm ("
                            + swept + " hostile things cleared)");
 
                 // The shape WorkGiver_Fish.NonScanJob builds: the fishing cell first, the cell to
@@ -1240,46 +1240,46 @@ namespace ShiftChange.Tests
                 IntVec3 shore = new IntVec3(scene.Outside.minX, 0, at.z);
                 IntVec3 farShore = new IntVec3(scene.Outside.minX, 0, scene.Outside.maxZ);
 
-                story.Check(scene.Comp.HandlesWork(fishing), "the stand serves fishing");
-                story.Check(SendsToChange(scene, stamped, JobTag.Fieldwork),
+                scenario.Check(scene.Comp.HandlesWork(fishing), "the stand serves fishing");
+                scenario.Check(SendsToChange(scene, stamped, JobTag.Fieldwork),
                             "fishing in the room, with the job naming its work giver, sends " + name + " to change");
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(fish, spot, standOn), JobTag.Fieldwork),
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(fish, spot, standOn), JobTag.Fieldwork),
                             "and so does the same job as Odyssey hands it out, naming none");
-                story.Check(!SendsToChange(scene, JobMaker.MakeJob(fish, spot, standOn), JobTag.Misc),
+                scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(fish, spot, standOn), JobTag.Misc),
                             "but not with the tag a player's order carries: fishing is known by its work giver's tag");
-                story.Check(!SendsToChange(scene, JobMaker.MakeJob(fish, shore, shore), JobTag.Fieldwork),
+                scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(fish, shore, shore), JobTag.Fieldwork),
                             "while the stand serves its room, fishing out past the door sends nobody to change");
 
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(5);
-                story.Note("the stand is set to serve Within a radius, of 5 cells: a hut by the shore");
+                scenario.Note("the stand is set to serve Within a radius, of 5 cells: a hut by the shore");
                 Job forced = JobMaker.MakeJob(fish, shore, shore);
                 forced.playerForced = true;
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(fish, shore, shore), JobTag.Fieldwork),
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(fish, shore, shore), JobTag.Fieldwork),
                             "now fishing out past the door, inside the ring, sends " + name + " to change");
-                story.Check(!SendsToChange(scene, JobMaker.MakeJob(fish, farShore, farShore), JobTag.Fieldwork),
+                scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(fish, farShore, farShore), JobTag.Fieldwork),
                             "fishing past the ring does not");
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(fish, shore, shore)),
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(fish, shore, shore)),
                             "the job with no tag, as the game puts it back in the queue behind a haul, still does");
-                story.Check(JobRoomTargets.NonScanGiver(forced, null) == null,
+                scenario.Check(JobRoomTargets.NonScanGiver(forced, null) == null,
                             "while one the player ordered, with no tag, is not read as fishing");
 
                 // On shift, the shape vanilla's opportunistic haul leaves
                 // (Pawn_JobTracker.TryOpportunisticJob): the fishing job back at the head of the
                 // queue, untagged, and a haul started first.
-                story.Check(SwapNow(story, scene), name + " changes into the duster to go fishing");
-                story.Check(scene.Comp.OnShift, "and is on shift");
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the duster to go fishing");
+                scenario.Check(scene.Comp.OnShift, "and is on shift");
                 if (!scene.Comp.OnShift)
                 {
                     return;
                 }
-                NotSentStraightBack(story, scene);
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, farShore, shore)),
+                NotSentStraightBack(scenario, scene);
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, farShore, shore)),
                             "hauling something in from past the ring changes them back first");
                 scene.Colonist.jobs.jobQueue.EnqueueFirst(JobMaker.MakeJob(fish, shore, shore));
-                story.Note("fishing inside the ring is put back at the head of " + name + "'s queue, untagged, "
+                scenario.Note("fishing inside the ring is put back at the head of " + name + "'s queue, untagged, "
                            + "as the game leaves it behind a haul");
-                story.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, farShore, shore)),
+                scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, farShore, shore)),
                             "and the same haul keeps the duster on, with that fishing queued behind it");
             }
         }
@@ -1289,12 +1289,12 @@ namespace ShiftChange.Tests
         /// counts as <paramref name="kind"/>, charged to <paramref name="work"/>. A failing line
         /// says what it counted as instead.
         /// </summary>
-        internal static bool SortsAs(Story story, Scene scene, string what, Job job, JobTag? tag, JobKind kind,
+        internal static bool SortsAs(Scenario scenario, Scene scene, string what, Job job, JobTag? tag, JobKind kind,
                                      WorkTypeDef work)
         {
             JobClass c = Patch_JobInterception.Classify(scene.Colonist, job, tag);
             bool right = c.Kind == kind && c.Work == work;
-            return story.Check(right, what + ": " + Counted(kind, work)
+            return scenario.Check(right, what + ": " + Counted(kind, work)
                                       + (right ? "" : ", but it counts as " + Counted(c.Kind, c.Work)));
         }
 

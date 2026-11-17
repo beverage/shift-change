@@ -10,7 +10,7 @@ namespace ShiftChange.Tests
     /// What every test takes for granted about the colony it runs in: a healthy colonist, and open ground past the pad.
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(RunOrder.First - (int)CaseGroup.TheTestColony)]
-    internal class TheTestColony : StoryFixture
+    internal class TheTestColony : FeatureFixture
     {
         /// <summary>
         /// What every test takes for granted about the colonist it is handed and the ground past
@@ -32,7 +32,7 @@ namespace ShiftChange.Tests
                           + "of his that made way",
                           Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 Map map = scene.Map;
                 int enclosed = 0;
@@ -44,7 +44,7 @@ namespace ShiftChange.Tests
                         enclosed++;
                     }
                 }
-                story.Check(enclosed == 0,
+                scenario.Check(enclosed == 0,
                             "the ring of cells around the pad reaches the map's edge, so a stand just outside "
                             + "the pad stands in the open (" + enclosed + " of those cells do not)");
 
@@ -58,7 +58,7 @@ namespace ShiftChange.Tests
                     }
                     p.Destroy();
                 }
-                story.Check(tending == 0, "forty new test colonists in a row: none needs a doctor's tending");
+                scenario.Check(tending == 0, "forty new test colonists in a row: none needs a doctor's tending");
 
                 // Asthma stands for any condition a generated colonist arrives needing tended.
                 HediffDef asthma = DefDatabase<HediffDef>.GetNamedSilentFail("Asthma");
@@ -76,16 +76,16 @@ namespace ShiftChange.Tests
                 if (asthma == null || lung == null)
                 {
                     patient.Destroy();
-                    story.Check(false, "asthma and the lung can be found");
+                    scenario.Check(false, "asthma and the lung can be found");
                     return;
                 }
                 patient.health.AddHediff(HediffMaker.MakeHediff(asthma, patient, lung), lung);
                 bool urgentWithIt = HealthAIUtility.ShouldSeekMedicalRestUrgent(patient);
                 DebugTools_Fixtures.RemoveTendableConditions(patient);
-                story.Note("another test colonist is given asthma in a lung, and then has it taken away "
+                scenario.Note("another test colonist is given asthma in a lung, and then has it taken away "
                            + "as every test colonist does");
-                story.Check(urgentWithIt, "untended asthma made her an urgent patient");
-                story.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(patient)
+                scenario.Check(urgentWithIt, "untended asthma made her an urgent patient");
+                scenario.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(patient)
                             && patient.health.hediffSet.GetFirstHediffOfDef(asthma) == null,
                             "and with it taken away, she is not one");
                 patient.Destroy();
@@ -95,16 +95,16 @@ namespace ShiftChange.Tests
                 IntVec3 past = scene.OutfitStand.Position + new IntVec3(8, 0, 4);
                 if (granite == null || !past.InBounds(map))
                 {
-                    story.Check(false, "granite can be found, and a cell past the pad is on the map");
+                    scenario.Check(false, "granite can be found, and a cell past the pad is on the map");
                     return;
                 }
                 GenDebug.ClearArea(CellRect.SingleCell(past), map);
                 GenSpawn.Spawn(ThingMaker.MakeThing(granite), past, map);
                 bool rock = past.GetEdifice(map)?.def == granite && past.GetRoom(map) == null;
                 OpenGround(scene, past);
-                story.Note("a cell past the pad is made natural granite, then cleared for a test to use");
-                story.Check(rock, "as natural rock, the cell was in no room");
-                story.Check(past.GetEdifice(map) == null && past.Standable(map) && past.GetRoom(map) != null,
+                scenario.Note("a cell past the pad is made natural granite, then cleared for a test to use");
+                scenario.Check(rock, "as natural rock, the cell was in no room");
+                scenario.Check(past.GetEdifice(map) == null && past.Standable(map) && past.GetRoom(map) != null,
                             "cleared, it is open ground to stand on, with a room");
             }
         }

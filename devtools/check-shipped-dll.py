@@ -78,7 +78,7 @@ FORBIDDEN_TYPES = [
     "DebugTools_SleepStage",
     "DebugTools_ExportScene",
     "DebugTools_Fixtures",
-    "StoryFixture",
+    "FeatureFixture",
     "SceneKit",
     "SaveRoundTrip",
 ]

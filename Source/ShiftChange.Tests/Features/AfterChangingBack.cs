@@ -14,7 +14,7 @@ namespace ShiftChange.Tests
     /// are drafted.
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(RunOrder.First - (int)CaseGroup.AfterChangingBack)]
-    internal class AfterChangingBack : StoryFixture
+    internal class AfterChangingBack : FeatureFixture
     {
         /// <summary>What <see cref="SceneKit.Stage"/> sets up with the pad enclosed.</summary>
         internal const string InAWalledRoom =
@@ -52,32 +52,32 @@ namespace ShiftChange.Tests
                                           capableOf: WorkType("Doctor")),
                           DoctorInAWalledRoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
                 WorkGiverDef tend = Giver("DoctorTendToHumanlikes");
                 if (doctor == null || tend == null)
                 {
-                    story.Check(false, "the game has Doctor work and its tending of colonists");
+                    scenario.Check(false, "the game has Doctor work and its tending of colonists");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
-                story.Note("Doctor is ticked on the stand");
+                scenario.Note("Doctor is ticked on the stand");
 
                 MakeCalm(scene.Map);
-                story.Check(scene.Map.dangerWatcher.DangerRating == StoryDanger.None,
+                scenario.Check(scene.Map.dangerWatcher.DangerRating == StoryDanger.None,
                             "the map is calm, as in danger a freed stand calls nobody over");
-                story.Check(SwapNow(story, scene), name + " changes into the duster for the shift");
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the duster for the shift");
 
                 Job working;
-                Pawn bare = DoctoringInHerOwnClothes(story, scene, doctor, tend, out working);
+                Pawn bare = DoctoringInHerOwnClothes(scenario, scene, doctor, tend, out working);
                 string other = bare.LabelShort;
-                story.Check(SwapPlan.WouldDress(bare, scene.OutfitStand), other + " could wear the stand's outfit");
-                story.Check(StillWorking(bare, tend), "and is still doctoring in her own clothes");
+                scenario.Check(SwapPlan.WouldDress(bare, scene.OutfitStand), other + " could wear the stand's outfit");
+                scenario.Check(StillWorking(bare, tend), "and is still doctoring in her own clothes");
 
-                story.Check(SwapNow(story, scene), name + " changes back, which frees the stand");
-                story.Check(bare.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
+                scenario.Check(SwapNow(scenario, scene), name + " changes back, which frees the stand");
+                scenario.Check(bare.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
                             "the freed stand interrupts " + other + "'s doctoring to dress her");
             }
         }
@@ -97,31 +97,31 @@ namespace ShiftChange.Tests
             return Staged((map, pad) => StageWithDoorway(map, pad, WorkType("Doctor")),
                           DoctorBesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
                 WorkGiverDef tend = Giver("DoctorTendToHumanlikes");
                 if (doctor == null || tend == null)
                 {
-                    story.Check(false, "the game has Doctor work and its tending of colonists");
+                    scenario.Check(false, "the game has Doctor work and its tending of colonists");
                     return;
                 }
                 if (scene.Outside.Area == 0)
                 {
-                    story.Check(false, "the stand's room has a door with open ground outside it");
+                    scenario.Check(false, "the stand's room has a door with open ground outside it");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 MakeCalm(scene.Map);
                 Patch_JobInterception.ChangedBackAt.Remove(scene.Colonist);
-                story.Note("Doctor is ticked on the stand, the map holds no enemies, "
+                scenario.Note("Doctor is ticked on the stand, the map holds no enemies, "
                            + "and no Change back holds the stand off " + name);
 
-                story.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                scenario.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                             "doctoring in the stand's room dresses " + name);
-                story.Check(SwapNow(story, scene), name + " changes into the duster for the shift");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift at the stand"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the duster for the shift");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift at the stand"))
                 {
                     return;
                 }
@@ -131,16 +131,16 @@ namespace ShiftChange.Tests
                 // change interrupted before anything moves announces nothing, so the cut leaves no
                 // trace.
                 Patch_ChangeBackGizmo.ChangeBack(scene.Colonist, scene.Comp);
-                story.Note(name + "'s Change back button is pressed");
-                story.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                scenario.Note(name + "'s Change back button is pressed");
+                scenario.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                             "the stand now holds off dressing " + name + " again");
                 scene.Colonist.jobs.EndCurrentJob(JobCondition.InterruptForced, startNewJob: false);
-                story.Check(SwapNow(story, scene), name + " changes back into their own clothes");
-                story.Check(!scene.Comp.OnShift, "so nothing of the stand's is out");
+                scenario.Check(SwapNow(scenario, scene), name + " changes back into their own clothes");
+                scenario.Check(!scene.Comp.OnShift, "so nothing of the stand's is out");
 
-                story.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                             "held off, doctoring in the same room does not dress " + name);
-                story.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                scenario.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                             "and starting a job inside the room keeps the hold");
 
                 // A stand in another room still dresses them meanwhile. It is outside the door and
@@ -153,51 +153,51 @@ namespace ShiftChange.Tests
                 CompShiftStand otherComp = other?.TryGetComp<CompShiftStand>();
                 if (otherComp == null || !StockOne(other, "Apparel_Duster"))
                 {
-                    story.Check(false, "a second stand holding a duster can be put outside the door");
+                    scenario.Check(false, "a second stand holding a duster can be put outside the door");
                     return;
                 }
                 otherComp.ToggleWork(doctor);
                 otherComp.SetServes(CatchmentKind.Radius);
                 otherComp.SetServeRadius(CompShiftStand.MinServeRadius);
-                story.Note("a second stand holding a duster stands outside the door, Doctor ticked, "
+                scenario.Note("a second stand holding a duster stands outside the door, Doctor ticked, "
                            + "serving within " + CompShiftStand.MinServeRadius + " cells");
-                story.Check(other.GetRoom() != scene.OutfitStand.GetRoom(), "the second stand is in another room");
-                story.Check(otherComp.serves == CatchmentKind.Radius, "serving a radius around it");
-                story.Check(SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, outsideCell)),
+                scenario.Check(other.GetRoom() != scene.OutfitStand.GetRoom(), "the second stand is in another room");
+                scenario.Check(otherComp.serves == CatchmentKind.Radius, "serving a radius around it");
+                scenario.Check(SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, outsideCell)),
                             "doctoring out there still dresses " + name + " at it");
-                story.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                scenario.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                             "while the hold on their own room stays");
                 other.Destroy();
-                story.Note("the second stand is taken away");
+                scenario.Note("the second stand is taken away");
 
                 // Leaving ends the hold at the next job, whatever the job: here a Wait no work
                 // gave, which nothing dresses for.
                 IntVec3 inside = scene.Colonist.Position;
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = outsideCell;
-                story.Note(name + " steps outside the door and waits there");
+                scenario.Note(name + " steps outside the door and waits there");
                 SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.Wait, outsideCell));
-                story.Check(!Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                scenario.Check(!Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                             "a job outside the room ends the hold");
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = inside;
-                story.Note(name + " is back inside");
-                story.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                scenario.Note(name + " is back inside");
+                scenario.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                             "so back inside, doctoring in the room dresses " + name + " again");
 
                 Patch_JobInterception.ChangedBackAt[scene.Colonist] =
                     new Patch_JobInterception.ChangeBackLatch(scene.OutfitStand);
-                story.Note("the stand holds off dressing " + name + " again, as after Change back");
-                story.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                scenario.Note("the stand holds off dressing " + name + " again, as after Change back");
+                scenario.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                             "held off again, doctoring in the room does not dress " + name);
                 if (scene.Colonist.drafter != null)
                 {
                     scene.Colonist.drafter.Drafted = true;
                     scene.Colonist.drafter.Drafted = false;
-                    story.Note(name + " is drafted and released");
-                    story.Check(!Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                    scenario.Note(name + " is drafted and released");
+                    scenario.Check(!Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                                 "drafting ends the hold");
-                    story.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                    scenario.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                                 "so doctoring in the room dresses " + name + " again");
                 }
 
@@ -208,17 +208,17 @@ namespace ShiftChange.Tests
                 Job working = WorkingAt(tend, scene.OutfitStand.Position + new IntVec3(3, 0, 2));
                 scene.Colonist.jobs.StartJob(working, JobCondition.InterruptForced, null,
                     resumeCurJobAfterwards: false, cancelBusyStances: true, null, null);
-                story.Note("held off once more, " + name + " is set doctoring in the room");
-                story.Check(StillWorking(scene.Colonist, tend),
+                scenario.Note("held off once more, " + name + " is set doctoring in the room");
+                scenario.Check(StillWorking(scene.Colonist, tend),
                             "held off, " + name + " starts doctoring in their own clothes");
                 Patch_JobInterception.Notify_StandFreed(scene.Comp, null);
-                story.Note("the stand says it is free");
-                story.Check(StillWorking(scene.Colonist, tend),
+                scenario.Note("the stand says it is free");
+                scenario.Check(StillWorking(scene.Colonist, tend),
                             "and the stand coming free does not interrupt them to dress");
                 Patch_JobInterception.ChangedBackAt.Remove(scene.Colonist);
                 Patch_JobInterception.Notify_StandFreed(scene.Comp, null);
-                story.Note("the hold is lifted by hand, and the stand says it is free again");
-                story.Check(scene.Colonist.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
+                scenario.Note("the hold is lifted by hand, and the stand says it is free again");
+                scenario.Check(scene.Colonist.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
                             "without the hold, the same stand coming free interrupts " + name + " to dress");
                 ClearSwapDecision(scene.Colonist);
             }
@@ -238,45 +238,45 @@ namespace ShiftChange.Tests
                                           capableOf: WorkType("Doctor")),
                           DoctorInAWalledRoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
                 WorkGiverDef tend = Giver("DoctorTendToHumanlikes");
                 if (doctor == null || tend == null)
                 {
-                    story.Check(false, "the game has Doctor work and its tending of colonists");
+                    scenario.Check(false, "the game has Doctor work and its tending of colonists");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 MakeCalm(scene.Map);
-                story.Note("Doctor is ticked on the stand, and the map holds no enemies");
+                scenario.Note("Doctor is ticked on the stand, and the map holds no enemies");
 
-                story.Check(SwapNow(story, scene), name + " changes into the duster for the shift");
-                NotSentStraightBack(story, scene);
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the duster for the shift");
+                NotSentStraightBack(scenario, scene);
 
                 Job working;
-                Pawn bare = DoctoringInHerOwnClothes(story, scene, doctor, tend, out working);
+                Pawn bare = DoctoringInHerOwnClothes(scenario, scene, doctor, tend, out working);
                 string other = bare.LabelShort;
-                story.Check(StillWorking(bare, tend), other + " is doctoring in the room in her own clothes");
+                scenario.Check(StillWorking(bare, tend), other + " is doctoring in the room in her own clothes");
 
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(10);
-                story.Note("Within a radius is chosen under Serves, and the radius set to 10 cells");
-                story.Check(scene.Comp.Covers(scene.OutfitStand.Position + new IntVec3(3, 0, 2), scene.Map),
+                scenario.Note("Within a radius is chosen under Serves, and the radius set to 10 cells");
+                scenario.Check(scene.Comp.Covers(scene.OutfitStand.Position + new IntVec3(3, 0, 2), scene.Map),
                             "the ring takes in " + other + "'s doctoring");
-                story.Check(SwapNow(story, scene), name + " changes back, which frees the stand");
-                story.Check(StillWorking(bare, tend),
+                scenario.Check(SwapNow(scenario, scene), name + " changes back, which frees the stand");
+                scenario.Check(StillWorking(bare, tend),
                             "the freed stand, serving a radius, does not interrupt " + other);
 
                 scene.Comp.SetServes(CatchmentKind.Room);
-                story.Note("the stand is set back to serve its room");
-                story.Check(SwapNow(story, scene), "serving its room again, " + name + " changes into the duster");
-                story.Check(SwapNow(story, scene), "and changes back, which frees the stand");
-                story.Check(bare.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
+                scenario.Note("the stand is set back to serve its room");
+                scenario.Check(SwapNow(scenario, scene), "serving its room again, " + name + " changes into the duster");
+                scenario.Check(SwapNow(scenario, scene), "and changes back, which frees the stand");
+                scenario.Check(bare.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
                             "so the freed stand, serving its room, interrupts " + other + " to dress her");
                 Patch_JobInterception.DeferredJob resumed;
-                story.Check(Patch_JobInterception.DressedFor.TryGetValue(bare, out resumed) && resumed.Is(working),
+                scenario.Check(Patch_JobInterception.DressedFor.TryGetValue(bare, out resumed) && resumed.Is(working),
                             "and her doctoring is remembered as the job she dressed for, "
                             + "so going back to it keeps the uniform on");
                 Patch_JobInterception.DressedFor.Remove(bare);
@@ -301,7 +301,7 @@ namespace ShiftChange.Tests
             return Staged((map, pad) => StageWithDoorway(map, pad, WorkType("Doctor")),
                           DoctorBesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
@@ -309,19 +309,19 @@ namespace ShiftChange.Tests
                 JobDef chess = DefDatabase<JobDef>.GetNamedSilentFail("Play_Chess");
                 if (doctor == null || tend == null || chess == null)
                 {
-                    story.Check(false, "the game has Doctor work, its tending of colonists, and chess");
+                    scenario.Check(false, "the game has Doctor work, its tending of colonists, and chess");
                     return;
                 }
                 if (scene.Outside.Area == 0)
                 {
-                    story.Check(false, "the stand's room has a door with open ground outside it");
+                    scenario.Check(false, "the stand's room has a door with open ground outside it");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(4);
                 MakeCalm(scene.Map);
-                story.Note("Doctor is ticked on the stand, which serves within 4 cells, "
+                scenario.Note("Doctor is ticked on the stand, which serves within 4 cells, "
                            + "and the map holds no enemies");
 
                 IntVec3 at = scene.OutfitStand.Position;
@@ -333,7 +333,7 @@ namespace ShiftChange.Tests
                 CompShiftStand open = CatchmentKit.StageStand(scene, new IntVec3(scene.Outside.minX, 0, at.z + 3));
                 if (pooled == null || play == null || open == null)
                 {
-                    story.Check(false, "three more stands holding a duster can be put up");
+                    scenario.Check(false, "three more stands holding a duster can be put up");
                     return;
                 }
                 pooled.ToggleWork(doctor);
@@ -342,7 +342,7 @@ namespace ShiftChange.Tests
                 // A room stand in the open serves nothing, so this one serves a ring.
                 open.SetServes(CatchmentKind.Radius);
                 open.SetServeRadius(CompShiftStand.MinServeRadius);
-                story.Note("three more stands holding a duster: a shared one two cells north of the first, "
+                scenario.Note("three more stands holding a duster: a shared one two cells north of the first, "
                            + "Doctor ticked, serving its room; one four cells north, Recreation ticked; "
                            + "and one outside the door, Doctor ticked, serving within "
                            + CompShiftStand.MinServeRadius + " cells");
@@ -351,48 +351,48 @@ namespace ShiftChange.Tests
                 IntVec3 joyAt = at + new IntVec3(3, 0, 3);
                 IntVec3 doorside = new IntVec3(scene.Outside.minX, 0, at.z);
                 IntVec3 pastRing = new IntVec3(scene.Outside.minX, 0, scene.Outside.maxZ - 1);
-                story.Check(scene.Comp.Covers(inRoom, scene.Map) && scene.Comp.Covers(doorside, scene.Map)
+                scenario.Check(scene.Comp.Covers(inRoom, scene.Map) && scene.Comp.Covers(doorside, scene.Map)
                             && !scene.Comp.Covers(pastRing, scene.Map),
                             "the first stand's ring takes in work in the room and beside the door, "
                             + "and not the far end outside");
-                story.Check(pooled.serves == CatchmentKind.Room && pooled.Covers(at, scene.Map)
+                scenario.Check(pooled.serves == CatchmentKind.Room && pooled.Covers(at, scene.Map)
                             && !open.Covers(at, scene.Map),
                             "the shared stand's room holds the first stand, and the ring of the stand outside "
                             + "does not reach it");
-                story.Check(open.Covers(doorside, scene.Map) && !open.Covers(inRoom, scene.Map),
+                scenario.Check(open.Covers(doorside, scene.Map) && !open.Covers(inRoom, scene.Map),
                             "and that ring takes in work beside the door, not the room's");
-                story.Check(SwapNow(story, scene), name + " changes into the first stand's duster for the shift");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift at it"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the first stand's duster for the shift");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift at it"))
                 {
                     return;
                 }
-                NotSentStraightBack(story, scene);
+                NotSentStraightBack(scenario, scene);
 
                 // The button orders a change; it is cut short and run through SwapNow, which steps
                 // the clock until it ends.
                 Patch_ChangeBackGizmo.ChangeBack(scene.Colonist, scene.Comp);
                 scene.Colonist.jobs.EndCurrentJob(JobCondition.InterruptForced, startNewJob: false);
-                story.Note(name + "'s Change back button is pressed");
-                story.Check(SwapNow(story, scene), name + " changes back into their own clothes");
-                story.Check(!scene.Comp.OnShift && Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                scenario.Note(name + "'s Change back button is pressed");
+                scenario.Check(SwapNow(scenario, scene), name + " changes back into their own clothes");
+                scenario.Check(!scene.Comp.OnShift && Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                             "nothing of the stand's is out, and it now holds off dressing them again");
                 ClearSwapDecision(scene.Colonist);
 
-                story.Check(!SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, inRoom)),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, inRoom)),
                             "held off, doctoring in the ring dresses " + name
                             + " neither at the first stand nor at the shared stand beside it");
-                story.Check(SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(chess, joyAt, joyAt)),
+                scenario.Check(SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(chess, joyAt, joyAt)),
                             "the recreation stand in the same room still dresses them for chess: "
                             + "the hold is on work only");
-                story.Check(SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, doorside)),
+                scenario.Check(SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, doorside)),
                             "and the stand outside still dresses them for doctoring beside the door, "
                             + "its ring not reaching the first stand");
-                story.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                scenario.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                             "the hold stays all the while, since " + name + " never left the ring");
 
                 Patch_JobInterception.ChangedBackAt.Remove(scene.Colonist);
-                story.Note("the hold is lifted by hand");
-                story.Check(SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, inRoom)),
+                scenario.Note("the hold is lifted by hand");
+                scenario.Check(SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, inRoom)),
                             "with the hold lifted, the same doctoring in the ring dresses " + name);
 
                 Patch_JobInterception.ChangedBackAt[scene.Colonist] =
@@ -402,18 +402,18 @@ namespace ShiftChange.Tests
                 // done from, so the pause there is not leaving.
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = pastRing;
-                story.Note("held off again, " + name + " stands outside one cell past the ring, and pauses");
+                scenario.Note("held off again, " + name + " stands outside one cell past the ring, and pauses");
                 SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.Wait_MaintainPosture, 1));
-                story.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                scenario.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                             "a pause one cell past the ring, beside a cell it takes in, keeps the hold");
                 IntVec3 farEnd = new IntVec3(scene.Outside.minX, 0, scene.Outside.maxZ);
                 bool farClear = System.Array.TrueForAll(GenAdj.AdjacentCellsAndInside,
                                                         o => !scene.Comp.Covers(farEnd + o, scene.Map));
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = farEnd;
-                story.Note(name + " moves to the far end outside and waits there");
+                scenario.Note(name + " moves to the far end outside and waits there");
                 SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.Wait, farEnd));
-                story.Check(farClear && !Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                scenario.Check(farClear && !Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                             "a job at the far end, with no cell of the ring beside it, ends the hold");
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = wasAt;
@@ -436,13 +436,13 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InAWalledRoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Bed");
                 if (bedDef == null)
                 {
-                    story.Check(false, "the game has the bed");
+                    scenario.Check(false, "the game has the bed");
                     return;
                 }
                 // Ticked before the bed lands: a bed makes the pad a bedroom, and on an automatic
@@ -451,7 +451,7 @@ namespace ShiftChange.Tests
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(3);
                 MakeCalm(scene.Map);
-                story.Note("Sleeping is ticked on the stand, which serves within 3 cells, "
+                scenario.Note("Sleeping is ticked on the stand, which serves within 3 cells, "
                            + "and the map holds no enemies");
 
                 IntVec3 at = scene.OutfitStand.Position;
@@ -460,31 +460,31 @@ namespace ShiftChange.Tests
                     scene.Map, bedDef, ThingDefOf.WoodLog, at + new IntVec3(2, 0, 0), Rot4.North) as Building_Bed;
                 if (bed == null)
                 {
-                    story.Check(false, "a bed can be put up inside the ring");
+                    scenario.Check(false, "a bed can be put up inside the ring");
                     return;
                 }
-                story.Note("a bed stands two cells east of the stand, inside its ring");
+                scenario.Note("a bed stands two cells east of the stand, inside its ring");
 
-                story.Check(SwapNow(story, scene), name + " changes into the duster for bed");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift at the stand"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the duster for bed");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift at the stand"))
                 {
                     return;
                 }
-                NotSentStraightBack(story, scene);
+                NotSentStraightBack(scenario, scene);
 
                 // The button orders a change; it is cut short and run through SwapNow, which steps
                 // the clock until it ends.
                 Patch_ChangeBackGizmo.ChangeBack(scene.Colonist, scene.Comp);
                 scene.Colonist.jobs.EndCurrentJob(JobCondition.InterruptForced, startNewJob: false);
-                story.Note(name + "'s Change back button is pressed");
-                story.Check(SwapNow(story, scene), name + " changes back out of their sleepwear");
-                story.Check(!scene.Comp.OnShift && Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                scenario.Note(name + "'s Change back button is pressed");
+                scenario.Check(SwapNow(scenario, scene), name + " changes back out of their sleepwear");
+                scenario.Check(!scene.Comp.OnShift && Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                             "nothing of the stand's is out, and it now holds off dressing them again");
                 ClearSwapDecision(scene.Colonist);
 
-                story.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed)),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed)),
                             "held off, going to bed does not dress " + name + " again");
-                story.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                scenario.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                             "and lying down does not end the hold");
 
                 // Vanilla's StartJob can put the lay-down back in the queue and start a haul first
@@ -492,25 +492,25 @@ namespace ShiftChange.Tests
                 scene.Colonist.jobs.jobQueue.EnqueueFirst(JobMaker.MakeJob(JobDefOf.LayDown, bed));
                 SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, inside, inside));
                 scene.Colonist.jobs.ClearQueuedJobs();
-                story.Note("the game starts a haul ahead of lying down, which waits in the queue");
-                story.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                scenario.Note("the game starts a haul ahead of lying down, which waits in the queue");
+                scenario.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                             "a haul started ahead of going to bed is not waking up: the hold stays");
 
                 IntVec3 wasAt = scene.Colonist.Position;
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = bed.Position;
-                story.Note(name + " is in the bed, and pauses between jobs");
+                scenario.Note(name + " is in the bed, and pauses between jobs");
                 SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.Wait_MaintainPosture, 1));
-                story.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                scenario.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                             "the pause between jobs is not waking up");
                 SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.Wait, inside));
-                story.Check(!Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                scenario.Check(!Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                             "the first job after lying down is waking up, and ends the hold");
 
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = wasAt;
-                story.Note(name + " is back beside the stand");
-                story.Check(SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed)),
+                scenario.Note(name + " is back beside the stand");
+                scenario.Check(SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed)),
                             "so going to bed again dresses " + name);
 
                 // Pressed while they lie in bed: the press is what woke them.
@@ -518,10 +518,10 @@ namespace ShiftChange.Tests
                 scene.Colonist.Position = bed.Position;
                 Patch_JobInterception.ChangedBackAt[scene.Colonist] =
                     new Patch_JobInterception.ChangeBackLatch(scene.OutfitStand);
-                story.Note(name + " is in the bed again, and the stand holds off dressing them, "
+                scenario.Note(name + " is in the bed again, and the stand holds off dressing them, "
                            + "as a Change back pressed there leaves it");
                 SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.Wait, inside));
-                story.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
+                scenario.Check(Patch_JobInterception.ChangedBackAt.ContainsKey(scene.Colonist),
                             "a Change back that woke them is not waking up: the hold lasts through the job after it");
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = wasAt;
@@ -534,7 +534,7 @@ namespace ShiftChange.Tests
         /// interrupt and that stays open while the clock runs (<see cref="SceneKit.WorkingAt"/>).
         /// Cleared with the scene.
         /// </summary>
-        internal static Pawn DoctoringInHerOwnClothes(Story story, Scene scene, WorkTypeDef doctor,
+        internal static Pawn DoctoringInHerOwnClothes(Scenario scenario, Scene scene, WorkTypeDef doctor,
                                                       WorkGiverDef tend, out Job working)
         {
             Pawn bare = DebugTools_Fixtures.AveragePawn(Gender.Female, "Bare", doctor);
@@ -547,7 +547,7 @@ namespace ShiftChange.Tests
             working = WorkingAt(tend, scene.OutfitStand.Position + new IntVec3(3, 0, 2));
             bare.jobs.StartJob(working, JobCondition.InterruptForced, null,
                 resumeCurJobAfterwards: false, cancelBusyStances: true, null, null);
-            story.Note(bare.LabelShort + ", a woman able to doctor, joins the colony in the room "
+            scenario.Note(bare.LabelShort + ", a woman able to doctor, joins the colony in the room "
                        + "in a shirt and trousers of her own, and starts doctoring there");
             return bare;
         }

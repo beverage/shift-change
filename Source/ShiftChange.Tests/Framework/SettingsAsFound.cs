@@ -5,13 +5,13 @@ namespace ShiftChange.Tests
 {
     /// <summary>
     /// Shift Change's settings and the interception's switches as a test found them, put back by
-    /// <see cref="StoryFixture.Tell"/> whatever the test did or threw. A setting a test left
+    /// <see cref="FeatureFixture.RunScenario"/> whatever the test did or threw. A setting a test left
     /// changed would hold for every test after it, which would then test something nobody chose,
     /// and a fault count left standing would add up across tests until one stopped the mod.
     ///
     /// <para>Every setting is kept, read from <see cref="ShiftChangeSettings"/>'s fields, so one
     /// added later is kept too. A test may still put back what it changed itself, when doing so
-    /// is part of its story.</para>
+    /// is part of its scenario.</para>
     /// </summary>
     internal sealed class SettingsAsFound
     {

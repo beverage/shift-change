@@ -16,7 +16,7 @@ namespace ShiftChange.Tests
     /// for a stand that serves nothing, and the menus and words for it.
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(RunOrder.First - (int)CaseGroup.ServingAnArea)]
-    internal class ServingAnArea : StoryFixture
+    internal class ServingAnArea : FeatureFixture
     {
         /// <summary>What <see cref="SceneKit.Stage"/> sets up with the pad enclosed.</summary>
         internal const string InARoom =
@@ -54,12 +54,12 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 WorkTypeDef doctor = WorkType("Doctor");
                 if (doctor == null)
                 {
-                    story.Check(false, "the game has the Doctor work type");
+                    scenario.Check(false, "the game has the Doctor work type");
                     return;
                 }
                 IntVec3 at = scene.OutfitStand.Position;
@@ -69,56 +69,56 @@ namespace ShiftChange.Tests
                 Area_Allowed area = CatchmentKit.NewArea(scene, "Shift test area", at, inRoom, pastWall);
                 if (area == null)
                 {
-                    story.Check(false, "the map has room for another allowed area");
+                    scenario.Check(false, "the map has room for another allowed area");
                     return;
                 }
-                story.Note("an allowed area is painted on the stand's cell, a cell of its room "
+                scenario.Note("an allowed area is painted on the stand's cell, a cell of its room "
                            + "and a cell past the west wall");
 
-                story.Check(scene.Comp.Covers(farCorner, scene.Map) && !scene.Comp.Covers(pastWall, scene.Map),
+                scenario.Check(scene.Comp.Covers(farCorner, scene.Map) && !scene.Comp.Covers(pastWall, scene.Map),
                             "serving its room, the stand covers the room's far corner and nothing past the wall");
                 scene.Comp.SetServeArea(area);
-                story.Check(scene.Comp.serves == CatchmentKind.Room && scene.Comp.serveArea == null,
+                scenario.Check(scene.Comp.serves == CatchmentKind.Room && scene.Comp.serveArea == null,
                             "with nothing ticked, picking the area changes nothing: the stand still serves its room");
 
                 scene.Comp.ToggleWork(doctor);
-                story.Note("Doctoring is ticked on the stand");
+                scenario.Note("Doctoring is ticked on the stand");
                 scene.Comp.SetServeArea(scene.Map.areaManager.BuildRoof);
-                story.Check(scene.Comp.serves == CatchmentKind.Room && scene.Comp.serveArea == null,
+                scenario.Check(scene.Comp.serves == CatchmentKind.Room && scene.Comp.serveArea == null,
                             "nor can it serve the Build roof area, which no colonist can be restricted to");
 
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(9);
-                story.Note("the stand is set to serve within 9 cells, then the area is picked");
+                scenario.Note("the stand is set to serve within 9 cells, then the area is picked");
                 scene.Comp.SetServeArea(area);
-                story.Check(scene.Comp.serves == CatchmentKind.Area && scene.Comp.serveArea == area,
+                scenario.Check(scene.Comp.serves == CatchmentKind.Area && scene.Comp.serveArea == area,
                             "with Doctoring ticked, it serves the area");
-                story.Check(CompShiftStand.CatchmentStands.Contains(scene.Comp),
+                scenario.Check(CompShiftStand.CatchmentStands.Contains(scene.Comp),
                             "and the stand search now looks for it beyond its room");
-                story.Check(scene.Comp.Covers(inRoom, scene.Map), "it covers a painted cell of its room");
-                story.Check(scene.Comp.Covers(pastWall, scene.Map), "and a painted cell past the wall");
-                story.Check(!scene.Comp.Covers(farCorner, scene.Map),
+                scenario.Check(scene.Comp.Covers(inRoom, scene.Map), "it covers a painted cell of its room");
+                scenario.Check(scene.Comp.Covers(pastWall, scene.Map), "and a painted cell past the wall");
+                scenario.Check(!scene.Comp.Covers(farCorner, scene.Map),
                             "but not the room's unpainted far corner: the area replaces the room");
-                story.Check(!scene.Comp.Covers(inRoom, null), "and nothing when asked of no map");
+                scenario.Check(!scene.Comp.Covers(inRoom, null), "and nothing when asked of no map");
 
                 area[at] = false;
-                story.Check(!scene.Comp.Covers(inRoom, scene.Map) && !scene.Comp.Covers(pastWall, scene.Map),
+                scenario.Check(!scene.Comp.Covers(inRoom, scene.Map) && !scene.Comp.Covers(pastWall, scene.Map),
                             "with its own cell cleared from the area, the stand stands outside it and covers nothing");
                 area[at] = true;
-                story.Check(scene.Comp.Covers(inRoom, scene.Map), "painted back in, it covers again");
+                scenario.Check(scene.Comp.Covers(inRoom, scene.Map), "painted back in, it covers again");
 
                 scene.Comp.SetServes(CatchmentKind.Radius);
-                story.Check(scene.Comp.serves == CatchmentKind.Radius && scene.Comp.serveRadius == 9,
+                scenario.Check(scene.Comp.serves == CatchmentKind.Radius && scene.Comp.serveRadius == 9,
                             "switched to Within a radius, it serves the 9 cells it had before");
                 scene.Comp.SetServes(CatchmentKind.Area);
-                story.Check(scene.Comp.serves == CatchmentKind.Area && scene.Comp.serveArea == area,
+                scenario.Check(scene.Comp.serves == CatchmentKind.Area && scene.Comp.serveArea == area,
                             "and switched back, the area it was bound to");
 
                 scene.Comp.ToggleWork(doctor);
-                story.Check(scene.Comp.IsExcluded && scene.Comp.serves == CatchmentKind.Room,
+                scenario.Check(scene.Comp.IsExcluded && scene.Comp.serves == CatchmentKind.Room,
                             "unticking Doctoring, the last thing ticked, leaves the stand not used for "
                             + "shift changes and back on its room");
-                story.Check(scene.Comp.serveArea == area, "still bound to the area, which is still there");
+                scenario.Check(scene.Comp.serveArea == area, "still bound to the area, which is still there");
             }
         }
 
@@ -136,24 +136,24 @@ namespace ShiftChange.Tests
             return Staged((map, pad) => StageWithDoorway(map, pad, WorkType("Doctor")),
                           InARoomWithADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
                 WorkGiverDef tend = Giver("DoctorTendToHumanlikes");
                 if (doctor == null || tend == null)
                 {
-                    story.Check(false, "the game has the Doctor work type and its tend to patients work");
+                    scenario.Check(false, "the game has the Doctor work type and its tend to patients work");
                     return;
                 }
                 if (scene.Outside.Area == 0)
                 {
-                    story.Check(false, "the room has a door and open ground outside it");
+                    scenario.Check(false, "the room has a door and open ground outside it");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 MakeCalm(scene.Map);
-                story.Note("Doctoring is ticked on the stand, and the map is calm");
+                scenario.Note("Doctoring is ticked on the stand, and the map is calm");
 
                 IntVec3 at = scene.OutfitStand.Position;
                 IntVec3 nearOutside = new IntVec3(scene.Outside.minX, 0, at.z);
@@ -162,28 +162,28 @@ namespace ShiftChange.Tests
                 Area_Allowed area = CatchmentKit.NewArea(scene, "Shift test area", at, nearOutside);
                 if (area == null)
                 {
-                    story.Check(false, "the map has room for another allowed area");
+                    scenario.Check(false, "the map has room for another allowed area");
                     return;
                 }
-                story.Note("an allowed area is painted on the stand's cell and the cell just outside the door");
+                scenario.Note("an allowed area is painted on the stand's cell and the cell just outside the door");
 
-                story.Check(!SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, nearOutside)),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, nearOutside)),
                             "serving its room, the stand does not send " + name
                             + " to change for doctoring just outside the door");
-                story.Check(SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, farCorner)),
+                scenario.Check(SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, farCorner)),
                             "but does for doctoring in the room's far corner");
 
                 scene.Comp.SetServeArea(area);
-                story.Check(scene.Comp.serves == CatchmentKind.Area, "the area picked, the stand serves it");
-                story.Check(SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, nearOutside)),
+                scenario.Check(scene.Comp.serves == CatchmentKind.Area, "the area picked, the stand serves it");
+                scenario.Check(SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, nearOutside)),
                             "doctoring on the painted cell outside the door sends " + name + " to change");
-                story.Check(!SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, farOutside)),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, farOutside)),
                             "doctoring on an unpainted cell further out does not");
-                story.Check(!SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, farCorner)),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, farCorner)),
                             "and nor does doctoring in the room's unpainted far corner: the area replaces the room");
 
                 area[farCorner] = true;
-                story.Check(SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, farCorner)),
+                scenario.Check(SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, farCorner)),
                             "painted in, the far corner sends " + name + " to change again");
             }
         }
@@ -202,12 +202,12 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 WorkTypeDef growing = WorkType("Growing");
                 if (growing == null)
                 {
-                    story.Check(false, "the game has the Growing work type");
+                    scenario.Check(false, "the game has the Growing work type");
                     return;
                 }
                 IntVec3 at = scene.OutfitStand.Position;
@@ -215,39 +215,39 @@ namespace ShiftChange.Tests
                     new IntVec3(at.x + 2, 0, at.z + 2), Rot4.North) as Building_Bed;
                 if (bed == null)
                 {
-                    story.Check(false, "a bed is built in the stand's room");
+                    scenario.Check(false, "a bed is built in the stand's room");
                     return;
                 }
-                story.Note("a bed is built in the stand's room");
-                story.Check(scene.Comp.IsAutomatic && scene.Comp.HandlesRest(),
+                scenario.Note("a bed is built in the stand's room");
+                scenario.Check(scene.Comp.IsAutomatic && scene.Comp.HandlesRest(),
                             "the bed makes the room a bedroom, and the stand, left on Automatic, serves sleep");
-                story.Check(!scene.Comp.HidesWorkList, "with its work list in reach");
+                scenario.Check(!scene.Comp.HidesWorkList, "with its work list in reach");
 
                 Area_Allowed area = CatchmentKit.NewArea(scene, "Shift test farm", at, at + new IntVec3(1, 0, 1));
                 if (area == null)
                 {
-                    story.Check(false, "the map has room for another allowed area");
+                    scenario.Check(false, "the map has room for another allowed area");
                     return;
                 }
                 scene.Comp.SetServeArea(area);
-                story.Check(scene.Comp.serves == CatchmentKind.Area && scene.Comp.IsTriggerOverridden
+                scenario.Check(scene.Comp.serves == CatchmentKind.Area && scene.Comp.IsTriggerOverridden
                             && scene.Comp.HandlesRest(),
                             "set to serve an allowed area, the stand has Sleeping ticked for real");
-                story.Check(scene.Comp.TriggerIsRoomsOwn && !scene.Comp.HidesWorkList,
+                scenario.Check(scene.Comp.TriggerIsRoomsOwn && !scene.Comp.HidesWorkList,
                             "and, since the bedroom suggests it anyway, keeps its work list in reach");
 
                 scene.Comp.ToggleWork(growing);
-                story.Check(scene.Comp.serves == CatchmentKind.Area && scene.Comp.serveArea == area,
+                scenario.Check(scene.Comp.serves == CatchmentKind.Area && scene.Comp.serveArea == area,
                             "ticking Growing keeps the stand on its area");
-                story.Check(scene.Comp.HandlesWork(growing) && !scene.Comp.HandlesRest()
+                scenario.Check(scene.Comp.HandlesWork(growing) && !scene.Comp.HandlesRest()
                             && !scene.Comp.IsTriggerOverridden,
                             "and swaps Sleeping out for Growing");
 
                 scene.Comp.ToggleRest();
-                story.Check(scene.Comp.HandlesRest() && !scene.Comp.HidesWorkList,
+                scenario.Check(scene.Comp.HandlesRest() && !scene.Comp.HidesWorkList,
                             "Sleeping ticked by hand in the bedroom keeps the work list in reach as well");
                 bed.Destroy(DestroyMode.Vanish);
-                story.Check(!scene.Comp.TriggerIsRoomsOwn && scene.Comp.HidesWorkList,
+                scenario.Check(!scene.Comp.TriggerIsRoomsOwn && scene.Comp.HidesWorkList,
                             "with the bed gone the room is no bedroom, and Sleeping hides the work list");
             }
         }
@@ -267,58 +267,58 @@ namespace ShiftChange.Tests
                                           capableOf: WorkType("Doctor")),
                           InARoomWithADoctor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
                 WorkGiverDef tend = Giver("DoctorTendToHumanlikes");
                 if (doctor == null || tend == null)
                 {
-                    story.Check(false, "the game has the Doctor work type and its tend to patients work");
+                    scenario.Check(false, "the game has the Doctor work type and its tend to patients work");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 MakeCalm(scene.Map);
-                story.Note("Doctoring is ticked on the stand, and the map is calm");
+                scenario.Note("Doctoring is ticked on the stand, and the map is calm");
 
                 IntVec3 at = scene.OutfitStand.Position;
                 IntVec3 inRoom = at + new IntVec3(2, 0, 2);
                 Area_Allowed area = CatchmentKit.NewArea(scene, "Shift test area", at, inRoom);
                 if (area == null)
                 {
-                    story.Check(false, "the map has room for another allowed area");
+                    scenario.Check(false, "the map has room for another allowed area");
                     return;
                 }
                 scene.Comp.SetServeArea(area);
                 area.SetLabel("Shift test renamed");
-                story.Note("the stand is set to serve an allowed area, which is then renamed");
-                story.Check(scene.Comp.serves == CatchmentKind.Area && scene.Comp.Covers(inRoom, scene.Map),
+                scenario.Note("the stand is set to serve an allowed area, which is then renamed");
+                scenario.Check(scene.Comp.serves == CatchmentKind.Area && scene.Comp.Covers(inRoom, scene.Map),
                             "the stand serves its area");
-                story.Check(scene.Comp.LiveServeArea() == area
+                scenario.Check(scene.Comp.LiveServeArea() == area
                             && scene.Comp.serveAreaLabel == "Shift test renamed",
                             "and, looked at again after the rename, goes by the area's new name");
-                story.Check(SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, inRoom)),
+                scenario.Check(SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, inRoom)),
                             "doctoring in the area sends " + name + " to change");
 
                 area.Delete();
-                story.Check(scene.Comp.LiveServeArea() == null && !scene.Comp.Covers(inRoom, scene.Map),
+                scenario.Check(scene.Comp.LiveServeArea() == null && !scene.Comp.Covers(inRoom, scene.Map),
                             "with the area deleted, the stand covers nothing");
-                story.Check(!SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, inRoom)),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, GateKit.DoctoringAt(tend, inRoom)),
                             "and doctoring in the same spot sends nobody to change");
-                story.Check(scene.Comp.serves == CatchmentKind.Area
+                scenario.Check(scene.Comp.serves == CatchmentKind.Area
                             && scene.Comp.serveAreaLabel == "Shift test renamed",
                             "it stays set to the area, under the area's last name, rather than falling back to its room");
 
                 Area_Allowed namesake = CatchmentKit.NewArea(scene, "Shift test renamed", at, inRoom);
                 if (namesake == null)
                 {
-                    story.Check(false, "the map has room for another allowed area");
+                    scenario.Check(false, "the map has room for another allowed area");
                     return;
                 }
-                story.Check(!scene.Comp.Covers(inRoom, scene.Map) && scene.Comp.serveArea != namesake,
+                scenario.Check(!scene.Comp.Covers(inRoom, scene.Map) && scene.Comp.serveArea != namesake,
                             "a new area painted under the same name is not taken up");
                 scene.Comp.SetServeArea(namesake);
-                story.Check(scene.Comp.serveArea == namesake && scene.Comp.Covers(inRoom, scene.Map),
+                scenario.Check(scene.Comp.serveArea == namesake && scene.Comp.Covers(inRoom, scene.Map),
                             "picking it binds it, and the stand covers again");
             }
         }
@@ -342,45 +342,45 @@ namespace ShiftChange.Tests
                                           capableOf: WorkType("Doctor")),
                           InARoomWithADoctor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 WorkTypeDef doctor = WorkType("Doctor");
                 if (doctor == null)
                 {
-                    story.Check(false, "the game has the Doctor work type");
+                    scenario.Check(false, "the game has the Doctor work type");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 MakeCalm(scene.Map);
-                story.Note("Doctoring is ticked on the stand, and the map is calm");
+                scenario.Note("Doctoring is ticked on the stand, and the map is calm");
 
                 IntVec3 at = scene.OutfitStand.Position;
                 IntVec3 inRoom = at + new IntVec3(2, 0, 2);
                 Area_Allowed area = CatchmentKit.NewArea(scene, "Shift test deck", at, inRoom);
                 if (area == null)
                 {
-                    story.Check(false, "the map has room for another allowed area");
+                    scenario.Check(false, "the map has room for another allowed area");
                     return;
                 }
                 scene.Comp.SetServeArea(area);
-                story.Check(scene.Comp.Covers(inRoom, scene.Map), "the stand serves its area");
+                scenario.Check(scene.Comp.Covers(inRoom, scene.Map), "the stand serves its area");
 
                 area.Delete();
                 Area_Allowed carried = CatchmentKit.NewArea(scene, "Shift test deck", at, inRoom);
                 if (carried == null)
                 {
-                    story.Check(false, "the map has room for another allowed area");
+                    scenario.Check(false, "the map has room for another allowed area");
                     return;
                 }
-                story.Note("the area is deleted and painted again under its name, as a landing copies "
+                scenario.Note("the area is deleted and painted again under its name, as a landing copies "
                            + "the ship's areas");
-                story.Check(scene.Comp.serveArea != carried && !scene.Comp.Covers(inRoom, scene.Map),
+                scenario.Check(scene.Comp.serveArea != carried && !scene.Comp.Covers(inRoom, scene.Map),
                             "with no flight, the area under the same name is not taken up");
 
                 Land(scene);
-                story.Note("the stand is lifted and set down on the same cell, as a gravship lands");
-                story.Check(!scene.Comp.OnShift, "nobody is wearing the stand's outfit as it lands");
-                story.Check(scene.Comp.serveArea == carried && scene.Comp.serves == CatchmentKind.Area
+                scenario.Note("the stand is lifted and set down on the same cell, as a gravship lands");
+                scenario.Check(!scene.Comp.OnShift, "nobody is wearing the stand's outfit as it lands");
+                scenario.Check(scene.Comp.serveArea == carried && scene.Comp.serves == CatchmentKind.Area
                             && scene.Comp.Covers(inRoom, scene.Map),
                             "after landing, the stand is bound to the area carried under its name, and serves it");
 
@@ -388,11 +388,11 @@ namespace ShiftChange.Tests
                 Area_Allowed namesake = CatchmentKit.NewArea(scene, "Shift test deck", inRoom);
                 if (namesake == null)
                 {
-                    story.Check(false, "the map has room for another allowed area");
+                    scenario.Check(false, "the map has room for another allowed area");
                     return;
                 }
                 Land(scene);
-                story.Check(scene.Comp.serveArea != namesake && !scene.Comp.Covers(inRoom, scene.Map),
+                scenario.Check(scene.Comp.serveArea != namesake && !scene.Comp.Covers(inRoom, scene.Map),
                             "an area of the same name that leaves out the stand's own cell is not taken up on landing");
             }
         }
@@ -412,26 +412,26 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 WorkTypeDef doctor = WorkType("Doctor");
                 if (doctor == null)
                 {
-                    story.Check(false, "the game has the Doctor work type");
+                    scenario.Check(false, "the game has the Doctor work type");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
-                story.Note("Doctoring is ticked on the stand");
+                scenario.Note("Doctoring is ticked on the stand");
                 IntVec3 at = scene.OutfitStand.Position;
                 IntVec3 inRoom = at + new IntVec3(2, 0, 2);
                 Area_Allowed with = CatchmentKit.NewArea(scene, "Shift test with", at, inRoom);
                 Area_Allowed without = CatchmentKit.NewArea(scene, "Shift test without", inRoom);
                 if (with == null || without == null)
                 {
-                    story.Check(false, "the map has room for two more allowed areas");
+                    scenario.Check(false, "the map has room for two more allowed areas");
                     return;
                 }
-                story.Note("two allowed areas: one painted over the stand, one beside it that leaves it out");
+                scenario.Note("two allowed areas: one painted over the stand, one beside it that leaves it out");
 
                 List<FloatMenuOption> options = new Dialog_SetStandWorkTypes(scene.Comp).ServesMenuOptions();
                 int areas = scene.Map.areaManager.AllAreas.Count(a => a.AssignableAsAllowed() && !(a is Area_Home));
@@ -443,35 +443,35 @@ namespace ShiftChange.Tests
                 ServesMenuOption pickWith = options.Find(o => o.Label == with.Label) as ServesMenuOption;
                 ServesMenuOption pickWithout = options.Find(o => o.Label == withoutLabel) as ServesMenuOption;
                 List<int> sections = options.OfType<ServesMenuOption>().Select(o => o.section).ToList();
-                story.Check(options.Count == areas + 4,
+                scenario.Check(options.Count == areas + 4,
                             "the Serves menu has a row per allowed area, and four more ("
                             + options.Count + " for " + areas + ")");
-                story.Check(options.Count > 1
+                scenario.Check(options.Count > 1
                             && options[0].Label == (string)"ShiftChange.ServesOptionRoom".Translate()
                             && options[1].Label == (string)"ShiftChange.ServesOptionRadius".Translate(),
                             "This room and Within a radius come first");
-                story.Check(options.Count > 1
+                scenario.Check(options.Count > 1
                             && options[options.Count - 2].Label == (string)"ShiftChange.ServesOptionNewArea".Translate()
                             && options[options.Count - 1].Label == (string)"ManageAreas".Translate(),
                             "New allowed area and Manage areas come last");
-                story.Check(sections.Count == options.Count
+                scenario.Check(sections.Count == options.Count
                             && sections.Take(2).All(s => s == ServesMenuOption.SectionWhere)
                             && sections.Skip(2).Take(areas).All(s => s == ServesMenuOption.SectionAreas)
                             && sections.Skip(2 + areas).All(s => s == ServesMenuOption.SectionManage),
                             "every row sits in its section: where, the areas, then making and managing");
-                story.Check(pickWith != null && pickWith.mouseoverGuiAction != null,
+                scenario.Check(pickWith != null && pickWith.mouseoverGuiAction != null,
                             "the area painted over the stand goes by its name, and hovering over it draws it on the map");
-                story.Check(pickWith != null && ReferenceEquals(Swatch(pickWith), with.ColorTexture)
+                scenario.Check(pickWith != null && ReferenceEquals(Swatch(pickWith), with.ColorTexture)
                             && pickWith.iconColor.a == 1f,
                             "with its own colour beside it");
-                story.Check(pickWithout != null
+                scenario.Check(pickWithout != null
                             && ReferenceEquals(Swatch(pickWithout), without.ColorTexture)
                             && pickWithout.iconColor.a < 1f,
                             "the one leaving the stand out has its colour faded");
-                story.Check(withoutLabel.StartsWith(redTag)
+                scenario.Check(withoutLabel.StartsWith(redTag)
                             && withoutLabel.Contains(without.Label.Colorize(ColoredText.SubtleGrayColor)),
                             "and its name faded, inside a red label saying the stand is outside it");
-                story.Check(home != null && !options.Any(o => o.Label == home), "Home is not offered");
+                scenario.Check(home != null && !options.Any(o => o.Label == home), "Home is not offered");
                 if (pickWith == null || pickWithout == null)
                 {
                     return;
@@ -482,22 +482,22 @@ namespace ShiftChange.Tests
                 Dictionary<FloatMenuOption, float> heights = options.ToDictionary(o => o, o => o.RequiredHeight);
                 ServesMenuOption.MarkSections(options);
                 List<ServesMenuOption> gapped = options.OfType<ServesMenuOption>().Where(o => o.gapAbove > 0f).ToList();
-                story.Check(ServesMenuOption.RequiredHeightRef != null,
+                scenario.Check(ServesMenuOption.RequiredHeightRef != null,
                             "the row height vanilla's menus lay out by can still be reached, to add the gaps to");
-                story.Check(gapped.Count == 2 && gapped[0] == options[2] && gapped[1] == options[options.Count - 2],
+                scenario.Check(gapped.Count == 2 && gapped[0] == options[2] && gapped[1] == options[options.Count - 2],
                             "a gap opens the areas and the last section, and nothing else");
-                story.Check(gapped.All(o => o.RequiredHeight == heights[o] + ServesMenuOption.SectionGap),
+                scenario.Check(gapped.All(o => o.RequiredHeight == heights[o] + ServesMenuOption.SectionGap),
                             "each row opening a section is taller by the gap");
 
                 pickWith.action();
-                story.Check(scene.Comp.serves == CatchmentKind.Area && scene.Comp.serveArea == with
+                scenario.Check(scene.Comp.serves == CatchmentKind.Area && scene.Comp.serveArea == with
                             && scene.Comp.ServeFault == CatchmentFault.None,
                             "picking the area painted over the stand binds it, and the stand serves it");
                 pickWithout.action();
-                story.Check(scene.Comp.serveArea == without && scene.Comp.ServeFault == CatchmentFault.OutsideArea,
+                scenario.Check(scene.Comp.serveArea == without && scene.Comp.ServeFault == CatchmentFault.OutsideArea,
                             "picking the faded one binds it too, and the stand serves nothing");
                 options[0].action();
-                story.Check(scene.Comp.serves == CatchmentKind.Room, "This room puts it back on its room");
+                scenario.Check(scene.Comp.serves == CatchmentKind.Room, "This room puts it back on its room");
             }
         }
 
@@ -515,42 +515,42 @@ namespace ShiftChange.Tests
             return Staged((map, pad) => StageWithDoorway(map, pad, WorkType("Doctor")),
                           InARoomWithADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 WorkTypeDef doctor = WorkType("Doctor");
                 if (doctor == null)
                 {
-                    story.Check(false, "the game has the Doctor work type");
+                    scenario.Check(false, "the game has the Doctor work type");
                     return;
                 }
                 if (scene.Outside.Area == 0)
                 {
-                    story.Check(false, "the room has a door and open ground outside it");
+                    scenario.Check(false, "the room has a door and open ground outside it");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
-                story.Note("Doctoring is ticked on the stand");
+                scenario.Note("Doctoring is ticked on the stand");
                 string doctoring = WorkTypeLabels.Of(doctor).CapitalizeFirst();
                 Room room = scene.OutfitStand.GetRoom();
 
                 Area_Allowed first = MakeFromMenu(scene, scene.Comp);
                 if (first == null || room == null)
                 {
-                    story.Check(false, "New allowed area made an area for a stand in a room");
+                    scenario.Check(false, "New allowed area made an area for a stand in a room");
                     return;
                 }
-                story.Note("New allowed area is picked from the Serves menu");
-                story.Check(first.Label == (string)"ShiftChange.NewAreaLabel".Translate(doctoring),
+                scenario.Note("New allowed area is picked from the Serves menu");
+                scenario.Check(first.Label == (string)"ShiftChange.NewAreaLabel".Translate(doctoring),
                             "it is named for the stand's work (" + first.Label + ")");
-                story.Check(room.Cells.All(c => first[c]) && first.TrueCount == room.CellCount,
+                scenario.Check(room.Cells.All(c => first[c]) && first.TrueCount == room.CellCount,
                             "it is a copy of the stand's room, no more ("
                             + first.TrueCount + " of " + room.CellCount + ")");
-                story.Check(scene.Comp.serves == CatchmentKind.Area && scene.Comp.serveArea == first
+                scenario.Check(scene.Comp.serves == CatchmentKind.Area && scene.Comp.serveArea == first
                             && scene.Comp.ServeFault == CatchmentFault.None,
                             "and the stand serves it at once");
 
                 Area_Allowed second = MakeFromMenu(scene, scene.Comp);
-                story.Check(second != null
+                scenario.Check(second != null
                             && second.Label == (string)"ShiftChange.NewAreaLabelNumbered".Translate(doctoring, 2)
                             && scene.Comp.serveArea == second,
                             "picked again, it makes a second with the next number, and the stand moves to it");
@@ -559,13 +559,13 @@ namespace ShiftChange.Tests
                     CatchmentKit.StageStand(scene, new IntVec3(scene.Outside.minX, 0, scene.Outside.maxZ));
                 if (open == null)
                 {
-                    story.Check(false, "a second stand could be built out in the open");
+                    scenario.Check(false, "a second stand could be built out in the open");
                     return;
                 }
                 open.ToggleWork(doctor);
-                story.Note("a second stand out in the open past the door, with Doctoring ticked");
+                scenario.Note("a second stand out in the open past the door, with Doctoring ticked");
                 Area_Allowed outdoors = MakeFromMenu(scene, open);
-                story.Check(open.StandsInTheOpen && outdoors != null && outdoors.TrueCount == 1
+                scenario.Check(open.StandsInTheOpen && outdoors != null && outdoors.TrueCount == 1
                             && outdoors[open.parent.Position] && open.ServeFault == CatchmentFault.None,
                             "in the open, the new area holds the stand's own cell alone, and the stand serves it");
 
@@ -576,21 +576,21 @@ namespace ShiftChange.Tests
                         break;
                     }
                 }
-                story.Note("allowed areas are added until the map can take no more");
+                scenario.Note("allowed areas are added until the map can take no more");
                 List<FloatMenuOption> cappedMenu = new Dialog_SetStandWorkTypes(scene.Comp).ServesMenuOptions();
                 string newLabel = "ShiftChange.ServesOptionNewArea".Translate();
                 ServesMenuOption capped = cappedMenu.Find(o => o.Label == newLabel) as ServesMenuOption;
                 ServesMenuOption manage = cappedMenu.LastOrDefault() as ServesMenuOption;
                 ServesMenuOption.MarkSections(cappedMenu);
                 int count = scene.Map.areaManager.AllAreas.Count;
-                story.Check(capped != null && capped.Disabled && capped.tooltip.HasValue
+                scenario.Check(capped != null && capped.Disabled && capped.tooltip.HasValue
                             && capped.tooltip.Value.text
                                == (string)"MaxAreasReached".Translate(AreaManager.MaxAllowedAreas),
                             "at ten allowed areas, New allowed area is greyed, with vanilla's reason");
-                story.Check(capped != null && manage != null && manage != capped
+                scenario.Check(capped != null && manage != null && manage != capped
                             && manage.gapAbove > 0f && capped.gapAbove == 0f,
                             "greyed, it sorts below Manage areas, so the gap opens the section there instead");
-                story.Check(scene.Comp.MakeServeArea() == null && scene.Map.areaManager.AllAreas.Count == count
+                scenario.Check(scene.Comp.MakeServeArea() == null && scene.Map.areaManager.AllAreas.Count == count
                             && scene.Comp.serveArea == second,
                             "and it makes nothing, the stand keeping its area");
             }
@@ -609,32 +609,32 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 WorkTypeDef doctor = WorkType("Doctor");
                 if (doctor == null)
                 {
-                    story.Check(false, "the game has the Doctor work type");
+                    scenario.Check(false, "the game has the Doctor work type");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 Area_Allowed area = CatchmentKit.NewArea(scene, "Shift test area", scene.OutfitStand.Position);
                 if (area == null)
                 {
-                    story.Check(false, "the map has room for another allowed area");
+                    scenario.Check(false, "the map has room for another allowed area");
                     return;
                 }
                 scene.Comp.SetServeArea(area);
-                story.Note("Doctoring is ticked on the stand, which serves an allowed area painted on its cell");
+                scenario.Note("Doctoring is ticked on the stand, which serves an allowed area painted on its cell");
 
                 Dialog_SetStandWorkTypes dialog = new Dialog_SetStandWorkTypes(scene.Comp);
                 try
                 {
                     Find.WindowStack.Add(dialog);
-                    story.Check(Find.WindowStack.IsOpen(dialog), "the stand's settings window is open");
+                    scenario.Check(Find.WindowStack.IsOpen(dialog), "the stand's settings window is open");
                     dialog.Paint(area);
-                    story.Check(!Find.WindowStack.IsOpen(dialog), "Paint closed it");
-                    story.Check(Find.DesignatorManager.SelectedDesignator is Designator_AreaAllowedExpand
+                    scenario.Check(!Find.WindowStack.IsOpen(dialog), "Paint closed it");
+                    scenario.Check(Find.DesignatorManager.SelectedDesignator is Designator_AreaAllowedExpand
                                 && Designator_AreaAllowed.SelectedArea == area,
                                 "and left vanilla's Expand allowed area tool in hand, on the stand's area");
                     Find.DesignatorManager.Deselect();
@@ -642,11 +642,11 @@ namespace ShiftChange.Tests
 
                     dialog = new Dialog_SetStandWorkTypes(scene.Comp);
                     Find.WindowStack.Add(dialog);
-                    story.Note("the settings window is opened again");
+                    scenario.Note("the settings window is opened again");
                     string manage = "ManageAreas".Translate();
                     FloatMenuOption option = dialog.ServesMenuOptions().Find(o => o.Label == manage);
                     option?.action?.Invoke();
-                    story.Check(option != null && !Find.WindowStack.IsOpen(dialog)
+                    scenario.Check(option != null && !Find.WindowStack.IsOpen(dialog)
                                 && Find.WindowStack.IsOpen<Dialog_ManageAreas>(),
                                 "Manage areas, in the Serves menu, closed it and opened vanilla's own Manage areas");
                 }
@@ -674,17 +674,17 @@ namespace ShiftChange.Tests
             return Staged((map, pad) => StageWithDoorway(map, pad, WorkType("Doctor")),
                           InARoomWithADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 WorkTypeDef doctor = WorkType("Doctor");
                 if (doctor == null)
                 {
-                    story.Check(false, "the game has the Doctor work type");
+                    scenario.Check(false, "the game has the Doctor work type");
                     return;
                 }
                 if (scene.Outside.Area == 0)
                 {
-                    story.Check(false, "the room has a door and open ground outside it");
+                    scenario.Check(false, "the room has a door and open ground outside it");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
@@ -693,60 +693,60 @@ namespace ShiftChange.Tests
                 Area_Allowed area = CatchmentKit.NewArea(scene, name, at, at + new IntVec3(2, 0, 2));
                 if (area == null)
                 {
-                    story.Check(false, "the map has room for another allowed area");
+                    scenario.Check(false, "the map has room for another allowed area");
                     return;
                 }
                 scene.Comp.SetServeArea(area);
-                story.Note("Doctoring is ticked on the stand, which serves the allowed area " + name);
+                scenario.Note("Doctoring is ticked on the stand, which serves the allowed area " + name);
                 string manual = "ShiftChange.Manual".Translate();
                 string doctoring = WorkTypeLabels.Of(doctor);
                 string servesNothing = "ShiftChange.RegimeServesNothing".Translate().RawText;
 
-                story.Check(scene.Comp.ServesLabel() == name, "the Serves row names the area");
-                story.Check(scene.Comp.ByCatchment("ShiftChange.RestRow") == "ShiftChange.RestRowArea",
+                scenario.Check(scene.Comp.ServesLabel() == name, "the Serves row names the area");
+                scenario.Check(scene.Comp.ByCatchment("ShiftChange.RestRow") == "ShiftChange.RestRowArea",
                             "the settings rows are worded for an allowed area, as in \"going to bed in its allowed area\"");
-                story.Check(GizmoKit.Switch(scene.Comp)?.defaultDesc
+                scenario.Check(GizmoKit.Switch(scene.Comp)?.defaultDesc
                             == (string)"ShiftChange.SetWorkTypeDescArea".Translate(
                                 scene.Comp.WorkTypesLabel(), manual, scene.Comp.serveRadius, name),
                             "and so is its button's tooltip, which names the area");
-                story.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel == GizmoKit.Shift(doctoring),
+                scenario.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel == GizmoKit.Shift(doctoring),
                             "the button reads " + GizmoKit.Shift(doctoring) + " while the stand serves");
-                story.Check(scene.Comp.CompInspectStringExtra()
+                scenario.Check(scene.Comp.CompInspectStringExtra()
                                 .Contains((string)"ShiftChange.InspectServesArea".Translate(name)),
                             "and the inspect pane names the area");
 
                 area[at] = false;
-                story.Check(scene.Comp.ServesLabel() == (string)"ShiftChange.ServesAreaStandOutside".Translate(name),
+                scenario.Check(scene.Comp.ServesLabel() == (string)"ShiftChange.ServesAreaStandOutside".Translate(name),
                             "with its own cell cleared from the area, the Serves row says the stand is outside it");
-                story.Check(scene.Comp.CompInspectStringExtra()
+                scenario.Check(scene.Comp.CompInspectStringExtra()
                                 .Contains((string)"ShiftChange.InspectStandOutsideArea".Translate(name)),
                             "so does the inspect pane");
-                story.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel == servesNothing,
+                scenario.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel == servesNothing,
                             "and the button reads " + servesNothing);
 
                 area[at] = true;
                 area.Delete();
-                story.Check(scene.Comp.ServesLabel() == (string)"ShiftChange.ServesAreaGone".Translate(name),
+                scenario.Check(scene.Comp.ServesLabel() == (string)"ShiftChange.ServesAreaGone".Translate(name),
                             "with the area painted back and then deleted, the Serves row says it is gone");
-                story.Check(scene.Comp.CompInspectStringExtra()
+                scenario.Check(scene.Comp.CompInspectStringExtra()
                                 .Contains((string)"ShiftChange.InspectAreaGone".Translate(name)),
                             "so does the inspect pane");
-                story.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel == servesNothing,
+                scenario.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel == servesNothing,
                             "and the button reads " + servesNothing);
 
                 CompShiftStand open =
                     CatchmentKit.StageStand(scene, new IntVec3(scene.Outside.minX, 0, scene.Outside.maxZ));
                 if (open == null)
                 {
-                    story.Check(false, "a second stand could be built out in the open");
+                    scenario.Check(false, "a second stand could be built out in the open");
                     return;
                 }
                 open.ToggleWork(doctor);
-                story.Note("a second stand out in the open past the door, with Doctoring ticked");
-                story.Check(GizmoKit.Switch(open)?.defaultLabel == servesNothing,
+                scenario.Note("a second stand out in the open past the door, with Doctoring ticked");
+                scenario.Check(GizmoKit.Switch(open)?.defaultLabel == servesNothing,
                             "serving its room out in the open, its button reads " + servesNothing + " too");
                 open.SetServes(CatchmentKind.Radius);
-                story.Check(GizmoKit.Switch(open)?.defaultLabel == GizmoKit.Shift(doctoring),
+                scenario.Check(GizmoKit.Switch(open)?.defaultLabel == GizmoKit.Shift(doctoring),
                             "until it serves a radius");
             }
         }
@@ -767,49 +767,49 @@ namespace ShiftChange.Tests
                                           capableOf: WorkType("Doctor")),
                           InARoomWithADoctor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 WorkTypeDef doctor = WorkType("Doctor");
                 WorkGiverDef tend = Giver("DoctorTendToHumanlikes");
                 ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
                 if (doctor == null || tend == null || standDef == null)
                 {
-                    story.Check(false,
+                    scenario.Check(false,
                                 "the game has the Doctor work type, its tend to patients work and the outfit stand");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 MakeCalm(scene.Map);
-                story.Note("Doctoring is ticked on the stand, and the map is calm");
+                scenario.Note("Doctoring is ticked on the stand, and the map is calm");
 
                 Pawn pawn = scene.Colonist;
                 string name = pawn.LabelShort;
                 IntVec3 workAt = scene.OutfitStand.Position + new IntVec3(3, 0, 3);
-                story.Check(SendsToChange(scene, GateKit.DoctoringAt(tend, workAt)),
+                scenario.Check(SendsToChange(scene, GateKit.DoctoringAt(tend, workAt)),
                             "with no allowed area set, doctoring in the room sends " + name + " to change");
 
                 Area_Allowed area = GateKit.AreaWithoutTheStand(scene);
                 if (area == null)
                 {
-                    story.Check(false, "an allowed area could be made");
+                    scenario.Check(false, "an allowed area could be made");
                     return;
                 }
                 Pawn bare = null;
                 try
                 {
                     pawn.playerSettings.AreaRestrictionInPawnCurrentMap = area;
-                    story.Note(name + " is restricted to an allowed area holding the whole room "
+                    scenario.Note(name + " is restricted to an allowed area holding the whole room "
                                + "but the stand's own cell");
-                    story.Check(scene.OutfitStand.IsForbidden(pawn),
+                    scenario.Check(scene.OutfitStand.IsForbidden(pawn),
                                 "the area leaves the stand out, so it is forbidden to " + name);
-                    story.Check(!workAt.IsForbidden(pawn), "while the work is inside it");
+                    scenario.Check(!workAt.IsForbidden(pawn), "while the work is inside it");
 
                     bool inserted = Patch_JobInterception.TryInsertSwap(GateKit.DoctoringAt(tend, workAt), null,
                                                                         pawn, pawn.jobs);
-                    story.Check(!inserted, "a stand outside " + name + "'s allowed area does not send them to change");
+                    scenario.Check(!inserted, "a stand outside " + name + "'s allowed area does not send them to change");
                     if (inserted)
                     {
-                        story.Note("a change was started anyway: still under way "
+                        scenario.Note("a change was started anyway: still under way "
                                    + (pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand ? "yes" : "no")
                                    + ", retry cooldown set "
                                    + (Patch_JobInterception.LastBlockedTick.ContainsKey(pawn.thingIDNumber) ? "yes" : "no"));
@@ -842,19 +842,19 @@ namespace ShiftChange.Tests
                     {
                         Patch_JobInterception.Enabled = armed;
                     }
-                    story.Note(other + ", in a shirt and trousers and restricted to the same area, "
+                    scenario.Note(other + ", in a shirt and trousers and restricted to the same area, "
                                + "starts doctoring in the room");
                     JobDriver before = bare.jobs.curDriver;
-                    story.Check(StillWorking(bare, tend) && SwapPlan.WouldDress(bare, scene.OutfitStand),
+                    scenario.Check(StillWorking(bare, tend) && SwapPlan.WouldDress(bare, scene.OutfitStand),
                                 other + " is doctoring in the room and could wear the stand's outfit");
 
                     Patch_JobInterception.TryDressMidJob(scene.Comp, null);
-                    story.Check(bare.jobs.curDriver == before,
+                    scenario.Check(bare.jobs.curDriver == before,
                                 "a freed stand outside " + other + "'s area does not interrupt them to change");
 
                     bare.playerSettings.AreaRestrictionInPawnCurrentMap = null;
                     Patch_JobInterception.TryDressMidJob(scene.Comp, null);
-                    story.Check(bare.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
+                    scenario.Check(bare.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
                                 "with " + other + "'s area lifted, the same freed stand does");
                     ClearSwapDecision(bare);
 
@@ -867,18 +867,18 @@ namespace ShiftChange.Tests
                         scene.OutfitStand.TryGetComp<CompAssignableToPawn_ShiftStand>();
                     if (sharedComp == null || mine == null || !StockOne(shared, "Apparel_Duster"))
                     {
-                        story.Check(false, "a second, shared stand could be built in the room");
+                        scenario.Check(false, "a second, shared stand could be built in the room");
                         return;
                     }
                     sharedComp.ToggleWork(doctor);
                     mine.TryAssignPawn(pawn);
-                    story.Note("the first stand is assigned to " + name
+                    scenario.Note("the first stand is assigned to " + name
                                + "; a second stand holding a duster, inside the area, also serves doctoring");
-                    story.Check(scene.Comp.IsAssignedTo(pawn) && sharedComp.IsPool && !shared.IsForbidden(pawn),
+                    scenario.Check(scene.Comp.IsAssignedTo(pawn) && sharedComp.IsPool && !shared.IsForbidden(pawn),
                                 name + "'s own stand is outside the area, a shared one inside it");
 
                     CompShiftStand chosen = Patch_JobInterception.FindAvailableStand(workAt, scene.Map, pawn, doctor);
-                    story.Check(chosen == sharedComp,
+                    scenario.Check(chosen == sharedComp,
                                 "so the shared stand inside the area is chosen over their own (chose "
                                 + (chosen == null ? "nothing" : chosen == scene.Comp ? "their own" : "another")
                                 + ")");
@@ -886,7 +886,7 @@ namespace ShiftChange.Tests
                                                                     pawn, pawn.jobs)
                                 && pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand
                                 && pawn.CurJob.targetA.Thing == shared;
-                    story.Check(went, "and " + name + " goes to it to change");
+                    scenario.Check(went, "and " + name + " goes to it to change");
                     ClearSwapDecision(pawn);
                 }
                 finally
@@ -919,14 +919,14 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 JobDef chess = DefDatabase<JobDef>.GetNamedSilentFail("Play_Chess");
                 JobDef laydown = DefDatabase<JobDef>.GetNamedSilentFail("LayDown");
                 ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Bed");
                 if (chess == null || laydown == null || bedDef == null)
                 {
-                    story.Check(false, "the game has playing chess, lying down and the bed");
+                    scenario.Check(false, "the game has playing chess, lying down and the bed");
                     return;
                 }
                 MakeCalm(scene.Map);
@@ -934,31 +934,31 @@ namespace ShiftChange.Tests
                 string name = pawn.LabelShort;
 
                 scene.Comp.ToggleRecreation();
-                story.Note("Recreation is ticked on the stand, and the map is calm");
-                story.Check(scene.Comp.HandlesRecreation(), "the stand serves recreation");
-                story.Check(SendsToChange(scene, JoyJob(scene, chess)),
+                scenario.Note("Recreation is ticked on the stand, and the map is calm");
+                scenario.Check(scene.Comp.HandlesRecreation(), "the stand serves recreation");
+                scenario.Check(SendsToChange(scene, JoyJob(scene, chess)),
                             "with no allowed area set, playing chess in the room sends " + name + " to change");
 
                 Area_Allowed area = GateKit.AreaWithoutTheStand(scene);
                 if (area == null)
                 {
-                    story.Check(false, "an allowed area could be made");
+                    scenario.Check(false, "an allowed area could be made");
                     return;
                 }
                 try
                 {
                     pawn.playerSettings.AreaRestrictionInPawnCurrentMap = area;
-                    story.Note(name + " is restricted to an allowed area holding the whole room "
+                    scenario.Note(name + " is restricted to an allowed area holding the whole room "
                                + "but the stand's own cell");
-                    story.Check(scene.OutfitStand.IsForbidden(pawn),
+                    scenario.Check(scene.OutfitStand.IsForbidden(pawn),
                                 "the area leaves the stand out, so it is forbidden to " + name);
-                    story.Check(Patch_JobInterception.FindAvailableStand(pawn.Position, scene.Map, pawn, null,
+                    scenario.Check(Patch_JobInterception.FindAvailableStand(pawn.Position, scene.Map, pawn, null,
                                     Patch_JobInterception.StandTrigger.Recreation) == null,
                                 "the search for a stand to change at for recreation passes it over");
-                    story.Check(!SendsToChange(scene, JoyJob(scene, chess)),
+                    scenario.Check(!SendsToChange(scene, JoyJob(scene, chess)),
                                 "so playing chess in the room does not send " + name + " to it");
                     area[scene.OutfitStand.Position] = true;
-                    story.Check(SendsToChange(scene, JoyJob(scene, chess)),
+                    scenario.Check(SendsToChange(scene, JoyJob(scene, chess)),
                                 "with the stand painted back into the area, the same game of chess does");
                     area[scene.OutfitStand.Position] = false;
 
@@ -966,22 +966,22 @@ namespace ShiftChange.Tests
                         scene.OutfitStand.Position + new IntVec3(2, 0, 2), Rot4.North) as Building_Bed;
                     if (bed == null)
                     {
-                        story.Check(false, "a bed is built in the stand's room");
+                        scenario.Check(false, "a bed is built in the stand's room");
                         return;
                     }
                     scene.Comp.ToggleRest();
-                    story.Note("the stand is left out of the area again, a bed is built in the room, "
+                    scenario.Note("the stand is left out of the area again, a bed is built in the room, "
                                + "and Sleeping is ticked on the stand");
-                    story.Check(scene.Comp.HandlesRest() && !scene.Comp.HandlesRecreation(),
+                    scenario.Check(scene.Comp.HandlesRest() && !scene.Comp.HandlesRecreation(),
                                 "the stand serves sleep instead of recreation");
-                    story.Check(!bed.IsForbidden(pawn), "and the bed is inside " + name + "'s area");
-                    story.Check(Patch_JobInterception.FindAvailableStand(bed.Position, scene.Map, pawn, null,
+                    scenario.Check(!bed.IsForbidden(pawn), "and the bed is inside " + name + "'s area");
+                    scenario.Check(Patch_JobInterception.FindAvailableStand(bed.Position, scene.Map, pawn, null,
                                     Patch_JobInterception.StandTrigger.Rest) == null,
                                 "the search for a stand to change at for bed passes the stand over");
-                    story.Check(!SendsToChange(scene, JobMaker.MakeJob(laydown, bed)),
+                    scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(laydown, bed)),
                                 "so going to bed in the room does not send " + name + " to it");
                     area[scene.OutfitStand.Position] = true;
-                    story.Check(SendsToChange(scene, JobMaker.MakeJob(laydown, bed)),
+                    scenario.Check(SendsToChange(scene, JobMaker.MakeJob(laydown, bed)),
                                 "with the stand painted back into the area, going to bed does");
                 }
                 finally
@@ -1009,64 +1009,64 @@ namespace ShiftChange.Tests
                                           capableOf: WorkType("Doctor")),
                           InARoomWithADoctor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
                 WorkGiverDef tend = Giver("DoctorTendToHumanlikes");
                 if (doctor == null || tend == null)
                 {
-                    story.Check(false, "the game has the Doctor work type and its tend to patients work");
+                    scenario.Check(false, "the game has the Doctor work type and its tend to patients work");
                     return;
                 }
                 Alert alert = CatchmentKit.VanillaAlert(typeof(Alert_ShiftStandServesNothing));
-                if (!story.Check(alert != null,
+                if (!scenario.Check(alert != null,
                                  "the game made the \"Shift stand serves nothing\" alert from its type alone"))
                 {
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 MakeCalm(scene.Map);
-                story.Note("Doctoring is ticked on the stand, and the map is calm");
+                scenario.Note("Doctoring is ticked on the stand, and the map is calm");
 
                 IntVec3 at = scene.OutfitStand.Position;
                 IntVec3 inRoom = at + new IntVec3(2, 0, 2);
                 Area_Allowed area = CatchmentKit.NewArea(scene, "Shift test area", at, inRoom);
                 if (area == null)
                 {
-                    story.Check(false, "the map has room for another allowed area");
+                    scenario.Check(false, "the map has room for another allowed area");
                     return;
                 }
                 scene.Comp.SetServeArea(area);
-                story.Note("the stand is set to serve an allowed area painted on its own cell and a cell of its room");
-                story.Check(scene.Comp.serves == CatchmentKind.Area && !CatchmentKit.Lists(alert, scene.OutfitStand),
+                scenario.Note("the stand is set to serve an allowed area painted on its own cell and a cell of its room");
+                scenario.Check(scene.Comp.serves == CatchmentKind.Area && !CatchmentKit.Lists(alert, scene.OutfitStand),
                             "serving the area, the stand is not on the alert");
 
                 area[at] = false;
-                story.Check(CatchmentKit.Lists(alert, scene.OutfitStand)
+                scenario.Check(CatchmentKit.Lists(alert, scene.OutfitStand)
                             && Explains(alert, "Shift test area"),
                             "with its own cell cleared from the area, the alert lists it, naming the area");
                 area[at] = true;
-                story.Check(!CatchmentKit.Lists(alert, scene.OutfitStand), "painted back in, it is off the alert");
+                scenario.Check(!CatchmentKit.Lists(alert, scene.OutfitStand), "painted back in, it is off the alert");
 
-                story.Check(SwapNow(story, scene), name + " changes into the area stand's outfit");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the area stand's outfit");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
-                NotSentStraightBack(story, scene);
-                story.Check(!SendsToChange(scene, CatchmentKit.WorkAt(tend, inRoom)),
+                NotSentStraightBack(scenario, scene);
+                scenario.Check(!SendsToChange(scene, CatchmentKit.WorkAt(tend, inRoom)),
                             "doctoring in the area keeps the uniform on");
 
                 area.Delete();
-                story.Check(CatchmentKit.Lists(alert, scene.OutfitStand)
+                scenario.Check(CatchmentKit.Lists(alert, scene.OutfitStand)
                             && Explains(alert, "Shift test area"),
                             "with the area deleted, the alert lists the stand, still naming the area");
-                story.Check(SendsToChange(scene, CatchmentKit.WorkAt(tend, inRoom)),
+                scenario.Check(SendsToChange(scene, CatchmentKit.WorkAt(tend, inRoom)),
                             "and " + name + " changes back for the same doctoring");
 
                 scene.Comp.SetServes(CatchmentKind.Room);
-                story.Check(!CatchmentKit.Lists(alert, scene.OutfitStand),
+                scenario.Check(!CatchmentKit.Lists(alert, scene.OutfitStand),
                             "set to serve its room again, the stand is off the alert");
             }
         }
@@ -1088,7 +1088,7 @@ namespace ShiftChange.Tests
                                           capableOf: WorkType("Mining")),
                           InARoomWithAMiner, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef mining = WorkType("Mining");
@@ -1097,67 +1097,67 @@ namespace ShiftChange.Tests
                 ThingDef granite = DefDatabase<ThingDef>.GetNamedSilentFail("Granite");
                 if (mining == null || mine == null || repair == null || granite == null)
                 {
-                    story.Check(false, "the game has mining, repairing and granite");
+                    scenario.Check(false, "the game has mining, repairing and granite");
                     return;
                 }
                 scene.Comp.ToggleWork(mining);
                 MakeCalm(scene.Map);
-                story.Note("Mining is ticked on the stand, and the map is calm");
+                scenario.Note("Mining is ticked on the stand, and the map is calm");
 
                 IntVec3 at = scene.OutfitStand.Position;
                 Thing rock = GenSpawn.Spawn(ThingMaker.MakeThing(granite), at + new IntVec3(3, 0, 3), scene.Map);
                 if (rock == null || !rock.Spawned)
                 {
-                    story.Check(false, "a granite rock could be put in the stand's room");
+                    scenario.Check(false, "a granite rock could be put in the stand's room");
                     return;
                 }
-                story.Note("a granite rock stands in the room");
+                scenario.Note("a granite rock stands in the room");
                 Job mineRock = CatchmentKit.JobOn(JobDefOf.Mine, mine, rock);
                 JobPlace place = Patch_JobInterception.SharedTargetPlace(
                     mineRock, Patch_JobInterception.Classify(scene.Colonist, mineRock, null), scene.Map);
-                story.Check(rock.Position.GetRoom(scene.Map) == null && place.Cell == rock.Position
+                scenario.Check(rock.Position.GetRoom(scene.Map) == null && place.Cell == rock.Position
                             && place.RoomCell != rock.Position && place.RoomCell.GetRoom(scene.Map) != null,
                             "the rock's own cell is in no room, so mining it counts as work in the room "
                             + "by a floor cell beside it");
-                story.Check(SendsToChange(scene, CatchmentKit.JobOn(JobDefOf.Mine, mine, rock)),
+                scenario.Check(SendsToChange(scene, CatchmentKit.JobOn(JobDefOf.Mine, mine, rock)),
                             "serving its room, the stand sends " + name + " to change to mine it, by that floor cell");
 
                 Area_Allowed area = CatchmentKit.NewArea(scene, "Shift test quarry", at, rock.Position);
                 if (area == null)
                 {
-                    story.Check(false, "the map has room for another allowed area");
+                    scenario.Check(false, "the map has room for another allowed area");
                     return;
                 }
                 scene.Comp.SetServeArea(area);
-                story.Check(scene.Comp.serves == CatchmentKind.Area && !area[place.RoomCell],
+                scenario.Check(scene.Comp.serves == CatchmentKind.Area && !area[place.RoomCell],
                             "the stand serves an allowed area painted on the rock and not on that floor cell");
-                story.Check(SendsToChange(scene, CatchmentKit.JobOn(JobDefOf.Mine, mine, rock)),
+                scenario.Check(SendsToChange(scene, CatchmentKit.JobOn(JobDefOf.Mine, mine, rock)),
                             "which sends " + name + " to change to mine the rock face");
 
                 area[rock.Position] = false;
-                story.Check(!SendsToChange(scene, CatchmentKit.JobOn(JobDefOf.Mine, mine, rock)),
+                scenario.Check(!SendsToChange(scene, CatchmentKit.JobOn(JobDefOf.Mine, mine, rock)),
                             "with the rock cleared from the area too, it does not");
 
                 List<IntVec3> aroundRock = new List<IntVec3>(GenAdj.CellsAdjacent8Way(rock));
                 CatchmentKit.SetCells(area, aroundRock, true);
-                story.Check(SendsToChange(scene, CatchmentKit.JobOn(JobDefOf.Mine, mine, rock)),
+                scenario.Check(SendsToChange(scene, CatchmentKit.JobOn(JobDefOf.Mine, mine, rock)),
                             "with only the floor around the rock painted, it does");
 
                 CatchmentKit.SetCells(area, aroundRock, false);
                 area[rock.Position] = true;
-                story.Note("the floor around the rock is cleared and the rock painted back in");
+                scenario.Note("the floor around the rock is cleared and the rock painted back in");
                 // Asking whether a job sends them to dress records that job as the one just
                 // dressed for, and on shift that record keeps the uniform on for the same job
                 // whatever the catchment says, so the ask below would pass for the wrong reason.
                 // Clear it.
                 Patch_JobInterception.DressedFor.Remove(scene.Colonist);
-                story.Check(SwapNow(story, scene), name + " changes into the stand's outfit to mine");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's outfit to mine");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
-                NotSentStraightBack(story, scene);
-                story.Check(!SendsToChange(scene, CatchmentKit.JobOn(JobDefOf.Mine, mine, rock)),
+                NotSentStraightBack(scenario, scene);
+                scenario.Check(!SendsToChange(scene, CatchmentKit.JobOn(JobDefOf.Mine, mine, rock)),
                             "in uniform, " + name + " keeps it on to mine the rock, painted alone");
 
                 // Clear of the rock's ring, so the two sets of painted cells never meet. One wall
@@ -1166,18 +1166,18 @@ namespace ShiftChange.Tests
                                             at + new IntVec3(0, 0, 3), scene.Map);
                 if (wall == null || !wall.Spawned)
                 {
-                    story.Check(false, "a steel wall could be built in the stand's room");
+                    scenario.Check(false, "a steel wall could be built in the stand's room");
                     return;
                 }
                 List<IntVec3> aroundWall = new List<IntVec3>(GenAdj.CellsAdjacent8Way(wall));
                 CatchmentKit.SetCells(area, aroundWall, true);
-                story.Note("a steel wall stands in the room, and the floor around it is painted into the area");
-                story.Check(!area[wall.Position]
+                scenario.Note("a steel wall stands in the room, and the floor around it is painted into the area");
+                scenario.Check(!area[wall.Position]
                             && !SendsToChange(scene, CatchmentKit.JobOn(JobDefOf.Repair, repair, wall)),
                             "with only the floor around it painted, repairing the wall keeps the uniform on: "
                             + "work on a wall counts by the same rule");
                 CatchmentKit.SetCells(area, aroundWall, false);
-                story.Check(SendsToChange(scene, CatchmentKit.JobOn(JobDefOf.Repair, repair, wall)),
+                scenario.Check(SendsToChange(scene, CatchmentKit.JobOn(JobDefOf.Repair, repair, wall)),
                             "with nothing around it painted, repairing it changes " + name + " back");
             }
         }
@@ -1203,20 +1203,20 @@ namespace ShiftChange.Tests
                                           capableOf: WorkType("Doctor")),
                           InARoomWithADoctor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 WorkTypeDef doctor = WorkType("Doctor");
                 WorkGiverDef tend = Giver("DoctorTendToHumanlikes");
                 ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
                 if (doctor == null || tend == null || mealDef == null)
                 {
-                    story.Check(false, "the game has the Doctor work type, its tend to patients work "
+                    scenario.Check(false, "the game has the Doctor work type, its tend to patients work "
                                        + "and the simple meal");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 MakeCalm(scene.Map);
-                story.Note("Doctoring is ticked on the stand, and the map is calm");
+                scenario.Note("Doctoring is ticked on the stand, and the map is calm");
 
                 Pawn pawn = scene.Colonist;
                 string name = pawn.LabelShort;
@@ -1225,27 +1225,27 @@ namespace ShiftChange.Tests
                 IntVec3 mealCell = OpenGround(scene, outside + new IntVec3(0, 0, 1));
                 if (!outside.InBounds(map) || outside.GetRoom(map) == scene.OutfitStand.GetRoom())
                 {
-                    story.Check(false, "there is open ground outside the stand's room for doctoring and a meal");
+                    scenario.Check(false, "there is open ground outside the stand's room for doctoring and a meal");
                     return;
                 }
                 Thing meal = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), mealCell, map);
                 string line = "ShiftChange.InspectOutsideArea".Translate(pawn.LabelShort);
-                story.Note("a simple meal lies outside the room");
+                scenario.Note("a simple meal lies outside the room");
 
-                story.Check(SwapNow(story, scene), name + " changes into the stand's outfit");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's outfit");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
-                story.Check(SendsToChange(scene, GateKit.DoctoringAt(tend, outside)),
+                scenario.Check(SendsToChange(scene, GateKit.DoctoringAt(tend, outside)),
                             "with no allowed area set, doctoring outside the room changes " + name + " back");
-                story.Check(!scene.Comp.CompInspectStringExtra().Contains(line),
+                scenario.Check(!scene.Comp.CompInspectStringExtra().Contains(line),
                             "and the stand's inspect pane says nothing about areas");
 
                 Area_Allowed area = GateKit.AreaWithoutTheStand(scene);
                 if (area == null)
                 {
-                    story.Check(false, "an allowed area could be made");
+                    scenario.Check(false, "an allowed area could be made");
                     return;
                 }
                 try
@@ -1253,9 +1253,9 @@ namespace ShiftChange.Tests
                     area[outside] = true;
                     area[meal.Position] = true;
                     pawn.playerSettings.AreaRestrictionInPawnCurrentMap = area;
-                    story.Note(name + " is restricted to an allowed area holding the whole room but the stand's "
+                    scenario.Note(name + " is restricted to an allowed area holding the whole room but the stand's "
                                + "own cell, and the cells outside where the doctoring and the meal are");
-                    story.Check(scene.OutfitStand.IsForbidden(pawn),
+                    scenario.Check(scene.OutfitStand.IsForbidden(pawn),
                                 "the area leaves the stand out, so it is forbidden to " + name);
 
                     int now = Find.TickManager.TicksGame;
@@ -1264,28 +1264,28 @@ namespace ShiftChange.Tests
                     int blocked;
                     bool cooled = Patch_JobInterception.LastBlockedTick.TryGetValue(pawn.thingIDNumber, out blocked)
                                   && blocked == now;
-                    story.Check(!inserted, "with the stand outside their allowed area, " + name
+                    scenario.Check(!inserted, "with the stand outside their allowed area, " + name
                                            + " keeps the outfit on to doctor outside the room");
-                    story.Check(cooled, "and Shift Change holds off, so their next job does not try again at once");
-                    story.Check(CompShiftStand.OnShiftStandFor(pawn) == scene.Comp, name + " is still on shift");
+                    scenario.Check(cooled, "and Shift Change holds off, so their next job does not try again at once");
+                    scenario.Check(CompShiftStand.OnShiftStandFor(pawn) == scene.Comp, name + " is still on shift");
                     if (inserted)
                     {
-                        story.Note("a change back was started anyway: still under way "
+                        scenario.Note("a change back was started anyway: still under way "
                                    + (pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand ? "yes" : "no"));
                     }
                     string inspect = scene.Comp.CompInspectStringExtra() ?? "";
-                    story.Check(inspect.Contains(line), "the stand's inspect pane says why: \"" + line + "\"");
+                    scenario.Check(inspect.Contains(line), "the stand's inspect pane says why: \"" + line + "\"");
                     ClearSwapDecision(pawn);
 
-                    story.Check(!SendsToChange(scene, IngestJob(meal)),
+                    scenario.Check(!SendsToChange(scene, IngestJob(meal)),
                                 "a meal break does not walk " + name + " out of their area to change either");
 
                     area[scene.OutfitStand.Position] = true;
-                    story.Check(!scene.OutfitStand.IsForbidden(pawn),
+                    scenario.Check(!scene.OutfitStand.IsForbidden(pawn),
                                 "with the stand painted into the area, it is allowed again");
-                    story.Check(SendsToChange(scene, GateKit.DoctoringAt(tend, outside)),
+                    scenario.Check(SendsToChange(scene, GateKit.DoctoringAt(tend, outside)),
                                 "so doctoring outside the room changes " + name + " back as usual");
-                    story.Check(!scene.Comp.CompInspectStringExtra().Contains(line), "and the inspect line is gone");
+                    scenario.Check(!scene.Comp.CompInspectStringExtra().Contains(line), "and the inspect line is gone");
                 }
                 finally
                 {

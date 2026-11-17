@@ -88,7 +88,7 @@ namespace ShiftChange.Tests
                 }
                 foreach (MethodInfo test in declared)
                 {
-                    string sentence = StoryFixture.SentenceOf(test);
+                    string sentence = FeatureFixture.SentenceOf(test);
                     if (sentence == null)
                     {
                         problems.Add(name + "." + test.Name + " has no TestDescription");
