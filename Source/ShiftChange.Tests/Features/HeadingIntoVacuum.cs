@@ -22,7 +22,7 @@ namespace ShiftChange.Tests
     /// vacuum where it set it while the clock runs (<see cref="VacuumKit.HoldVacuum"/>).</para>
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(RunOrder.First - (int)CaseGroup.HeadingIntoVacuum)]
-    internal class HeadingIntoVacuum : StoryFixture
+    internal class HeadingIntoVacuum : FeatureFixture
     {
         /// <summary>What <see cref="VacuumKit.StageCrafterAtHome"/> sets up.</summary>
         internal const string CrafterAtHome =
@@ -41,11 +41,11 @@ namespace ShiftChange.Tests
         {
             return Staged(VacuumKit.StageShip, KeepingTheirVacsuitOn.OpenShip, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
-                if (!story.Check(SwapNow(story, scene), name + " changes out of the vacsuit into the stand's duster")
-                    || !story.Check(scene.Comp.OnShift, "and is on shift"))
+                if (!scenario.Check(SwapNow(scenario, scene), name + " changes out of the vacsuit into the stand's duster")
+                    || !scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
@@ -54,15 +54,15 @@ namespace ShiftChange.Tests
                 Job inside = VacuumKit.BillFetching(scene, ship.InRoom);
                 if (outside == null || inside == null)
                 {
-                    story.Check(false, "a bill fetching steel from the open floor, and one fetching it "
+                    scenario.Check(false, "a bill fetching steel from the open floor, and one fetching it "
                                        + "from the room, could be set up");
                     return;
                 }
-                story.Note("ten steel lie on the open floor, and ten more in the room");
-                story.Check(SendsToChange(scene, outside),
+                scenario.Note("ten steel lie on the open floor, and ten more in the room");
+                scenario.Check(SendsToChange(scene, outside),
                             name + " is sent back to the stand to change before a bill fetching steel "
                             + "from the open floor");
-                story.Check(!SendsToChange(scene, inside),
+                scenario.Check(!SendsToChange(scene, inside),
                             "but keeps the duster on for the same bill fetching steel from the room");
             }
         }
@@ -81,11 +81,11 @@ namespace ShiftChange.Tests
         {
             return Staged(VacuumKit.StageShip, KeepingTheirVacsuitOn.OpenShip, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
-                if (!story.Check(SwapNow(story, scene), name + " changes out of the vacsuit into the stand's duster")
-                    || !story.Check(scene.Comp.OnShift, "and is on shift"))
+                if (!scenario.Check(SwapNow(scenario, scene), name + " changes out of the vacsuit into the stand's duster")
+                    || !scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
@@ -95,42 +95,42 @@ namespace ShiftChange.Tests
                 Job again = VacuumKit.BillFetching(scene, ship.OnFloor + IntVec3.East);
                 if (ordered == null || again == null)
                 {
-                    story.Check(false, "two bills fetching steel from the open floor could be set up");
+                    scenario.Check(false, "two bills fetching steel from the open floor could be set up");
                     return;
                 }
                 ordered.playerForced = true;
                 again.playerForced = true;
-                story.Note("ten steel lie on each of two cells of the open floor, and " + name
+                scenario.Note("ten steel lie on each of two cells of the open floor, and " + name
                            + " is ordered to do a bill fetching each");
                 int id = scene.Colonist.thingIDNumber;
                 Patch_JobInterception.LastVacuumWarningTick.Remove(id);
                 string text = "ShiftChange.OrderIntoVacuum".Translate(scene.Colonist.LabelShort);
                 List<Message> before = VacuumKit.LiveMessages();
-                story.Check(!SendsToChange(scene, ordered),
+                scenario.Check(!SendsToChange(scene, ordered),
                             "ordered to do the first bill, " + name + " is not sent to change first");
-                story.Check(VacuumKit.PostedSince(before, text),
+                scenario.Check(VacuumKit.PostedSince(before, text),
                             "and a message goes up: " + name + " is heading through vacuum in work clothes "
                             + "that protect them less than their own");
-                story.Check(!Patch_JobInterception.WarnIfOrderedIntoVacuum(again, scene.Colonist),
+                scenario.Check(!Patch_JobInterception.WarnIfOrderedIntoVacuum(again, scene.Colonist),
                             "a second order within the hour puts up no second message");
                 Patch_JobInterception.LastVacuumWarningTick.Remove(id);
-                story.Note("Shift Change forgets when it last warned " + name);
-                story.Check(Patch_JobInterception.WarnIfOrderedIntoVacuum(again, scene.Colonist),
+                scenario.Note("Shift Change forgets when it last warned " + name);
+                scenario.Check(Patch_JobInterception.WarnIfOrderedIntoVacuum(again, scene.Colonist),
                             "and then the same order warns again");
 
                 Patch_JobInterception.LastVacuumWarningTick.Remove(id);
                 Job move = JobMaker.MakeJob(JobDefOf.Goto, ship.OnFloor);
                 move.playerForced = true;
                 scene.Colonist.drafter.Drafted = true;
-                story.Note(name + " is drafted and ordered to move onto the open floor, the last warning "
+                scenario.Note(name + " is drafted and ordered to move onto the open floor, the last warning "
                            + "forgotten again");
                 try
                 {
-                    story.Check(Patch_JobInterception.MapToDecideOn(move, scene.Colonist) == null,
+                    scenario.Check(Patch_JobInterception.MapToDecideOn(move, scene.Colonist) == null,
                                 "drafted, " + name + " is left to their orders: Shift Change does not weigh them");
-                    story.Check(!SendsToChange(scene, move),
+                    scenario.Check(!SendsToChange(scene, move),
                                 "so the move onto the open floor does not send them to change");
-                    story.Check(Patch_JobInterception.WarnedLately(scene.Colonist),
+                    scenario.Check(Patch_JobInterception.WarnedLately(scene.Colonist),
                                 "but " + name + " is warned all the same");
                 }
                 finally
@@ -153,16 +153,16 @@ namespace ShiftChange.Tests
         {
             return Staged(VacuumKit.StageShip, KeepingTheirVacsuitOn.OpenShip, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkGiverDef fires = Giver("FightFires");
-                if (!story.Check(fires != null && fires.emergency, "the game treats fighting fires as an emergency"))
+                if (!scenario.Check(fires != null && fires.emergency, "the game treats fighting fires as an emergency"))
                 {
                     return;
                 }
-                if (!story.Check(SwapNow(story, scene), name + " changes out of the vacsuit into the stand's duster")
-                    || !story.Check(scene.Comp.OnShift, "and is on shift"))
+                if (!scenario.Check(SwapNow(scenario, scene), name + " changes out of the vacsuit into the stand's duster")
+                    || !scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
@@ -171,9 +171,9 @@ namespace ShiftChange.Tests
                 outside.workGiverDef = fires;
                 Job inside = JobMaker.MakeJob(JobDefOf.Wait, ship.InRoom);
                 inside.workGiverDef = fires;
-                story.Check(SendsToChange(scene, outside),
+                scenario.Check(SendsToChange(scene, outside),
                             "a fire to fight out on the open floor sends " + name + " back to the stand to change first");
-                story.Check(!SendsToChange(scene, inside),
+                scenario.Check(!SendsToChange(scene, inside),
                             "while a fire in the room is fought straight away, in the duster");
             }
         }
@@ -191,13 +191,13 @@ namespace ShiftChange.Tests
         {
             return Staged(VacuumKit.StageShip, KeepingTheirVacsuitOn.OpenShip, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 VacuumKit.StripVacsuit(scene.Colonist);
                 ClearStand(scene.OutfitStand);
-                story.Note(name + "'s vacsuit and helmet are taken away, and so is the stand's duster");
-                if (!story.Check(StockOne(scene.OutfitStand, "Apparel_Vacsuit")
+                scenario.Note(name + "'s vacsuit and helmet are taken away, and so is the stand's duster");
+                if (!scenario.Check(StockOne(scene.OutfitStand, "Apparel_Vacsuit")
                                  && StockOne(scene.OutfitStand, "Apparel_VacsuitHelmet"),
                                  "the stand holds a vacsuit and its helmet"))
                 {
@@ -207,26 +207,26 @@ namespace ShiftChange.Tests
                 Job outside = VacuumKit.BillFetching(scene, ship.OnFloor);
                 if (outside == null)
                 {
-                    story.Check(false, "a bill fetching steel from the open floor could be set up");
+                    scenario.Check(false, "a bill fetching steel from the open floor could be set up");
                     return;
                 }
-                story.Note("ten steel lie on the open floor");
-                story.Check(SendsToChange(scene, outside),
+                scenario.Note("ten steel lie on the open floor");
+                scenario.Check(SendsToChange(scene, outside),
                             name + ", with no suit of their own, is sent to the stand to change into its vacsuit "
                             + "for a bill fetching steel from the open floor");
-                story.Check(SwapNow(story, scene), name + " changes into the stand's vacsuit and helmet");
-                story.Check(scene.Comp.OnShift, "and is on shift");
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's vacsuit and helmet");
+                scenario.Check(scene.Comp.OnShift, "and is on shift");
                 if (!scene.Comp.OnShift)
                 {
                     return;
                 }
                 Job again = VacuumKit.BillFetching(scene, ship.OnFloor + IntVec3.East);
-                story.Note("ten more steel lie on the open floor, for the next bill");
-                story.Check(Patch_JobInterception.UniformIntoVacuum(again, scene.Colonist, scene.Comp, scene.Map)
+                scenario.Note("ten more steel lie on the open floor, for the next bill");
+                scenario.Check(Patch_JobInterception.UniformIntoVacuum(again, scene.Colonist, scene.Comp, scene.Map)
                             == Patch_JobInterception.UniformInVacuum.Fine,
                             "in the stand's vacsuit, " + name + " may head into vacuum: it protects better "
                             + "than their own clothes");
-                story.Check(!SendsToChange(scene, again), "and the next bill through vacuum keeps them in it");
+                scenario.Check(!SendsToChange(scene, again), "and the next bill through vacuum keeps them in it");
             }
         }
 
@@ -243,17 +243,17 @@ namespace ShiftChange.Tests
         {
             return Staged(VacuumKit.StageConnectedShip, KeepingTheirVacsuitOn.ConnectedShip, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkGiverDef giver = Giver("DoBillsUseCraftingSpot");
                 if (giver == null)
                 {
-                    story.Check(false, "the game hands out bills at a crafting spot");
+                    scenario.Check(false, "the game hands out bills at a crafting spot");
                     return;
                 }
-                if (!story.Check(SwapNow(story, scene), name + " changes out of the vacsuit into the stand's duster")
-                    || !story.Check(scene.Comp.OnShift, "and is on shift"))
+                if (!scenario.Check(SwapNow(scenario, scene), name + " changes out of the vacsuit into the stand's duster")
+                    || !scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
@@ -262,15 +262,15 @@ namespace ShiftChange.Tests
                 Thing steelFar = CatchmentKit.Steel(map, ship.InFarRoom);
                 JobQueue queue = scene.Colonist.jobs.jobQueue;
                 queue.EnqueueFirst(RideAlongKit.QueuedWork(giver, ship.Bench));
-                story.Note("twenty steel lie in the far room, and a bill at the crafting spot waits in "
+                scenario.Note("twenty steel lie in the far room, and a bill at the crafting spot waits in "
                            + name + "'s queue");
-                story.Check(!SendsToChange(scene, RideAlongKit.GiverlessHaul(steelFar, ship.InRoom)),
+                scenario.Check(!SendsToChange(scene, RideAlongKit.GiverlessHaul(steelFar, ship.InRoom)),
                             "hauling the steel in from the far room down the corridor, ahead of the bill, "
                             + name + " keeps the duster on");
                 VacuumKit.HoldVacuum(scene, map, ship.OnFloor, 1f);
                 queue.EnqueueFirst(RideAlongKit.QueuedWork(giver, ship.Bench));
-                story.Note("the corridor is opened to vacuum, and the bill waits in the queue again");
-                story.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(steelFar, ship.InRoom)),
+                scenario.Note("the corridor is opened to vacuum, and the bill waits in the queue again");
+                scenario.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(steelFar, ship.InRoom)),
                             "now the same haul sends " + name + " back to the stand to change first");
             }
         }
@@ -288,17 +288,17 @@ namespace ShiftChange.Tests
         {
             return Staged(VacuumKit.StageShip, KeepingTheirVacsuitOn.OpenShip, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkGiverDef giver = Giver("DoBillsUseCraftingSpot");
                 if (giver == null)
                 {
-                    story.Check(false, "the game hands out bills at a crafting spot");
+                    scenario.Check(false, "the game hands out bills at a crafting spot");
                     return;
                 }
-                if (!story.Check(SwapNow(story, scene), name + " changes out of the vacsuit into the stand's duster")
-                    || !story.Check(scene.Comp.OnShift, "and is on shift"))
+                if (!scenario.Check(SwapNow(scenario, scene), name + " changes out of the vacsuit into the stand's duster")
+                    || !scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
@@ -311,20 +311,20 @@ namespace ShiftChange.Tests
                 string text = "ShiftChange.VacuumStandAcrossVacuum".Translate(scene.Colonist.LabelShort);
 
                 scene.Colonist.Position = new IntVec3(ship.FarRoom.minX + 1, 0, z);
-                story.Note(name + " is put in the far room, with the open floor between them and the stand");
+                scenario.Note(name + " is put in the far room, with the open floor between them and the stand");
                 List<Message> before = VacuumKit.LiveMessages();
-                story.Check(scene.Colonist.GetRoom() == ship.InFarRoom.GetRoom(map), name + " stands in the far room");
-                story.Check(!SendsToChange(scene, local),
+                scenario.Check(scene.Colonist.GetRoom() == ship.InFarRoom.GetRoom(map), name + " stands in the far room");
+                scenario.Check(!SendsToChange(scene, local),
                             "cut off by vacuum, " + name + " is not sent back across it to change for crafting "
                             + "in the far room");
-                story.Check(!SendsToChange(scene, outOnFloor), "nor for crafting out on the open floor");
-                story.Check(VacuumKit.PostedSince(before, text),
+                scenario.Check(!SendsToChange(scene, outOnFloor), "nor for crafting out on the open floor");
+                scenario.Check(VacuumKit.PostedSince(before, text),
                             "and a message says their own clothes are across vacuum too, so they will not "
                             + "go back to change first");
 
                 scene.Colonist.Position = scene.OutfitStand.InteractionCell;
-                story.Note(name + " is put back beside the stand");
-                story.Check(SendsToChange(scene,
+                scenario.Note(name + " is put back beside the stand");
+                scenario.Check(SendsToChange(scene,
                                           CatchmentKit.WorkAt(giver, new IntVec3(ship.FarRoom.minX + 3, 0, z + 1))),
                             "from there, the same crafting in the far room sends them to change first");
             }
@@ -342,29 +342,29 @@ namespace ShiftChange.Tests
         {
             return Staged(VacuumKit.StageShip, KeepingTheirVacsuitOn.OpenShip, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
-                if (!story.Check(SwapNow(story, scene), name + " changes out of the vacsuit into the stand's duster")
-                    || !story.Check(scene.Comp.OnShift, "and is on shift"))
+                if (!scenario.Check(SwapNow(scenario, scene), name + " changes out of the vacsuit into the stand's duster")
+                    || !scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
                 int id = scene.Colonist.thingIDNumber;
                 Patch_JobInterception.LastBlockedTick[id] = Find.TickManager.TicksGame;
-                story.Note("a change for " + name + " could not start, a moment ago");
-                story.Check(Patch_JobInterception.CoolingDown(scene.Colonist),
+                scenario.Note("a change for " + name + " could not start, a moment ago");
+                scenario.Check(Patch_JobInterception.CoolingDown(scene.Colonist),
                             "so " + name + " waits a while before trying the stand again");
-                story.Check(!LifecycleKit.MealBreakSendsThemBack(scene),
+                scenario.Check(!LifecycleKit.MealBreakSendsThemBack(scene),
                             "and meanwhile a meal break does not send them back to change, as it would");
                 // Asking about the meal break cleared the wait, so it starts again.
                 Patch_JobInterception.LastBlockedTick[id] = Find.TickManager.TicksGame;
-                story.Note("again a change for " + name + " could not start, a moment ago");
+                scenario.Note("again a change for " + name + " could not start, a moment ago");
                 Job outside = VacuumKit.BillFetching(scene, VacuumKit.ShipOn(scene.Map).OnFloor);
-                story.Check(outside != null && SendsToChange(scene, outside),
+                scenario.Check(outside != null && SendsToChange(scene, outside),
                             "but a bill fetching steel from the open floor still sends " + name
                             + " back to change first");
-                story.Check(LifecycleKit.MealBreakSendsThemBack(scene),
+                scenario.Check(LifecycleKit.MealBreakSendsThemBack(scene),
                             "and, the wait cleared, a meal break sends them back to change too");
             }
         }
@@ -381,17 +381,17 @@ namespace ShiftChange.Tests
         {
             return Staged(VacuumKit.StageShip, KeepingTheirVacsuitOn.OpenShip, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Bed");
                 if (bedDef == null)
                 {
-                    story.Check(false, "the game has a bed");
+                    scenario.Check(false, "the game has a bed");
                     return;
                 }
-                if (!story.Check(SwapNow(story, scene), name + " changes out of the vacsuit into the stand's duster")
-                    || !story.Check(scene.Comp.OnShift, "and is on shift"))
+                if (!scenario.Check(SwapNow(scenario, scene), name + " changes out of the vacsuit into the stand's duster")
+                    || !scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
@@ -401,30 +401,30 @@ namespace ShiftChange.Tests
                     new IntVec3(ship.FarRoom.minX + 2, 0, ship.OnFloor.z), Rot4.South) as Building_Bed;
                 if (bed == null)
                 {
-                    story.Check(false, "a bed could be put in the far room");
+                    scenario.Check(false, "a bed could be put in the far room");
                     return;
                 }
                 bed.Medical = true;
-                story.Note("a medical bed stands in the far room, across the open floor");
+                scenario.Note("a medical bed stands in the far room, across the open floor");
                 bool was = ShiftChangeMod.Settings.medicalEmergenciesChangeFirst;
                 Hediff wound = null;
                 try
                 {
                     ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = false;
-                    story.Note("Medical emergencies change first is off");
-                    story.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist),
+                    scenario.Note("Medical emergencies change first is off");
+                    scenario.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist),
                                 name + " needs no doctor to begin with");
-                    story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed),
+                    scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed),
                                               JobTag.RestingForMedicalReasons),
                                 "so recuperating in the medical bed across vacuum sends them to change first");
                     BodyPartRecord part = scene.Colonist.health.hediffSet.GetNotMissingParts().FirstOrDefault();
                     wound = HediffMaker.MakeHediff(HediffDefOf.Cut, scene.Colonist, part);
                     wound.Severity = 6f;
                     scene.Colonist.health.AddHediff(wound, part);
-                    story.Note(name + " gets a deep cut, untended");
-                    story.Check(HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist) && !scene.Colonist.Downed,
+                    scenario.Note(name + " gets a deep cut, untended");
+                    scenario.Check(HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist) && !scene.Colonist.Downed,
                                 "the untended cut makes " + name + " an urgent case, still on their feet");
-                    story.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed),
+                    scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed),
                                                JobTag.RestingForMedicalReasons),
                                 "so " + name + " goes straight to the medical bed across vacuum, in the duster");
                 }
@@ -452,21 +452,21 @@ namespace ShiftChange.Tests
         {
             return Staged(VacuumKit.StageCrafterAtHome, CrafterAtHome, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkGiverDef giver = Giver("DoBillsUseCraftingSpot");
                 if (giver == null)
                 {
-                    story.Check(false, "the game hands out bills at a crafting spot");
+                    scenario.Check(false, "the game hands out bills at a crafting spot");
                     return;
                 }
-                if (!story.Check(WearOne(scene.Colonist, "Apparel_Vacsuit")
+                if (!scenario.Check(WearOne(scene.Colonist, "Apparel_Vacsuit")
                                  && WearOne(scene.Colonist, "Apparel_VacsuitHelmet"),
                                  name + " puts on a vacsuit and its helmet")
-                    || !story.Check(SwapNow(story, scene),
+                    || !scenario.Check(SwapNow(scenario, scene),
                                     "and changes out of the vacsuit into the duster at the stand on the colony's map")
-                    || !story.Check(scene.Comp.OnShift, "and is on shift"))
+                    || !scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
@@ -474,32 +474,32 @@ namespace ShiftChange.Tests
                 Map away = SecondMap(home);
                 if (away == null)
                 {
-                    story.Check(false, "a second map, out in space, could be made");
+                    scenario.Check(false, "a second map, out in space, could be made");
                     return;
                 }
                 scene.SecondMap = away;
                 VacuumKit.VacuumScene vacuumScene = VacuumKit.StageVacuumScene(away);
-                story.Note("on a second map, out in space, a walled, roofed room with a door onto open floor");
+                scenario.Note("on a second map, out in space, a walled, roofed room with a door onto open floor");
                 int id = scene.Colonist.thingIDNumber;
                 string text = "ShiftChange.VacuumStandElsewhere".Translate(scene.Colonist.LabelShort);
                 LifecycleKit.Fly(scene.Colonist, away, vacuumScene.InsideCell);
-                story.Note(name + " flies there in the duster, into the room");
+                scenario.Note(name + " flies there in the duster, into the room");
                 try
                 {
                     Patch_JobInterception.LastVacuumWarningTick.Remove(id);
                     List<Message> before = VacuumKit.LiveMessages();
-                    story.Check(scene.Colonist.Map == away
+                    scenario.Check(scene.Colonist.Map == away
                                 && CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
                                 name + " is on the space map, still on shift at the stand back home");
-                    story.Check(!SendsToChange(scene, CatchmentKit.WorkAt(giver, vacuumScene.OutsideCell)),
+                    scenario.Check(!SendsToChange(scene, CatchmentKit.WorkAt(giver, vacuumScene.OutsideCell)),
                                 "crafting out on the open floor does not send " + name + " after a stand on another map");
-                    story.Check(VacuumKit.PostedSince(before, text),
+                    scenario.Check(VacuumKit.PostedSince(before, text),
                                 "and a message says their own clothes are not on this map");
 
                     Patch_JobInterception.LastVacuumWarningTick.Remove(id);
                     Job ordered = CatchmentKit.WorkAt(giver, vacuumScene.OutsideCell);
                     ordered.playerForced = true;
-                    story.Check(Patch_JobInterception.WarnIfOrderedIntoVacuum(ordered, scene.Colonist),
+                    scenario.Check(Patch_JobInterception.WarnIfOrderedIntoVacuum(ordered, scene.Colonist),
                                 "and an order to work out there warns the same");
                 }
                 finally

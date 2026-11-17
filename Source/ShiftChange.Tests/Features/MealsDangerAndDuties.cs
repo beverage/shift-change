@@ -15,7 +15,7 @@ namespace ShiftChange.Tests
     /// changing back, and a duty holds back both until it ends.
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(RunOrder.First - (int)CaseGroup.MealsDangerAndDuties)]
-    internal class MealsDangerAndDuties : StoryFixture
+    internal class MealsDangerAndDuties : FeatureFixture
     {
         /// <summary>What <see cref="Stage"/> sets up with the pad walled, roofed and floored.</summary>
         internal const string InARoom =
@@ -38,11 +38,11 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
-                story.Check(SwapNow(story, scene), name + " changes into the stand's duster");
-                story.Check(scene.Comp.OnShift, "and is on shift");
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's duster");
+                scenario.Check(scene.Comp.OnShift, "and is on shift");
                 if (!scene.Comp.OnShift)
                 {
                     return;
@@ -51,19 +51,19 @@ namespace ShiftChange.Tests
                 ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
                 if (mealDef == null)
                 {
-                    story.Check(false, "the game has its simple meal");
+                    scenario.Check(false, "the game has its simple meal");
                     return;
                 }
 
                 Thing stored = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), scene.Colonist.Position, scene.Map);
-                story.Note("a simple meal is set down at " + name + "'s feet");
-                story.Check(SendsToChangeKeepingQueue(scene, IngestJob(stored)),
+                scenario.Note("a simple meal is set down at " + name + "'s feet");
+                scenario.Check(SendsToChangeKeepingQueue(scene, IngestJob(stored)),
                             "going to eat it, " + name + " is sent to change out of the duster first");
 
                 Thing carried = ThingMaker.MakeThing(mealDef);
                 scene.Colonist.inventory.innerContainer.TryAdd(carried);
-                story.Note(name + " is given a simple meal to carry");
-                story.Check(!SendsToChangeKeepingQueue(scene, IngestJob(carried)),
+                scenario.Note(name + " is given a simple meal to carry");
+                scenario.Check(!SendsToChangeKeepingQueue(scene, IngestJob(carried)),
                             "but a meal they carry is simply eaten, duster and all");
             }
         }
@@ -87,14 +87,14 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Bed");
                 ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
                 if (bedDef == null || mealDef == null)
                 {
-                    story.Check(false, "the game has its bed and its simple meal");
+                    scenario.Check(false, "the game has its bed and its simple meal");
                     return;
                 }
 
@@ -108,36 +108,36 @@ namespace ShiftChange.Tests
                     Rot4.North) as Building_Bed;
                 if (bed == null)
                 {
-                    story.Check(false, "a bed is built in the stand's room");
+                    scenario.Check(false, "a bed is built in the stand's room");
                     return;
                 }
-                story.Note("a bed is built in the stand's room");
+                scenario.Note("a bed is built in the stand's room");
 
-                story.Check(scene.Comp.HandlesRest(), "the bed makes the room a bedroom, so the stand serves sleep");
-                story.Check(!scene.Comp.HandlesRecreation(),
+                scenario.Check(scene.Comp.HandlesRest(), "the bed makes the room a bedroom, so the stand serves sleep");
+                scenario.Check(!scene.Comp.HandlesRecreation(),
                             "and not recreation, whose meals go by a rule of their own");
                 if (!scene.Comp.HandlesRest())
                 {
                     return;
                 }
 
-                story.Check(SwapNow(story, scene), name + " changes into the stand's duster for bed");
-                story.Check(scene.Comp.OnShift, "and is on shift");
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's duster for bed");
+                scenario.Check(scene.Comp.OnShift, "and is on shift");
                 if (!scene.Comp.OnShift)
                 {
                     return;
                 }
 
                 Thing stored = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), scene.Colonist.Position, scene.Map);
-                story.Note("a simple meal is set down at " + name + "'s feet");
-                story.Check(SendsToChangeKeepingQueue(scene, IngestJob(stored)),
+                scenario.Note("a simple meal is set down at " + name + "'s feet");
+                scenario.Check(SendsToChangeKeepingQueue(scene, IngestJob(stored)),
                             "going to eat it for breakfast, " + name + " changes out of the sleepwear first, "
                             + "as always");
 
                 Thing carried = ThingMaker.MakeThing(mealDef);
                 scene.Colonist.inventory.innerContainer.TryAdd(carried);
-                story.Note(name + " is given a simple meal to carry");
-                story.Check(SendsToChangeKeepingQueue(scene, IngestJob(carried)),
+                scenario.Note(name + " is given a simple meal to carry");
+                scenario.Check(SendsToChangeKeepingQueue(scene, IngestJob(carried)),
                             "and so for a breakfast they carry, which is what this test guards");
 
                 // The wake-up: the real breakfast is decided with the colonist still on the bed, and
@@ -148,11 +148,11 @@ namespace ShiftChange.Tests
                 IntVec3 wasAt = scene.Colonist.Position;
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = bed.Position;
-                story.Note(name + " is moved onto the bed, as on waking");
-                story.Check(Patch_JobInterception.OnABed(scene.Colonist), name + " counts as on the bed");
-                story.Check(!Patch_JobInterception.StaysInBed(scene.Colonist, IngestJob(carried)),
+                scenario.Note(name + " is moved onto the bed, as on waking");
+                scenario.Check(Patch_JobInterception.OnABed(scene.Colonist), name + " counts as on the bed");
+                scenario.Check(!Patch_JobInterception.StaysInBed(scene.Colonist, IngestJob(carried)),
                             "and eating is not something done lying in it");
-                story.Check(SendsToChangeKeepingQueue(scene, IngestJob(carried)),
+                scenario.Check(SendsToChangeKeepingQueue(scene, IngestJob(carried)),
                             "so on waking " + name + " changes back before breakfast, by the stand");
 
                 scene.Colonist.pather?.StopDead();
@@ -186,7 +186,7 @@ namespace ShiftChange.Tests
                                           capableOf: WorkType("Doctor")),
                           InARoomADoctor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
@@ -194,7 +194,7 @@ namespace ShiftChange.Tests
                 ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
                 if (doctor == null || tend == null || mealDef == null)
                 {
-                    story.Check(false, "the game has its doctoring, its tending and its simple meal");
+                    scenario.Check(false, "the game has its doctoring, its tending and its simple meal");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
@@ -202,11 +202,11 @@ namespace ShiftChange.Tests
                 // Arrange the calm rather than assume it: a generated map can start with a hostile on
                 // it (see MakeCalm).
                 int swept = MakeCalm(scene.Map);
-                story.Note("the stand is ticked for doctoring, and the map is calm ("
+                scenario.Note("the stand is ticked for doctoring, and the map is calm ("
                            + swept + " hostile things cleared)");
-                story.Check(scene.Map.dangerWatcher.DangerRating == StoryDanger.None,
+                scenario.Check(scene.Map.dangerWatcher.DangerRating == StoryDanger.None,
                             "the colony is in no danger");
-                story.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                scenario.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                             "and " + name + " changes before tending a patient on their own");
 
                 // The half that stays shut. Deciding a job never ticks the colonist, so the hostile
@@ -214,21 +214,21 @@ namespace ShiftChange.Tests
                 Pawn threat = Threat(scene);
                 if (threat == null)
                 {
-                    story.Check(false, "a hostile can be set down near the stand");
+                    scenario.Check(false, "a hostile can be set down near the stand");
                     return;
                 }
-                story.Note("a hostile " + threat.kindDef.label + " is set down near the stand");
-                story.Check(scene.Map.dangerWatcher.DangerRating != StoryDanger.None,
+                scenario.Note("a hostile " + threat.kindDef.label + " is set down near the stand");
+                scenario.Check(scene.Map.dangerWatcher.DangerRating != StoryDanger.None,
                             "and the colony is in danger");
-                story.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                scenario.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                             "so " + name + " goes to tend the patient without changing");
                 ClearThreat(scene, threat);
-                story.Note("the hostile is removed");
+                scenario.Note("the hostile is removed");
 
                 // Dressed by the change itself, not by the trigger just shown shut, and with no
                 // hostile on the map: this is the only step that runs the clock.
-                story.Check(SwapNow(story, scene), name + " changes into the stand's duster on the calm map");
-                story.Check(scene.Comp.OnShift, "and is on shift");
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's duster on the calm map");
+                scenario.Check(scene.Comp.OnShift, "and is on shift");
                 if (!scene.Comp.OnShift)
                 {
                     return;
@@ -237,20 +237,20 @@ namespace ShiftChange.Tests
                 threat = Threat(scene);
                 if (threat == null)
                 {
-                    story.Check(false, "a hostile can be set down again for the way back");
+                    scenario.Check(false, "a hostile can be set down again for the way back");
                     return;
                 }
                 Thing meal = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), scene.Colonist.Position, scene.Map);
-                story.Note("a hostile " + threat.kindDef.label + " is set down again, and a simple meal at "
+                scenario.Note("a hostile " + threat.kindDef.label + " is set down again, and a simple meal at "
                            + name + "'s feet");
-                story.Check(scene.Map.dangerWatcher.DangerRating != StoryDanger.None,
+                scenario.Check(scene.Map.dangerWatcher.DangerRating != StoryDanger.None,
                             "the colony is in danger again");
-                story.Check(SendsToChangeKeepingQueue(scene, IngestJob(meal)),
+                scenario.Check(SendsToChangeKeepingQueue(scene, IngestJob(meal)),
                             "but going to eat, " + name + " still changes out of the duster first");
                 ClearThreat(scene, threat);
-                story.Note("the hostile is removed");
+                scenario.Note("the hostile is removed");
 
-                story.Check(scene.Map.dangerWatcher.DangerRating == StoryDanger.None,
+                scenario.Check(scene.Map.dangerWatcher.DangerRating == StoryDanger.None,
                             "and with it gone, the colony is in no danger again");
             }
         }
@@ -277,7 +277,7 @@ namespace ShiftChange.Tests
                                           capableOf: WorkType("Doctor")),
                           InARoomADoctor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
@@ -285,36 +285,36 @@ namespace ShiftChange.Tests
                 ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
                 if (doctor == null || tend == null || mealDef == null)
                 {
-                    story.Check(false, "the game has its doctoring, its tending and its simple meal");
+                    scenario.Check(false, "the game has its doctoring, its tending and its simple meal");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 int swept = MakeCalm(scene.Map);
-                story.Note("the stand is ticked for doctoring, and the map is calm ("
+                scenario.Note("the stand is ticked for doctoring, and the map is calm ("
                            + swept + " hostile things cleared)");
 
-                story.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                scenario.Check(SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                             name + ", free, changes before tending a patient on their own");
 
                 Lord lord = LordMaker.MakeNewLord(Faction.OfPlayer,
                     new LordJob_DefendPoint(scene.Colonist.Position), scene.Map, new[] { scene.Colonist });
                 if (lord == null)
                 {
-                    story.Check(false, name + " can be told to defend a spot");
+                    scenario.Check(false, name + " can be told to defend a spot");
                     return;
                 }
-                story.Note(name + " is told to defend the spot where they stand");
-                story.Check(scene.Colonist.GetLord() == lord, name + " is under those orders");
-                story.Check(scene.Colonist.mindState?.duty != null, "and has a duty from them");
-                story.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
+                scenario.Note(name + " is told to defend the spot where they stand");
+                scenario.Check(scene.Colonist.GetLord() == lord, name + " is under those orders");
+                scenario.Check(scene.Colonist.mindState?.duty != null, "and has a duty from them");
+                scenario.Check(!SendsToChangeKeepingQueue(scene, WorkJob(scene, tend)),
                             "so " + name + " goes to tend the patient without changing");
 
                 // Dressed while free, since dressing is shut under a duty. Changing back is the way
                 // that strands a colonist.
                 lord.RemovePawn(scene.Colonist);
-                story.Note(name + " is released from the duty");
-                story.Check(SwapNow(story, scene), name + " changes into the stand's duster, once released");
-                story.Check(scene.Comp.OnShift, "and is on shift");
+                scenario.Note(name + " is released from the duty");
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's duster, once released");
+                scenario.Check(scene.Comp.OnShift, "and is on shift");
                 if (!scene.Comp.OnShift)
                 {
                     scene.Map.lordManager.RemoveLord(lord);
@@ -324,33 +324,33 @@ namespace ShiftChange.Tests
                 // A meal break sets off the way back without a second room: at a work stand a meal
                 // sends them to change wherever the food is.
                 Thing meal = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), scene.Colonist.Position, scene.Map);
-                story.Note("a simple meal is set down at " + name + "'s feet");
-                story.Check(SendsToChangeKeepingQueue(scene, IngestJob(meal)),
+                scenario.Note("a simple meal is set down at " + name + "'s feet");
+                scenario.Check(SendsToChangeKeepingQueue(scene, IngestJob(meal)),
                             "going to eat it, " + name + ", free, changes out of the duster first");
 
                 lord.AddPawn(scene.Colonist);
-                story.Note(name + " is told to defend the spot again");
-                story.Check(scene.Colonist.mindState?.duty != null, name + " has a duty again");
-                story.Check(!SendsToChangeKeepingQueue(scene, IngestJob(meal)),
+                scenario.Note(name + " is told to defend the spot again");
+                scenario.Check(scene.Colonist.mindState?.duty != null, name + " has a duty again");
+                scenario.Check(!SendsToChangeKeepingQueue(scene, IngestJob(meal)),
                             "and going to eat, is not sent to change back: the duty would take them from the "
                             + "stand mid-change, again and again, and leave them stranded there");
 
                 lord.RemovePawn(scene.Colonist);
-                story.Note(name + " is released from the duty again");
-                story.Check(scene.Colonist.GetLord() == null && scene.Colonist.mindState?.duty == null,
+                scenario.Note(name + " is released from the duty again");
+                scenario.Check(scene.Colonist.GetLord() == null && scene.Colonist.mindState?.duty == null,
                             "which ends both the orders and the duty");
-                story.Check(SendsToChangeKeepingQueue(scene, IngestJob(meal)),
+                scenario.Check(SendsToChangeKeepingQueue(scene, IngestJob(meal)),
                             "so the meal sends " + name + " to change back the moment the duty ends");
 
                 // A duty with no lord behind it, which a mod's own think node can leave on a
                 // colonist. The gate reads the duty as well as the lord for this.
                 scene.Colonist.mindState.duty = new PawnDuty(DutyDefOf.Idle);
-                story.Note(name + " is given a duty with no lord behind it, as a mod can leave one");
-                story.Check(!SendsToChangeKeepingQueue(scene, IngestJob(meal)),
+                scenario.Note(name + " is given a duty with no lord behind it, as a mod can leave one");
+                scenario.Check(!SendsToChangeKeepingQueue(scene, IngestJob(meal)),
                             "which holds them back from changing too");
                 scene.Colonist.mindState.duty = null;
-                story.Note("the duty is cleared");
-                story.Check(SendsToChangeKeepingQueue(scene, IngestJob(meal)),
+                scenario.Note("the duty is cleared");
+                scenario.Check(SendsToChangeKeepingQueue(scene, IngestJob(meal)),
                             "and with it cleared, the meal sends them to change back again");
 
                 scene.Map.lordManager.RemoveLord(lord);

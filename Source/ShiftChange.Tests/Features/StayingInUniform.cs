@@ -18,7 +18,7 @@ namespace ShiftChange.Tests
     /// jobs that could come next, each paired with one of the same shape that goes the other way.
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(RunOrder.First - (int)CaseGroup.StayingInUniform)]
-    internal class StayingInUniform : StoryFixture
+    internal class StayingInUniform : FeatureFixture
     {
         /// <summary>What <see cref="SceneKit.Stage"/> sets up with the pad enclosed.</summary>
         internal const string InARoom =
@@ -59,7 +59,7 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
@@ -73,7 +73,7 @@ namespace ShiftChange.Tests
                 if (doctor == null || tend == null || cook == null || haul == null || clean == null
                     || construct == null || chess == null || bedDef == null)
                 {
-                    story.Check(false, "the game has Doctor work, cooking, hauling, cleaning, building, "
+                    scenario.Check(false, "the game has Doctor work, cooking, hauling, cleaning, building, "
                                        + "chess and the bed");
                     return;
                 }
@@ -81,7 +81,7 @@ namespace ShiftChange.Tests
                 // would read as sleep.
                 scene.Comp.ToggleWork(doctor);
                 MakeCalm(scene.Map);
-                story.Note("Doctor is ticked on the stand, and the map is calm");
+                scenario.Note("Doctor is ticked on the stand, and the map is calm");
 
                 IntVec3 at = scene.OutfitStand.Position;
                 IntVec3 inside = at + new IntVec3(1, 0, 2);
@@ -90,65 +90,65 @@ namespace ShiftChange.Tests
                     scene.Map, bedDef, ThingDefOf.WoodLog, at + new IntVec3(2, 0, 0), Rot4.North) as Building_Bed;
                 if (bed == null)
                 {
-                    story.Check(false, "a bed can be built in the stand's room");
+                    scenario.Check(false, "a bed can be built in the stand's room");
                     return;
                 }
-                story.Note("a bed is built in the room, two cells east of the stand");
+                scenario.Note("a bed is built in the room, two cells east of the stand");
 
-                story.Check(SwapNow(story, scene), name + " changes into the stand's duster");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's duster");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
-                NotSentStraightBack(story, scene);
-                story.Check(!SendsToChange(scene, WorkAt(cook, past)),
+                NotSentStraightBack(scenario, scene);
+                scenario.Check(!SendsToChange(scene, WorkAt(cook, past)),
                             "serving its room, the stand keeps the uniform on for cooking anywhere in the room, "
                             + "though it does not serve cooking");
-                story.Check(!SendsToChange(scene, JobMaker.MakeJob(chess, inside, inside)),
+                scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(chess, inside, inside)),
                             "and for a game of chess in the room, as it always has");
 
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(3);
-                story.Note("Within a radius is chosen under Serves, and the radius set to 3 cells");
-                story.Check(scene.Comp.Covers(inside, scene.Map) && scene.Comp.Covers(bed.Position, scene.Map)
+                scenario.Note("Within a radius is chosen under Serves, and the radius set to 3 cells");
+                scenario.Check(scene.Comp.Covers(inside, scene.Map) && scene.Comp.Covers(bed.Position, scene.Map)
                             && !scene.Comp.Covers(past, scene.Map),
                             "the ring takes in a spot near the stand and the bed, not the room's far corner");
-                story.Check(!SendsToChange(scene, WorkAt(tend, inside)),
+                scenario.Check(!SendsToChange(scene, WorkAt(tend, inside)),
                             "Doctor work inside the ring keeps the uniform on");
-                story.Check(SendsToChange(scene, WorkAt(tend, past)),
+                scenario.Check(SendsToChange(scene, WorkAt(tend, past)),
                             "Doctor work past the ring, in the stand's own room, changes them back");
-                story.Check(SendsToChange(scene, WorkAt(cook, inside)),
+                scenario.Check(SendsToChange(scene, WorkAt(cook, inside)),
                             "cooking inside the ring changes them back: the stand does not serve it");
-                story.Check(!SendsToChange(scene, WorkAt(haul, inside)),
+                scenario.Check(!SendsToChange(scene, WorkAt(haul, inside)),
                             "hauling inside the ring keeps the uniform on, as work passing through");
-                story.Check(!SendsToChange(scene, WorkAt(clean, inside)), "and so does cleaning");
-                story.Check(!SendsToChange(scene, WorkAt(construct, inside)), "and building");
-                story.Check(SendsToChange(scene, WorkAt(haul, past)), "hauling past the ring changes them back");
-                story.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.GotoWander, inside)),
+                scenario.Check(!SendsToChange(scene, WorkAt(clean, inside)), "and so does cleaning");
+                scenario.Check(!SendsToChange(scene, WorkAt(construct, inside)), "and building");
+                scenario.Check(SendsToChange(scene, WorkAt(haul, past)), "hauling past the ring changes them back");
+                scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.GotoWander, inside)),
                             "wandering inside the ring keeps the uniform on");
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.GotoWander, past)),
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.GotoWander, past)),
                             "wandering past it changes them back");
-                story.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.Wait)),
+                scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.Wait)),
                             "idling where they stand, inside the ring, keeps the uniform on");
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, inside)),
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, inside)),
                             "sleeping on the ground inside the ring changes them back: a work stand does not "
                             + "keep it on for that");
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(chess, inside, inside)),
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(chess, inside, inside)),
                             "and so does a game of chess inside it");
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed)),
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bed)),
                             "and going to bed inside it");
 
                 // A wait goes nowhere, so it is judged where the colonist stands.
                 IntVec3 wasAt = scene.Colonist.Position;
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = past;
-                story.Note(name + " is moved to the room's far corner, past the ring");
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.Wait)),
+                scenario.Note(name + " is moved to the room's far corner, past the ring");
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.Wait)),
                             "idling past the ring changes them back");
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = wasAt;
-                story.Note(name + " is moved back beside the stand");
-                story.Check(scene.Comp.OnShift, "and " + name + " is still on shift at the end");
+                scenario.Note(name + " is moved back beside the stand");
+                scenario.Check(scene.Comp.OnShift, "and " + name + " is still on shift at the end");
             }
         }
 
@@ -168,7 +168,7 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
@@ -178,12 +178,12 @@ namespace ShiftChange.Tests
                 if (doctor == null || tend == null || haul == null || clean == null
                     || ThingDefOf.RawPotatoes == null || ThingDefOf.Filth_Dirt == null)
                 {
-                    story.Check(false, "the game has Doctor work, hauling, cleaning, potatoes and dirt");
+                    scenario.Check(false, "the game has Doctor work, hauling, cleaning, potatoes and dirt");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 MakeCalm(scene.Map);
-                story.Note("Doctor is ticked on the stand, and the map is calm");
+                scenario.Note("Doctor is ticked on the stand, and the map is calm");
 
                 Map map = scene.Map;
                 IntVec3 at = scene.OutfitStand.Position;
@@ -197,47 +197,47 @@ namespace ShiftChange.Tests
                 Thing dirtThere = GenSpawn.Spawn(ThingMaker.MakeThing(ThingDefOf.Filth_Dirt),
                                                  at + new IntVec3(0, 0, 2), map);
                 Thing dirtPast = GenSpawn.Spawn(ThingMaker.MakeThing(ThingDefOf.Filth_Dirt), past, map);
-                story.Note("potatoes lie near the stand and across the room, and dirt near the stand "
+                scenario.Note("potatoes lie near the stand and across the room, and dirt near the stand "
                            + "and in the room's far corner");
 
-                story.Check(SwapNow(story, scene), name + " changes into the stand's duster");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's duster");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
-                NotSentStraightBack(story, scene);
-                story.Check(!SendsToChange(scene, Haul(haul, near, past)),
+                NotSentStraightBack(scenario, scene);
+                scenario.Check(!SendsToChange(scene, Haul(haul, near, past)),
                             "serving its room, the stand keeps the uniform on for a haul to the room's far corner");
 
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(3);
-                story.Note("Within a radius is chosen under Serves, and the radius set to 3 cells");
-                story.Check(scene.Comp.Covers(from, map) && scene.Comp.Covers(to, map)
+                scenario.Note("Within a radius is chosen under Serves, and the radius set to 3 cells");
+                scenario.Check(scene.Comp.Covers(from, map) && scene.Comp.Covers(to, map)
                             && scene.Comp.Covers(dirtHere.Position, map) && scene.Comp.Covers(dirtThere.Position, map)
                             && !scene.Comp.Covers(far.Position, map) && !scene.Comp.Covers(past, map),
                             "the ring takes in the near potatoes, the dirt near the stand and a cell on its edge, "
                             + "and not the far potatoes or the room's far corner");
-                story.Check(!SendsToChange(scene, Haul(haul, near, to)),
+                scenario.Check(!SendsToChange(scene, Haul(haul, near, to)),
                             "hauling potatoes from inside the ring to a cell on its edge keeps the uniform on");
-                story.Check(SendsToChange(scene, Haul(haul, near, past)),
+                scenario.Check(SendsToChange(scene, Haul(haul, near, past)),
                             "the same haul to a cell past the ring changes them back first");
-                story.Check(SendsToChange(scene, Haul(haul, far, to)),
+                scenario.Check(SendsToChange(scene, Haul(haul, far, to)),
                             "and so does one bringing potatoes in from past the ring");
-                story.Check(!SendsToChange(scene, Cleaning(clean, dirtHere, dirtThere)),
+                scenario.Check(!SendsToChange(scene, Cleaning(clean, dirtHere, dirtThere)),
                             "cleaning with all its dirt inside the ring keeps the uniform on");
-                story.Check(SendsToChange(scene, Cleaning(clean, dirtHere, dirtPast)),
+                scenario.Check(SendsToChange(scene, Cleaning(clean, dirtHere, dirtPast)),
                             "with one patch of it past the ring, it changes them back");
 
                 JobQueue queue = scene.Colonist.jobs.jobQueue;
                 queue.EnqueueFirst(RideAlongKit.QueuedWork(tend, from));
-                story.Note("Doctor work inside the ring is queued for " + name);
-                story.Check(!SendsToChange(scene, RideAlongKit.GiverlessHaul(far, to)),
+                scenario.Note("Doctor work inside the ring is queued for " + name);
+                scenario.Check(!SendsToChange(scene, RideAlongKit.GiverlessHaul(far, to)),
                             "a haul no work handed out, ahead of the stand's own work inside the ring, keeps it on");
                 queue.EnqueueFirst(RideAlongKit.QueuedWork(tend, past));
-                story.Note("Doctor work past the ring is queued instead");
-                story.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(far, to)),
+                scenario.Note("Doctor work past the ring is queued instead");
+                scenario.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(far, to)),
                             "ahead of that work past the ring, the same haul changes them back");
-                story.Check(scene.Comp.OnShift, "and " + name + " is still on shift at the end");
+                scenario.Check(scene.Comp.OnShift, "and " + name + " is still on shift at the end");
             }
         }
 
@@ -255,7 +255,7 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
@@ -263,7 +263,7 @@ namespace ShiftChange.Tests
                 ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Bed");
                 if (doctor == null || haul == null || bedDef == null)
                 {
-                    story.Check(false, "the game has Doctor work, hauling and the bed");
+                    scenario.Check(false, "the game has Doctor work, hauling and the bed");
                     return;
                 }
                 // Ticked before the beds land: a bed makes the pad a bedroom, and on an automatic
@@ -272,7 +272,7 @@ namespace ShiftChange.Tests
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(3);
                 MakeCalm(scene.Map);
-                story.Note("Sleeping is ticked on the stand, Within a radius chosen under Serves, the radius "
+                scenario.Note("Sleeping is ticked on the stand, Within a radius chosen under Serves, the radius "
                            + "set to 3 cells, and the map is calm");
 
                 IntVec3 at = scene.OutfitStand.Position;
@@ -283,50 +283,50 @@ namespace ShiftChange.Tests
                     scene.Map, bedDef, ThingDefOf.WoodLog, at + new IntVec3(4, 0, 3), Rot4.North) as Building_Bed;
                 if (near == null || far == null)
                 {
-                    story.Check(false, "two beds can be built in the stand's room");
+                    scenario.Check(false, "two beds can be built in the stand's room");
                     return;
                 }
-                story.Note("a bed is built near the stand and another across the room");
+                scenario.Note("a bed is built near the stand and another across the room");
 
-                story.Check(scene.Comp.HandlesRest() && scene.Comp.serves == CatchmentKind.Radius,
+                scenario.Check(scene.Comp.HandlesRest() && scene.Comp.serves == CatchmentKind.Radius,
                             "the stand serves sleeping within a radius");
-                story.Check(scene.Comp.Covers(near.Position, scene.Map) && !scene.Comp.Covers(far.Position, scene.Map),
+                scenario.Check(scene.Comp.Covers(near.Position, scene.Map) && !scene.Comp.Covers(far.Position, scene.Map),
                             "its ring takes in the near bed and not the far one");
-                story.Check(SwapNow(story, scene), name + " changes into the stand's duster for bed");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's duster for bed");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
-                NotSentStraightBack(story, scene);
-                story.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, near)),
+                NotSentStraightBack(scenario, scene);
+                scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, near)),
                             "going to the bed inside the ring keeps the pyjamas on");
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, far)),
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, far)),
                             "the bed past the ring changes them back");
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, near),
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, near),
                                           JobTag.RestingForMedicalReasons),
                             "and so does bed rest for medical reasons, inside the ring or not");
 
                 IntVec3 wasAt = scene.Colonist.Position;
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = near.Position;
-                story.Note(name + " is moved onto the near bed, as if just waking");
-                story.Check(SendsToChange(scene, WorkAt(haul, inside)),
+                scenario.Note(name + " is moved onto the near bed, as if just waking");
+                scenario.Check(SendsToChange(scene, WorkAt(haul, inside)),
                             "on waking, the first job out of bed changes them back, a haul inside the ring included");
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.GotoWander, inside)),
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.GotoWander, inside)),
                             "and so does wandering inside it");
-                story.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, near)),
+                scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, near)),
                             "while staying in bed does not");
 
                 scene.Comp.ToggleWork(doctor);
-                story.Note("Doctor is ticked on the stand as well");
-                story.Check(scene.Comp.HandlesWork(doctor) && scene.Comp.serves == CatchmentKind.Radius
+                scenario.Note("Doctor is ticked on the stand as well");
+                scenario.Check(scene.Comp.HandlesWork(doctor) && scene.Comp.serves == CatchmentKind.Radius
                             && scene.Comp.OnShift,
                             "the same stand now serves Doctor work in its ring, " + name + " still on shift");
-                story.Check(!SendsToChange(scene, WorkAt(haul, inside)),
+                scenario.Check(!SendsToChange(scene, WorkAt(haul, inside)),
                             "and the same haul keeps the uniform on, as at any work stand");
                 scene.Colonist.pather?.StopDead();
                 scene.Colonist.Position = wasAt;
-                story.Note(name + " is moved back beside the stand");
+                scenario.Note(name + " is moved back beside the stand");
             }
         }
 
@@ -343,7 +343,7 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
@@ -351,44 +351,44 @@ namespace ShiftChange.Tests
                 JobDef chess = DefDatabase<JobDef>.GetNamedSilentFail("Play_Chess");
                 if (doctor == null || haul == null || chess == null)
                 {
-                    story.Check(false, "the game has Doctor work, hauling and chess");
+                    scenario.Check(false, "the game has Doctor work, hauling and chess");
                     return;
                 }
                 scene.Comp.ToggleRecreation();
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(3);
                 MakeCalm(scene.Map);
-                story.Note("Recreation is ticked on the stand, Within a radius chosen under Serves, the radius "
+                scenario.Note("Recreation is ticked on the stand, Within a radius chosen under Serves, the radius "
                            + "set to 3 cells, and the map is calm");
 
                 IntVec3 at = scene.OutfitStand.Position;
                 IntVec3 inside = at + new IntVec3(1, 0, 2);
                 IntVec3 past = at + new IntVec3(4, 0, 4);
-                story.Check(scene.Comp.HandlesRecreation() && scene.Comp.serves == CatchmentKind.Radius,
+                scenario.Check(scene.Comp.HandlesRecreation() && scene.Comp.serves == CatchmentKind.Radius,
                             "the stand serves recreation within a radius");
-                story.Check(SwapNow(story, scene), name + " changes into the stand's duster for play");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's duster for play");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
-                NotSentStraightBack(story, scene);
-                story.Check(!SendsToChange(scene, JobMaker.MakeJob(chess, inside, inside)),
+                NotSentStraightBack(scenario, scene);
+                scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(chess, inside, inside)),
                             "a game of chess inside the ring keeps the outfit on");
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(chess, past, past)),
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(chess, past, past)),
                             "one past the ring changes them back");
-                story.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.GotoWander, inside)),
+                scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.GotoWander, inside)),
                             "wandering inside the ring keeps it on");
-                story.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.Wait)),
+                scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.Wait)),
                             "and so does idling where they stand");
-                story.Check(SendsToChange(scene, WorkAt(haul, inside)),
+                scenario.Check(SendsToChange(scene, WorkAt(haul, inside)),
                             "hauling inside the ring changes them back: work passing through is a work stand's");
 
                 scene.Comp.ToggleWork(doctor);
-                story.Note("Doctor is ticked on the stand as well");
-                story.Check(scene.Comp.HandlesWork(doctor) && scene.Comp.serves == CatchmentKind.Radius
+                scenario.Note("Doctor is ticked on the stand as well");
+                scenario.Check(scene.Comp.HandlesWork(doctor) && scene.Comp.serves == CatchmentKind.Radius
                             && scene.Comp.OnShift,
                             "the same stand now serves Doctor work in its ring, " + name + " still on shift");
-                story.Check(!SendsToChange(scene, WorkAt(haul, inside)),
+                scenario.Check(!SendsToChange(scene, WorkAt(haul, inside)),
                             "and the same haul keeps the uniform on, as at any work stand");
             }
         }
@@ -412,52 +412,52 @@ namespace ShiftChange.Tests
             return Staged((map, pad) => StageWithDoorway(map, pad, WorkType("Doctor")),
                           BesideADoorADoctor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
                 WorkGiverDef tend = Giver("DoctorTendToHumanlikes");
                 if (doctor == null || tend == null)
                 {
-                    story.Check(false, "the game has Doctor work and tending patients");
+                    scenario.Check(false, "the game has Doctor work and tending patients");
                     return;
                 }
                 if (scene.Outside.Area == 0)
                 {
-                    story.Check(false, "the room has a door, with open ground outside it");
+                    scenario.Check(false, "the room has a door, with open ground outside it");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 MakeCalm(scene.Map);
-                story.Note("Doctor is ticked on the stand, and the map is calm");
-                Pawn patient = AnotherColonist(story, scene, Gender.Female, "Patient");
+                scenario.Note("Doctor is ticked on the stand, and the map is calm");
+                Pawn patient = AnotherColonist(scenario, scene, Gender.Female, "Patient");
                 StayPut(patient);
                 IntVec3 patientAt = patient.Position;
-                story.Note(patient.LabelShort + " holds still there, as a patient in bed would");
+                scenario.Note(patient.LabelShort + " holds still there, as a patient in bed would");
 
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(3);
-                story.Note("Within a radius is chosen under Serves, and the radius set to 3 cells");
-                story.Check(scene.Comp.Covers(patientAt, scene.Map), patient.LabelShort + " is inside the ring");
-                DressedForThenMoved(story, scene, tend, patient, scene.OutfitStand.Position + new IntVec3(4, 0, 4),
+                scenario.Note("Within a radius is chosen under Serves, and the radius set to 3 cells");
+                scenario.Check(scene.Comp.Covers(patientAt, scene.Map), patient.LabelShort + " is inside the ring");
+                DressedForThenMoved(scenario, scene, tend, patient, scene.OutfitStand.Position + new IntVec3(4, 0, 4),
                                     "serving a radius", "past the ring");
 
                 // Changed back while the stand still serves its radius, so the freed stand catches
                 // nobody up on the way to its room.
-                story.Check(SwapNow(story, scene), name + " changes back between the two passes");
-                story.Check(!scene.Comp.OnShift, "and is off shift");
+                scenario.Check(SwapNow(scenario, scene), name + " changes back between the two passes");
+                scenario.Check(!scene.Comp.OnShift, "and is off shift");
                 ClearSwapDecision(scene.Colonist);
                 patient.pather?.StopDead();
                 patient.Position = patientAt;
-                story.Note(patient.LabelShort + " is put back where she lay");
+                scenario.Note(patient.LabelShort + " is put back where she lay");
 
                 scene.Comp.SetServes(CatchmentKind.Room);
-                story.Note("This room is chosen under Serves");
+                scenario.Note("This room is chosen under Serves");
                 IntVec3 outside = new IntVec3(scene.Outside.minX, 0, scene.Outside.maxZ);
-                story.Check(scene.Comp.Covers(patientAt, scene.Map) && !scene.Comp.Covers(outside, scene.Map),
+                scenario.Check(scene.Comp.Covers(patientAt, scene.Map) && !scene.Comp.Covers(outside, scene.Map),
                             "serving its room, the stand takes in " + patient.LabelShort
                             + " and not the ground outside the door");
-                DressedForThenMoved(story, scene, tend, patient, outside, "serving its room", "out of the room");
+                DressedForThenMoved(scenario, scene, tend, patient, outside, "serving its room", "out of the room");
             }
         }
 
@@ -468,7 +468,7 @@ namespace ShiftChange.Tests
         /// the stand serves, and <paramref name="gone"/> where the patient goes, in the game's
         /// words.
         /// </summary>
-        internal static void DressedForThenMoved(Story story, Scene scene, WorkGiverDef tend, Pawn patient,
+        internal static void DressedForThenMoved(Scenario scenario, Scene scene, WorkGiverDef tend, Pawn patient,
                                                  IntVec3 away, string pass, string gone)
         {
             Pawn pawn = scene.Colonist;
@@ -477,46 +477,46 @@ namespace ShiftChange.Tests
             tending.workGiverDef = tend;
             JobQueue queue = pawn.jobs.jobQueue;
             bool inserted = Patch_JobInterception.TryInsertSwap(tending, null, pawn, pawn.jobs);
-            story.Check(inserted && pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand
+            scenario.Check(inserted && pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand
                         && queue.Count > 0 && queue[0].job == tending,
                         pass + ": tending " + patient.LabelShort + " sends " + name
                         + " to change first, the tending queued behind the change");
             // The change started here gives way to the one SwapNow starts, and the queue keeps the
             // tending: the change never touches it.
-            story.Check(SwapNow(story, scene), name + " changes into the stand's duster");
-            story.Check(scene.Comp.OnShift && queue.Count > 0 && queue[0].job == tending,
+            scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's duster");
+            scenario.Check(scene.Comp.OnShift && queue.Count > 0 && queue[0].job == tending,
                         "and is on shift, the tending still queued");
 
             patient.pather?.StopDead();
             patient.Position = away;
-            story.Check(!scene.Comp.Covers(away, scene.Map),
+            scenario.Check(!scene.Comp.Covers(away, scene.Map),
                         patient.LabelShort + " has walked " + gone + " while " + name + " changed");
-            story.Check(pawn.CurJobDef == JobDefOf.Wait_MaintainPosture,
+            scenario.Check(pawn.CurJobDef == JobDefOf.Wait_MaintainPosture,
                         "the game pauses " + name + " for a moment between the change and the queue, "
                         + "so the pause is on the way to the tending");
 
             // The pause ends as the job tracker ends it when it runs out, and the queue starts the
             // tending through the game's own StartJob, this mod's prefix included.
             pawn.jobs.EndCurrentJob(JobCondition.Succeeded);
-            story.Check(pawn.CurJob == tending,
+            scenario.Check(pawn.CurJob == tending,
                         "the tending " + name + " dressed for starts (" + (pawn.CurJobDef?.defName ?? "no job") + ")");
-            story.Check(scene.Comp.OnShift, "in uniform: the job they were dressed for does not send them back");
+            scenario.Check(scene.Comp.OnShift, "in uniform: the job they were dressed for does not send them back");
 
             // Vanilla's StartJob can then put the tending back at the head of the queue,
             // untagged, and start a haul first (Pawn_JobTracker.TryOpportunisticJob).
             queue.EnqueueFirst(tending);
-            story.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, away, away)),
+            scenario.Check(!SendsToChangeKeepingQueue(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, away, away)),
                         "a haul the game starts first, the tending queued behind it, keeps the uniform on");
-            story.Check(!SendsToChangeKeepingQueue(scene, tending),
+            scenario.Check(!SendsToChangeKeepingQueue(scene, tending),
                         "and the tending, starting again after the haul, still does");
             queue.Extract(tending);
 
             Job again = JobMaker.MakeJob(JobDefOf.Wait, patient);
             again.workGiverDef = tend;
-            story.Check(SendsToChange(scene, again),
+            scenario.Check(SendsToChange(scene, again),
                         "but the next tending out there changes them back: the grace lasts one job");
             ClearSwapDecision(pawn);
-            story.Check(scene.Comp.OnShift, "and " + name + " is still on shift at the end of the pass");
+            scenario.Check(scene.Comp.OnShift, "and " + name + " is still on shift at the end of the pass");
         }
 
         // A known gap unless Complex Jobs is loaded (--with=).
@@ -538,7 +538,7 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef construction = WorkType("Construction");
@@ -548,7 +548,7 @@ namespace ShiftChange.Tests
                 WorkGiverDef blueprints = Giver("ConstructDeliverResourcesToBlueprints");
                 if (construction == null || growing == null || finish == null || sow == null || blueprints == null)
                 {
-                    story.Check(false, "the game has Construction and Growing work, building frames, sowing "
+                    scenario.Check(false, "the game has Construction and Growing work, building frames, sowing "
                                        + "and delivering to blueprints");
                     return;
                 }
@@ -592,7 +592,7 @@ namespace ShiftChange.Tests
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(3);
                 MakeCalm(scene.Map);
-                story.Note("Construction, Growing and every delivery's own work are ticked on the stand, "
+                scenario.Note("Construction, Growing and every delivery's own work are ticked on the stand, "
                            + "Within a radius chosen under Serves, the radius set to 3 cells, and the map is calm");
 
                 IntVec3 at = scene.OutfitStand.Position;
@@ -600,32 +600,32 @@ namespace ShiftChange.Tests
                 IntVec3 insideSite = at + new IntVec3(2, 0, 1);
                 IntVec3 past = at + new IntVec3(4, 0, 4);
                 IntVec3 pastSite = at + new IntVec3(4, 0, 3);
-                story.Check(givers.Count >= 6, "the game's five Core delivery works and seed planting are all found");
-                story.Check(SendsToChange(scene, WorkAt(finish, inside)),
+                scenario.Check(givers.Count >= 6, "the game's five Core delivery works and seed planting are all found");
+                scenario.Check(SendsToChange(scene, WorkAt(finish, inside)),
                             "building a frame inside the ring sends " + name + ", in their own clothes, to change");
-                story.Check(SendsToChange(scene, FloorRemovalAt(blueprints, inside)),
+                scenario.Check(SendsToChange(scene, FloorRemovalAt(blueprints, inside)),
                             "and so does removing an old floor inside it, though the same work hands out deliveries");
                 foreach (WorkGiverDef giver in givers)
                 {
-                    story.Check(scene.Comp.HandlesWork(giver.workType)
+                    scenario.Check(scene.Comp.HandlesWork(giver.workType)
                                 && !SendsToChange(scene, DeliveryAt(giver, inside, insideSite)),
                                 Called(giver) + ": its delivery sends nobody to change, though the stand serves "
                                 + "its work and the whole trip is inside the ring");
                 }
 
-                story.Check(SwapNow(story, scene), name + " changes into the stand's duster");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's duster");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
-                NotSentStraightBack(story, scene);
-                story.Check(SendsToChange(scene, WorkAt(finish, past)), "a frame past the ring changes them back");
-                story.Check(SendsToChange(scene, WorkAt(sow, past)), "and so does sowing past it");
-                story.Check(SendsToChange(scene, FloorRemovalAt(blueprints, past)),
+                NotSentStraightBack(scenario, scene);
+                scenario.Check(SendsToChange(scene, WorkAt(finish, past)), "a frame past the ring changes them back");
+                scenario.Check(SendsToChange(scene, WorkAt(sow, past)), "and so does sowing past it");
+                scenario.Check(SendsToChange(scene, FloorRemovalAt(blueprints, past)),
                             "and so does removing an old floor past it: that is work at the site, not a delivery");
                 foreach (WorkGiverDef giver in givers)
                 {
-                    story.Check(!SendsToChange(scene, DeliveryAt(giver, past, insideSite)),
+                    scenario.Check(!SendsToChange(scene, DeliveryAt(giver, past, insideSite)),
                                 Called(giver) + ": its delivery keeps the uniform on, the stack past the ring and "
                                 + "the site inside, since the stand serves its work");
                 }
@@ -636,7 +636,7 @@ namespace ShiftChange.Tests
                 {
                     Job resumed = DeliveryAt(seedPlanter, past, insideSite);
                     resumed.targetC = past;
-                    story.Check(!SendsToChange(scene, resumed),
+                    scenario.Check(!SendsToChange(scene, resumed),
                                 "seed planting picked up again, with its seed stack past the ring where a site "
                                 + "would be, keeps it on: that is no site");
                 }
@@ -644,8 +644,8 @@ namespace ShiftChange.Tests
                 // decision.
                 Thing steelInside = Steel(scene.Map, inside);
                 Thing siteOutside = WallBlueprint(scene.Map, pastSite);
-                story.Note("twenty steel are put inside the ring, and a wall blueprint placed past it");
-                story.Check(siteOutside != null && SendsToChange(scene, Delivery(blueprints, steelInside, siteOutside)),
+                scenario.Note("twenty steel are put inside the ring, and a wall blueprint placed past it");
+                scenario.Check(siteOutside != null && SendsToChange(scene, Delivery(blueprints, steelInside, siteOutside)),
                             "a delivery to a site past the ring changes them back now, while the stand is near");
 
                 // Jobs are pooled, so the next delivery from the same steel can be the same Job object
@@ -653,36 +653,36 @@ namespace ShiftChange.Tests
                 // not let it through.
                 Job dressedFor = Delivery(blueprints, steelInside, siteOutside);
                 Patch_JobInterception.DressedFor[scene.Colonist] = new Patch_JobInterception.DeferredJob(dressedFor);
-                story.Note(name + " is marked as just dressed for that delivery");
-                story.Check(!SendsToChange(scene, dressedFor),
+                scenario.Note(name + " is marked as just dressed for that delivery");
+                scenario.Check(!SendsToChange(scene, dressedFor),
                             "the delivery they were dressed for keeps the uniform on, its site past the ring or not");
                 Patch_JobInterception.DressedFor[scene.Colonist] = new Patch_JobInterception.DeferredJob(dressedFor);
                 dressedFor.loadID = Find.UniqueIDsManager.GetNextJobID();
-                story.Note("the same job is handed out again under a new number");
-                story.Check(SendsToChange(scene, dressedFor),
+                scenario.Note("the same job is handed out again under a new number");
+                scenario.Check(SendsToChange(scene, dressedFor),
                             "and handed out again, the same steel to the same site, it changes them back");
                 Patch_JobInterception.DressedFor.Remove(scene.Colonist);
 
                 // The shape vanilla's opportunistic haul leaves: the delivery put back at the head of
                 // the queue, untagged, and a haul started first.
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, past, pastSite)),
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, past, pastSite)),
                             "a haul past the ring changes them back");
                 scene.Colonist.jobs.jobQueue.EnqueueFirst(DeliveryAt(blueprints, past, insideSite));
-                story.Note("a delivery to a site inside the ring is queued for " + name);
-                story.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, past, pastSite)),
+                scenario.Note("a delivery to a site inside the ring is queued for " + name);
+                scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, past, pastSite)),
                             "the same haul keeps it on with that delivery queued behind it");
                 scene.Colonist.jobs.jobQueue.EnqueueFirst(DeliveryAt(blueprints, past, pastSite));
-                story.Note("a delivery to a site past the ring is queued instead");
-                story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, past, pastSite)),
+                scenario.Note("a delivery to a site past the ring is queued instead");
+                scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, past, pastSite)),
                             "but not with that one queued behind it");
 
                 if (!complexJobs)
                 {
-                    story.KnownGap(false, "Complex Jobs' two delivery works are checked too",
+                    scenario.KnownGap(false, "Complex Jobs' two delivery works are checked too",
                                    "Complex Jobs is not on this mod list; --with=FrozenSnowFox.ComplexJobs loads it");
                     return;
                 }
-                story.Check(complexFound == 2, "Complex Jobs' two delivery works are found, and were checked above");
+                scenario.Check(complexFound == 2, "Complex Jobs' two delivery works are found, and were checked above");
             }
         }
 
@@ -705,7 +705,7 @@ namespace ShiftChange.Tests
             return Staged((map, pad) => StageWithDoorway(map, pad, WorkType("Construction")),
                           BesideADoorABuilder, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef construction = WorkType("Construction");
@@ -716,17 +716,17 @@ namespace ShiftChange.Tests
                 WorkGiverDef haulDeliver = Giver("DeliverResourcesToBlueprints");
                 if (construction == null || cooking == null || deliver == null)
                 {
-                    story.Check(false, "the game has Construction and Cooking work and delivering to blueprints");
+                    scenario.Check(false, "the game has Construction and Cooking work and delivering to blueprints");
                     return;
                 }
                 if (scene.Outside.Area == 0)
                 {
-                    story.Check(false, "the room has a door, with open ground outside it");
+                    scenario.Check(false, "the room has a door, with open ground outside it");
                     return;
                 }
                 scene.Comp.ToggleRest();
                 MakeCalm(scene.Map);
-                story.Note("Sleeping is ticked on the stand, and the map is calm");
+                scenario.Note("Sleeping is ticked on the stand, and the map is calm");
 
                 Map map = scene.Map;
                 IntVec3 at = scene.OutfitStand.Position;
@@ -738,55 +738,55 @@ namespace ShiftChange.Tests
                 Thing siteOutToo = WallBlueprint(map, new IntVec3(scene.Outside.minX, 0, scene.Outside.maxZ - 2));
                 if (siteOut == null || siteIn == null || siteInToo == null || siteOutToo == null)
                 {
-                    story.Check(false, "the wall blueprints can be placed");
+                    scenario.Check(false, "the wall blueprints can be placed");
                     return;
                 }
-                story.Note("steel lies out past the door and in the room, with two wall blueprints placed "
+                scenario.Note("steel lies out past the door and in the room, with two wall blueprints placed "
                            + "in each");
 
-                story.Check(scene.Comp.HandlesRest() && !scene.Comp.HandlesWork(construction),
+                scenario.Check(scene.Comp.HandlesRest() && !scene.Comp.HandlesWork(construction),
                             "the stand serves sleeping and not Construction");
-                story.Check(SwapNow(story, scene), name + " changes into the stand's duster for bed");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's duster for bed");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
-                NotSentStraightBack(story, scene);
-                story.Check(SendsToChange(scene, Delivery(deliver, steelOut, siteOut)),
+                NotSentStraightBack(scenario, scene);
+                scenario.Check(SendsToChange(scene, Delivery(deliver, steelOut, siteOut)),
                             "in pyjamas, a delivery from steel out past the door changes them back first");
-                story.Check(SendsToChange(scene, Delivery(deliver, steelOut, siteIn)),
+                scenario.Check(SendsToChange(scene, Delivery(deliver, steelOut, siteIn)),
                             "and so does one to a site in the room: the trip starts at the steel");
-                story.Check(!SendsToChange(scene, Delivery(deliver, steelIn, siteIn)),
+                scenario.Check(!SendsToChange(scene, Delivery(deliver, steelIn, siteIn)),
                             "while one with steel and site both in the room is the room's, and keeps the pyjamas on");
 
                 scene.Comp.ToggleWork(cooking);
-                story.Note("Cooking is ticked on the stand");
-                story.Check(scene.Comp.HandlesWork(cooking) && !scene.Comp.HandlesWork(construction)
+                scenario.Note("Cooking is ticked on the stand");
+                scenario.Check(scene.Comp.HandlesWork(cooking) && !scene.Comp.HandlesWork(construction)
                             && scene.Comp.OnShift,
                             "the stand now serves Cooking, " + name + " still on shift");
-                story.Check(SendsToChange(scene, Delivery(deliver, steelOut, siteOut)),
+                scenario.Check(SendsToChange(scene, Delivery(deliver, steelOut, siteOut)),
                             "and in a cook's whites, the delivery from past the door changes them back first too");
 
                 scene.Comp.ToggleWork(construction);
-                story.Note("Construction is ticked on the stand as well");
-                story.Check(scene.Comp.HandlesWork(construction) && scene.Comp.OnShift,
+                scenario.Note("Construction is ticked on the stand as well");
+                scenario.Check(scene.Comp.HandlesWork(construction) && scene.Comp.OnShift,
                             "the stand now serves Construction too");
-                story.Check(!SendsToChange(scene, Delivery(deliver, steelOut, siteIn)),
+                scenario.Check(!SendsToChange(scene, Delivery(deliver, steelOut, siteIn)),
                             "so a delivery from steel out past the door to a site in the room keeps the uniform on");
-                story.Check(SendsToChange(scene, Delivery(deliver, steelIn, siteOut)),
+                scenario.Check(SendsToChange(scene, Delivery(deliver, steelIn, siteOut)),
                             "and one to a site out past the door changes them back now, while the stand is near");
                 // First drop and site set apart, as the giver sets them (CatchmentKit.DeliveryVia).
-                story.Check(!SendsToChange(scene, DeliveryVia(deliver, steelOut, siteInToo, siteIn)),
+                scenario.Check(!SendsToChange(scene, DeliveryVia(deliver, steelOut, siteInToo, siteIn)),
                             "a first drop and a site that differ, both in the room, keep it on");
-                story.Check(SendsToChange(scene, DeliveryVia(deliver, steelOut, siteOut, siteIn)),
+                scenario.Check(SendsToChange(scene, DeliveryVia(deliver, steelOut, siteOut, siteIn)),
                             "a first drop out past the door changes them back, the site in the room");
-                story.Check(SendsToChange(scene, DeliveryVia(deliver, steelOut, siteIn, siteOut)),
+                scenario.Check(SendsToChange(scene, DeliveryVia(deliver, steelOut, siteIn, siteOut)),
                             "and so does a site out there with the first drop in the room");
-                story.Check(SendsToChange(scene, DeliveryVia(deliver, steelOut, siteIn, siteInToo, siteOutToo)),
+                scenario.Check(SendsToChange(scene, DeliveryVia(deliver, steelOut, siteIn, siteInToo, siteOutToo)),
                             "and a further site out there, queued behind the first drop");
                 if (haulDeliver != null)
                 {
-                    story.Check(!scene.Comp.HandlesWork(haulDeliver.workType)
+                    scenario.Check(!scene.Comp.HandlesWork(haulDeliver.workType)
                                 && !SendsToChange(scene, Delivery(haulDeliver, steelOut, siteIn)),
                                 "the same fetch filed under " + haulDeliver.workType.defName
                                 + ", which the stand does not tick, keeps it on too: it supplies construction");
@@ -797,7 +797,7 @@ namespace ShiftChange.Tests
                 WorkGiverDef replant = Giver("Replant");
                 if (replant != null && replant.workType != null)
                 {
-                    story.Check((replant.workType.workTags & WorkTags.Hauling) == 0
+                    scenario.Check((replant.workType.workTags & WorkTags.Hauling) == 0
                                 && !scene.Comp.HandlesWork(replant.workType)
                                 && SendsToChange(scene, Delivery(replant, steelOut, siteIn)),
                                 "a fetch filed under " + replant.workType.defName
@@ -809,13 +809,13 @@ namespace ShiftChange.Tests
                 scene.Comp.ToggleRest();
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(3);
-                story.Note("Construction and Cooking are unticked, Sleeping ticked again, and Within a radius "
+                scenario.Note("Construction and Cooking are unticked, Sleeping ticked again, and Within a radius "
                            + "chosen under Serves, the radius set to 3 cells");
-                story.Check(scene.Comp.HandlesRest() && scene.Comp.serves == CatchmentKind.Radius && scene.Comp.OnShift,
+                scenario.Check(scene.Comp.HandlesRest() && scene.Comp.serves == CatchmentKind.Radius && scene.Comp.OnShift,
                             "the stand serves sleeping again, now within a radius, " + name + " still on shift");
-                story.Check(scene.Comp.Covers(steelIn.Position, map) && scene.Comp.Covers(siteIn.Position, map),
+                scenario.Check(scene.Comp.Covers(steelIn.Position, map) && scene.Comp.Covers(siteIn.Position, map),
                             "the ring takes in the steel and the site in the room");
-                story.Check(SendsToChange(scene, Delivery(deliver, steelIn, siteIn)),
+                scenario.Check(SendsToChange(scene, Delivery(deliver, steelIn, siteIn)),
                             "and a delivery with the whole trip inside it changes them back: the first job out "
                             + "of bed always does");
             }
@@ -837,24 +837,24 @@ namespace ShiftChange.Tests
             return Staged((map, pad) => StageWithDoorway(map, pad, WorkType("Doctor")),
                           BesideADoorADoctor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
                 ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Bed");
                 if (doctor == null || bedDef == null)
                 {
-                    story.Check(false, "the game has Doctor work and the bed");
+                    scenario.Check(false, "the game has Doctor work and the bed");
                     return;
                 }
                 if (scene.Outside.Area == 0)
                 {
-                    story.Check(false, "the room has a door, with open ground outside it");
+                    scenario.Check(false, "the room has a door, with open ground outside it");
                     return;
                 }
                 scene.Comp.ToggleWork(doctor);
                 MakeCalm(scene.Map);
-                story.Note("Doctor is ticked on the stand, and the map is calm");
+                scenario.Note("Doctor is ticked on the stand, and the map is calm");
                 Map map = scene.Map;
                 Building_Bed bedOut = DebugTools_Fixtures.Spawn(
                     map, bedDef, ThingDefOf.WoodLog, new IntVec3(scene.Outside.minX, 0, scene.Outside.minZ + 2),
@@ -864,36 +864,36 @@ namespace ShiftChange.Tests
                     Rot4.North) as Building_Bed;
                 if (bedOut == null || bedIn == null)
                 {
-                    story.Check(false, "a bed can be built out past the door and one in the room");
+                    scenario.Check(false, "a bed can be built out past the door and one in the room");
                     return;
                 }
                 bedOut.Medical = true;
                 bedIn.Medical = true;
-                story.Note("a medical bed is built out past the door, and another in the room beside the stand");
+                scenario.Note("a medical bed is built out past the door, and another in the room beside the stand");
                 IntVec3 haulFrom = new IntVec3(scene.Outside.minX, 0, scene.Outside.maxZ);
                 IntVec3 haulTo = new IntVec3(scene.Outside.minX, 0, scene.Outside.maxZ - 1);
 
                 // The wound below must be the only thing that makes them urgent. Vanilla leaves a
                 // generated colonist's conditions untended, so the scene removes them
                 // (DebugTools_Fixtures.RemoveTendableConditions).
-                story.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist),
+                scenario.Check(!HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist),
                             name + " needs no doctor to begin with");
-                story.Check(!scene.Comp.Covers(bedOut.Position, map) && scene.Comp.Covers(bedIn.Position, map),
+                scenario.Check(!scene.Comp.Covers(bedOut.Position, map) && scene.Comp.Covers(bedIn.Position, map),
                             "the stand's room holds the bed beside the stand and not the one past the door");
-                story.Check(SwapNow(story, scene), name + " changes into the stand's duster for doctoring");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's duster for doctoring");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
-                NotSentStraightBack(story, scene);
+                NotSentStraightBack(scenario, scene);
 
                 bool was = ShiftChangeMod.Settings.medicalEmergenciesChangeFirst;
                 Hediff wound = null;
                 try
                 {
                     ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = false;
-                    story.Note("Medical emergencies change first is off");
-                    story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bedOut),
+                    scenario.Note("Medical emergencies change first is off");
+                    scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bedOut),
                                               JobTag.RestingForMedicalReasons),
                                 "serving its room, resting to recover in the bed past the door changes them back first");
 
@@ -901,49 +901,49 @@ namespace ShiftChange.Tests
                     wound = HediffMaker.MakeHediff(HediffDefOf.Cut, scene.Colonist, part);
                     wound.Severity = 6f;
                     scene.Colonist.health.AddHediff(wound, part);
-                    story.Note(name + " gets a bad cut, untended");
-                    story.Check(HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist) && !scene.Colonist.Downed,
+                    scenario.Note(name + " gets a bad cut, untended");
+                    scenario.Check(HealthAIUtility.ShouldSeekMedicalRestUrgent(scene.Colonist) && !scene.Colonist.Downed,
                                 "the untended wound makes " + name + " an urgent case, still on their feet");
-                    story.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bedOut),
+                    scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bedOut),
                                                JobTag.RestingForMedicalReasons),
                                 "so they go straight to the bed past the door in uniform");
-                    story.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bedOut)),
+                    scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bedOut)),
                                 "and so they do when the game puts the lay-down back in the queue unmarked");
-                    story.Check(!Patch_JobInterception.IsOrdinarySleep(
+                    scenario.Check(!Patch_JobInterception.IsOrdinarySleep(
                                     scene.Colonist, JobMaker.MakeJob(JobDefOf.LayDown, bedIn), null),
                                 "which never reads as ordinary sleep, that a sleep stand would dress them for");
 
                     // The shape vanilla's opportunistic haul leaves: the lay-down
                     // back at the head of the queue, untagged, and a haul first.
-                    story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, haulFrom, haulTo)),
+                    scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, haulFrom, haulTo)),
                                 "a haul past the door changes them back");
                     scene.Colonist.jobs.jobQueue.EnqueueFirst(JobMaker.MakeJob(JobDefOf.LayDown, bedOut));
-                    story.Note("the lay-down in the bed past the door is queued for " + name);
-                    story.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, haulFrom, haulTo)),
+                    scenario.Note("the lay-down in the bed past the door is queued for " + name);
+                    scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.HaulToCell, haulFrom, haulTo)),
                                 "the same haul keeps the uniform on with the urgent lay-down queued behind it");
 
                     ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = true;
-                    story.Note("Medical emergencies change first is turned on");
-                    story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bedOut),
+                    scenario.Note("Medical emergencies change first is turned on");
+                    scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bedOut),
                                               JobTag.RestingForMedicalReasons),
                                 "and now they change back first");
                     ShiftChangeMod.Settings.medicalEmergenciesChangeFirst = false;
-                    story.Note("and off again");
+                    scenario.Note("and off again");
 
                     scene.Comp.SetServes(CatchmentKind.Radius);
                     scene.Comp.SetServeRadius(3);
-                    story.Note("Within a radius is chosen under Serves, and the radius set to 3 cells");
-                    story.Check(scene.Comp.serves == CatchmentKind.Radius && scene.Comp.Covers(bedIn.Position, map)
+                    scenario.Note("Within a radius is chosen under Serves, and the radius set to 3 cells");
+                    scenario.Check(scene.Comp.serves == CatchmentKind.Radius && scene.Comp.Covers(bedIn.Position, map)
                                 && scene.Comp.OnShift,
                                 "the stand now serves a radius that takes in the bed in the room, "
                                 + name + " still on shift");
-                    story.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bedIn),
+                    scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bedIn),
                                                JobTag.RestingForMedicalReasons),
                                 "serving a radius, they go straight to the bed inside the ring");
                     scene.Colonist.health.RemoveHediff(wound);
                     wound = null;
-                    story.Note("the cut is taken away");
-                    story.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bedIn),
+                    scenario.Note("the cut is taken away");
+                    scenario.Check(SendsToChange(scene, JobMaker.MakeJob(JobDefOf.LayDown, bedIn),
                                               JobTag.RestingForMedicalReasons),
                                 "resting to recover in that bed with no such wound changes them back first");
                 }
@@ -979,7 +979,7 @@ namespace ShiftChange.Tests
                                           capableOf: WorkType("Construction")),
                           InARoomABuilder, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef construction = WorkType("Construction");
@@ -990,12 +990,12 @@ namespace ShiftChange.Tests
                 WorkGiverDef haulDeliver = Giver("DeliverResourcesToBlueprints");
                 if (construction == null || deliver == null || finish == null)
                 {
-                    story.Check(false, "the game has Construction work, delivering to blueprints and building frames");
+                    scenario.Check(false, "the game has Construction work, delivering to blueprints and building frames");
                     return;
                 }
                 scene.Comp.ToggleWork(construction);
                 MakeCalm(scene.Map);
-                story.Note("Construction is ticked on the stand, and the map is calm");
+                scenario.Note("Construction is ticked on the stand, and the map is calm");
 
                 Map map = scene.Map;
                 IntVec3 at = scene.OutfitStand.Position;
@@ -1006,43 +1006,43 @@ namespace ShiftChange.Tests
                 Thing siteOut = WallBlueprint(map, at + new IntVec3(4, 0, 4));
                 if (site == null || nextSite == null || siteOut == null)
                 {
-                    story.Check(false, "the wall blueprints can be placed");
+                    scenario.Check(false, "the wall blueprints can be placed");
                     return;
                 }
                 Area_Allowed area =
                     NewArea(scene, "Shift test yard", at, steel.Position, site.Position, nextSite.Position);
                 if (area == null)
                 {
-                    story.Check(false, "the map has room for another allowed area");
+                    scenario.Check(false, "the map has room for another allowed area");
                     return;
                 }
-                story.Note("steel lies in two places and three wall blueprints are placed in the room; an allowed "
+                scenario.Note("steel lies in two places and three wall blueprints are placed in the room; an allowed "
                            + "area, Shift test yard, is painted over the stand, the near steel and two of the "
                            + "blueprints");
 
-                story.Check(!SendsToChange(scene, Delivery(deliver, steel, site)),
+                scenario.Check(!SendsToChange(scene, Delivery(deliver, steel, site)),
                             "serving its room, the stand sends nobody to change for a delivery inside the room");
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(6);
-                story.Note("Within a radius is chosen under Serves, and the radius set to 6 cells");
-                story.Check(scene.Comp.Covers(steel.Position, map) && scene.Comp.Covers(site.Position, map),
+                scenario.Note("Within a radius is chosen under Serves, and the radius set to 6 cells");
+                scenario.Check(scene.Comp.Covers(steel.Position, map) && scene.Comp.Covers(site.Position, map),
                             "the ring takes in the steel and the site");
-                story.Check(!SendsToChange(scene, Delivery(deliver, steel, site)),
+                scenario.Check(!SendsToChange(scene, Delivery(deliver, steel, site)),
                             "and serving it, the stand sends nobody to change for a delivery inside the ring");
 
                 scene.Comp.SetServeArea(area);
-                story.Note("Shift test yard is chosen under Serves");
-                story.Check(scene.Comp.serves == CatchmentKind.Area, "the stand now serves the area");
-                story.Check(SendsToChange(scene, Delivery(deliver, steel, site)),
+                scenario.Note("Shift test yard is chosen under Serves");
+                scenario.Check(scene.Comp.serves == CatchmentKind.Area, "the stand now serves the area");
+                scenario.Check(SendsToChange(scene, Delivery(deliver, steel, site)),
                             "a delivery with its steel and its site painted in sends " + name
                             + ", in their own clothes, to change");
-                story.Check(SendsToChange(scene, Delivery(deliver, steel, site, nextSite)),
+                scenario.Check(SendsToChange(scene, Delivery(deliver, steel, site, nextSite)),
                             "and so does one supplying a second site in the area");
-                story.Check(!SendsToChange(scene, Delivery(deliver, steelOut, site)),
+                scenario.Check(!SendsToChange(scene, Delivery(deliver, steelOut, site)),
                             "steel outside the area sends nobody");
-                story.Check(!SendsToChange(scene, Delivery(deliver, steel, siteOut)),
+                scenario.Check(!SendsToChange(scene, Delivery(deliver, steel, siteOut)),
                             "nor does a site outside it");
-                story.Check(!SendsToChange(scene, Delivery(deliver, steel, site, siteOut)),
+                scenario.Check(!SendsToChange(scene, Delivery(deliver, steel, site, siteOut)),
                             "nor a trip that also supplies a site outside it");
 
                 Pawn_WorkSettings work = scene.Colonist.workSettings;
@@ -1051,30 +1051,30 @@ namespace ShiftChange.Tests
                 {
                     int priority = work.GetPriority(construction);
                     work.SetPriority(construction, 3);
-                    story.Note(name + "'s Construction priority is set to 3");
-                    story.Check(work.WorkIsActive(construction) && !scene.Comp.HandlesWork(haulDeliver.workType),
+                    scenario.Note(name + "'s Construction priority is set to 3");
+                    scenario.Check(work.WorkIsActive(construction) && !scene.Comp.HandlesWork(haulDeliver.workType),
                                 name + " does construction, and the stand does not tick "
                                 + haulDeliver.workType.defName);
-                    story.Check(!SendsToChange(scene, Delivery(haulDeliver, steel, site)),
+                    scenario.Check(!SendsToChange(scene, Delivery(haulDeliver, steel, site)),
                                 "the same fetch filed under " + haulDeliver.workType.defName
                                 + " sends nobody, though the stand serves Construction");
                     work.SetPriority(construction, priority);
-                    story.Note("and set back as it was");
+                    scenario.Note("and set back as it was");
                 }
 
-                story.Check(SwapNow(story, scene), name + " changes into the stand's duster");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's duster");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
-                NotSentStraightBack(story, scene);
-                story.Check(!SendsToChange(scene, Delivery(deliver, steelOut, site)),
+                NotSentStraightBack(scenario, scene);
+                scenario.Check(!SendsToChange(scene, Delivery(deliver, steelOut, site)),
                             "in uniform, a delivery from steel outside the area to a site inside keeps it on");
-                story.Check(!hauled || !SendsToChange(scene, Delivery(haulDeliver, steelOut, site)),
+                scenario.Check(!hauled || !SendsToChange(scene, Delivery(haulDeliver, steelOut, site)),
                             "and so does the same fetch filed under Hauling, the stand ticking Construction alone");
-                story.Check(SendsToChange(scene, Delivery(deliver, steel, siteOut)),
+                scenario.Check(SendsToChange(scene, Delivery(deliver, steel, siteOut)),
                             "and one to a site outside the area changes them back now");
-                story.Check(SendsToChange(scene, WorkAt(finish, siteOut.Position)),
+                scenario.Check(SendsToChange(scene, WorkAt(finish, siteOut.Position)),
                             "as a frame outside it does");
             }
         }

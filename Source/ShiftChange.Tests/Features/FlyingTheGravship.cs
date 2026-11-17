@@ -14,7 +14,7 @@ namespace ShiftChange.Tests
     /// outfit they wear: the shift is kept through each, and ends at the stand as usual.
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(RunOrder.First - (int)CaseGroup.FlyingTheGravship)]
-    internal class FlyingTheGravship : StoryFixture
+    internal class FlyingTheGravship : FeatureFixture
     {
         /// <summary>
         /// A flight carrying the stand and the colonist on shift at it together. The stand, the
@@ -33,7 +33,7 @@ namespace ShiftChange.Tests
         {
             return Staged(Build, LosingAStandOrAColonist.OnShift, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 IntVec3 standCell = scene.OutfitStand.Position;
@@ -42,7 +42,7 @@ namespace ShiftChange.Tests
                 List<Apparel> parked = new List<Apparel>(scene.Comp.StoredOwnerApparelForReading);
                 if (uniform == null || parked.Count == 0)
                 {
-                    story.Check(false, name + " is on shift in the stand's outfit, "
+                    scenario.Check(false, name + " is on shift in the stand's outfit, "
                                        + "their own clothes kept on the stand");
                     return;
                 }
@@ -56,20 +56,20 @@ namespace ShiftChange.Tests
                 GenSpawn.Spawn(scene.Colonist, pawnCell, scene.Map, Rot4.North);
                 scene.OutfitStand.PostSwapMap();
                 scene.Colonist.PostSwapMap();
-                story.Note("a gravship takes off with the stand and " + name
+                scenario.Note("a gravship takes off with the stand and " + name
                            + " aboard, and lands them where they stood");
 
-                story.Check(scene.Comp.OnShift, "the stand's shift goes on");
-                story.Check(scene.Comp.Borrower == scene.Colonist, "it still lends its outfit to " + name);
-                story.Check(scene.Comp.StoredOwnerApparelForReading.Count == scene.StoredCount,
+                scenario.Check(scene.Comp.OnShift, "the stand's shift goes on");
+                scenario.Check(scene.Comp.Borrower == scene.Colonist, "it still lends its outfit to " + name);
+                scenario.Check(scene.Comp.StoredOwnerApparelForReading.Count == scene.StoredCount,
                             "and still keeps " + name + "'s own clothes for them");
-                story.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
+                scenario.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
                             name + " is still on shift at it, so their Change back button "
                             + "leads there");
-                story.Check(MealBreakSendsThemBack(scene),
+                scenario.Check(MealBreakSendsThemBack(scene),
                             "and a meal break would send " + name
                             + " to the stand to change back first");
-                ShiftEndsNormally(story, scene, uniform, parked);
+                ShiftEndsNormally(scenario, scene, uniform, parked);
             }
         }
 
@@ -92,14 +92,14 @@ namespace ShiftChange.Tests
         {
             return Staged(Build, LosingAStandOrAColonist.OnShift, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 Apparel uniform = FirstIssued(scene);
                 List<Apparel> parked = new List<Apparel>(scene.Comp.StoredOwnerApparelForReading);
                 if (uniform == null || parked.Count == 0)
                 {
-                    story.Check(false, name + " is on shift in the stand's outfit, "
+                    scenario.Check(false, name + " is on shift in the stand's outfit, "
                                        + "their own clothes kept on the stand");
                     return;
                 }
@@ -108,43 +108,43 @@ namespace ShiftChange.Tests
                 Map away = SecondMap(home);
                 if (away == null)
                 {
-                    story.Check(false, "a second map can be made for the gravship to land on, "
+                    scenario.Check(false, "a second map can be made for the gravship to land on, "
                                        + "a pocket of space from Odyssey");
                     return;
                 }
                 scene.SecondMap = away;
-                story.Note("a second map is made, a small pocket of space");
+                scenario.Note("a second map is made, a small pocket of space");
 
                 Fly(scene.OutfitStand, away, away.Center);
-                story.Note("the stand flies off to it in a gravship, " + name + " staying behind");
-                story.Check(scene.OutfitStand.Map == away, "the stand lands on the second map");
-                story.Check(scene.Colonist.Spawned && scene.Colonist.Map == home,
+                scenario.Note("the stand flies off to it in a gravship, " + name + " staying behind");
+                scenario.Check(scene.OutfitStand.Map == away, "the stand lands on the second map");
+                scenario.Check(scene.Colonist.Spawned && scene.Colonist.Map == home,
                             "and " + name + " is still on the first, which the takeoff kept");
-                story.Check(scene.Comp.OnShift && scene.Comp.Borrower == scene.Colonist,
+                scenario.Check(scene.Comp.OnShift && scene.Comp.Borrower == scene.Colonist,
                             "the shift is kept while they are apart");
-                story.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
+                scenario.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
                             "and " + name + " is still on shift at the stand, on another map");
-                story.Check(StillForced(scene, uniform),
+                scenario.Check(StillForced(scene, uniform),
                             "the " + uniform.def.label + " stays forced on " + name
                             + " while they are apart");
-                story.Check(!MealBreakSendsThemBack(scene),
+                scenario.Check(!MealBreakSendsThemBack(scene),
                             "and a meal break would not send " + name
                             + " after a stand on another map");
                 for (int i = 0; i < parked.Count; i++)
                 {
-                    story.Check(scene.OutfitStand.HeldItems.Contains(parked[i]),
+                    scenario.Check(scene.OutfitStand.HeldItems.Contains(parked[i]),
                                 name + "'s " + parked[i].def.label + " flew with the stand");
                 }
 
                 Fly(scene.OutfitStand, home, standCell);
-                story.Note("the stand flies back to where it stood");
-                story.Check(scene.OutfitStand.Map == home, "the stand is back on " + name + "'s map");
-                story.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
+                scenario.Note("the stand flies back to where it stood");
+                scenario.Check(scene.OutfitStand.Map == home, "the stand is back on " + name + "'s map");
+                scenario.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
                             "and " + name + " is still on shift at it");
-                story.Check(MealBreakSendsThemBack(scene),
+                scenario.Check(MealBreakSendsThemBack(scene),
                             "and a meal break would send " + name
                             + " to the stand to change back first");
-                ShiftEndsNormally(story, scene, uniform, parked);
+                ShiftEndsNormally(scenario, scene, uniform, parked);
             }
         }
 
@@ -162,14 +162,14 @@ namespace ShiftChange.Tests
         {
             return Staged(Build, LosingAStandOrAColonist.OnShift, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 Apparel uniform = FirstIssued(scene);
                 List<Apparel> parked = new List<Apparel>(scene.Comp.StoredOwnerApparelForReading);
                 if (uniform == null || parked.Count == 0)
                 {
-                    story.Check(false, name + " is on shift in the stand's outfit, "
+                    scenario.Check(false, name + " is on shift in the stand's outfit, "
                                        + "their own clothes kept on the stand");
                     return;
                 }
@@ -177,38 +177,38 @@ namespace ShiftChange.Tests
                 Map away = SecondMap(home);
                 if (away == null)
                 {
-                    story.Check(false, "a second map can be made for the gravship to land on, "
+                    scenario.Check(false, "a second map can be made for the gravship to land on, "
                                        + "a pocket of space from Odyssey");
                     return;
                 }
                 scene.SecondMap = away;
-                story.Note("a second map is made, a small pocket of space");
+                scenario.Note("a second map is made, a small pocket of space");
 
                 Fly(scene.Colonist, away, away.Center);
-                story.Note(name + " flies off to it in a gravship, leaving the stand behind");
-                story.Check(scene.Colonist.Map == away, name + " lands on the second map");
-                story.Check(scene.OutfitStand.Spawned && scene.OutfitStand.Map == home,
+                scenario.Note(name + " flies off to it in a gravship, leaving the stand behind");
+                scenario.Check(scene.Colonist.Map == away, name + " lands on the second map");
+                scenario.Check(scene.OutfitStand.Spawned && scene.OutfitStand.Map == home,
                             "and the stand is still on the first, which the takeoff kept");
-                story.Check(scene.Comp.OnShift && scene.Comp.Borrower == scene.Colonist,
+                scenario.Check(scene.Comp.OnShift && scene.Comp.Borrower == scene.Colonist,
                             "the shift is kept while they are apart");
-                story.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
+                scenario.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
                             "and " + name + " is still on shift at the stand, on another map");
-                story.Check(scene.Colonist.apparel.WornApparel.Contains(uniform),
+                scenario.Check(scene.Colonist.apparel.WornApparel.Contains(uniform),
                             name + " still wears the " + uniform.def.label);
-                story.Check(StillForced(scene, uniform), "forced on them while they are apart");
-                story.Check(!MealBreakSendsThemBack(scene),
+                scenario.Check(StillForced(scene, uniform), "forced on them while they are apart");
+                scenario.Check(!MealBreakSendsThemBack(scene),
                             "and a meal break would not send " + name
                             + " after a stand on another map");
 
                 Fly(scene.Colonist, home, scene.OutfitStand.InteractionCell);
-                story.Note(name + " flies back, landing beside the stand");
-                story.Check(scene.Colonist.Map == home, name + " is back on the stand's map");
-                story.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
+                scenario.Note(name + " flies back, landing beside the stand");
+                scenario.Check(scene.Colonist.Map == home, name + " is back on the stand's map");
+                scenario.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
                             "and still on shift at it");
-                story.Check(MealBreakSendsThemBack(scene),
+                scenario.Check(MealBreakSendsThemBack(scene),
                             "and a meal break would send " + name
                             + " to the stand to change back first");
-                ShiftEndsNormally(story, scene, uniform, parked);
+                ShiftEndsNormally(scenario, scene, uniform, parked);
             }
         }
 
@@ -216,26 +216,26 @@ namespace ShiftChange.Tests
         /// Changing back at the stand, run for real on the game's clock: the outfit must end up
         /// back on the stand and every one of the colonist's own clothes back on them.
         /// </summary>
-        internal static void ShiftEndsNormally(Story story, Scene scene, Apparel uniform,
+        internal static void ShiftEndsNormally(Scenario scenario, Scene scene, Apparel uniform,
                                                List<Apparel> parked)
         {
             string name = scene.Colonist.LabelShort;
             // On the interaction cell, so the change starts without a walk, as every staged
             // change does (SceneKit.Stage).
             scene.Colonist.Position = scene.OutfitStand.InteractionCell;
-            if (!SwapNow(story, scene))
+            if (!SwapNow(scenario, scene))
             {
-                story.Check(false, name + " changes back at the stand");
+                scenario.Check(false, name + " changes back at the stand");
                 return;
             }
-            story.Check(!scene.Comp.OnShift,
+            scenario.Check(!scene.Comp.OnShift,
                         name + " changes back at the stand, which ends the shift");
             for (int i = 0; i < parked.Count; i++)
             {
-                story.Check(scene.Colonist.apparel.WornApparel.Contains(parked[i]),
+                scenario.Check(scene.Colonist.apparel.WornApparel.Contains(parked[i]),
                             name + " wears their own " + parked[i].def.label + " again");
             }
-            story.Check(scene.OutfitStand.HeldItems.Contains(uniform),
+            scenario.Check(scene.OutfitStand.HeldItems.Contains(uniform),
                         "and the " + uniform.def.label + " is back on the stand");
         }
     }

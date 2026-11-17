@@ -85,8 +85,8 @@ devtools/run-harness.sh --with-after=khamenman.outfitstandsplus   # the same, lo
 ```
 
 Each case runs as a test under SmashPhil's DevTools, so 1.7 only, with a
-DevTools build that has SmashPhil/DevTools#17. Each is a `[Test]` told as a
-story, in a fixture under `Source/ShiftChange.Tests/` named for what a player
+DevTools build that has SmashPhil/DevTools#17. Each is a `[Test]` written as a
+BDD scenario, in a feature under `Source/ShiftChange.Tests/Features/` named for what a player
 sees (docs/TESTING.md, "Adding a case").
 
 It asserts where the ledger lands after each despawn/death/banishment event, by
@@ -94,8 +94,8 @@ firing the engine's real entry points at a throwaway fixture, and exits non-zero
 if a case fails. Touch `PostDeSpawn`, `PostSwapMap`, `Notify_MapRemoved`,
 `ReleaseBorrower`, `AbandonLedger` or `Patch_UnclaimStands` and run it.
 
-A harness pass is not a play observation, and a skipped test (a `GAP` line in
-its story) is a known failure being tracked, not a pass. **Six gaps are expected on the default list**: the
+A harness pass is not a play observation, and a skipped test (a `GAP` step in
+its scenario) is a known failure being tracked, not a pass. **Six gaps are expected on the default list**: the
 Rimatomics table and marker cases skip themselves when Rimatomics is not
 loaded, and the Outfit Stands Plus, Common Sense and Pick Up And Haul cases
 when their mod is not (`--with=` loads each). The sixth is Complex Jobs'

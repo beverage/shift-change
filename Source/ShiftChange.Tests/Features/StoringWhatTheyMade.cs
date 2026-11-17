@@ -18,7 +18,7 @@ namespace ShiftChange.Tests
     /// short of the real driver has this shape.
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(RunOrder.First - (int)CaseGroup.StoringWhatTheyMade)]
-    internal class StoringWhatTheyMade : StoryFixture
+    internal class StoringWhatTheyMade : FeatureFixture
     {
         /// <summary>
         /// What <see cref="SceneKit.StageWithDoorway(Map, CellRect, WorkTypeDef)"/> sets up
@@ -46,9 +46,9 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => StageWithDoorway(map, pad, BillWork), BesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
-                StoreTheBlocks(story, scene, CatchmentKind.Area, true, true, true);
+                StoreTheBlocks(scenario, scene, CatchmentKind.Area, true, true, true);
             }
         }
 
@@ -63,9 +63,9 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => StageWithDoorway(map, pad, BillWork), BesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
-                StoreTheBlocks(story, scene, CatchmentKind.Radius, true, true, true);
+                StoreTheBlocks(scenario, scene, CatchmentKind.Radius, true, true, true);
             }
         }
 
@@ -80,9 +80,9 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => StageWithDoorway(map, pad, BillWork), BesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
-                StoreTheBlocks(story, scene, CatchmentKind.Area, false, true, true);
+                StoreTheBlocks(scenario, scene, CatchmentKind.Area, false, true, true);
             }
         }
 
@@ -97,9 +97,9 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => StageWithDoorway(map, pad, BillWork), BesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
-                StoreTheBlocks(story, scene, CatchmentKind.Area, true, false, false);
+                StoreTheBlocks(scenario, scene, CatchmentKind.Area, true, false, false);
             }
         }
 
@@ -115,9 +115,9 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => StageWithDoorway(map, pad, BillWork), BesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
-                StoreTheBlocks(story, scene, CatchmentKind.Radius, true, false, false);
+                StoreTheBlocks(scenario, scene, CatchmentKind.Radius, true, false, false);
             }
         }
 
@@ -131,9 +131,9 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => StageWithDoorway(map, pad, BillWork), BesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
-                StoreTheBlocks(story, scene, CatchmentKind.Area, false, false, false);
+                StoreTheBlocks(scenario, scene, CatchmentKind.Area, false, false, false);
             }
         }
 
@@ -148,9 +148,9 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => StageWithDoorway(map, pad, BillWork), BesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
-                StoreTheBlocks(story, scene, CatchmentKind.Room, true, true, true);
+                StoreTheBlocks(scenario, scene, CatchmentKind.Room, true, true, true);
             }
         }
 
@@ -165,9 +165,9 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => StageWithDoorway(map, pad, BillWork), BesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
-                StoreTheBlocks(story, scene, CatchmentKind.Room, true, false, true);
+                StoreTheBlocks(scenario, scene, CatchmentKind.Room, true, false, true);
             }
         }
 
@@ -182,35 +182,35 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => StageWithDoorway(map, pad, BillWork), BesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
-                BillStage stage = StageBill(story, scene);
+                BillStage stage = StageBill(scenario, scene);
                 if (stage == null)
                 {
                     return;
                 }
                 IntVec3 store = stage.Corner + FarCorner;
                 scene.Comp.SetServeArea(PaintRoom(scene, stage, stage.Table.InteractionCell));
-                story.Note("the stand serves an allowed area painted over the whole room, the stonecutter's "
+                scenario.Note("the stand serves an allowed area painted over the whole room, the stonecutter's "
                            + "table too, all but the spot in front of it where " + name + " works");
                 Zone_Stockpile stockpile = StageStockpile(scene.Map, store);
-                story.Note("a one-cell stockpile at critical priority stands in the room's far corner");
+                scenario.Note("a one-cell stockpile at critical priority stands in the room's far corner");
                 try
                 {
-                    bool painted = story.Check(!scene.Comp.Covers(stage.Table.InteractionCell, scene.Map)
+                    bool painted = scenario.Check(!scene.Comp.Covers(stage.Table.InteractionCell, scene.Map)
                                                && scene.Comp.Covers(stage.Table.Position, scene.Map)
                                                && scene.Comp.Covers(store, scene.Map),
                                                "the area takes in the stonecutter's table and the stockpile, "
                                                + "and not the spot where " + name + " works");
-                    bool onShift = story.Check(SwapNow(story, scene) && scene.Comp.OnShift,
+                    bool onShift = scenario.Check(SwapNow(scenario, scene) && scene.Comp.OnShift,
                                                name + " changes into the stand's duster and is on shift");
                     if (!painted || !onShift)
                     {
                         return;
                     }
-                    FinishBill(story, scene, stage);
-                    KeptTheUniform(story, scene, stage);
+                    FinishBill(scenario, scene, stage);
+                    KeptTheUniform(scenario, scene, stage);
                 }
                 finally
                 {
@@ -233,10 +233,10 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => StageWithDoorway(map, pad, BillWork), BesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
-                BillStage stage = StageBill(story, scene);
+                BillStage stage = StageBill(scenario, scene);
                 if (stage == null)
                 {
                     return;
@@ -247,29 +247,29 @@ namespace ShiftChange.Tests
                 {
                     scene.Comp.ToggleWork(hauling);
                 }
-                story.Note("Hauling is ticked on the stand too");
+                scenario.Note("Hauling is ticked on the stand too");
                 scene.Comp.SetServeArea(PaintRoom(scene, stage, IntVec3.Invalid));
-                story.Note("the stand serves an allowed area painted over the whole room");
+                scenario.Note("the stand serves an allowed area painted over the whole room");
                 Zone_Stockpile stockpile = StageStockpile(scene.Map, store);
-                story.Note("a one-cell stockpile at critical priority stands in the room's far corner");
+                scenario.Note("a one-cell stockpile at critical priority stands in the room's far corner");
                 try
                 {
-                    bool covered = story.Check(scene.Comp.Covers(store, scene.Map),
+                    bool covered = scenario.Check(scene.Comp.Covers(store, scene.Map),
                                                "the area takes in the stockpile");
-                    bool onShift = story.Check(SwapNow(story, scene) && scene.Comp.OnShift,
+                    bool onShift = scenario.Check(SwapNow(scenario, scene) && scene.Comp.OnShift,
                                                name + " changes into the stand's duster and is on shift");
                     if (!covered || !onShift)
                     {
                         return;
                     }
-                    FinishBill(story, scene, stage, () =>
+                    FinishBill(scenario, scene, stage, () =>
                     {
                         scene.Comp.ToggleWork(stage.Work);
-                        story.Note(Ticked(stage.Work) + " is unticked on the stand with the bill under way");
+                        scenario.Note(Ticked(stage.Work) + " is unticked on the stand with the bill under way");
                     });
-                    story.Check(!scene.Comp.HandlesWork(stage.Work),
+                    scenario.Check(!scene.Comp.HandlesWork(stage.Work),
                                 "the stand no longer serves " + Ticked(stage.Work) + ", the bill's work");
-                    ChangedBackFirst(story, scene, stage);
+                    ChangedBackFirst(scenario, scene, stage);
                 }
                 finally
                 {
@@ -290,9 +290,9 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => StageWithDoorway(map, pad, BillWork), BesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
-                BillStage stage = StageBill(story, scene);
+                BillStage stage = StageBill(scenario, scene);
                 if (stage == null)
                 {
                     return;
@@ -300,28 +300,28 @@ namespace ShiftChange.Tests
                 Pawn pawn = scene.Colonist;
                 string name = pawn.LabelShort;
                 scene.Comp.SetServeArea(PaintRoom(scene, stage, IntVec3.Invalid));
-                story.Note("the stand serves an allowed area painted over the whole room");
+                scenario.Note("the stand serves an allowed area painted over the whole room");
                 Zone_Stockpile stockpile = StageStockpile(
                     scene.Map, stage.Corner + FarCorner);
-                story.Note("a one-cell stockpile at critical priority stands in the room's far corner");
+                scenario.Note("a one-cell stockpile at critical priority stands in the room's far corner");
                 try
                 {
-                    if (!story.Check(SwapNow(story, scene) && scene.Comp.OnShift,
+                    if (!scenario.Check(SwapNow(scenario, scene) && scene.Comp.OnShift,
                                      name + " changes into the stand's duster and is on shift")
-                        || StartBill(story, scene, stage) == null)
+                        || StartBill(scenario, scene, stage) == null)
                     {
                         return;
                     }
                     Thing stack = GenSpawn.Spawn(ThingMaker.MakeThing(stage.Blocks),
                                                  stage.Corner + new IntVec3(3, 0, 3), scene.Map);
-                    story.Note("a stack of granite blocks is put on the floor in the middle of the room");
+                    scenario.Note("a stack of granite blocks is put on the floor in the middle of the room");
                     Job haul = HaulAIUtility.HaulToStorageJob(pawn, stack, false);
-                    story.Check(haul != null && haul.def == JobDefOf.HaulToCell
+                    scenario.Check(haul != null && haul.def == JobDefOf.HaulToCell
                                 && haul.workGiverDef == null
                                 && pawn.carryTracker.CarriedThing == null,
                                 "the game would have " + name + " haul that stack to storage, a haul that "
                                 + "names no work, with their hands empty");
-                    story.Check(haul != null && SendsToChange(scene, haul),
+                    scenario.Check(haul != null && SendsToChange(scene, haul),
                                 "that haul sends " + name + " to the stand to change back first");
                 }
                 finally
@@ -343,9 +343,9 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => StageWithDoorway(map, pad, BillWork), BesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
-                BillStage stage = StageBill(story, scene);
+                BillStage stage = StageBill(scenario, scene);
                 if (stage == null)
                 {
                     return;
@@ -354,12 +354,12 @@ namespace ShiftChange.Tests
                 string name = pawn.LabelShort;
                 IntVec3 store = stage.Corner + FarCorner;
                 scene.Comp.SetServeArea(PaintRoom(scene, stage, IntVec3.Invalid));
-                story.Note("the stand serves an allowed area painted over the whole room");
+                scenario.Note("the stand serves an allowed area painted over the whole room");
                 Zone_Stockpile stockpile = StageStockpile(scene.Map, store);
-                story.Note("a one-cell stockpile at critical priority stands in the room's far corner");
+                scenario.Note("a one-cell stockpile at critical priority stands in the room's far corner");
                 try
                 {
-                    if (!story.Check(SwapNow(story, scene) && scene.Comp.OnShift,
+                    if (!scenario.Check(SwapNow(scenario, scene) && scene.Comp.OnShift,
                                      name + " changes into the stand's duster and is on shift"))
                     {
                         return;
@@ -370,16 +370,16 @@ namespace ShiftChange.Tests
                     served.workGiverDef = stage.Giver;
                     pawn.jobs.StartJob(served, JobCondition.None, null, resumeCurJobAfterwards: false,
                                        cancelBusyStances: true, null, null);
-                    story.Note(name + " is set to stand and wait as stonecutting work, with no bill");
+                    scenario.Note(name + " is set to stand and wait as stonecutting work, with no bill");
                     Thing stack = ThingMaker.MakeThing(stage.Blocks);
                     pawn.carryTracker.TryStartCarry(stack);
-                    story.Note(name + " is handed a stack of granite blocks");
+                    scenario.Note(name + " is handed a stack of granite blocks");
                     Job haul = JobMaker.MakeJob(JobDefOf.HaulToCell, stack, store);
-                    story.Check(pawn.CurJobDef == JobDefOf.Wait && scene.Comp.OnShift
+                    scenario.Check(pawn.CurJobDef == JobDefOf.Wait && scene.Comp.OnShift
                                 && pawn.carryTracker.CarriedThing == stack,
                                 name + " is on shift, at work the stand serves that is no bill, "
                                 + "with the blocks in hand");
-                    story.Check(SendsToChange(scene, haul),
+                    scenario.Check(SendsToChange(scene, haul),
                                 "a haul of those blocks to the stockpile sends " + name
                                 + " to the stand to change back first");
                 }
@@ -403,11 +403,11 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => StageWithDoorway(map, pad, BillWork), BesideADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef hauling = WorkType("Hauling");
-                BillStage stage = StageBill(story, scene);
+                BillStage stage = StageBill(scenario, scene);
                 if (stage == null)
                 {
                     return;
@@ -417,22 +417,22 @@ namespace ShiftChange.Tests
                     scene.Comp.ToggleWork(hauling);
                 }
                 scene.Comp.ToggleWork(stage.Work);
-                story.Note("Hauling is ticked on the stand and " + Ticked(stage.Work)
+                scenario.Note("Hauling is ticked on the stand and " + Ticked(stage.Work)
                            + " unticked again, so it serves Hauling alone");
                 scene.Comp.SetServeArea(PaintRoom(scene, stage, IntVec3.Invalid));
-                story.Note("the stand serves an allowed area painted over the whole room");
+                scenario.Note("the stand serves an allowed area painted over the whole room");
                 Zone_Stockpile stockpile = StageStockpile(
                     scene.Map, stage.Corner + FarCorner);
-                story.Note("a one-cell stockpile at critical priority stands in the room's far corner");
+                scenario.Note("a one-cell stockpile at critical priority stands in the room's far corner");
                 try
                 {
-                    story.Check(!scene.Comp.OnShift && !scene.Comp.HandlesWork(stage.Work),
+                    scenario.Check(!scene.Comp.OnShift && !scene.Comp.HandlesWork(stage.Work),
                                 name + " starts off shift, in their own clothes, at a stand that serves "
                                 + "Hauling alone");
-                    FinishBill(story, scene, stage);
-                    story.Check(scene.Colonist.CurJobDef == JobDefOf.HaulToCell,
+                    FinishBill(scenario, scene, stage);
+                    scenario.Check(scene.Colonist.CurJobDef == JobDefOf.HaulToCell,
                                 name + " hauls what they made in their own clothes, sent nowhere to dress");
-                    story.Check(!scene.Comp.OnShift, "and is still off shift");
+                    scenario.Check(!scene.Comp.OnShift, "and is still off shift");
                 }
                 finally
                 {
@@ -453,11 +453,11 @@ namespace ShiftChange.Tests
         /// stack in hand; changing back means the change at the stand started, the haul waits
         /// behind it and the stack is on the ground.</para>
         /// </summary>
-        internal static void StoreTheBlocks(Story story, Scene scene, CatchmentKind kind, bool tickHauling,
+        internal static void StoreTheBlocks(Scenario scenario, Scene scene, CatchmentKind kind, bool tickHauling,
                                             bool stockpileInside, bool keepsUniform)
         {
             string name = scene.Colonist.LabelShort;
-            BillStage stage = StageBill(story, scene);
+            BillStage stage = StageBill(scenario, scene);
             if (stage == null)
             {
                 return;
@@ -467,7 +467,7 @@ namespace ShiftChange.Tests
             {
                 scene.Comp.ToggleWork(hauling);
             }
-            story.Note("Hauling is " + (tickHauling ? "ticked" : "unticked") + " on the stand");
+            scenario.Note("Hauling is " + (tickHauling ? "ticked" : "unticked") + " on the stand");
             IntVec3 store = stage.Corner + FarCorner;
             bool pastTheDoor = kind == CatchmentKind.Room && !stockpileInside;
             if (pastTheDoor)
@@ -479,7 +479,7 @@ namespace ShiftChange.Tests
             {
                 scene.Comp.SetServeArea(PaintRoom(scene, stage, stockpileInside ? IntVec3.Invalid : store));
                 serving = "the stand serves the allowed area";
-                story.Note(stockpileInside
+                scenario.Note(stockpileInside
                                ? "the stand serves an allowed area painted over the whole room"
                                : "the stand serves an allowed area painted over the whole room but its far corner");
             }
@@ -488,40 +488,40 @@ namespace ShiftChange.Tests
                 scene.Comp.SetServes(CatchmentKind.Radius);
                 scene.Comp.SetServeRadius(stockpileInside ? 8 : 5);
                 serving = "the stand serves within " + (stockpileInside ? 8 : 5) + " cells";
-                story.Note(serving);
+                scenario.Note(serving);
             }
             else
             {
                 serving = "the stand serves its room";
-                story.Note(serving);
+                scenario.Note(serving);
             }
 
             Zone_Stockpile stockpile = StageStockpile(scene.Map, store);
-            story.Note("a one-cell stockpile at critical priority stands "
+            scenario.Note("a one-cell stockpile at critical priority stands "
                        + (pastTheDoor ? "outside the room, past the door" : "in the room's far corner"));
             try
             {
-                bool asSet = story.Check(scene.Comp.serves == kind
+                bool asSet = scenario.Check(scene.Comp.serves == kind
                                          && scene.Comp.HandlesWork(hauling) == tickHauling
                                          && scene.Comp.Covers(stage.Table.InteractionCell, scene.Map)
                                          && scene.Comp.Covers(store, scene.Map) == stockpileInside,
                                          serving + " with Hauling " + (tickHauling ? "ticked" : "unticked")
                                          + ", taking in the spot where " + name + " works the stonecutter's "
                                          + "table " + (stockpileInside ? "and the stockpile" : "but not the stockpile"));
-                bool onShift = story.Check(SwapNow(story, scene) && scene.Comp.OnShift,
+                bool onShift = scenario.Check(SwapNow(scenario, scene) && scene.Comp.OnShift,
                                            name + " changes into the stand's duster and is on shift");
                 if (!asSet || !onShift)
                 {
                     return;
                 }
-                FinishBill(story, scene, stage);
+                FinishBill(scenario, scene, stage);
                 if (keepsUniform)
                 {
-                    KeptTheUniform(story, scene, stage);
+                    KeptTheUniform(scenario, scene, stage);
                 }
                 else
                 {
-                    ChangedBackFirst(story, scene, stage);
+                    ChangedBackFirst(scenario, scene, stage);
                 }
             }
             finally
@@ -537,7 +537,7 @@ namespace ShiftChange.Tests
         /// with Complex Jobs, which moves it. Ticked before the table lands: it would make an
         /// automatic stand read the room as a workshop. Null, the test failed, when it cannot.
         /// </summary>
-        internal static BillStage StageBill(Story story, Scene scene)
+        internal static BillStage StageBill(Scenario scenario, Scene scene)
         {
             WorkGiverDef giver = Giver("DoBillsStonecut");
             WorkTypeDef work = giver?.workType;
@@ -547,7 +547,7 @@ namespace ShiftChange.Tests
             if (work == null || tableDef == null || chunkDef == null
                 || recipe == null || scene.Outside.Area == 0)
             {
-                story.Check(false, "the game has a stonecutter's table, its bill for granite blocks and "
+                scenario.Check(false, "the game has a stonecutter's table, its bill for granite blocks and "
                                    + "granite chunks, and the stand's room has a door to open ground");
                 return null;
             }
@@ -556,7 +556,7 @@ namespace ShiftChange.Tests
                 scene.Comp.ToggleWork(work);
             }
             MakeCalm(scene.Map);
-            story.Note(Ticked(work) + ", the stonecutting bill's work, is ticked on the stand, and the map is calm");
+            scenario.Note(Ticked(work) + ", the stonecutting bill's work, is ticked on the stand, and the map is calm");
 
             // The doorway strip pins the pad's corner: the stand is at (1, 1), the door at (0, 1).
             IntVec3 corner = new IntVec3(scene.Outside.minX + 1, 0, scene.Outside.minZ);
@@ -566,12 +566,12 @@ namespace ShiftChange.Tests
                 as Building_WorkTable;
             if (table == null)
             {
-                story.Check(false, "a stonecutter's table can be built in the stand's room");
+                scenario.Check(false, "a stonecutter's table can be built in the stand's room");
                 return null;
             }
             Bill_Production bill = new Bill_Production(recipe);
             table.BillStack.AddBill(bill);
-            story.Note("a stonecutter's table stands along the room's south wall, with a bill to make granite blocks");
+            scenario.Note("a stonecutter's table stands along the room's south wall, with a bill to make granite blocks");
             return new BillStage
             {
                 Corner = corner,
@@ -589,7 +589,7 @@ namespace ShiftChange.Tests
         /// chunk already placed, so the bill goes straight to work with no fetch. Returns the
         /// driver, or null, the test failed, if the bill did not start.
         /// </summary>
-        internal static JobDriver_DoBill StartBill(Story story, Scene scene, BillStage stage)
+        internal static JobDriver_DoBill StartBill(Scenario scenario, Scene scene, BillStage stage)
         {
             Pawn pawn = scene.Colonist;
             if (pawn.CurJob != null)
@@ -611,7 +611,7 @@ namespace ShiftChange.Tests
                                cancelBusyStances: true, null, null);
 
             JobDriver_DoBill bench = pawn.jobs.curDriver as JobDriver_DoBill;
-            story.Check(bench != null, pawn.LabelShort + " starts the bill at the stonecutter's table, "
+            scenario.Check(bench != null, pawn.LabelShort + " starts the bill at the stonecutter's table, "
                                        + "a granite chunk set beside them");
             return bench;
         }
@@ -621,12 +621,12 @@ namespace ShiftChange.Tests
         /// recipe's work short. <paramref name="midBill"/> runs once with the bill under way.
         /// False, the test failed, when the bill did not start or finish.
         /// </summary>
-        internal static bool FinishBill(Story story, Scene scene, BillStage stage,
+        internal static bool FinishBill(Scenario scenario, Scene scene, BillStage stage,
                                         Action midBill = null)
         {
             Pawn pawn = scene.Colonist;
             // Watch the driver, never the Job: jobs are pooled, drivers are not.
-            JobDriver_DoBill bench = StartBill(story, scene, stage);
+            JobDriver_DoBill bench = StartBill(scenario, scene, stage);
             if (bench == null)
             {
                 return false;
@@ -646,37 +646,37 @@ namespace ShiftChange.Tests
             }
             if (pawn.jobs?.curDriver != bench)
             {
-                story.Note(pawn.LabelShort + " finishes the bill"
+                scenario.Note(pawn.LabelShort + " finishes the bill"
                            + (run == null ? "" : ", its work cut short, in " + run.Ticks + " ticks"));
                 return true;
             }
-            return story.Check(false, "the bill is done within 2,000 ticks");
+            return scenario.Check(false, "the bill is done within 2,000 ticks");
         }
 
         /// <summary>The crafter is hauling the stack in their hands, still on shift.</summary>
-        internal static void KeptTheUniform(Story story, Scene scene, BillStage stage)
+        internal static void KeptTheUniform(Scenario scenario, Scene scene, BillStage stage)
         {
             Pawn pawn = scene.Colonist;
             string name = pawn.LabelShort;
             Thing carried = pawn.carryTracker.CarriedThing;
-            story.Check(pawn.CurJobDef == JobDefOf.HaulToCell,
+            scenario.Check(pawn.CurJobDef == JobDefOf.HaulToCell,
                         name + " sets off to store what they made, with no change at the stand ahead of it ("
                         + Doing(pawn) + ")");
-            story.Check(carried != null && carried.def == stage.Blocks, "the granite blocks in hand");
-            story.Check(scene.Comp.OnShift, name + " is still on shift");
+            scenario.Check(carried != null && carried.def == stage.Blocks, "the granite blocks in hand");
+            scenario.Check(scene.Comp.OnShift, name + " is still on shift");
         }
 
         /// <summary>The change at the stand started, the stack is down and the haul waits behind it.</summary>
-        internal static void ChangedBackFirst(Story story, Scene scene, BillStage stage)
+        internal static void ChangedBackFirst(Scenario scenario, Scene scene, BillStage stage)
         {
             Pawn pawn = scene.Colonist;
             string name = pawn.LabelShort;
             JobQueue queue = pawn.jobs.jobQueue;
-            story.Check(pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
+            scenario.Check(pawn.CurJobDef == ShiftChangeDefOf.ShiftChange_SwapAtStand,
                         name + " goes to the stand to change back first (" + Doing(pawn) + ")");
-            story.Check(queue.Count > 0 && queue[0].job.def == JobDefOf.HaulToCell,
+            scenario.Check(queue.Count > 0 && queue[0].job.def == JobDefOf.HaulToCell,
                         "with storing what they made waiting behind the change");
-            story.Check(pawn.carryTracker.CarriedThing == null
+            scenario.Check(pawn.carryTracker.CarriedThing == null
                         && scene.Map.listerThings.ThingsOfDef(stage.Blocks).Count > 0,
                         "and the granite blocks set down, to be fetched in their own clothes");
         }

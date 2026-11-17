@@ -5,8 +5,8 @@ namespace ShiftChange.Tests
     /// <summary>
     /// What every fixture in this assembly allows: lines other mods log by themselves on a full
     /// list, which land in whichever test is running. Each passes only with that mod's own code
-    /// on its stack, so the same text from this mod still fails. How a story test runs:
-    /// <see cref="StoryFixture"/>.
+    /// on its stack, so the same text from this mod still fails. How a scenario runs:
+    /// <see cref="FeatureFixture"/>.
     /// </summary>
     [WarningsAllowedFrom(ShiftChangeFixture.MeleeAnimationFrame, ShiftChangeFixture.MeleeAnimationLine)]
     [WarningsAllowedFrom(ShiftChangeFixture.MapPreviewFrame, ShiftChangeFixture.MapPreviewRandomness)]

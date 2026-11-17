@@ -23,7 +23,7 @@ namespace ShiftChange.Tests
     /// to come straight back to the stand to change first.</para>
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(RunOrder.First - (int)CaseGroup.RidingAlong)]
-    internal class RidingAlong : StoryFixture
+    internal class RidingAlong : FeatureFixture
     {
         /// <summary>What <see cref="SceneKit.Stage"/> sets up with the pad enclosed.</summary>
         internal const string InARoom =
@@ -66,7 +66,7 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef doctor = WorkType("Doctor");
@@ -74,7 +74,7 @@ namespace ShiftChange.Tests
                 ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
                 if (doctor == null || tend == null || mealDef == null)
                 {
-                    story.Check(false, "the game has the Doctor work type, its tend to patients work "
+                    scenario.Check(false, "the game has the Doctor work type, its tend to patients work "
                                        + "and the simple meal");
                     return;
                 }
@@ -84,23 +84,23 @@ namespace ShiftChange.Tests
                 ToggleEach(scene, served);
                 MakeCalm(scene.Map);
                 string works = string.Join(", ", served.Select(w => WorkTypeLabels.Of(w)));
-                story.Note("ticked on the stand: " + works + "; the map is calm");
+                scenario.Note("ticked on the stand: " + works + "; the map is calm");
 
                 Map map = scene.Map;
                 Room room = scene.OutfitStand.GetRoom();
-                Pawn patient = AnotherColonist(story, scene, Gender.Female, "Patient");
+                Pawn patient = AnotherColonist(scenario, scene, Gender.Female, "Patient");
                 StayPut(patient);
                 Thing mealHere = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef),
                                                 scene.OutfitStand.Position + new IntVec3(3, 0, 3), map);
                 IntVec3 outside = OpenGround(scene, scene.OutfitStand.Position + new IntVec3(8, 0, 0));
                 if (!outside.InBounds(map) || outside.GetRoom(map) == room)
                 {
-                    story.Check(false, "there is open ground outside the stand's room for a meal");
+                    scenario.Check(false, "there is open ground outside the stand's room for a meal");
                     return;
                 }
                 Thing mealAway = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), outside, map);
                 string patientName = patient.LabelShort;
-                story.Note(patientName + " stays where she is, as a patient in bed would; a simple meal "
+                scenario.Note(patientName + " stays where she is, as a patient in bed would; a simple meal "
                            + "lies in the stand's room, and another outside it");
 
                 List<KeyValuePair<WorkGiverDef, JobDef>> rows = new List<KeyValuePair<WorkGiverDef, JobDef>>();
@@ -123,12 +123,12 @@ namespace ShiftChange.Tests
 
                 IntVec3 read = Patch_JobInterception.TargetCell(
                     RideAlongKit.FeedingJob(JobDefOf.FeedPatient, mealAway, patient, tend), map);
-                story.Check(served.All(scene.Comp.HandlesWork),
+                scenario.Check(served.All(scene.Comp.HandlesWork),
                             "the stand serves doctoring and the work of every way to feed someone (" + works + ")");
-                story.Check(rows.Count >= 5,
+                scenario.Check(rows.Count >= 5,
                             "the game's five Core ways to feed a patient or a prisoner are there ("
                             + rows.Count + " of seven; Biotech adds the two with hemogen)");
-                story.Check(read == mealAway.Position,
+                scenario.Check(read == mealAway.Position,
                             "feeding someone counts as happening where the meal is, not where the patient is"
                             + (read == mealAway.Position
                                 ? ""
@@ -138,29 +138,29 @@ namespace ShiftChange.Tests
                                   + string.Join(", ", mealAway.Position.GetThingList(map).Select(t => t.LabelShort))));
 
                 // Not yet dressed, with the meal stored in the stand's room: the job is this room's.
-                story.Check(SendsToChange(scene,
+                scenario.Check(SendsToChange(scene,
                                           RideAlongKit.FeedingJob(JobDefOf.FeedPatient, mealHere, patient, tend)),
                             "a meal from the room for " + patientName + ", handed out as tending to patients, "
                             + "sends " + name + " to change: such a job can dress");
                 foreach (KeyValuePair<WorkGiverDef, JobDef> row in rows)
                 {
-                    story.Check(!SendsToChange(scene, RideAlongKit.FeedingJob(row.Value, mealHere, patient, row.Key)),
+                    scenario.Check(!SendsToChange(scene, RideAlongKit.FeedingJob(row.Value, mealHere, patient, row.Key)),
                                 FeedingGiver(row.Key) + " sends nobody to change, even with the meal in the stand's room");
                 }
 
-                story.Check(SwapNow(story, scene), name + " changes into the stand's outfit");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's outfit");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
 
-                story.Check(SendsToChange(scene,
+                scenario.Check(SendsToChange(scene,
                                           RideAlongKit.FeedingJob(JobDefOf.FeedPatient, mealAway, patient, tend)),
                             "handed out as tending to patients, the meal from outside the room still changes "
                             + name + " back first");
                 foreach (KeyValuePair<WorkGiverDef, JobDef> row in rows)
                 {
-                    story.Check(!SendsToChange(scene, RideAlongKit.FeedingJob(row.Value, mealAway, patient, row.Key)),
+                    scenario.Check(!SendsToChange(scene, RideAlongKit.FeedingJob(row.Value, mealAway, patient, row.Key)),
                                 FeedingGiver(row.Key) + " keeps the uniform on while " + name
                                 + " fetches the meal from outside the room");
                 }
@@ -169,16 +169,16 @@ namespace ShiftChange.Tests
                 // stand's outfit, pyjamas here, it changes them back first.
                 ToggleEach(scene, served);
                 scene.Comp.ToggleRest();
-                story.Note("the stand's work is unticked and Sleeping ticked instead, "
+                scenario.Note("the stand's work is unticked and Sleeping ticked instead, "
                            + "so its outfit is now " + name + "'s pyjamas");
-                story.Check(scene.Comp.HandlesRest() && !served.Any(scene.Comp.HandlesWork) && scene.Comp.OnShift,
+                scenario.Check(scene.Comp.HandlesRest() && !served.Any(scene.Comp.HandlesWork) && scene.Comp.OnShift,
                             "the stand now serves sleep and none of that work, and " + name + " still wears its outfit");
                 foreach (KeyValuePair<WorkGiverDef, JobDef> row in rows)
                 {
-                    story.Check(SendsToChange(scene, RideAlongKit.FeedingJob(row.Value, mealAway, patient, row.Key)),
+                    scenario.Check(SendsToChange(scene, RideAlongKit.FeedingJob(row.Value, mealAway, patient, row.Key)),
                                 FeedingGiver(row.Key) + " changes " + name + " out of pyjamas before the meal run");
                 }
-                story.Check(scene.Comp.OnShift, "and " + name + " is still on shift at the end");
+                scenario.Check(scene.Comp.OnShift, "and " + name + " is still on shift at the end");
             }
         }
 
@@ -200,7 +200,7 @@ namespace ShiftChange.Tests
             return Staged((map, pad) => StageWithDoorway(map, pad, WorkType("Doctor")),
                           InARoomWithADoorAndADoctor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkGiverDef feed = Giver("DoctorFeedHumanlikes");
@@ -208,7 +208,7 @@ namespace ShiftChange.Tests
                 ThingDef mealDef = DefDatabase<ThingDef>.GetNamedSilentFail("MealSimple");
                 if (feed?.workType == null || deliver?.workType == null || mealDef == null)
                 {
-                    story.Check(false, "the game has feeding patients and delivering food to prisoners, "
+                    scenario.Check(false, "the game has feeding patients and delivering food to prisoners, "
                                        + "their work types, and the simple meal");
                     return;
                 }
@@ -218,12 +218,12 @@ namespace ShiftChange.Tests
                     new[] { feed.workType, deliver.workType }.Distinct().ToList();
                 if (scene.Outside.Height < 4)
                 {
-                    story.Check(false, "the room has a door and four cells of open ground outside it");
+                    scenario.Check(false, "the room has a door and four cells of open ground outside it");
                     return;
                 }
                 ToggleEach(scene, served);
                 MakeCalm(scene.Map);
-                story.Note("ticked on the stand: " + string.Join(", ", served.Select(w => WorkTypeLabels.Of(w)))
+                scenario.Note("ticked on the stand: " + string.Join(", ", served.Select(w => WorkTypeLabels.Of(w)))
                            + "; the map is calm");
 
                 Map map = scene.Map;
@@ -231,8 +231,8 @@ namespace ShiftChange.Tests
                 IntVec3 at = scene.OutfitStand.Position;
                 int x = scene.Outside.minX;
                 int top = scene.Outside.maxZ;
-                Pawn patientIn = AnotherColonist(story, scene, Gender.Female, "Patient");
-                Pawn patientOut = AnotherColonist(story, scene, Gender.Male, "Outpatient",
+                Pawn patientIn = AnotherColonist(scenario, scene, Gender.Female, "Patient");
+                Pawn patientOut = AnotherColonist(scenario, scene, Gender.Male, "Outpatient",
                                                   new IntVec3(x, 0, top), "out past the door");
                 StayPut(patientIn);
                 StayPut(patientOut);
@@ -242,17 +242,17 @@ namespace ShiftChange.Tests
                 IntVec3 store = new IntVec3(x, 0, top - 3);
                 string inside = patientIn.LabelShort;
                 string outside = patientOut.LabelShort;
-                story.Note("both stay where they are, as patients in bed would; a simple meal lies in the room, "
+                scenario.Note("both stay where they are, as patients in bed would; a simple meal lies in the room, "
                            + "and another out past the door, beside twenty steel");
 
-                story.Check(patientIn.GetRoom() == room && patientOut.GetRoom() != room
+                scenario.Check(patientIn.GetRoom() == room && patientOut.GetRoom() != room
                             && mealOut.GetRoom() != room && mealIn.GetRoom() == room,
                             inside + " and a meal are in the stand's room, " + outside
                             + " and another meal out past the door");
-                story.Check(served.All(scene.Comp.HandlesWork),
+                scenario.Check(served.All(scene.Comp.HandlesWork),
                             "the stand serves the work of feeding patients and of delivering food to prisoners");
-                story.Check(SwapNow(story, scene), name + " changes into the stand's outfit");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's outfit");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
@@ -261,46 +261,46 @@ namespace ShiftChange.Tests
                 spotIn.targetC = at + new IntVec3(3, 0, 2);
                 Job spotOut = RideAlongKit.FeedingJob(JobDefOf.DeliverFood, mealOut, patientIn, deliver);
                 spotOut.targetC = store;
-                story.Check(!SendsToChange(scene,
+                scenario.Check(!SendsToChange(scene,
                                            RideAlongKit.FeedingJob(JobDefOf.FeedPatient, mealOut, patientIn, feed)),
                             "fetching a meal from out past the door for " + inside + ", in the room, keeps the uniform on");
-                story.Check(SendsToChange(scene,
+                scenario.Check(SendsToChange(scene,
                                           RideAlongKit.FeedingJob(JobDefOf.FeedPatient, mealOut, patientOut, feed)),
                             "fetching one for " + outside + ", out past the door, changes " + name
                             + " back now, while the stand is near");
-                story.Check(!SendsToChange(scene, spotIn), "a prisoner's meal left at a spot in the room keeps it on");
-                story.Check(SendsToChange(scene, spotOut),
+                scenario.Check(!SendsToChange(scene, spotIn), "a prisoner's meal left at a spot in the room keeps it on");
+                scenario.Check(SendsToChange(scene, spotOut),
                             "and one left at a spot out past the door changes them back");
 
                 // The shape the game's opportunistic haul leaves: the meal run put back at the head
                 // of the queue, handed out by no work, and a haul started first.
                 JobQueue queue = scene.Colonist.jobs.jobQueue;
-                story.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(steel, store)),
+                scenario.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(steel, store)),
                             "hauling the steel out past the door, with nothing to do after it, changes "
                             + name + " back");
                 queue.EnqueueFirst(RideAlongKit.FeedingJob(JobDefOf.FeedPatient, mealOut, patientIn, feed));
-                story.Note("a meal run for " + inside + " is queued next");
-                story.Check(!SendsToChange(scene, RideAlongKit.GiverlessHaul(steel, store)),
+                scenario.Note("a meal run for " + inside + " is queued next");
+                scenario.Check(!SendsToChange(scene, RideAlongKit.GiverlessHaul(steel, store)),
                             "the same haul slipped in ahead of a meal run for " + inside
                             + ", in the room, keeps the uniform on");
                 queue.EnqueueFirst(RideAlongKit.FeedingJob(JobDefOf.FeedPatient, mealOut, patientOut, feed));
-                story.Note("a meal run for " + outside + " is queued next instead");
-                story.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(steel, store)),
+                scenario.Note("a meal run for " + outside + " is queued next instead");
+                scenario.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(steel, store)),
                             "but not ahead of one for " + outside + ", out past the door");
 
                 ToggleEach(scene, served);
                 scene.Comp.ToggleRest();
-                story.Note("the stand's work is unticked and Sleeping ticked instead, "
+                scenario.Note("the stand's work is unticked and Sleeping ticked instead, "
                            + "so its outfit is now " + name + "'s pyjamas");
-                story.Check(scene.Comp.HandlesRest() && !served.Any(scene.Comp.HandlesWork) && scene.Comp.OnShift,
+                scenario.Check(scene.Comp.HandlesRest() && !served.Any(scene.Comp.HandlesWork) && scene.Comp.OnShift,
                             "the stand now serves sleep and not that work, and " + name + " still wears its outfit");
-                story.Check(!SendsToChange(scene,
+                scenario.Check(!SendsToChange(scene,
                                            RideAlongKit.FeedingJob(JobDefOf.FeedPatient, mealIn, patientIn, feed)),
                             "in pyjamas, carrying a meal from the room to " + inside + ", in the room, keeps them on");
-                story.Check(SendsToChange(scene,
+                scenario.Check(SendsToChange(scene,
                                           RideAlongKit.FeedingJob(JobDefOf.FeedPatient, mealIn, patientOut, feed)),
                             "and carrying one to " + outside + ", out past the door, changes " + name + " back first");
-                story.Check(scene.Comp.OnShift, "and " + name + " is still on shift at the end");
+                scenario.Check(scene.Comp.OnShift, "and " + name + " is still on shift at the end");
             }
         }
 
@@ -322,7 +322,7 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 WorkTypeDef cooking = WorkType("Cooking");
@@ -333,12 +333,12 @@ namespace ShiftChange.Tests
                 if (cooking == null || cookBills == null || tailorBills == null
                     || potatoDef == null || mealDef == null)
                 {
-                    story.Check(false, "the game has cooking and tailoring bills, potatoes and the simple meal");
+                    scenario.Check(false, "the game has cooking and tailoring bills, potatoes and the simple meal");
                     return;
                 }
                 scene.Comp.ToggleWork(cooking);
                 MakeCalm(scene.Map);
-                story.Note("Cooking is ticked on the stand, and the map is calm");
+                scenario.Note("Cooking is ticked on the stand, and the map is calm");
 
                 Map map = scene.Map;
                 Room room = scene.OutfitStand.GetRoom();
@@ -348,64 +348,64 @@ namespace ShiftChange.Tests
                 IntVec3 mealCell = OpenGround(scene, outside + new IntVec3(0, 0, 1));
                 if (!outside.InBounds(map) || !store.InBounds(map) || outside.GetRoom(map) == room)
                 {
-                    story.Check(false, "there is open ground outside the stand's room for potatoes and a meal");
+                    scenario.Check(false, "there is open ground outside the stand's room for potatoes and a meal");
                     return;
                 }
                 Thing potatoes = ThingMaker.MakeThing(potatoDef);
                 potatoes.stackCount = 10;
                 GenSpawn.Spawn(potatoes, outside, map);
                 Thing meal = GenSpawn.Spawn(ThingMaker.MakeThing(mealDef), mealCell, map);
-                story.Note("ten potatoes and a simple meal lie outside the room");
+                scenario.Note("ten potatoes and a simple meal lie outside the room");
 
-                story.Check(SwapNow(story, scene), name + " changes into the stand's outfit");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's outfit");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
                 JobQueue queue = scene.Colonist.jobs.jobQueue;
 
                 scene.Colonist.jobs.ClearQueuedJobs();
-                story.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(potatoes, store)),
+                scenario.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(potatoes, store)),
                             "hauling the potatoes from outside the room, with nothing to do after it, changes "
                             + name + " back");
 
                 queue.EnqueueFirst(RideAlongKit.QueuedWork(cookBills, bench));
-                story.Note("a cooking bill in the room is queued next");
-                story.Check(!SendsToChange(scene, RideAlongKit.GiverlessHaul(potatoes, store)),
+                scenario.Note("a cooking bill in the room is queued next");
+                scenario.Check(!SendsToChange(scene, RideAlongKit.GiverlessHaul(potatoes, store)),
                             "the same haul slipped in ahead of a cooking bill in this room keeps the uniform on");
 
                 queue.EnqueueFirst(RideAlongKit.QueuedWork(tailorBills, bench));
-                story.Note("a tailoring bill in the room is queued next instead");
-                story.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(potatoes, store)),
+                scenario.Note("a tailoring bill in the room is queued next instead");
+                scenario.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(potatoes, store)),
                             "but not ahead of tailoring, which the stand does not serve");
 
                 queue.EnqueueFirst(RideAlongKit.QueuedWork(cookBills, outside));
-                story.Note("a cooking bill outside the room is queued next instead");
-                story.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(potatoes, store)),
+                scenario.Note("a cooking bill outside the room is queued next instead");
+                scenario.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(potatoes, store)),
                             "nor ahead of the stand's own cooking in another room");
 
                 queue.EnqueueFirst(RideAlongKit.GiverlessHaul(potatoes, store));
-                story.Note("another haul is queued next instead");
-                story.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(potatoes, store)),
+                scenario.Note("another haul is queued next instead");
+                scenario.Check(SendsToChange(scene, RideAlongKit.GiverlessHaul(potatoes, store)),
                             "nor ahead of another errand");
 
                 queue.EnqueueFirst(RideAlongKit.QueuedWork(cookBills, bench));
-                story.Note("a cooking bill in the room is queued next again");
-                story.Check(SendsToChange(scene, IngestJob(meal)),
+                scenario.Note("a cooking bill in the room is queued next again");
+                scenario.Check(SendsToChange(scene, IngestJob(meal)),
                             "and a meal break still changes " + name + " out, a cooking bill queued or not");
 
-                story.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.UnloadYourInventory)),
+                scenario.Check(!SendsToChange(scene, JobMaker.MakeJob(JobDefOf.UnloadYourInventory)),
                             "unloading their inventory, a job with no target at all, keeps the uniform on");
 
                 // Off shift: the rule is about staying dressed and nothing else.
-                story.Check(SwapNow(story, scene), name + " changes back into their own clothes");
-                story.Check(!scene.Comp.OnShift, "and is off shift");
+                scenario.Check(SwapNow(scenario, scene), name + " changes back into their own clothes");
+                scenario.Check(!scene.Comp.OnShift, "and is off shift");
                 queue.EnqueueFirst(RideAlongKit.QueuedWork(cookBills, bench));
-                story.Note("a cooking bill in the room is queued next");
-                story.Check(!SendsToChange(scene, RideAlongKit.GiverlessHaul(potatoes, store)),
+                scenario.Note("a cooking bill in the room is queued next");
+                scenario.Check(!SendsToChange(scene, RideAlongKit.GiverlessHaul(potatoes, store)),
                             "off shift, an errand no work handed out sends nobody to change, "
                             + "whatever is queued behind it");
-                story.Check(SendsToChange(scene, RideAlongKit.QueuedWork(cookBills, bench)),
+                scenario.Check(SendsToChange(scene, RideAlongKit.QueuedWork(cookBills, bench)),
                             "while the cooking bill itself sends " + name + " to change");
             }
         }
@@ -440,7 +440,7 @@ namespace ShiftChange.Tests
             return Staged((map, pad) => StageWithDoorway(map, pad, WorkType("Hauling")),
                           InARoomWithADoorAndAHauler, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 WorkTypeDef crafting = WorkType("Crafting");
                 WorkGiverDef spotBills = Giver("DoBillsUseCraftingSpot");
@@ -450,7 +450,7 @@ namespace ShiftChange.Tests
                 if (crafting == null || spotBills == null || spotDef == null || potatoDef == null
                     || recipe == null || scene.Outside.Area == 0)
                 {
-                    story.Check(false, "the game has crafting, the crafting spot and its bills, and potatoes, "
+                    scenario.Check(false, "the game has crafting, the crafting spot and its bills, and potatoes, "
                                        + "and the room has a door");
                     return;
                 }
@@ -459,7 +459,7 @@ namespace ShiftChange.Tests
                 string name = pawn.LabelShort;
                 scene.Comp.ToggleWork(crafting);
                 MakeCalm(map);
-                story.Note("Crafting is ticked on the stand, and the map is calm");
+                scenario.Note("Crafting is ticked on the stand, and the map is calm");
 
                 // Relative to the pad's corner, which the doorway strip pins: it runs up the pad's
                 // west side, one column out. The stand is at (1, 1) and the door at (0, 1).
@@ -475,7 +475,7 @@ namespace ShiftChange.Tests
                     as Building_WorkTable;
                 if (spot == null)
                 {
-                    story.Check(false, "a crafting spot could be put down in the stand's room");
+                    scenario.Check(false, "a crafting spot could be put down in the stand's room");
                     return;
                 }
                 Bill_Production bill = new Bill_Production(recipe);
@@ -491,11 +491,11 @@ namespace ShiftChange.Tests
                     Thing potatoes = ThingMaker.MakeThing(potatoDef);
                     potatoes.stackCount = 10;
                     GenSpawn.Spawn(potatoes, itemAt, map);
-                    story.Note("a crafting spot with a bill in the room's south-east corner, a critical "
+                    scenario.Note("a crafting spot with a bill in the room's south-east corner, a critical "
                                + "stockpile cell beside it, and ten potatoes outside the west wall");
 
-                    story.Check(SwapNow(story, scene), name + ", a crafter, changes into the stand's outfit");
-                    if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                    scenario.Check(SwapNow(scenario, scene), name + ", a crafter, changes into the stand's outfit");
+                    if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                     {
                         return;
                     }
@@ -503,7 +503,7 @@ namespace ShiftChange.Tests
                     pawn.jobs.ClearQueuedJobs();
                     pawn.pather?.StopDead();
                     pawn.Position = waitAt;
-                    story.Note(name + " stops, and is put in the room's north-west corner, "
+                    scenario.Note(name + " stops, and is put in the room's north-west corner, "
                                + "the potatoes just outside the wall");
 
                     Job billJob = JobMaker.MakeJob(JobDefOf.DoBill, spot);
@@ -515,10 +515,10 @@ namespace ShiftChange.Tests
                     Job offered = pawn.jobs.TryOpportunisticJob(null, billJob);
                     bool shaped = offered != null && offered.def == JobDefOf.HaulToCell
                                   && offered.targetA.Thing == potatoes && offered.workGiverDef == null;
-                    if (!story.Check(shaped, "on the way to the crafting spot's bill, the game itself offers "
+                    if (!scenario.Check(shaped, "on the way to the crafting spot's bill, the game itself offers "
                                              + name + " a haul of the potatoes first"))
                     {
-                        story.Note("it offered "
+                        scenario.Note("it offered "
                                    + (offered == null ? "nothing" : JobCalled(offered.def) + " of " + offered.targetA)
                                    + "; " + name + " at " + pawn.Position + ", the crafting spot at " + benchAt
                                    + ", the potatoes at " + itemAt + ", the stockpile at " + storeAt);
@@ -529,20 +529,20 @@ namespace ShiftChange.Tests
                     // StartJob queue the bill and start the haul.
                     pawn.jobs.StartJob(billJob, JobCondition.None, null,
                         resumeCurJobAfterwards: false, cancelBusyStances: true, null, null);
-                    story.Note(name + " is given the bill");
+                    scenario.Note(name + " is given the bill");
                     JobQueue queue = pawn.jobs.jobQueue;
-                    story.Check(queue.Count > 0 && queue[0].job == billJob,
+                    scenario.Check(queue.Count > 0 && queue[0].job == billJob,
                                 "the game puts the bill next in line and starts the haul in its place");
-                    story.Check(pawn.CurJobDef != ShiftChangeDefOf.ShiftChange_SwapAtStand,
+                    scenario.Check(pawn.CurJobDef != ShiftChangeDefOf.ShiftChange_SwapAtStand,
                                 name + " is not sent to change out for it");
-                    story.Check(pawn.CurJobDef == JobDefOf.HaulToCell && RideAlongKit.Hauls(pawn.CurJob, potatoes),
+                    scenario.Check(pawn.CurJobDef == JobDefOf.HaulToCell && RideAlongKit.Hauls(pawn.CurJob, potatoes),
                                 name + " fetches the potatoes in uniform");
-                    story.Check(scene.Comp.OnShift, "and is still on shift for the bill behind it");
+                    scenario.Check(scene.Comp.OnShift, "and is still on shift for the bill behind it");
 
                     pawn.jobs.EndCurrentJob(JobCondition.InterruptForced, startNewJob: false);
                     pawn.jobs.ClearQueuedJobs();
                     Job lone = HaulAIUtility.HaulToStorageJob(pawn, potatoes, false);
-                    story.Check(lone != null && SendsToChange(scene, lone),
+                    scenario.Check(lone != null && SendsToChange(scene, lone),
                                 "the same haul with nothing to do after it still changes " + name + " back");
                 }
                 finally
@@ -573,17 +573,17 @@ namespace ShiftChange.Tests
         {
             return Staged(StageWithDoorway, InARoomWithADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 if (!ModsConfig.IsActive("avilmask.CommonSense"))
                 {
-                    story.KnownGap(false, "Common Sense's haul of an ingredient ahead of a bill keeps a cook in uniform",
+                    scenario.KnownGap(false, "Common Sense's haul of an ingredient ahead of a bill keeps a cook in uniform",
                         "Common Sense is not on this mod list; --with=avilmask.commonsense loads it");
                     return;
                 }
                 Type settings = AccessTools.TypeByName("CommonSense.Settings");
                 FieldInfo setting = settings == null ? null : AccessTools.Field(settings, "hauling_over_bills");
-                if (!story.Check(setting != null && (bool)setting.GetValue(null),
+                if (!scenario.Check(setting != null && (bool)setting.GetValue(null),
                                  "Common Sense's \"haul ingredients over doing bills\" is on, as it ships"))
                 {
                     return;
@@ -597,7 +597,7 @@ namespace ShiftChange.Tests
                 if (cooking == null || cookBills == null || stoveDef == null || recipe == null
                     || potatoDef == null || scene.Outside.Area == 0)
                 {
-                    story.Check(false, "the game has cooking, the fueled stove, simple meals and potatoes, "
+                    scenario.Check(false, "the game has cooking, the fueled stove, simple meals and potatoes, "
                                        + "and the room has a door");
                     return;
                 }
@@ -605,7 +605,7 @@ namespace ShiftChange.Tests
                 string name = scene.Colonist.LabelShort;
                 scene.Comp.ToggleWork(cooking);
                 MakeCalm(map);
-                story.Note("Cooking is ticked on the stand, and the map is calm");
+                scenario.Note("Cooking is ticked on the stand, and the map is calm");
 
                 // A kitchen: the stove across the room from the stand, the potatoes on the ground
                 // outside, and a stockpile just outside the door, nearer the cook than the stove
@@ -615,7 +615,7 @@ namespace ShiftChange.Tests
                     as Building_WorkTable;
                 if (stove == null)
                 {
-                    story.Check(false, "a fueled stove could be built in the stand's room");
+                    scenario.Check(false, "a fueled stove could be built in the stand's room");
                     return;
                 }
                 Bill_Production bill = new Bill_Production(recipe);
@@ -631,11 +631,11 @@ namespace ShiftChange.Tests
                 Thing potatoes = ThingMaker.MakeThing(potatoDef);
                 potatoes.stackCount = 10;
                 GenSpawn.Spawn(potatoes, potatoCell, map);
-                story.Note("a fueled stove with a bill for simple meals across the room, a critical stockpile "
+                scenario.Note("a fueled stove with a bill for simple meals across the room, a critical stockpile "
                            + "cell just outside the door, and ten potatoes further out");
 
-                story.Check(SwapNow(story, scene), name + ", a cook, changes into the stand's outfit");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + ", a cook, changes into the stand's outfit");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
@@ -650,17 +650,17 @@ namespace ShiftChange.Tests
                 pawn.jobs.ClearQueuedJobs();
                 pawn.jobs.StartJob(billJob, JobCondition.InterruptForced, null,
                     resumeCurJobAfterwards: false, cancelBusyStances: true, null, null);
-                story.Note(name + " is given the stove's bill, to cook with the potatoes");
+                scenario.Note(name + " is given the stove's bill, to cook with the potatoes");
 
                 // The engine half: what Common Sense really does with that bill.
                 JobQueue queue = pawn.jobs.jobQueue;
                 Job haul = queue.Count > 0 ? queue[0].job : null;
                 bool shaped = queue.Count == 2 && haul != null && haul.workGiverDef == null
                               && RideAlongKit.Hauls(haul, potatoes) && queue[1].job == billJob;
-                if (!story.Check(shaped, "Common Sense queues a haul of the potatoes from outside, handed out "
+                if (!scenario.Check(shaped, "Common Sense queues a haul of the potatoes from outside, handed out "
                                          + "by no work, ahead of the bill"))
                 {
-                    story.Note("the queue: " + string.Join(", ", queue.Select(q => JobCalled(q.job.def)
+                    scenario.Note("the queue: " + string.Join(", ", queue.Select(q => JobCalled(q.job.def)
                         + (q.job.workGiverDef == null ? "" : " for " + q.job.workGiverDef.label)).ToArray()));
                     return;
                 }
@@ -669,16 +669,16 @@ namespace ShiftChange.Tests
                 // Shift Change's half: the haul starts at the next job boundary, from the queue,
                 // through every prefix in their real order.
                 pawn.jobs.EndCurrentJob(JobCondition.InterruptForced, startNewJob: true);
-                story.Check(pawn.CurJobDef != ShiftChangeDefOf.ShiftChange_SwapAtStand,
+                scenario.Check(pawn.CurJobDef != ShiftChangeDefOf.ShiftChange_SwapAtStand,
                             name + " is not sent to change out for Common Sense's haul");
-                story.Check(pawn.CurJobDef == haulDef && RideAlongKit.Hauls(pawn.CurJob, potatoes),
+                scenario.Check(pawn.CurJobDef == haulDef && RideAlongKit.Hauls(pawn.CurJob, potatoes),
                             name + " fetches the potatoes in uniform");
-                story.Check(scene.Comp.OnShift, "and is still on shift for the bill behind it");
+                scenario.Check(scene.Comp.OnShift, "and is still on shift for the bill behind it");
 
                 pawn.jobs.EndCurrentJob(JobCondition.InterruptForced, startNewJob: false);
                 pawn.jobs.ClearQueuedJobs();
                 Job lone = HaulAIUtility.HaulToStorageJob(pawn, potatoes, false);
-                story.Check(lone != null && SendsToChange(scene, lone),
+                scenario.Check(lone != null && SendsToChange(scene, lone),
                             "the same haul with no bill behind it still changes " + name + " back");
             }
         }
@@ -700,14 +700,14 @@ namespace ShiftChange.Tests
         {
             return Staged(StageWithDoorway, InARoomWithADoor, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 JobDef unload = DefDatabase<JobDef>.GetNamedSilentFail("UnloadYourHauledInventory");
                 JobDef toInventory = DefDatabase<JobDef>.GetNamedSilentFail("HaulToInventory");
                 WorkGiverDef theirGiver = Giver("HaulToInventory");
                 if (unload == null || toInventory == null || theirGiver == null)
                 {
-                    story.KnownGap(false, "Pick Up And Haul's next steps keep a colonist in uniform",
+                    scenario.KnownGap(false, "Pick Up And Haul's next steps keep a colonist in uniform",
                         "Pick Up And Haul is not on this mod list; --with=mehni.pickupandhaul loads it");
                     return;
                 }
@@ -715,7 +715,7 @@ namespace ShiftChange.Tests
                 ThingDef potatoDef = DefDatabase<ThingDef>.GetNamedSilentFail("RawPotatoes");
                 if (cooking == null || potatoDef == null || scene.Outside.Area == 0)
                 {
-                    story.Check(false, "the game has cooking and potatoes, and the room has a door");
+                    scenario.Check(false, "the game has cooking and potatoes, and the room has a door");
                     return;
                 }
                 Map map = scene.Map;
@@ -723,11 +723,11 @@ namespace ShiftChange.Tests
                 string name = pawn.LabelShort;
                 scene.Comp.ToggleWork(cooking);
                 MakeCalm(map);
-                story.Note("Cooking is ticked on the stand, and the map is calm");
+                scenario.Note("Cooking is ticked on the stand, and the map is calm");
 
                 // Their driver reads its comp off the colonist the moment it starts, so a colonist
                 // without it would throw for a reason that is not Shift Change's.
-                if (!story.Check(pawn.AllComps.Any(c => c.GetType().Name == "CompHauledToInventory"),
+                if (!scenario.Check(pawn.AllComps.Any(c => c.GetType().Name == "CompHauledToInventory"),
                                  name + " carries Pick Up And Haul's record of what they hauled"))
                 {
                     return;
@@ -739,10 +739,10 @@ namespace ShiftChange.Tests
                 Thing potatoes = ThingMaker.MakeThing(potatoDef);
                 potatoes.stackCount = 10;
                 GenSpawn.Spawn(potatoes, itemCell, map);
-                story.Note("ten potatoes lie out past the door");
+                scenario.Note("ten potatoes lie out past the door");
 
-                story.Check(SwapNow(story, scene), name + " changes into the stand's outfit");
-                if (!story.Check(scene.Comp.OnShift, "and is on shift"))
+                scenario.Check(SwapNow(scenario, scene), name + " changes into the stand's outfit");
+                if (!scenario.Check(scene.Comp.OnShift, "and is on shift"))
                 {
                     return;
                 }
@@ -751,34 +751,34 @@ namespace ShiftChange.Tests
                 // item, outside the kitchen, so it changes them back first.
                 Job handedOut = RideAlongKit.HaulToInventoryJob(toInventory, potatoes, storeCell);
                 handedOut.workGiverDef = theirGiver;
-                story.Check(SendsToChange(scene, handedOut),
+                scenario.Check(SendsToChange(scene, handedOut),
                             "a haul Pick Up And Haul's own work hands out, starting outside, changes "
                             + name + " back first");
 
-                story.Note("an unload at the cell just outside the door is queued, as their haul ends with one");
+                scenario.Note("an unload at the cell just outside the door is queued, as their haul ends with one");
                 JobDef started = RideAlongKit.StartFromQueue(scene, JobMaker.MakeJob(unload, storeCell), JobTag.Misc);
-                story.Check(started == unload,
+                scenario.Check(started == unload,
                             "unloading there keeps the uniform on (it started: " + JobCalled(started) + ")");
 
-                story.Note("the next haul of the potatoes is queued, as their driver queues one");
+                scenario.Note("the next haul of the potatoes is queued, as their driver queues one");
                 started = RideAlongKit.StartFromQueue(
                     scene, RideAlongKit.HaulToInventoryJob(toInventory, potatoes, storeCell), JobTag.Misc);
-                story.Check(started == toInventory,
+                scenario.Check(started == toInventory,
                             "the next haul keeps the uniform on too (it started: " + JobCalled(started) + ")");
 
                 IntVec3 home = pawn.Position;
                 pawn.pather?.StopDead();
                 pawn.Position = standingOut;
-                story.Note(name + " is put out past the door, and an unload is queued on them there, "
+                scenario.Note(name + " is put out past the door, and an unload is queued on them there, "
                            + "as their checker does");
                 started = RideAlongKit.StartFromQueue(scene, JobMaker.MakeJob(unload, pawn), JobTag.Misc);
                 pawn.pather?.StopDead();
                 pawn.Position = home;
-                story.Note(name + " is put back beside the stand");
-                story.Check(started == unload,
+                scenario.Note(name + " is put back beside the stand");
+                scenario.Check(started == unload,
                             "unloading out of the room, queued by their checker, keeps it on as well (it started: "
                             + JobCalled(started) + ")");
-                story.Check(scene.Comp.OnShift, "and " + name + " is still on shift at the end");
+                scenario.Check(scene.Comp.OnShift, "and " + name + " is still on shift at the end");
             }
         }
 

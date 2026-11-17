@@ -19,7 +19,7 @@ namespace ShiftChange.Tests
     /// game's setting, which a player may have turned on.</para>
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(RunOrder.First - (int)CaseGroup.KeepingThemDecent)]
-    internal class KeepingThemDecent : StoryFixture
+    internal class KeepingThemDecent : FeatureFixture
     {
         /// <summary>
         /// A stand holding only a shield belt, which covers the waist and neither torso nor legs,
@@ -33,53 +33,53 @@ namespace ShiftChange.Tests
         {
             return Staged(Body);
 
-            IEnumerator Body(Scene scene, Story story)
+            IEnumerator Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 List<Apparel> before = new List<Apparel>(scene.Colonist.apparel.WornApparel);
                 Apparel parka = Worn(scene.Colonist, "Apparel_Parka");
-                if (!SetDecent(story, true)
-                    || !story.Check(before.Count >= 3 && parka != null,
+                if (!SetDecent(scenario, true)
+                    || !scenario.Check(before.Count >= 3 && parka != null,
                                     name + " wears a shirt, trousers and a parka")
-                    || !StockOnly(story, scene, "Apparel_ShieldBelt", "a shield belt"))
+                    || !StockOnly(scenario, scene, "Apparel_ShieldBelt", "a shield belt"))
                 {
                     yield break;
                 }
-                story.Check(scene.OutfitStand.HeldItems.Count == 1,
+                scenario.Check(scene.OutfitStand.HeldItems.Count == 1,
                             "one garment, which covers neither torso nor legs");
-                story.Check(!scene.Colonist.apparel.PsychologicallyNude,
+                scenario.Check(!scene.Colonist.apparel.PsychologicallyNude,
                             name + " starts out dressed, as the game judges it");
-                story.Check(SwapPlan.WouldBeNude(scene.Colonist, before),
+                scenario.Check(SwapPlan.WouldBeNude(scene.Colonist, before),
                             "and taking off all three would leave " + name
                             + " naked by Shift Change's reckoning too");
 
                 scene.Comp.SetFullChange(true);
-                story.Note("Change the whole outfit is ticked on the stand");
+                scenario.Note("Change the whole outfit is ticked on the stand");
                 List<Apparel> wear = new List<Apparel>();
                 List<Apparel> store = new List<Apparel>();
                 bool planned = SwapPlan.BuildDress(scene.Colonist, scene.OutfitStand, wear, store);
-                story.Check(planned && wear.Count == 1, "the stand plans to hand over the belt");
-                story.Check(!SwapPlan.WouldBeNude(scene.Colonist, store, wear),
+                scenario.Check(planned && wear.Count == 1, "the stand plans to hand over the belt");
+                scenario.Check(!SwapPlan.WouldBeNude(scene.Colonist, store, wear),
                             "and its plan leaves " + name + " dressed");
-                story.Check(before.FindAll(a => a != parka && !store.Contains(a)).Count == 2,
+                scenario.Check(before.FindAll(a => a != parka && !store.Contains(a)).Count == 2,
                             "by keeping the shirt and trousers on");
-                story.Check(store.Count == 1 && store[0] == parka,
+                scenario.Check(store.Count == 1 && store[0] == parka,
                             "and taking only the parka, the outermost");
 
-                yield return Swap(scene, story, name + " changes into the belt");
-                story.Check(!scene.Colonist.apparel.PsychologicallyNude,
+                yield return Swap(scene, scenario, name + " changes into the belt");
+                scenario.Check(!scene.Colonist.apparel.PsychologicallyNude,
                             name + " is still dressed, as the game judges it");
-                story.Check(scene.Comp.StoredOwnerApparelForReading.Count == 1,
+                scenario.Check(scene.Comp.StoredOwnerApparelForReading.Count == 1,
                             "the stand keeps only the parka for " + name);
-                story.Check(scene.Colonist.apparel.WornApparel.Count == 3,
+                scenario.Check(scene.Colonist.apparel.WornApparel.Count == 3,
                             name + " wears the belt over their own shirt and trousers");
 
                 scene.Comp.SetFullChange(false);
-                story.Note("Change the whole outfit is unticked again");
-                yield return Swap(scene, story, name + " changes back");
-                story.Check(before.TrueForAll(scene.Colonist.apparel.WornApparel.Contains),
+                scenario.Note("Change the whole outfit is unticked again");
+                yield return Swap(scene, scenario, name + " changes back");
+                scenario.Check(before.TrueForAll(scene.Colonist.apparel.WornApparel.Contains),
                             "every garment came back on");
-                story.Check(!scene.Colonist.apparel.PsychologicallyNude, "and " + name + " is dressed as before");
+                scenario.Check(!scene.Colonist.apparel.PsychologicallyNude, "and " + name + " is dressed as before");
             }
         }
 
@@ -97,22 +97,22 @@ namespace ShiftChange.Tests
         {
             return Staged(Body, gender: Gender.Male);
 
-            IEnumerator Body(Scene scene, Story story)
+            IEnumerator Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
-                if (!SetDecent(story, true) || !StockOnly(story, scene, "Apparel_Pants", "trousers"))
+                if (!SetDecent(scenario, true) || !StockOnly(scenario, scene, "Apparel_Pants", "trousers"))
                 {
                     yield break;
                 }
-                story.Check(scene.Colonist.gender == Gender.Male, name + " is a man; the pair of tests turns on this");
-                story.Check(!scene.Colonist.apparel.PsychologicallyNude, "who starts out dressed");
+                scenario.Check(scene.Colonist.gender == Gender.Male, name + " is a man; the pair of tests turns on this");
+                scenario.Check(!scene.Colonist.apparel.PsychologicallyNude, "who starts out dressed");
 
                 scene.Comp.SetFullChange(true);
-                story.Note("Change the whole outfit is ticked on the stand");
-                yield return Swap(scene, story, name + " changes into the trousers");
-                story.Check(scene.Colonist.apparel.WornApparel.Count == 1,
+                scenario.Note("Change the whole outfit is ticked on the stand");
+                yield return Swap(scene, scenario, name + " changes into the trousers");
+                scenario.Check(scene.Colonist.apparel.WornApparel.Count == 1,
                             "he wears the stand's trousers and nothing else");
-                story.Check(!scene.Colonist.apparel.PsychologicallyNude,
+                scenario.Check(!scene.Colonist.apparel.PsychologicallyNude,
                             "and the game calls that dressed, so the change was fair");
             }
         }
@@ -130,29 +130,29 @@ namespace ShiftChange.Tests
         {
             return Staged(Body, gender: Gender.Female);
 
-            IEnumerator Body(Scene scene, Story story)
+            IEnumerator Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
-                if (!SetDecent(story, true) || !StockOnly(story, scene, "Apparel_Pants", "trousers"))
+                if (!SetDecent(scenario, true) || !StockOnly(scenario, scene, "Apparel_Pants", "trousers"))
                 {
                     yield break;
                 }
-                story.Check(scene.Colonist.gender == Gender.Female,
+                scenario.Check(scene.Colonist.gender == Gender.Female,
                             name + " is a woman; the pair of tests turns on this");
-                story.Check(!scene.Colonist.apparel.PsychologicallyNude, "who starts out dressed");
+                scenario.Check(!scene.Colonist.apparel.PsychologicallyNude, "who starts out dressed");
 
                 scene.Comp.SetFullChange(true);
-                story.Note("Change the whole outfit is ticked on the stand");
-                yield return Swap(scene, story, name + " changes into the trousers");
-                story.Check(scene.Colonist.apparel.WornApparel.Count == 2,
+                scenario.Note("Change the whole outfit is ticked on the stand");
+                yield return Swap(scene, scenario, name + " changes into the trousers");
+                scenario.Check(scene.Colonist.apparel.WornApparel.Count == 2,
                             "she wears the stand's trousers and her own shirt, "
                             + "where the man needed only the trousers");
-                story.Check(!scene.Colonist.apparel.PsychologicallyNude, "and is left dressed, as he was");
+                scenario.Check(!scene.Colonist.apparel.PsychologicallyNude, "and is left dressed, as he was");
 
                 scene.Comp.SetFullChange(false);
-                story.Note("Change the whole outfit is unticked again");
-                yield return Swap(scene, story, name + " changes back");
-                story.Check(!scene.Colonist.apparel.PsychologicallyNude, "in her own clothes again");
+                scenario.Note("Change the whole outfit is unticked again");
+                yield return Swap(scene, scenario, name + " changes back");
+                scenario.Check(!scene.Colonist.apparel.PsychologicallyNude, "in her own clothes again");
             }
         }
 
@@ -168,11 +168,11 @@ namespace ShiftChange.Tests
         {
             return Staged(Body);
 
-            IEnumerator Body(Scene scene, Story story)
+            IEnumerator Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
-                if (!SetDecent(story, true)
-                    || !story.Check(scene.Colonist.story?.traits != null, name + " can have traits"))
+                if (!SetDecent(scenario, true)
+                    || !scenario.Check(scene.Colonist.story?.traits != null, name + " can have traits"))
                 {
                     yield break;
                 }
@@ -180,29 +180,29 @@ namespace ShiftChange.Tests
                 {
                     scene.Colonist.story.traits.GainTrait(new Trait(TraitDefOf.Nudist));
                 }
-                if (!StockOnly(story, scene, "Apparel_ShieldBelt", "a shield belt"))
+                if (!StockOnly(scenario, scene, "Apparel_ShieldBelt", "a shield belt"))
                 {
                     yield break;
                 }
                 List<Apparel> before = new List<Apparel>(scene.Colonist.apparel.WornApparel);
-                story.Check(SwapPlan.PrefersNudity(scene.Colonist), name + " is a nudist; the exemption turns on this");
+                scenario.Check(SwapPlan.PrefersNudity(scene.Colonist), name + " is a nudist; the exemption turns on this");
 
                 scene.Comp.SetFullChange(true);
-                story.Note("Change the whole outfit is ticked on the stand");
+                scenario.Note("Change the whole outfit is ticked on the stand");
                 List<Apparel> wear = new List<Apparel>();
                 List<Apparel> store = new List<Apparel>();
-                story.Check(SwapPlan.BuildDress(scene.Colonist, scene.OutfitStand, wear, store),
+                scenario.Check(SwapPlan.BuildDress(scene.Colonist, scene.OutfitStand, wear, store),
                             "the stand still plans a change");
-                story.Check(store.Count == before.Count, "taking everything, holding nothing back");
-                story.Check(SwapPlan.WouldBeNude(scene.Colonist, store, wear),
+                scenario.Check(store.Count == before.Count, "taking everything, holding nothing back");
+                scenario.Check(SwapPlan.WouldBeNude(scene.Colonist, store, wear),
                             "though that leaves " + name + " naked by Shift Change's reckoning: "
                             + "what changed is the answer, not the question");
 
-                yield return Swap(scene, story, name + " changes into the belt");
-                story.Check(scene.Colonist.apparel.WornApparel.Count == 1,
+                yield return Swap(scene, scenario, name + " changes into the belt");
+                scenario.Check(scene.Colonist.apparel.WornApparel.Count == 1,
                             name + " wears the belt and nothing else, as the stand is set up");
-                yield return Swap(scene, story, name + " changes back");
-                story.Check(scene.Colonist.apparel.WornApparel.Count == before.Count,
+                yield return Swap(scene, scenario, name + " changes back");
+                scenario.Check(scene.Colonist.apparel.WornApparel.Count == before.Count,
                             "and " + name + "'s own clothes came back");
             }
         }
@@ -220,39 +220,39 @@ namespace ShiftChange.Tests
         {
             return Staged(Body);
 
-            IEnumerator Body(Scene scene, Story story)
+            IEnumerator Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
-                story.Check(!new ShiftChangeSettings().keepColonistsDecent,
+                scenario.Check(!new ShiftChangeSettings().keepColonistsDecent,
                             "Keep colonists decent is off in a new game's settings");
-                if (!StockOnly(story, scene, "Apparel_ShieldBelt", "a shield belt")
-                    || !SetDecent(story, false))
+                if (!StockOnly(scenario, scene, "Apparel_ShieldBelt", "a shield belt")
+                    || !SetDecent(scenario, false))
                 {
                     yield break;
                 }
                 List<Apparel> before = new List<Apparel>(scene.Colonist.apparel.WornApparel);
-                story.Check(!SwapPlan.PrefersNudity(scene.Colonist),
+                scenario.Check(!SwapPlan.PrefersNudity(scene.Colonist),
                             name + " is no nudist, so only the setting decides");
 
                 scene.Comp.SetFullChange(true);
-                story.Note("Change the whole outfit is ticked on the stand");
+                scenario.Note("Change the whole outfit is ticked on the stand");
                 List<Apparel> wear = new List<Apparel>();
                 List<Apparel> store = new List<Apparel>();
-                story.Check(SwapPlan.BuildDress(scene.Colonist, scene.OutfitStand, wear, store),
+                scenario.Check(SwapPlan.BuildDress(scene.Colonist, scene.OutfitStand, wear, store),
                             "the stand plans a change");
-                story.Check(store.Count == before.Count,
+                scenario.Check(store.Count == before.Count,
                             "which takes everything, as every version up to 1.3.0 did");
 
-                if (!SetDecent(story, true))
+                if (!SetDecent(scenario, true))
                 {
                     yield break;
                 }
                 List<Apparel> onWear = new List<Apparel>();
                 List<Apparel> onStore = new List<Apparel>();
-                story.Check(ShiftChangeMod.DecencyEnabled, "turning it on takes effect");
-                story.Check(SwapPlan.BuildDress(scene.Colonist, scene.OutfitStand, onWear, onStore),
+                scenario.Check(ShiftChangeMod.DecencyEnabled, "turning it on takes effect");
+                scenario.Check(SwapPlan.BuildDress(scene.Colonist, scene.OutfitStand, onWear, onStore),
                             "the stand still plans a change");
-                story.Check(onStore.Count < before.Count, "and now holds something back");
+                scenario.Check(onStore.Count < before.Count, "and now holds something back");
                 yield break;
             }
         }

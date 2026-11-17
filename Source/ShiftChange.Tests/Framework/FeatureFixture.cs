@@ -14,14 +14,15 @@ using static ShiftChange.Tests.SceneKit;
 namespace ShiftChange.Tests
 {
     /// <summary>
-    /// What the tests written as stories share: the frame each runs in (<see cref="Tell"/>), which
-    /// opens its <see cref="Story"/> with the test's sentence and always cleans up after it; the
-    /// ways to set a test up (<see cref="Staged(Action{Scene, Story}, StageKit, Gender, string)"/>
-    /// and its siblings, <see cref="OnThePad"/>, <see cref="Unstaged"/>); <see cref="Swap"/>, one
+    /// What every feature's scenarios share: the frame each runs in (<see cref="RunScenario"/>),
+    /// which opens its <see cref="Scenario"/> with the test's sentence and always cleans up after
+    /// it; the ways to set a test up
+    /// (<see cref="Staged(Action{Scene, Scenario}, StageKit, Gender, string)"/> and its siblings,
+    /// <see cref="OnThePad"/>, <see cref="Unstaged"/>); <see cref="Swap"/>, one
     /// change at the stand with the game's clock stepped until it ends (<see cref="GameClock"/>),
     /// and <see cref="SwapNow"/>, one within a frame; and the checks and set-up many tests share.
     /// </summary>
-    internal abstract class StoryFixture : ShiftChangeFixture
+    internal abstract class FeatureFixture : ShiftChangeFixture
     {
         /// <summary>
         /// The most ticks one change may take: a walk across the pad, the garments' equip
@@ -29,7 +30,7 @@ namespace ShiftChange.Tests
         /// </summary>
         internal const int MostTicks = 2500;
 
-        /// <summary>What the running test set up on the pad, for <see cref="Tell"/> to clear.</summary>
+        /// <summary>What the running test set up on the pad, for <see cref="RunScenario"/> to clear.</summary>
         internal Scene CurrentScene;
 
         /// <summary>
@@ -144,7 +145,7 @@ namespace ShiftChange.Tests
             runCase();
         }
 
-        /// <summary>The sentence a test's <c>TestDescription</c> opens its story with.</summary>
+        /// <summary>The sentence a test's <c>TestDescription</c> opens its scenario with.</summary>
         internal static string SentenceOf(MethodInfo test)
         {
             return test?.GetCustomAttribute<TestDescriptionAttribute>()?.Value as string;
@@ -163,22 +164,22 @@ namespace ShiftChange.Tests
         /// <paramref name="kit"/> on its interaction cell (<see cref="Stage"/>), for a test that
         /// steps the game's clock.
         /// </summary>
-        internal IEnumerator Staged(Func<Scene, Story, IEnumerator> body,
+        internal IEnumerator Staged(Func<Scene, Scenario, IEnumerator> body,
                                     StageKit kit = StageKit.Displacing, Gender gender = Gender.Male,
                                     [CallerMemberName] string test = null)
         {
-            return Tell(test, true, story => Within(StageFor(story, kit, gender), story, body));
+            return RunScenario(test, true, scenario => Within(StageFor(scenario, kit, gender), scenario, body));
         }
 
         /// <summary>
         /// Runs <paramref name="body"/> on a stand holding a duster and a colonist dressed per
         /// <paramref name="kit"/> on its interaction cell (<see cref="Stage"/>), within one frame.
         /// </summary>
-        internal IEnumerator Staged(Action<Scene, Story> body,
+        internal IEnumerator Staged(Action<Scene, Scenario> body,
                                     StageKit kit = StageKit.Displacing, Gender gender = Gender.Male,
                                     [CallerMemberName] string test = null)
         {
-            return Tell(test, true, story => Within(StageFor(story, kit, gender), story, Now(body)));
+            return RunScenario(test, true, scenario => Within(StageFor(scenario, kit, gender), scenario, Now(body)));
         }
 
         /// <summary>
@@ -188,48 +189,48 @@ namespace ShiftChange.Tests
         /// cannot set the scene up, which fails the test.
         /// </summary>
         internal IEnumerator Staged(Func<Map, CellRect, Scene> build, string description,
-                                    Action<Scene, Story> body, [CallerMemberName] string test = null)
+                                    Action<Scene, Scenario> body, [CallerMemberName] string test = null)
         {
-            return Tell(test, true, story => Within(BuildFor(story, build, description), story, Now(body)));
+            return RunScenario(test, true, scenario => Within(BuildFor(scenario, build, description), scenario, Now(body)));
         }
 
         /// <summary>
         /// Runs <paramref name="body"/> on the current map with the pad found, for a test that sets
         /// up what it needs itself and leaves nothing on the pad to clear.
         /// </summary>
-        internal IEnumerator OnThePad(Action<Story> body, [CallerMemberName] string test = null)
+        internal IEnumerator OnThePad(Action<Scenario> body, [CallerMemberName] string test = null)
         {
-            return Tell(test, true, story => Now(body, story));
+            return RunScenario(test, true, scenario => Now(body, scenario));
         }
 
         /// <summary>
         /// Runs <paramref name="body"/> with no pad and no camera move, for a test that reads the
         /// game's tables, or finds a place of its own.
         /// </summary>
-        internal IEnumerator Unstaged(Action<Story> body, [CallerMemberName] string test = null)
+        internal IEnumerator Unstaged(Action<Scenario> body, [CallerMemberName] string test = null)
         {
-            return Tell(test, false, story => Now(body, story));
+            return RunScenario(test, false, scenario => Now(body, scenario));
         }
 
         /// <summary>
-        /// The frame every story test runs in. Opens the story with the test's sentence, finds the
+        /// The frame every scenario runs in. Opens the scenario with the test's sentence, finds the
         /// pad when <paramref name="onPad"/>, and runs <paramref name="run"/>, whose exception,
-        /// even from a step after the clock ran, is the story's last line
+        /// even from code after the clock ran, is the scenario's last step
         /// (<see cref="Guarded"/>). Then, whatever happened: puts Shift Change's settings and the
         /// interception's switches back as they were (<see cref="SettingsAsFound"/>), clears what
         /// the test set up on the pad (<see cref="CurrentScene"/>), skips a test whose only trouble
-        /// was a known gap, and writes the story to Test.log.
+        /// was a known gap, and writes the scenario to Test.log.
         /// </summary>
-        internal IEnumerator Tell(string test, bool onPad, Func<Story, IEnumerator> run)
+        internal IEnumerator RunScenario(string test, bool onPad, Func<Scenario, IEnumerator> run)
         {
-            Story story = new Story(Sentence(test) ?? test);
+            Scenario scenario = new Scenario(Sentence(test) ?? test);
             CurrentScene = null;
             SettingsAsFound found = new SettingsAsFound();
             try
             {
                 if (Sentence(test) == null)
                 {
-                    story.Check(false, test + " has a TestDescription, the sentence its story opens with");
+                    scenario.Check(false, test + " has a TestDescription, the sentence its scenario opens with");
                     yield break;
                 }
                 if (onPad)
@@ -245,7 +246,7 @@ namespace ShiftChange.Tests
                     Map = Find.CurrentMap;
                     Pad = CellRect.Empty;
                 }
-                yield return Guarded(run(story), story.Threw);
+                yield return Guarded(run(scenario), scenario.Threw);
             }
             finally
             {
@@ -255,40 +256,40 @@ namespace ShiftChange.Tests
                     Teardown(CurrentScene, Map, Pad);
                     CurrentScene = null;
                 }
-                if (story.Gap && !story.Failing)
+                if (scenario.Gap && !scenario.Failing)
                 {
-                    Test.Skip("a known gap; the story is in Test.log");
+                    scenario.SkipForGaps();
                 }
-                story.Tell();
+                scenario.WriteToLog();
             }
         }
 
         /// <summary>
         /// Runs <paramref name="body"/> on <paramref name="scene"/>, null after a failed set-up.
         /// </summary>
-        internal IEnumerator Within(Scene scene, Story story, Func<Scene, Story, IEnumerator> body)
+        internal IEnumerator Within(Scene scene, Scenario scenario, Func<Scene, Scenario, IEnumerator> body)
         {
             if (scene == null)
             {
                 yield break;
             }
             CurrentScene = scene;
-            yield return body(scene, story);
+            yield return body(scene, scenario);
         }
 
         /// <summary>A body that runs within one frame, as a step of the test's routine.</summary>
-        internal Func<Scene, Story, IEnumerator> Now(Action<Scene, Story> body)
+        internal Func<Scene, Scenario, IEnumerator> Now(Action<Scene, Scenario> body)
         {
-            return (scene, story) => Now(s => body(scene, s), story);
+            return (scene, scenario) => Now(s => body(scene, s), scenario);
         }
 
         /// <summary>
         /// Runs <paramref name="body"/> now, the way this fixture runs a test
         /// (<see cref="Wrap"/>: the save/load fixture runs it as the game runs a
-        /// load). What it throws fails the test with the story so far, the exception its last
-        /// line. A body the wrap put off, which would run after the test had ended, fails it.
+        /// load). What it throws fails the test with the steps so far, the exception its last
+        /// step. A body the wrap put off, which would run after the test had ended, fails it.
         /// </summary>
-        internal IEnumerator Now(Action<Story> body, Story story)
+        internal IEnumerator Now(Action<Scenario> body, Scenario scenario)
         {
             bool ran = false;
             Wrap(() =>
@@ -296,16 +297,16 @@ namespace ShiftChange.Tests
                 ran = true;
                 try
                 {
-                    body(story);
+                    body(scenario);
                 }
                 catch (Exception e)
                 {
-                    story.Threw(e);
+                    scenario.Threw(e);
                 }
             });
             if (!ran)
             {
-                story.Check(false, "the test ran when it was started, not later");
+                scenario.Check(false, "the test ran when it was started, not later");
             }
             yield break;
         }
@@ -315,7 +316,7 @@ namespace ShiftChange.Tests
         /// DevTools would, and hands what any of them throws to <paramref name="threw"/> rather
         /// than to DevTools, ending the routine there. A test that steps the clock runs over
         /// several frames, out of reach of <see cref="Now"/>'s catch; without this its exception
-        /// would fail the test with no line in its story. The routines left open are disposed, so
+        /// would fail the test with no step in its scenario. The routines left open are disposed, so
         /// their own clean-up runs (<see cref="GameClock.Held"/>).
         /// </summary>
         internal static IEnumerator Guarded(IEnumerator routine, Action<Exception> threw)
@@ -369,7 +370,7 @@ namespace ShiftChange.Tests
         /// Sets a scene up with <paramref name="build"/>, retrying a build that throws as
         /// <see cref="StageFor"/> does. Null, the test failed, when none could be set up.
         /// </summary>
-        internal Scene BuildFor(Story story, Func<Map, CellRect, Scene> build, string description)
+        internal Scene BuildFor(Scenario scenario, Func<Map, CellRect, Scene> build, string description)
         {
             Exception last = null;
             for (int attempt = 1; attempt <= BuildAttempts; attempt++)
@@ -380,7 +381,7 @@ namespace ShiftChange.Tests
                     if (scene != null)
                     {
                         CurrentScene = scene;
-                        story.Check(true, description);
+                        scenario.Check(true, description);
                         return scene;
                     }
                     // Not a flake but something missing, so no retry; what the build spawned
@@ -391,11 +392,11 @@ namespace ShiftChange.Tests
                 catch (Exception e)
                 {
                     last = e;
-                    story.Note("setting up threw on try " + attempt + ": " + e.GetType().Name + ": " + e.Message);
+                    scenario.Note("setting up threw on try " + attempt + ": " + e.GetType().Name + ": " + e.Message);
                     Teardown(null, Map, Pad);
                 }
             }
-            story.Check(false, last == null
+            scenario.Check(false, last == null
                 ? description + ": could not be set up"
                 : description + ": could not be set up in " + BuildAttempts + " tries, last: " + last);
             return null;
@@ -406,7 +407,7 @@ namespace ShiftChange.Tests
         /// (<see cref="BuildAttempts"/>), each retry noted. Null, the test failed, when none could
         /// be built.
         /// </summary>
-        internal Scene StageFor(Story story, StageKit kit, Gender gender)
+        internal Scene StageFor(Scenario scenario, StageKit kit, Gender gender)
         {
             Exception last = null;
             for (int attempt = 1; attempt <= BuildAttempts; attempt++)
@@ -417,7 +418,7 @@ namespace ShiftChange.Tests
                     if (scene != null)
                     {
                         CurrentScene = scene;
-                        story.Check(true, "a stand holding a duster, and " + scene.Colonist.LabelShort
+                        scenario.Check(true, "a stand holding a duster, and " + scene.Colonist.LabelShort
                                           + " beside it in a shirt, trousers"
                                           + (kit == StageKit.Displacing ? " and a parka" : ""));
                         return scene;
@@ -429,37 +430,37 @@ namespace ShiftChange.Tests
                 catch (Exception e)
                 {
                     last = e;
-                    story.Note("setting the stand up threw on try " + attempt + ": "
+                    scenario.Note("setting the stand up threw on try " + attempt + ": "
                                + e.GetType().Name + ": " + e.Message);
                     Teardown(null, Map, Pad);
                 }
             }
-            story.Check(false, last == null
+            scenario.Check(false, last == null
                 ? "a stand and a colonist could be set up"
                 : "a stand and a colonist could be set up in " + BuildAttempts + " tries, last: " + last);
             return null;
         }
 
         /// <summary>
-        /// Turns Keep colonists decent on or off for this test; <see cref="Tell"/> puts it back.
+        /// Turns Keep colonists decent on or off for this test; <see cref="RunScenario"/> puts it back.
         /// False, the test failed, when the mod's settings cannot be read.
         /// </summary>
-        internal static bool SetDecent(Story story, bool on)
+        internal static bool SetDecent(Scenario scenario, bool on)
         {
-            if (!story.Check(ShiftChangeMod.Settings != null, "Shift Change's settings can be read"))
+            if (!scenario.Check(ShiftChangeMod.Settings != null, "Shift Change's settings can be read"))
             {
                 return false;
             }
             ShiftChangeMod.Settings.keepColonistsDecent = on;
-            story.Note("Keep colonists decent is " + (on ? "on" : "off"));
+            scenario.Note("Keep colonists decent is " + (on ? "on" : "off"));
             return true;
         }
 
         /// <summary>Changes what the stand holds to the one garment named, or fails the test.</summary>
-        internal static bool StockOnly(Story story, Scene scene, string defName, string what)
+        internal static bool StockOnly(Scenario scenario, Scene scene, string defName, string what)
         {
             ClearStand(scene.OutfitStand);
-            return story.Check(StockOne(scene.OutfitStand, defName), "the stand holds " + what + " and nothing else");
+            return scenario.Check(StockOne(scene.OutfitStand, defName), "the stand holds " + what + " and nothing else");
         }
 
         internal static Apparel Worn(Pawn pawn, string defName)
@@ -521,12 +522,12 @@ namespace ShiftChange.Tests
             }
         }
 
-        /// <summary>One change, stepped to its end, with a line in the story for how it went.</summary>
-        internal static IEnumerator Swap(Scene scene, Story story, string what, SwapLeg leg = null)
+        /// <summary>One change, stepped to its end, with a step in the scenario for how it went.</summary>
+        internal static IEnumerator Swap(Scene scene, Scenario scenario, string what, SwapLeg leg = null)
         {
             leg = leg ?? new SwapLeg();
             yield return Swap(scene, leg);
-            story.Check(leg.Succeeded, leg.Outcome(what));
+            scenario.Check(leg.Succeeded, leg.Outcome(what));
         }
 
         /// <summary>
@@ -535,9 +536,9 @@ namespace ShiftChange.Tests
         /// in the same frame. False when it gave up, with notes on where it got stuck or what took
         /// the colonist instead; the caller's check says what failed.
         /// </summary>
-        internal static bool SwapNow(Story story, Scene scene, int maxTicks = 5000)
+        internal static bool SwapNow(Scenario scenario, Scene scene, int maxTicks = 5000)
         {
-            return RunSwap(scene, story.Note, maxTicks);
+            return RunSwap(scene, scenario.Note, maxTicks);
         }
 
         /// <summary>
@@ -549,10 +550,10 @@ namespace ShiftChange.Tests
         /// colonist straight back to change, so it has to ride along. Clearing ends a change that
         /// did start, which would answer every later ask with <c>MidSwap</c>.
         /// </summary>
-        internal static bool NotSentStraightBack(Story story, Scene scene)
+        internal static bool NotSentStraightBack(Scenario scenario, Scene scene)
         {
             JobDef next = scene.Colonist.CurJobDef;
-            bool ok = story.Check(next != ShiftChangeDefOf.ShiftChange_SwapAtStand,
+            bool ok = scenario.Check(next != ShiftChangeDefOf.ShiftChange_SwapAtStand,
                                   scene.Colonist.LabelShort + "'s next job, " + (next == null ? "none" : next.label)
                                   + ", does not send them straight back to the stand");
             ClearSwapDecision(scene.Colonist);
@@ -566,9 +567,9 @@ namespace ShiftChange.Tests
         /// other mods' postfixes on <c>Pawn.SpawnSetup</c>. Each retry is noted, and the last
         /// try's exception fails the test.
         /// </summary>
-        internal static Pawn AnotherColonist(Story story, Scene scene, Gender gender, string nick)
+        internal static Pawn AnotherColonist(Scenario scenario, Scene scene, Gender gender, string nick)
         {
-            return AnotherColonist(story, scene, gender, nick, BesideTheStand(scene), "beside the stand");
+            return AnotherColonist(scenario, scene, gender, nick, BesideTheStand(scene), "beside the stand");
         }
 
         /// <summary>
@@ -611,10 +612,10 @@ namespace ShiftChange.Tests
         }
 
         /// <summary>
-        /// <see cref="AnotherColonist(Story, Scene, Gender, string)"/> on a given cell, which
+        /// <see cref="AnotherColonist(Scenario, Scene, Gender, string)"/> on a given cell, which
         /// <paramref name="where"/> says in the game's words.
         /// </summary>
-        internal static Pawn AnotherColonist(Story story, Scene scene, Gender gender, string nick,
+        internal static Pawn AnotherColonist(Scenario scenario, Scene scene, Gender gender, string nick,
                                              IntVec3 cell, string where)
         {
             for (int attempt = 1; ; attempt++)
@@ -625,13 +626,13 @@ namespace ShiftChange.Tests
                 {
                     GenSpawn.Spawn(pawn, cell, scene.Map, Rot4.North);
                     scene.Extras.Add(pawn);
-                    story.Note(pawn.LabelShort + (gender == Gender.Female ? ", a woman," : ", a man,")
+                    scenario.Note(pawn.LabelShort + (gender == Gender.Female ? ", a woman," : ", a man,")
                                + " joins the colony " + where);
                     return pawn;
                 }
                 catch (Exception e) when (attempt < BuildAttempts)
                 {
-                    story.Note("spawning " + nick + " threw on try " + attempt + ": "
+                    scenario.Note("spawning " + nick + " threw on try " + attempt + ": "
                                + e.GetType().Name + ": " + e.Message);
                     try
                     {

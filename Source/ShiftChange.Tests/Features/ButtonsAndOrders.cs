@@ -16,7 +16,7 @@ namespace ShiftChange.Tests
     /// The stand's buttons, the player's orders on shift, and the clothes a stand parks.
     /// </summary>
     [TestFixture(TestType.Playing), ExecutionPriority(RunOrder.First - (int)CaseGroup.ButtonsAndOrders)]
-    internal class ButtonsAndOrders : StoryFixture
+    internal class ButtonsAndOrders : FeatureFixture
     {
         /// <summary>What <see cref="Stage"/> sets up with the pad walled, roofed and floored.</summary>
         internal const string InARoom =
@@ -44,12 +44,12 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 WorkTypeDef doctor = WorkType("Doctor");
                 if (doctor == null)
                 {
-                    story.Check(false, "the game has its doctoring");
+                    scenario.Check(false, "the game has its doctoring");
                     return;
                 }
                 string recreation = "ShiftChange.Recreation".Translate().RawText;
@@ -57,28 +57,28 @@ namespace ShiftChange.Tests
                 string idle = "ShiftChange.RegimeIdle".Translate().RawText;
                 string off = "ShiftChange.RegimeOff".Translate().RawText;
 
-                story.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel == idle,
+                scenario.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel == idle,
                             "on Automatic, in a room with no role, the switch reads \"" + idle + "\"");
 
                 scene.Comp.ToggleWork(doctor);
-                story.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel
+                scenario.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel
                             == GizmoKit.Shift(WorkTypeLabels.Of(doctor)),
                             "ticked for doctoring, it reads \"" + GizmoKit.Shift(WorkTypeLabels.Of(doctor)) + "\"");
 
                 scene.Comp.ToggleRecreation();
-                story.Check(scene.Comp.HandlesRecreation(), "ticked for Recreation, the stand serves recreation");
-                story.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel == GizmoKit.Shift(recreation),
+                scenario.Check(scene.Comp.HandlesRecreation(), "ticked for Recreation, the stand serves recreation");
+                scenario.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel == GizmoKit.Shift(recreation),
                             "and its switch names recreation (it reads \""
                             + GizmoKit.Switch(scene.Comp)?.defaultLabel + "\")");
 
                 scene.Comp.ToggleRest();
-                story.Check(scene.Comp.HandlesRest(), "ticked for Sleeping, the stand serves sleep");
-                story.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel == GizmoKit.Shift(sleep),
+                scenario.Check(scene.Comp.HandlesRest(), "ticked for Sleeping, the stand serves sleep");
+                scenario.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel == GizmoKit.Shift(sleep),
                             "and its switch names sleep (it reads \""
                             + GizmoKit.Switch(scene.Comp)?.defaultLabel + "\")");
 
                 scene.Comp.SetExcluded();
-                story.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel == off,
+                scenario.Check(GizmoKit.Switch(scene.Comp)?.defaultLabel == off,
                             "and set to not used, it reads \"" + off + "\"");
             }
         }
@@ -97,12 +97,12 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
                 if (standDef == null)
                 {
-                    story.Check(false, "the game has its outfit stand");
+                    scenario.Check(false, "the game has its outfit stand");
                     return;
                 }
                 Building_OutfitStand other = DebugTools_Fixtures.Spawn(scene.Map, standDef, ThingDefOf.WoodLog,
@@ -110,30 +110,30 @@ namespace ShiftChange.Tests
                 CompShiftStand otherComp = other?.TryGetComp<CompShiftStand>();
                 if (otherComp == null)
                 {
-                    story.Check(false, "a second stand is built two cells along");
+                    scenario.Check(false, "a second stand is built two cells along");
                     return;
                 }
-                story.Note("a second stand is built two cells along");
+                scenario.Note("a second stand is built two cells along");
 
                 Command_Action mine = GizmoKit.Switch(scene.Comp);
                 Command_Action theirs = GizmoKit.Switch(otherComp);
-                if (!story.Check(mine != null && theirs != null, "both stands have a switch"))
+                if (!scenario.Check(mine != null && theirs != null, "both stands have a switch"))
                 {
                     return;
                 }
                 Command_Action twinA = new Command_Action { defaultLabel = mine.defaultLabel, icon = mine.icon };
                 Command_Action twinB = new Command_Action { defaultLabel = mine.defaultLabel, icon = mine.icon };
-                story.Check(mine.defaultLabel == theirs.defaultLabel && mine.icon == theirs.icon,
+                scenario.Check(mine.defaultLabel == theirs.defaultLabel && mine.icon == theirs.icon,
                             "set up alike, the two stands' switches look the same");
-                story.Check(twinA.GroupsWith(twinB), "and two plain buttons that look like that would merge into one");
-                story.Check(!mine.GroupsWith(theirs) && !theirs.GroupsWith(mine),
+                scenario.Check(twinA.GroupsWith(twinB), "and two plain buttons that look like that would merge into one");
+                scenario.Check(!mine.GroupsWith(theirs) && !theirs.GroupsWith(mine),
                             "but the two stands' switches stay separate buttons");
 
                 Command_Action myOwner = GizmoKit.OwnerButton(scene.OutfitStand);
                 Command_Action theirOwner = GizmoKit.OwnerButton(other);
-                story.Check(myOwner != null && theirOwner != null && myOwner.Label == theirOwner.Label,
+                scenario.Check(myOwner != null && theirOwner != null && myOwner.Label == theirOwner.Label,
                             "both stands show the same Set owner button");
-                story.Check(myOwner != null && theirOwner != null
+                scenario.Check(myOwner != null && theirOwner != null
                             && !myOwner.GroupsWith(theirOwner) && !theirOwner.GroupsWith(myOwner),
                             "and those stay separate too");
             }
@@ -154,15 +154,15 @@ namespace ShiftChange.Tests
         {
             return Staged((map, pad) => Stage(map, pad, StageKit.Displacing, enclose: true), InARoom, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 ThingDef standDef = DefDatabase<ThingDef>.GetNamedSilentFail("Building_OutfitStand");
                 List<Vector3> arrows = AccessTools.Field(typeof(TargetHighlighter), "arrowPositions")
                     ?.GetValue(null) as List<Vector3>;
                 Material square = GenDraw.CurTargetingMat;
-                if (!story.Check(standDef != null, "the game has its outfit stand")
-                    || !story.Check(arrows != null, "the game's list of arrows to draw can be read")
-                    || !story.Check(scene.Map == Find.CurrentMap, "the stand is on the map in view"))
+                if (!scenario.Check(standDef != null, "the game has its outfit stand")
+                    || !scenario.Check(arrows != null, "the game's list of arrows to draw can be read")
+                    || !scenario.Check(scene.Map == Find.CurrentMap, "the stand is on the map in view"))
                 {
                     return;
                 }
@@ -171,10 +171,10 @@ namespace ShiftChange.Tests
                 CompShiftStand otherComp = other?.TryGetComp<CompShiftStand>();
                 if (otherComp == null)
                 {
-                    story.Check(false, "a second stand is built two cells along");
+                    scenario.Check(false, "a second stand is built two cells along");
                     return;
                 }
-                story.Note("a second stand is built two cells along");
+                scenario.Note("a second stand is built two cells along");
 
                 void Reset()
                 {
@@ -197,19 +197,19 @@ namespace ShiftChange.Tests
                 void OnlyMarks(Command_Action button, Thing mine, Thing theirs, string what)
                 {
                     Reset();
-                    if (!story.Check(button?.onHover != null, what + " does something when hovered"))
+                    if (!scenario.Check(button?.onHover != null, what + " does something when hovered"))
                     {
                         return;
                     }
                     button.onHover();
-                    story.Check(Marks(mine) && !Marks(theirs) && Squared(),
+                    scenario.Check(Marks(mine) && !Marks(theirs) && Squared(),
                                 what + " marks its own stand and not the other" + Seen());
                 }
 
                 Reset();
-                story.Check(!Squared(), "the targeting square keeps the colour set on it, so a drawn one shows");
+                scenario.Check(!Squared(), "the targeting square keeps the colour set on it, so a drawn one shows");
                 CompShiftStand.PointAt(other);
-                story.Check(Marks(other) && !Marks(scene.OutfitStand) && Squared(),
+                scenario.Check(Marks(other) && !Marks(scene.OutfitStand) && Squared(),
                             "pointing at the second stand directly marks that stand alone" + Seen());
                 OnlyMarks(GizmoKit.Switch(scene.Comp), scene.OutfitStand, other, "the first stand's switch");
                 OnlyMarks(GizmoKit.Switch(otherComp), other, scene.OutfitStand, "the second stand's switch");
@@ -223,7 +223,7 @@ namespace ShiftChange.Tests
                 other.Destroy();
                 Reset();
                 stale?.onHover?.Invoke();
-                story.Check(stale != null && arrows.Count == 0 && !Squared(),
+                scenario.Check(stale != null && arrows.Count == 0 && !Squared(),
                             "a button kept after its stand is gone marks nothing" + Seen());
                 arrows.Clear();
             }
@@ -250,28 +250,28 @@ namespace ShiftChange.Tests
         {
             return Staged(Build, OnShift, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 Apparel parked = ParkedGarment(scene);
                 if (parked == null)
                 {
-                    story.Check(false, "the stand holds something of " + name + "'s to compare against");
+                    scenario.Check(false, "the stand holds something of " + name + "'s to compare against");
                     return;
                 }
 
                 Apparel spare = Duplicate(parked);
                 if (spare == null)
                 {
-                    story.Check(false, "a spare " + parked.def.label + " like the parked one can be made");
+                    scenario.Check(false, "a spare " + parked.def.label + " like the parked one can be made");
                     return;
                 }
                 string label = parked.def.label;
 
-                story.Check(scene.Comp.Borrower == scene.Colonist, name + " has borrowed the stand's outfit");
-                story.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
+                scenario.Check(scene.Comp.Borrower == scene.Colonist, name + " has borrowed the stand's outfit");
+                scenario.Check(CompShiftStand.OnShiftStandFor(scene.Colonist) == scene.Comp,
                             "and is on shift at this stand");
-                story.Check(Refused(scene.Colonist, spare),
+                scenario.Check(Refused(scene.Colonist, spare),
                             name + " refuses a spare " + label + " like the one parked on the stand");
 
                 // A garment that displaces nothing parked must come through untouched. Chosen against
@@ -280,10 +280,10 @@ namespace ShiftChange.Tests
                 // trousers, so fixed trousers would check the opposite of the truth and read as a
                 // broken patch.
                 Apparel unrelated = NonConflictingSpare(scene);
-                story.Check(unrelated != null, "a spare that would displace nothing on the stand can be made");
+                scenario.Check(unrelated != null, "a spare that would displace nothing on the stand can be made");
                 if (unrelated != null)
                 {
-                    story.Check(!Refused(scene.Colonist, unrelated),
+                    scenario.Check(!Refused(scene.Colonist, unrelated),
                                 "and " + name + " would still take a " + unrelated.def.label
                                 + ", which displaces nothing on the stand");
                 }
@@ -295,14 +295,14 @@ namespace ShiftChange.Tests
                     : null;
                 if (worn != null)
                 {
-                    story.Check(!Refused(scene.Colonist, worn),
+                    scenario.Check(!Refused(scene.Colonist, worn),
                                 "what " + name + " has on, such as the " + worn.def.label + ", is never refused");
                 }
 
                 // Last: it takes the colonist off shift, which the checks above need.
                 CompShiftStand.OnShiftStands.Remove(scene.Colonist);
-                story.Note(name + " is taken off shift");
-                story.Check(!Refused(scene.Colonist, spare),
+                scenario.Note(name + " is taken off shift");
+                scenario.Check(!Refused(scene.Colonist, spare),
                             "and off shift, the same spare " + label + " is theirs to take");
             }
         }
@@ -317,30 +317,30 @@ namespace ShiftChange.Tests
         {
             return Staged(Build, OnShift, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 string name = scene.Colonist.LabelShort;
                 Apparel parked = ParkedGarment(scene);
                 if (parked == null)
                 {
-                    story.Check(false, "the stand holds something of " + name + "'s to wear out");
+                    scenario.Check(false, "the stand holds something of " + name + "'s to wear out");
                     return;
                 }
                 if (!parked.def.useHitPoints || parked.MaxHitPoints < 5)
                 {
-                    story.Check(false, "the " + parked.def.label + " on the stand can wear out");
+                    scenario.Check(false, "the " + parked.def.label + " on the stand can wear out");
                     return;
                 }
 
                 Apparel spare = Duplicate(parked);
                 if (spare == null)
                 {
-                    story.Check(false, "a spare " + parked.def.label + " like the parked one can be made");
+                    scenario.Check(false, "a spare " + parked.def.label + " like the parked one can be made");
                     return;
                 }
                 string label = parked.def.label;
 
-                story.Check(Refused(scene.Colonist, spare),
+                scenario.Check(Refused(scene.Colonist, spare),
                             name + " refuses a spare " + label + " while the one on the stand is sound");
 
                 // A fifth of full hit points is well under the knee of the game's
@@ -348,9 +348,9 @@ namespace ShiftChange.Tests
                 // at most 0.2 from 20% down, so the parked garment is the worse one by the game's own
                 // reckoning, not by a threshold of ours.
                 parked.HitPoints = Mathf.Max(1, parked.MaxHitPoints / 5);
-                story.Note("the " + label + " on the stand is worn down to " + parked.HitPoints + " of "
+                scenario.Note("the " + label + " on the stand is worn down to " + parked.HitPoints + " of "
                            + parked.MaxHitPoints + " hit points");
-                story.Check(!Refused(scene.Colonist, spare),
+                scenario.Check(!Refused(scene.Colonist, spare),
                             "and " + name + " takes the spare once the one on the stand is worn through");
             }
         }
@@ -371,12 +371,12 @@ namespace ShiftChange.Tests
         {
             return Staged(Build, OnShift, Body);
 
-            void Body(Scene scene, Story story)
+            void Body(Scene scene, Scenario scenario)
             {
                 if (!ModsConfig.IdeologyActive || JobDefOf.RecolorApparel == null
                     || ThingDefOf.StylingStation == null || ThingDefOf.Dye == null)
                 {
-                    story.KnownGap(false, "a colonist on shift carries out a recolor order",
+                    scenario.KnownGap(false, "a colonist on shift carries out a recolor order",
                         "Ideology is not active on this mod list; add ludeon.rimworld.ideology to it");
                     return;
                 }
@@ -384,10 +384,10 @@ namespace ShiftChange.Tests
                 string name = pawn.LabelShort;
                 Apparel uniform = scene.Comp.issuedUniform.Count > 0 ? scene.Comp.issuedUniform[0] : null;
                 Apparel parked = ParkedGarment(scene);
-                bool ready = story.Check(CompShiftStand.OnShiftStandFor(pawn) == scene.Comp, name + " is on shift")
-                             & story.Check(uniform != null && pawn.apparel.WornApparel.Contains(uniform),
+                bool ready = scenario.Check(CompShiftStand.OnShiftStandFor(pawn) == scene.Comp, name + " is on shift")
+                             & scenario.Check(uniform != null && pawn.apparel.WornApparel.Contains(uniform),
                                            "and wears the stand's outfit")
-                             & story.Check(parked != null && parked.ParentHolder is Building_OutfitStand,
+                             & scenario.Check(parked != null && parked.ParentHolder is Building_OutfitStand,
                                            "with their own clothes parked on the stand");
                 if (!ready)
                 {
@@ -401,37 +401,37 @@ namespace ShiftChange.Tests
                 dye.stackCount = 10;
                 GenSpawn.Spawn(dye, scene.OutfitStand.Position + new IntVec3(4, 0, 2), scene.Map);
                 uniform.DesiredColor = new Color(0.8f, 0.2f, 0.2f);
-                story.Note("a styling station is built across the pad with ten dye beside it, and the "
+                scenario.Note("a styling station is built across the pad with ten dye beside it, and the "
                            + uniform.def.label + " is marked to be dyed red");
-                story.Check(JobGiver_OptimizeApparel.TryCreateRecolorJob(pawn, out _, dryRun: true),
+                scenario.Check(JobGiver_OptimizeApparel.TryCreateRecolorJob(pawn, out _, dryRun: true),
                             "the styling station would recolor it");
 
-                story.Check(!OptimizerJob(pawn).IsValid,
+                scenario.Check(!OptimizerJob(pawn).IsValid,
                             "on shift " + name + " does not go to dye the outfit unasked, though it is marked");
-                story.Check(RefusedAtReservations(pawn, RecolorJob(pawn, ordered: false, names: null)),
+                scenario.Check(RefusedAtReservations(pawn, RecolorJob(pawn, ordered: false, names: null)),
                             "and a recolor they were not ordered to do is refused");
 
                 Job order = RecolorJob(pawn, ordered: false, names: null);
-                story.Check(order != null && order.GetTargetQueue(TargetIndex.B).Contains(uniform),
+                scenario.Check(order != null && order.GetTargetQueue(TargetIndex.B).Contains(uniform),
                             "the station's order covers the " + uniform.def.label);
                 if (order != null)
                 {
-                    story.Check(pawn.jobs.TryTakeOrderedJob(order, JobTag.Misc), name + " takes the order on shift");
-                    story.Check(pawn.CurJobDef == JobDefOf.RecolorApparel, "and starts recoloring");
-                    story.Check(pawn.apparel.WornApparel.Contains(uniform),
+                    scenario.Check(pawn.jobs.TryTakeOrderedJob(order, JobTag.Misc), name + " takes the order on shift");
+                    scenario.Check(pawn.CurJobDef == JobDefOf.RecolorApparel, "and starts recoloring");
+                    scenario.Check(pawn.apparel.WornApparel.Contains(uniform),
                                 "still in the stand's outfit, since an order never sends anyone to change");
                     pawn.jobs.StopAll();
                 }
-                story.Check(RefusedAtReservations(pawn, RecolorJob(pawn, ordered: true, names: parked)),
+                scenario.Check(RefusedAtReservations(pawn, RecolorJob(pawn, ordered: true, names: parked)),
                             "an order to recolor the clothes on the stand is refused");
 
                 CompShiftStand.OnShiftStands.Remove(pawn);
-                story.Note(name + " is taken off shift");
+                scenario.Note(name + " is taken off shift");
                 ThinkResult offShift = OptimizerJob(pawn);
-                story.Check(offShift.IsValid && offShift.Job.def == JobDefOf.RecolorApparel
+                scenario.Check(offShift.IsValid && offShift.Job.def == JobDefOf.RecolorApparel
                             && Reserves(pawn, offShift.Job),
                             "off shift, " + name + " goes to recolor unasked, and can reserve the station and dye");
-                story.Check(RefusedAtReservations(pawn, RecolorJob(pawn, ordered: false, names: parked)),
+                scenario.Check(RefusedAtReservations(pawn, RecolorJob(pawn, ordered: false, names: parked)),
                             "but recoloring the clothes on the stand is still refused");
             }
         }
