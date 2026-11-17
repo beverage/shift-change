@@ -102,7 +102,8 @@ when their mod is not (`--with=` loads each). The sixth is Complex Jobs'
 two delivery givers, probed by the delivery case only when that mod is loaded
 (`--with=FrozenSnowFox.ComplexJobs`). So a clean default run reads
 `0 Failed` with 6 skipped and exits 0, or 5 skipped under
-`--with=FrozenSnowFox.ComplexJobs`, where the delivery gap closes. Any other gap, or any failure, is real. It does now run
+`--with=FrozenSnowFox.ComplexJobs`, where the delivery gap closes. CI's `mods` leg loads all five and
+fails on any skip. Any other gap, or any failure, is real. It does now run
 `JobDriver_SwapAtStand` for real, through the pawn's own tracker, so "the
 driver builds a correct ledger" is covered, and the player-facing rules have
 functional cases. Save/load round trips are covered by four cases that load
@@ -230,10 +231,10 @@ local build of it. Long-running feature threads live on `feature/<thread>`
 branches (`feature/recreation`, `feature/enclosures`, …) and merge back via
 pull request when the thread is accepted. CI (`ci.yml`) runs its checks on
 every push and pull request, and the tests on Fly on every push to a branch
-here, never on a pull request. Small fixes and docs may still land on
+here and on a `v*` tag, never on a pull request. Small fixes and docs may still land on
 main directly. Workshop publishing is manual and deliberately not automated
 (`.github/workflows/ci.yml` says so in as many words); a `v*` tag
-additionally produces a GitHub release zip.
+additionally produces a GitHub release zip, once the checks and every test leg pass.
 
 One machine-local consequence: the game's `Mods/` folder holds a symlink to
 this checkout, so a running game loads WHATEVER BRANCH is checked out —
