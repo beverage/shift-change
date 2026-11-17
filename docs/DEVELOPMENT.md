@@ -302,7 +302,7 @@ your list once and restores it verbatim.
 
 ## CI
 
-`.github/workflows/ci.yml`, in three jobs: `checks`, `tests` and `release`.
+`.github/workflows/ci.yml`, in four jobs: `checks`, `changes`, `tests` and `release`.
 
 `checks` runs on every push and every pull request, with no secrets. Most of
 its checks exist because the codebase broke that way once; the rest block a
@@ -319,11 +319,14 @@ failure that would land silently.
 | Media build | the filming config rotting between shoots, discovered on a shoot |
 | Release build | compile errors against Krafs |
 
-`tests` runs on every push to a branch here: the Release build, then the tests
+`tests` runs on every push to a branch here and on a `v*` tag: the Release build, then the tests
 against it and a dll of the DevTools the test machine carries, then every test
 under DevTools in RimWorld 1.7 on a Fly machine with Harmony, Core, DevTools and
-this mod (and the machine's own shim for running without a window), once with
-every DLC and once with Odyssey alone. Each run passes on DevTools' exit code
+this mod (and the machine's own shim for running without a window), in three
+legs: every DLC; Odyssey alone; and every DLC with the five mods the known gaps
+wait for, Rimatomics, Complex Jobs, Common Sense, Pick Up And Haul and Outfit
+Stands Plus, which the machine downloads from the Workshop for the run and
+loads after Harmony, ahead of this mod. Each run passes on DevTools' exit code
 together with the `Result: Passed` line it writes last in `Test.log`. Its
 summary, from flybridge's `summary` command, gives the game's exit code,
 DevTools' verdict, and the failed and skipped tests and totals from
@@ -331,16 +334,18 @@ DevTools' verdict, and the failed and skipped tests and totals from
 `Configs/UnitTestConfig.xml` asks for: each fixture's counts, and each failure
 with its message. DevTools writes the report as the run ends, so a run cut
 short has none or only part of one, and the summary then leaves it out and
-says why. The Odyssey run skips one test more than the other, the recolor
-case, which needs Ideology. A push of only Markdown, `docs/` or `media/`
-starts no machine. The job needs the lab's secrets, so it never runs on a pull
+says why. The Odyssey run skips one test more than the first, the recolor
+case, which needs Ideology. The mods run may skip none: there a skip means a
+mod did not load, and fails the leg. It takes each mod's current Workshop
+version, so an update of theirs can fail it with no change here. A push of
+only Markdown, `docs/` or `media/` starts no machine (`changes`). The job needs the lab's secrets, so it never runs on a pull
 request: a fork's change is tested once its branch is pushed here.
 
 That is the minimal list only. `--full` on this machine, against a real mod
 list, is still what a release is signed off on.
 
 Tagging a commit `v*` additionally packages the mod folder and publishes a
-GitHub release.
+GitHub release, once `checks` and all three test legs have passed on it.
 
 ## Workshop upload
 

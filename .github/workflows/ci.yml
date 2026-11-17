@@ -1,14 +1,18 @@
-# Shift Change's CI, in three jobs:
+# Shift Change's CI, in four jobs:
 #
 # - checks: build, lint, and the invariants this codebase actually broke once
 #   each, on every push and every pull request, with no secrets. Each check is
 #   explained in docs/DEVELOPMENT.md.
-# - tests: every test under DevTools in RimWorld 1.7 on a Fly machine, once
-#   with every DLC and once with Odyssey alone, on every push to a branch
-#   here. It needs the lab's secrets, so it never runs on a pull request: a
-#   fork's change is tested once its branch is pushed here.
-# - release: tag a commit v* to get a packaged mod zip on a GitHub Release.
-#   Workshop publishing is deliberately not automated here.
+# - changes: whether a push changed anything the game loads, so that a push of
+#   only Markdown, docs/ or media/ starts no Fly machine.
+# - tests: every test under DevTools in RimWorld 1.7 on Fly machines, in three
+#   legs: every DLC, Odyssey alone, and every DLC with the five mods the
+#   known gaps wait for. On every push to a branch here and on a release tag.
+#   It needs the lab's secrets, so it never runs on a pull request: a fork's
+#   change is tested once its branch is pushed here.
+# - release: tag a commit v* to get a packaged mod zip on a GitHub Release,
+#   once the checks and all three test legs have passed on it. Workshop
+#   publishing is deliberately not automated here.
 
 name: CI
 
@@ -129,10 +133,10 @@ jobs:
   # Whether this push changed anything the game loads or the tests build from.
   # A push of only Markdown, docs/ or media/ starts no Fly machine; the checks
   # above still read those. A push with nothing to compare against (a new
-  # branch, a rewritten one, a manual run) runs the tests. Never on a pull
-  # request or a tag.
+  # branch, a rewritten one, a manual run) runs the tests, and so does a tag,
+  # always, since the release waits for them. Never on a pull request.
   changes:
-    if: github.event_name != 'pull_request' && github.ref_type == 'branch'
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     outputs:
       game: ${{ steps.diff.outputs.game }}
@@ -142,9 +146,10 @@ jobs:
       - id: diff
         env:
           BEFORE: ${{ github.event.before }}
+          REF_TYPE: ${{ github.ref_type }}
         run: |
           game=true
-          if [ -n "$BEFORE" ] && git fetch --quiet --no-tags --depth=1 origin "$BEFORE" 2>/dev/null; then
+          if [ "$REF_TYPE" = branch ] && [ -n "$BEFORE" ] && git fetch --quiet --no-tags --depth=1 origin "$BEFORE" 2>/dev/null; then
             if ! git diff --name-only "$BEFORE" HEAD | grep -q -v -E '\.md$|^docs/|^media/'; then
               game=false
             fi
@@ -154,9 +159,10 @@ jobs:
   # Builds Shift Change and its tests and runs every test under DevTools in
   # RimWorld 1.7 on a Fly machine, as devtools/run-harness.sh runs them:
   # Harmony, Core, SmashPhil's DevTools and this mod, started with
-  # `--pid MrBeverage.ShiftChange --test -e`. It runs twice, once with every
-  # DLC and once with Odyssey alone, the one DLC this mod requires. The job
-  # fails when the build or a test fails. The build replaces the committed
+  # `--pid MrBeverage.ShiftChange --test -e`. It runs in three legs (the
+  # matrix below): every DLC, Odyssey alone, the one DLC this mod requires,
+  # and every DLC with the mods the known gaps wait for. A leg fails when the
+  # build or a test fails, and the mods leg also when a test skips. The build replaces the committed
   # Assemblies/ShiftChange.dll in this job's checkout only.
   #
   # The runner has no game, so the builds compile against Krafs.Rimworld.Ref,
@@ -176,30 +182,49 @@ jobs:
   # artifact each run leaves: the game's logs, DevTools' Test.log and the saves
   # the tests wrote, from a throwaway colony.
   tests:
+    name: tests (${{ matrix.leg }})
     needs: changes
     if: needs.changes.outputs.game == 'true'
     runs-on: ubuntu-latest
-    # One run per branch and DLC set at a time; a newer push waits for the
-    # older run rather than cancelling it.
+    # One run per branch and leg at a time; a newer push waits for the older
+    # run rather than cancelling it.
     concurrency:
-      group: tests-${{ github.ref }}-${{ matrix.dlcs }}
+      group: tests-${{ github.ref }}-${{ matrix.leg }}
       cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix:
-        # RW_DLCS on the Fly machine: every DLC the image has, then Odyssey
-        # alone. The second skips one test more, the recolor case, which
-        # needs Ideology.
-        dlcs: [all, odyssey]
+        # dlcs is RW_DLCS on the Fly machine, workshop the Workshop items it
+        # downloads for the run, minutes its --max-minutes.
+        # - all: every DLC the image has.
+        # - odyssey: Odyssey alone. It skips one test more, the recolor case,
+        #   which needs Ideology.
+        # - mods: every DLC and the five mods the known gaps wait for:
+        #   Rimatomics, Complex Jobs, Common Sense, Pick Up And Haul and
+        #   Outfit Stands Plus, loaded after Harmony and ahead of this mod, so
+        #   no test may skip. steamcmd fetches each mod's current version, so
+        #   an update of theirs can fail this leg with no change here.
+        include:
+          - leg: all
+            dlcs: all
+            minutes: 10
+          - leg: odyssey
+            dlcs: odyssey
+            minutes: 10
+          - leg: mods
+            dlcs: all
+            workshop: 1127530465,2069684319,1561769193,1279012058,3545172389
+            minutes: 20
     # The run waits up to --queue-minutes below for a slot under flybridge's
     # machine cap, then the machine stops itself after --max-minutes. The
-    # timeout covers both, with room for the build and the uploads. A
-    # cancelled job, the timeout's included, stops the machine at once.
-    timeout-minutes: 35
+    # timeout covers both for the longest leg, with room for the build and
+    # the uploads. A cancelled job, the timeout's included, stops the machine
+    # at once.
+    timeout-minutes: 45
     env:
       FLYBRIDGE_SHA256: 20524bf7755c83adbe1355f6b147f930ff67ef8bcbafd112b5d12682b6e946d3
       DEVTOOLS_SHA256: 7d1ed105d1697423b82c1b593ff7f2b9c4b17d961861a481c0eb7240fc5711e1
-      RUN_ID: gh-${{ github.event.repository.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.dlcs }}
+      RUN_ID: gh-${{ github.event.repository.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.leg }}
       AWS_ENDPOINT_URL_S3: ${{ vars.AWS_ENDPOINT_URL_S3 }}
       AWS_REGION: ${{ vars.AWS_REGION }}
       BUCKET_NAME: ${{ vars.BUCKET_NAME }}
@@ -258,11 +283,15 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           DLCS: ${{ matrix.dlcs }}
-        run: >-
-          exec python3 "$RUNNER_TEMP/flybridge.py" run "$RUN_ID"
-          --image ready-1 --mods smashphil.devtools --mod "$GITHUB_WORKSPACE"
-          --env "RW_DLCS=$DLCS" --queue-minutes 15 --max-minutes 10 --pull
-          -- --pid MrBeverage.ShiftChange --test -e
+          WORKSHOP: ${{ matrix.workshop }}
+          MINUTES: ${{ matrix.minutes }}
+        run: |
+          workshop=()
+          if [ -n "$WORKSHOP" ]; then workshop=(--workshop "$WORKSHOP"); fi
+          exec python3 "$RUNNER_TEMP/flybridge.py" run "$RUN_ID" \
+            --image ready-1 --mods smashphil.devtools --mod "$GITHUB_WORKSPACE" "${workshop[@]}" \
+            --env "RW_DLCS=$DLCS" --queue-minutes 15 --max-minutes "$MINUTES" --pull \
+            -- --pid MrBeverage.ShiftChange --test -e
 
       # --pull leaves the exit code alone when its download fails, and the
       # summary and the artifact below then lack what they show, so a passing
@@ -275,6 +304,18 @@ jobs:
               exit 1
             fi
           done
+
+      # With every optional mod loaded, every known gap has the mod it waits
+      # for, so a skipped test here means a mod did not load or a case no
+      # longer recognises it, and DevTools would still call the run Passed.
+      - name: No test skipped with every optional mod
+        if: matrix.leg == 'mods'
+        run: |
+          skipped=$(grep -E '^--[[:space:]]\[Skipped\]' "$RUNNER_TEMP/flybridge-runs/$RUN_ID/Test.log" | awk '{print $NF}' || true)
+          if [ -n "$skipped" ]; then
+            for test in $skipped; do echo "::error::$test skipped with every optional mod loaded"; done
+            exit 1
+          fi
 
       # flybridge's summary of the run: the game's exit code and DevTools'
       # verdict, each failed or skipped fixture and test from Test.log and its
@@ -299,8 +340,10 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # Waits for the checks and for every test leg, which a tag always runs
+  # (changes), so a release is never cut from a commit whose tests fail.
   release:
-    needs: checks
+    needs: [checks, tests]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
